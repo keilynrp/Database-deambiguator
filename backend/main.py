@@ -335,6 +335,82 @@ def enrich_bulk_queue(skip: int = 0, limit: int = 100, db: Session = Depends(get
     return {"message": "Bulk queue triggered", "queued_records": count}
 
 
+@app.get("/enrich/stats")
+def get_enrichment_stats(db: Session = Depends(get_db)):
+    """Returns enrichment statistics for the predictive analytics dashboard."""
+    total = db.query(func.count(models.RawProduct.id)).scalar() or 0
+
+    # Status breakdown
+    status_rows = db.query(
+        models.RawProduct.enrichment_status,
+        func.count(models.RawProduct.id)
+    ).group_by(models.RawProduct.enrichment_status).all()
+    status_breakdown = {row[0] or "none": row[1] for row in status_rows}
+
+    enriched_count = status_breakdown.get("completed", 0)
+    pending_count = status_breakdown.get("pending", 0)
+    failed_count = status_breakdown.get("failed", 0)
+    none_count = status_breakdown.get("none", 0)
+
+    # Top concepts — parse comma-separated concepts from enrichment_concepts column
+    enriched_products = db.query(models.RawProduct.enrichment_concepts).filter(
+        models.RawProduct.enrichment_concepts != None,
+        models.RawProduct.enrichment_concepts != ""
+    ).all()
+
+    concept_freq: dict = {}
+    for row in enriched_products:
+        if row[0]:
+            for concept in row[0].split(","):
+                concept = concept.strip()
+                if concept:
+                    concept_freq[concept] = concept_freq.get(concept, 0) + 1
+
+    top_concepts = sorted(concept_freq.items(), key=lambda x: x[1], reverse=True)[:20]
+
+    # Citation statistics
+    citation_rows = db.query(models.RawProduct.enrichment_citation_count).filter(
+        models.RawProduct.enrichment_status == "completed",
+        models.RawProduct.enrichment_citation_count != None,
+        models.RawProduct.enrichment_citation_count > 0
+    ).all()
+    citation_values = [r[0] for r in citation_rows if r[0]]
+
+    avg_citations = round(sum(citation_values) / len(citation_values), 1) if citation_values else 0
+    max_citations = max(citation_values) if citation_values else 0
+    total_citations = sum(citation_values)
+
+    # Citation distribution buckets
+    buckets = {"0": 0, "1-10": 0, "11-50": 0, "51-200": 0, "200+": 0}
+    for v in citation_values:
+        if v == 0:
+            buckets["0"] += 1
+        elif v <= 10:
+            buckets["1-10"] += 1
+        elif v <= 50:
+            buckets["11-50"] += 1
+        elif v <= 200:
+            buckets["51-200"] += 1
+        else:
+            buckets["200+"] += 1
+
+    return {
+        "total_products": total,
+        "enriched_count": enriched_count,
+        "pending_count": pending_count,
+        "failed_count": failed_count,
+        "none_count": none_count,
+        "enrichment_coverage_pct": round((enriched_count / total * 100), 1) if total > 0 else 0,
+        "top_concepts": [{"concept": c, "count": n} for c, n in top_concepts],
+        "citations": {
+            "average": avg_citations,
+            "max": max_citations,
+            "total": total_citations,
+            "distribution": buckets,
+        },
+    }
+
+
 
 from thefuzz import process, fuzz
 
