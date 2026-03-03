@@ -32,6 +32,16 @@ Fuentes doradas (gold-standard) cerradas tras costosas suscripciones.
 *   **Web of Science (WoS) (Clarivate) & Scopus (Elsevier):**
 *   **Estrategia "Bring Your Own Key" (BYOK):** El sistema **no** proveerá tokens globales. La arquitectura debe solicitar al investigador que inserte sus propias llaves institucionales aprobadas (API Keys) a nivel de sesión o configuración global del usuario. La app actuará solo como conducto pasivo.
 
+### 🟣 Fase 4: Descubrimiento de Patrones y Análisis Comparativo (Monte Carlo)
+Evolución analítica para trascender la simple extracción de métricas, permitiendo modelado predictivo de impacto.
+*   **Simulaciones Estocásticas (Método Monte Carlo):** Incorporación de un motor matemático para simular múltiples trayectorias de citación futuras basadas en la distribución histórica, permitiendo predecir la "vida útil" y el "perfil de impacto" de un grupo de conceptos o artículos.
+*   **Análisis Comparativo Profundo:** Herramientas para correlacionar variables cienciométricas (ej. Open Access vs. Tasas de Citación, o Mapeo Geográfico vs. Tópicos).
+
+### 🌌 Fase 5: Enriquecimiento Semántico & Arquitecturas RAG
+Transformación del texto plano a un espacio vectorial interactivo alimentado por Large Language Models (LLMs).
+*   **Vector Database Integration (Chroma / Pinecone):** Ingresar resúmenes (abstracts) y textos completos enriquecidos a una base de datos vectorial generando *embeddings* densos.
+*   **Retrieval-Augmented Generation (RAG):** Integrar motores semánticos (tipo OpenAI o DeepSeek) que puedan "leer" todo el corpus científico importado y responder consultas complejas del investigador (QA) basándose estrictamente en la evidencia del catálogo, reduciendo alucinaciones y hallando "links" ocultos entre documentos dispares.
+
 ---
 
 ## 3. Arquitectura del Backend (Python / FastAPI)
@@ -100,6 +110,6 @@ El Frontend mapea exitosamente el nuevo payload del modelo SQL subyacente y lo e
 
 ## 6. Siguientes Pasos Evolutivos (Roadmap a futuro)
 
-1. **Dashboard Predictivo / UI de Analítica:** Proveer gráficos visualmente atractivos para mapear los "Enrichment Concepts" detectados y generar correlaciones de tópicos.
-2. **Cola de Enriquecimiento Masivo (UI):** Construir una interfaz que envíe al EndPoint Bulk (`/enrich/bulk`) miles de registros con un botón para asignarles estado "pending" a los datos limpios importados recientemente.
-3. **Fase 2 - Refactorización de Proxies:** Añadir un rotador de Proxies transparentes cuando iniciemos la migración a *Scholarly* (Google Scholar).
+1. **Implementación Física de la Fase 4 (Motor Monte Carlo):** Diseñar un nuevo worker estadístico en Python (probablemente usando `numpy` / `scipy`) que pueda ingerir las tasas de citación de un producto y proyectar su impacto a 5 y 10 años.
+2. **Integración UI Fase 4:** Construcción de gráficas de distribución probabilística de citas (Campanas de Gauss / Percentiles) en el Dashboard de Analytics.
+3. **Prototipado Fase 5 (RAG):** Evaluaciones de Bases de Datos Vectoriales ligeras embebidas en el proyecto (ej. Milvus Lite o ChromaDB local) para acoger los conceptos abstractos y vectorizarlos de manera gratuita y local sin externalizar datos.
