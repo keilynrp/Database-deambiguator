@@ -410,7 +410,29 @@ def get_enrichment_stats(db: Session = Depends(get_db)):
         },
     }
 
+from backend.analytics.montecarlo import simulate_citation_impact
 
+@app.get("/enrich/montecarlo/{product_id}")
+def get_montecarlo_prediction(product_id: int, db: Session = Depends(get_db)):
+    """
+    Phase 4: Preforms a stochastic Monte Carlo simulation on the future citation trajectory
+    of a single enriched product, provided the product has citations.
+    """
+    product = db.query(models.RawProduct).filter(models.RawProduct.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    if product.enrichment_status != "completed":
+        raise HTTPException(status_code=400, detail="Cannot predict raw or unenriched data")
+        
+    citations = product.enrichment_citation_count or 0
+    predictions = simulate_citation_impact(
+        current_citations=citations, 
+        simulation_years=5, 
+        num_simulations=5000
+    )
+    
+    return predictions
 
 from thefuzz import process, fuzz
 

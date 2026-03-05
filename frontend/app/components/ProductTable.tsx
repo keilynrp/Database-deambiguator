@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import MonteCarloChart from "./MonteCarloChart";
 
 interface Product {
     id: number;
@@ -446,6 +447,11 @@ export default function ProductTable() {
                                         );
                                     })}
                                 </div>
+                                {selectedProduct.enrichment_status === "completed" && (
+                                    <div className="mt-8 rounded-xl border border-purple-100 bg-white p-5 shadow-sm dark:border-purple-500/10 dark:bg-gray-800/50">
+                                        <MonteCarloChart productId={selectedProduct.id} />
+                                    </div>
+                                )}
                             </div>
                             <div className="border-t border-gray-100 px-6 py-4 dark:border-gray-800">
                                 <button
