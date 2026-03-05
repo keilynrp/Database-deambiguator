@@ -2,8 +2,50 @@
 
 **Documento:** Plano Arquitectónico de Evolución  
 **Proyecto:** DB Disambiguador → UKIP  
+**Repositorio:** [github.com/keilynrp/universal-knowledge-intelligence-platform](https://github.com/keilynrp/universal-knowledge-intelligence-platform)  
 **Creado:** 2026-03-05  
 **Estado:** Documento vivo — Se actualiza con cada fase implementada
+
+---
+
+## 0. Historia del Proyecto: Trazabilidad de Decisiones Estratégicas
+
+> *Esta sección existe para preservar la memoria institucional del proyecto. Es la referencia autorizada para presentaciones académicas, artículos científicos, demos en eventos, rondas de inversión y workshops.*
+
+### Nombre de Origen: DB Disambiguador (2026-01 a 2026-03)
+
+| Atributo | Valor |
+|---|---|
+| **Nombre** | DB Disambiguador |
+| **Repositorio original** | `github.com/keilynrp/Database-deambiguador` (luego `Database-disambiguator`) |
+| **Carácter** | Herramienta de higiene de datos para catálogos de productos e-commerce |
+| **Stack base** | FastAPI + Next.js + SQLite + fuzzy matching |
+| **Razón de ser** | Normalizar nombres de marcas, modelos y SKUs en catrones de datos mal ingresados |
+
+### Decisión Estratégica de Rebranding (2026-03-05)
+
+La decisión de renombrar el proyecto a **UKIP** responde a los siguientes factores:
+
+1. **Evolución orgánica del sistema:** En 5 fases de desarrollo, el sistema incorporó enriquecimiento cienciométrico (OpenAlex, WoS, Scholar), simulaciones Monte Carlo y un motor RAG multi-proveedor, superando ampliamente el scope de un desambiguador de e-commerce.
+
+2. **Redicción de audiencia:** El sistema es ahora relevante para investigadores, analistas de I+D, tomadores de decisiones universitarias y empresariales — no solo operadores de datos en retail.
+
+3. **Agnosótica de dominio:** La visión de soportar cualquier tipo de entidad (papers, patentes, genes, ensayos clínicos, productos) hace que el término "Disambiguador de BD" sea insuficiente y restrictivo.
+
+4. **Context Engineering como pilar central:** La integración de LLMs como infraestructura de análisis (no como chat) justifica una identidad de plataforma, no de herramienta.
+
+5. **Posicionamiento para escalabilidad:** El nombre UKIP permite presentar el proyecto en contextos académicos, empresariales y de inversión con credibilidad como plataforma de alto impacto.
+
+### Nuevo Nombre: UKIP (2026-03-05 en adelante)
+
+| Atributo | Valor |
+|---|---|
+| **Nombre completo** | Universal Knowledge Intelligence Platform |
+| **Abreviatura** | UKIP |
+| **Repositorio** | `github.com/keilynrp/universal-knowledge-intelligence-platform` |
+| **Tagline** | *Ingest → Harmonize → Enrich → Analyze → Decide* |
+| **Carácter** | Plataforma de inteligencia de conocimiento agnóstica de dominio |
+| **Audiencias** | Investigadores, universidades, empresas, agencias de I+D, consultoras |
 
 ---
 
@@ -339,6 +381,7 @@ Este documento forma parte de un ecosistema de documentación viva:
 | Fecha | Versión | Descripción del cambio |
 |---|---|---|
 | 2026-03-05 | v1.0 | Documento inicial — Plano estratégico de evolución UKIP |
-| 2026-03-05 | v1.1 | Integración de `UKIP_DATA_CUBES_INTEGRATION.md` — OLAP Engine con DuckDB añadido a Fase 8, estructura de carpetas actualizada, tabla de documentos complementarios |
+| 2026-03-05 | v1.1 | Integración de `UKIP_DATA_CUBES_INTEGRATION.md` — OLAP Engine con DuckDB añadido a Fase 8 |
+| 2026-03-05 | v1.2 | Renombramiento oficial a UKIP — § 0 de trazabilidad histórica añadido, remote Git actualizado, referencias en todo el código migradas |
 
 *Este documento se actualiza en cada sesión de trabajo donde se avance en la implementación de las fases estratégicas.*

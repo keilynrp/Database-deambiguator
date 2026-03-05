@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DB Disambiguator",
-  description: "Database disambiguation and product catalog management tool",
+  title: "UKIP — Universal Knowledge Intelligence Platform",
+  description: "Ingest, harmonize, enrich, analyze, and deliver high-value knowledge for decision-making across science, health, business, and humanities domains.",
 };
 
 // Inline script to set dark class before first paint to prevent flash

@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🗄️ DB Disambiguator
+# 🌐 UKIP
 
-**A Full-Stack Research Intelligence Platform for E-commerce & Scientific Catalog Enrichment**
+**Universal Knowledge Intelligence Platform**
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -20,11 +20,11 @@
 
 ---
 
-## 🎯 Why DB Disambiguator?
+## 🎯 Why UKIP?
 
 What began as a data hygiene tool for e-commerce catalogs has evolved into a **full research intelligence platform**. The system normalizes messy product data, enriches it with scientometric metadata from premium and open academic APIs, runs stochastic simulations to predict future impact, and leverages RAG-powered LLMs to let you *query your own catalog in natural language*.
 
-**DB Disambiguador** provides a visual interface to:
+**UKIP — Universal Knowledge Intelligence Platform** provides a visual interface to:
 1. **Spot the mess**: Catch typos and variations using fuzzy matching.
 2. **Define the truth**: Select the correct "canonical" value.
 3. **Clean the database**: Apply rules to update thousands of records instantly.
@@ -105,8 +105,8 @@ As detailed in our [Architecture Documentation](docs/ARCHITECTURE.md), this code
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/keilynrp/Database-disambiguator.git
-cd Database-disambiguator
+git clone https://github.com/keilynrp/universal-knowledge-intelligence-platform.git
+cd universal-knowledge-intelligence-platform
 ```
 
 ### 2. Set up Backend

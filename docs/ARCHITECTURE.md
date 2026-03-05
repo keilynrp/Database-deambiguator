@@ -1,9 +1,12 @@
 # Arquitectura y Patrones de Ingeniería de Software
 
-## DB Disambiguator — Documentación Técnica de Diseño
+## UKIP — Universal Knowledge Intelligence Platform
+### Documentación Técnica de Diseño
 
-**Última actualización:** 2026-02-17  
-**Versión del documento:** 2.0
+> **Nota de proveniencia:** Este proyecto se originó como **DB Disambiguador** — una herramienta de higiene de catálogos de productos para e-commerce. A partir de marzo 2026, evolucionó estratégicamente hacia una plataforma de inteligencia de conocimiento agnosótica de dominio. Ver [EVOLUTION_STRATEGY.md](EVOLUTION_STRATEGY.md) para la trazabilidad completa de esta decisión.
+
+**Última actualización:** 2026-03-05 (renombramiento estratégico a UKIP)  
+**Versión del documento:** 3.0
 
 ---
 
@@ -124,7 +127,9 @@ Esto aplica a todo: funciones utilitarias, componentes React, endpoints de API. 
 
 ## 2. Visión General
 
-DB Disambiguator es una herramienta de gestión de catálogo de productos que permite desambiguar, normalizar, armonizar y sincronizar datos de productos provenientes de distintas fuentes (archivos Excel, APIs de tiendas virtuales).
+UKIP (Universal Knowledge Intelligence Platform) es una plataforma agnosótica de dominio para la ingesta, limpieza, harmonización, análisis, reconciliación y entrega de datos de alto valor para la toma de decisiones. Opera sobre cualquier tipo de entidad: papers científicos, patentes, productos, ensayos clínicos, empresas, y más.
+
+*Históricamente fue DB Disambiguador: una herramienta de gestión de catálogo de productos que permitía desambiguar, normalizar y sincronizar datos de productos de e-commerce. El núcleo técnico se preserva y extiende.*
 
 La aplicación está diseñada como un **monorepo** con dos módulos claramente separados:
 

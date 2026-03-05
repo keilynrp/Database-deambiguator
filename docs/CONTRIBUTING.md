@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for your interest in contributing to DB Disambiguator!
+Thank you for your interest in contributing to **UKIP — Universal Knowledge Intelligence Platform**!
 
 ## Development Setup
 

@@ -120,7 +120,7 @@ export default function Sidebar() {
               </svg>
             </div>
             <span className="text-base font-semibold text-gray-900 dark:text-white">
-              DB Disambiguator
+              UKIP
             </span>
           </Link>
         )}

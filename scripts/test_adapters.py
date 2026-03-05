@@ -18,7 +18,7 @@ def run_performance_test():
     query = "Deep learning"
     
     print("=" * 60)
-    print("🚀 DB Disambiguator - API Adapters Performance Benchmark")
+    print("🚀 UKIP — API Adapters Performance Benchmark")
     print("=" * 60)
     print(f"Test Query: '{query}'")
     
