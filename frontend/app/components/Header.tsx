@@ -14,6 +14,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   "/import-export": { title: "Import / Export", subtitle: "Upload and download dataset in Excel format" },
   "/rag": { title: "Semantic RAG", subtitle: "AI-powered retrieval and semantic analysis" },
   "/domains": { title: "Domain Registry", subtitle: "Manage workspace schemas and entity type definitions" },
+  "/analytics/olap": { title: "OLAP Cube Explorer", subtitle: "Multi-dimensional analysis and drill-down across your data" },
 };
 
 export default function Header() {

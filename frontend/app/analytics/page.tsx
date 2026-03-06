@@ -323,6 +323,30 @@ export default function AnalyticsPage() {
                 </div>
             )}
 
+            {/* OLAP Explorer CTA */}
+            <div className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-5 py-3.5 dark:border-blue-900/40 dark:bg-blue-900/10">
+                <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-blue-900 dark:text-blue-200">OLAP Cube Explorer</p>
+                        <p className="text-xs text-blue-600 dark:text-blue-400">Multi-dimensional GROUP BY queries, cross-tabs, drill-down and Excel export — powered by DuckDB</p>
+                    </div>
+                </div>
+                <Link
+                    href="/analytics/olap"
+                    className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors flex-shrink-0"
+                >
+                    Open Explorer
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                </Link>
+            </div>
+
             {/* ═══ SECTION 2: AI Knowledge Hub — Predictive Enrichment ═══════════ */}
             <SectionDivider label="UKIP Knowledge Hub — Semantic Enrichment" />
 

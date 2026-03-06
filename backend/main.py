@@ -571,6 +571,69 @@ def get_olap_cube(domain_id: str, _: models.User = Depends(get_current_user)):
         logger.exception("OLAP error for domain '%s'", domain_id)
         raise HTTPException(status_code=500, detail="OLAP processing error. Check server logs for details.")
 
+
+# ── OLAP Cube Explorer endpoints ─────────────────────────────────────────────
+
+class _CubeQueryPayload(BaseModel):
+    domain_id: str = Field(min_length=1, max_length=64)
+    group_by: List[str] = Field(min_length=1, max_length=2)
+    filters: dict = {}
+
+
+@app.get("/cube/dimensions/{domain_id}")
+def cube_dimensions(domain_id: str, _: models.User = Depends(get_current_user)):
+    """
+    Returns the list of groupable dimensions for a domain with distinct-value counts.
+    Used by the OLAP Cube Explorer dimension selector.
+    """
+    try:
+        return olap_engine.get_dimensions(domain_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception:
+        logger.exception("cube_dimensions error for domain '%s'", domain_id)
+        raise HTTPException(status_code=500, detail="OLAP error")
+
+
+@app.post("/cube/query")
+def cube_query(
+    payload: _CubeQueryPayload,
+    _: models.User = Depends(get_current_user),
+):
+    """
+    GROUP BY query against the domain data cube.
+    Accepts 1 or 2 dimensions and optional equality filters.
+    """
+    try:
+        return olap_engine.query_cube(payload.domain_id, payload.group_by, payload.filters or None)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception:
+        logger.exception("cube_query error")
+        raise HTTPException(status_code=500, detail="OLAP query error")
+
+
+@app.get("/cube/export/{domain_id}")
+def cube_export(
+    domain_id: str,
+    dimension: str = Query(min_length=1, max_length=64),
+    _: models.User = Depends(get_current_user),
+):
+    """Export a single-dimension GROUP BY as an Excel (.xlsx) file."""
+    try:
+        xlsx_bytes = olap_engine.export_to_excel(domain_id, dimension)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception:
+        logger.exception("cube_export error for domain '%s', dimension '%s'", domain_id, dimension)
+        raise HTTPException(status_code=500, detail="Export error")
+
+    return StreamingResponse(
+        iter([xlsx_bytes]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="cube_{domain_id}_{dimension}.xlsx"'},
+    )
+
 @app.get("/entities", response_model=List[schemas.Entity])
 def get_entities(
     response: Response,

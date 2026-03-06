@@ -1,8 +1,10 @@
+import io
 import re
 import json
 import logging
 
 import duckdb
+import openpyxl
 import pandas as pd
 
 from backend.database import engine
@@ -20,11 +22,30 @@ def _is_safe_identifier(name: str) -> bool:
     return bool(_SAFE_IDENTIFIER_RE.match(name))
 
 
+def _safe_parse(val) -> dict:
+    if pd.isna(val) or not val:
+        return {}
+    try:
+        return json.loads(val)
+    except (ValueError, TypeError):
+        return {}
+
+
 class DuckDBOLAPEngine:
     """
     In-Memory OLAP Engine leveraging DuckDB to build Data Cubes out of the
     domain-agnostic entities stored in SQLite.
     """
+
+    def _load_domain_df(self, domain) -> pd.DataFrame:
+        """Load raw_entities and project domain-specific attributes."""
+        df = pd.read_sql_table("raw_entities", engine)
+        if "normalized_json" in df.columns:
+            json_df = df["normalized_json"].apply(_safe_parse)
+            for attr in domain.attributes:
+                if not attr.is_core:
+                    df[attr.name] = json_df.apply(lambda x, n=attr.name: x.get(n))
+        return df
 
     @staticmethod
     def generate_cube_metrics(domain_id: str) -> dict:
@@ -32,26 +53,14 @@ class DuckDBOLAPEngine:
         if not domain:
             raise ValueError(f"Domain '{domain_id}' not found")
 
-        # 1. Load generic flat data from SQLite into pandas
         df = pd.read_sql_table("raw_entities", engine)
 
-        # 2. Virtualize domain-specific view by unpacking `normalized_json`
         if "normalized_json" in df.columns:
-            def safe_parse(val):
-                if pd.isna(val) or not val:
-                    return {}
-                try:
-                    return json.loads(val)
-                except (ValueError, TypeError):
-                    return {}
-
-            json_df = df["normalized_json"].apply(safe_parse)
+            json_df = df["normalized_json"].apply(_safe_parse)
             for attr in domain.attributes:
                 if not attr.is_core:
                     df[attr.name] = json_df.apply(lambda x, n=attr.name: x.get(n))
 
-        # Build the set of columns that actually exist in the DataFrame.
-        # This is the primary security whitelist: we only query columns we know exist.
         valid_columns: set[str] = set(df.columns)
 
         metrics: dict = {
@@ -70,28 +79,19 @@ class DuckDBOLAPEngine:
 
         metrics["total_records"] = con.execute("SELECT COUNT(*) FROM df").fetchone()[0]
 
-        # 4. Multidimensional slice: distributions for all string attributes
         skip_fields = {"entity_name", "title", "sku", "gtin", "doi", "nct_id"}
 
         for attr in domain.attributes:
             if attr.name in skip_fields:
                 continue
-
-            # ── Security: whitelist check ────────────────────────────────────
             if attr.name not in valid_columns:
-                # Column doesn't exist in the real data — skip silently
                 continue
-
             if not _is_safe_identifier(attr.name):
-                # Attribute name from YAML is not a safe SQL identifier — skip
                 logger.warning(f"OLAP: skipping unsafe attribute name '{attr.name}'")
                 continue
-            # ─────────────────────────────────────────────────────────────────
 
             if attr.type == "string" or attr.name in df.columns:
                 try:
-                    # Use quoted identifiers to prevent any residual injection.
-                    # attr.name is already validated above.
                     col = f'"{attr.name}"'
                     query = (
                         f"SELECT CAST({col} AS VARCHAR) AS label, "
@@ -113,6 +113,145 @@ class DuckDBOLAPEngine:
                     logger.debug(f"OLAP: skipping distribution for '{attr.name}': {e}")
 
         return metrics
+
+    def get_dimensions(self, domain_id: str) -> list:
+        """
+        Return domain attributes enriched with their distinct value count.
+        Used by the OLAP Cube Explorer to populate the dimension selector.
+        """
+        domain = registry.get_domain(domain_id)
+        if not domain:
+            raise ValueError(f"Domain '{domain_id}' not found")
+
+        df = self._load_domain_df(domain)
+        skip_fields = {"entity_name", "title", "sku", "gtin", "doi", "nct_id"}
+
+        result = []
+        for attr in domain.attributes:
+            if attr.name in skip_fields:
+                continue
+            if not _is_safe_identifier(attr.name):
+                continue
+            distinct = int(df[attr.name].nunique()) if attr.name in df.columns and len(df) > 0 else 0
+            result.append({
+                "name": attr.name,
+                "label": attr.label,
+                "type": attr.type,
+                "distinct_count": distinct,
+            })
+        return result
+
+    def query_cube(
+        self,
+        domain_id: str,
+        group_by: list,
+        filters: dict | None = None,
+    ) -> dict:
+        """
+        Group entities by 1 or 2 dimensions with optional equality filters.
+        Returns rows sorted by count descending, capped at 200.
+        """
+        if not 1 <= len(group_by) <= 2:
+            raise ValueError("group_by must specify 1 or 2 dimensions")
+
+        domain = registry.get_domain(domain_id)
+        if not domain:
+            raise ValueError(f"Domain '{domain_id}' not found")
+
+        attr_names = {a.name for a in domain.attributes}
+        valid_columns_schema = set()
+        for dim in group_by:
+            if not _is_safe_identifier(dim):
+                raise ValueError(f"Unsafe dimension name: '{dim}'")
+            if dim not in attr_names:
+                raise ValueError(f"Dimension '{dim}' is not in domain '{domain_id}'")
+            valid_columns_schema.add(dim)
+
+        df = self._load_domain_df(domain)
+
+        # Apply equality filters (field must exist in schema and DataFrame)
+        if filters:
+            for field, value in (filters or {}).items():
+                if not _is_safe_identifier(field):
+                    continue
+                if field in df.columns and value is not None:
+                    df = df[df[field].astype(str) == str(value)]
+
+        empty_response = {
+            "domain_id": domain_id,
+            "group_by": group_by,
+            "filters": filters or {},
+            "total": 0,
+            "rows": [],
+        }
+        if len(df) == 0:
+            return empty_response
+
+        # Secondary whitelist: dimensions must exist in the real DataFrame
+        valid_columns_df = set(df.columns)
+        for dim in group_by:
+            if dim not in valid_columns_df:
+                return empty_response
+
+        con = duckdb.connect()
+        con.register("df", df)
+
+        select_cols = ", ".join([f'CAST("{d}" AS VARCHAR) AS "{d}"' for d in group_by])
+        groupby_clause = ", ".join([f'"{d}"' for d in group_by])
+        sql = (
+            f"SELECT {select_cols}, COUNT(*) AS count "
+            f"FROM df "
+            f"GROUP BY {groupby_clause} "
+            f"ORDER BY count DESC "
+            f"LIMIT 200"
+        )
+        result_df = con.execute(sql).df()
+        total = int(result_df["count"].sum()) if not result_df.empty else 0
+
+        rows = [
+            {
+                "values": {d: row[d] for d in group_by},
+                "count": int(row["count"]),
+                "pct": round(row["count"] / total * 100, 1) if total > 0 else 0.0,
+            }
+            for _, row in result_df.iterrows()
+        ]
+
+        return {
+            "domain_id": domain_id,
+            "group_by": group_by,
+            "filters": filters or {},
+            "total": total,
+            "rows": rows,
+        }
+
+    def export_to_excel(self, domain_id: str, dimension: str) -> bytes:
+        """
+        Export a single-dimension GROUP BY result as an Excel workbook.
+        Returns raw bytes suitable for a StreamingResponse.
+        """
+        if not _is_safe_identifier(dimension):
+            raise ValueError(f"Unsafe dimension name: '{dimension}'")
+
+        data = self.query_cube(domain_id, [dimension])
+        domain = registry.get_domain(domain_id)
+        attr_map = {a.name: a for a in domain.attributes}
+        dim_label = attr_map[dimension].label if dimension in attr_map else dimension
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Cube Data"
+
+        # Header row
+        ws.append([dim_label, "Count", "% of Total"])
+        for row in data["rows"]:
+            ws.append([row["values"][dimension], row["count"], row["pct"]])
+        ws.append([])
+        ws.append(["Total", data["total"], 100.0])
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
 
 
 olap_engine = DuckDBOLAPEngine()
