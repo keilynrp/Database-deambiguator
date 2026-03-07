@@ -19,8 +19,6 @@ from backend.auth import (
     ALGORITHM,
 )
 
-# Use the same TestingSessionLocal from conftest (shared in-memory DB)
-from backend.tests.conftest import TestingSessionLocal
 
 
 # ── Unit: token creation ─────────────────────────────────────────────────────
@@ -45,23 +43,23 @@ def test_create_access_token_custom_expiry():
 
 # ── Unit: authentication logic ───────────────────────────────────────────────
 
-def test_authenticate_user_correct_credentials():
-    with TestingSessionLocal() as db:
+def test_authenticate_user_correct_credentials(session_factory):
+    with session_factory() as db:
         assert authenticate_user(db, "testadmin", "testpassword") is not None
 
 
-def test_authenticate_user_wrong_password():
-    with TestingSessionLocal() as db:
+def test_authenticate_user_wrong_password(session_factory):
+    with session_factory() as db:
         assert authenticate_user(db, "testadmin", "wrongpassword") is None
 
 
-def test_authenticate_user_wrong_username():
-    with TestingSessionLocal() as db:
+def test_authenticate_user_wrong_username(session_factory):
+    with session_factory() as db:
         assert authenticate_user(db, "notauser", "testpassword") is None
 
 
-def test_authenticate_user_empty_credentials():
-    with TestingSessionLocal() as db:
+def test_authenticate_user_empty_credentials(session_factory):
+    with session_factory() as db:
         assert authenticate_user(db, "", "") is None
 
 

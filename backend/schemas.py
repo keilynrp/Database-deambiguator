@@ -229,3 +229,15 @@ class AuthorityRecordResponse(BaseModel):
 
 class AuthorityConfirmRequest(BaseModel):
     also_create_rule: bool = True
+
+
+class BatchResolveRequest(BaseModel):
+    field_name:    str                 = Field(min_length=1, max_length=64)
+    entity_type:   AuthorityEntityType = AuthorityEntityType.general
+    limit:         int                 = Field(default=20, ge=1, le=100)
+    skip_existing: bool                = True
+
+
+class BulkActionRequest(BaseModel):
+    ids:              List[int] = Field(min_length=1, max_length=100)
+    also_create_rules: bool     = True  # only relevant for bulk-confirm

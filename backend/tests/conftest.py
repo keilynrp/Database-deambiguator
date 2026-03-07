@@ -11,7 +11,6 @@ from sqlalchemy.pool import StaticPool
 
 # ── Use a clean in-memory DB for every test session ────────────────────────
 # StaticPool ensures all sessions/connections share the SAME in-memory database.
-# Without it, each new connection creates an isolated empty SQLite database.
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
 # Patch the database URL before importing app modules.
@@ -30,7 +29,7 @@ from backend.main import app  # noqa: E402
 test_engine = create_engine(
     TEST_DATABASE_URL,
     connect_args={"check_same_thread": False},
-    poolclass=StaticPool,  # All sessions share the same in-memory connection
+    poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
@@ -89,6 +88,15 @@ def auth_headers(auth_token):
     return {"Authorization": f"Bearer {auth_token}"}
 
 
+@pytest.fixture(scope="session")
+def session_factory():
+    """Expose the test SessionLocal factory as a fixture so test files
+    don't need to import it from conftest (which causes conftest to be
+    loaded a second time as 'backend.tests.conftest' module, creating a
+    separate in-memory DB and overriding app.dependency_overrides)."""
+    return TestingSessionLocal
+
+
 # ── RBAC test users ────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="session")
@@ -142,18 +150,28 @@ _TABLES_TO_CLEAN = [
 @pytest.fixture()
 def db_session():
     """
-    Provide a DB session for each test, with full table cleanup after the test.
+    Provide a DB session for each test, with table cleanup BEFORE and AFTER.
 
-    Because enrichment worker functions call db.commit() internally, nested
-    transactions / savepoints are unreliable for isolation on SQLite. Instead
-    we truncate the relevant tables after every test.
+    Pre-test cleanup guarantees a known-clean state even when a prior test's
+    endpoint created records outside the fixture's own session (e.g. via
+    override_get_db).  Post-test cleanup keeps the DB tidy for tests that
+    do NOT use this fixture.
     """
+    # ── Pre-test cleanup ──────────────────────────────────────────────
+    pre = TestingSessionLocal()
+    try:
+        for table in _TABLES_TO_CLEAN:
+            pre.execute(text(f"DELETE FROM {table}"))
+        pre.commit()
+    finally:
+        pre.close()
+
     db = TestingSessionLocal()
     try:
         yield db
     finally:
         db.close()
-        # Wipe all test data so the next test starts clean
+        # ── Post-test cleanup ─────────────────────────────────────────
         cleanup_db = TestingSessionLocal()
         try:
             for table in _TABLES_TO_CLEAN:

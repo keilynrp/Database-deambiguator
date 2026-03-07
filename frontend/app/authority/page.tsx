@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useDomain } from "../contexts/DomainContext";
+import { apiFetch } from "@/lib/api";
+
+// ── Shared types ────────────────────────────────────────────────────────────
 
 interface AuthorityGroup {
     main: string;
@@ -28,20 +32,461 @@ interface GroupState {
     saved: boolean;
 }
 
-import { useDomain } from "../contexts/DomainContext";
-import { apiFetch } from "@/lib/api";
+// ── Review Queue types ──────────────────────────────────────────────────────
 
-export default function AuthorityPage() {
-    const { activeDomain } = useDomain();
+interface QueueSummary {
+    total_pending: number;
+    total_confirmed: number;
+    total_rejected: number;
+    by_field: {
+        field_name: string;
+        pending: number;
+        confirmed: number;
+        rejected: number;
+        avg_confidence: number;
+    }[];
+}
+
+interface AuthorityRecord {
+    id: number;
+    field_name: string;
+    original_value: string;
+    authority_source: string;
+    authority_id: string;
+    canonical_label: string;
+    aliases: string[];
+    description: string | null;
+    confidence: number;
+    uri: string | null;
+    status: string;
+    created_at: string;
+    confirmed_at: string | null;
+    resolution_status: string;
+}
+
+// ── Source badge colors ─────────────────────────────────────────────────────
+
+const SOURCE_COLORS: Record<string, string> = {
+    wikidata: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
+    viaf: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
+    orcid: "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400",
+    dbpedia: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400",
+    openalex: "bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400",
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Review Queue Tab
+// ═════════════════════════════════════════════════════════════════════════════
+
+function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
+    const [summary, setSummary] = useState<QueueSummary | null>(null);
+    const [records, setRecords] = useState<AuthorityRecord[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [loadingRecords, setLoadingRecords] = useState(false);
+    const [selected, setSelected] = useState<Set<number>>(new Set());
+    const [acting, setActing] = useState(false);
+    const [statusFilter, setStatusFilter] = useState("pending");
+    const [fieldFilter, setFieldFilter] = useState("");
+    const [batchField, setBatchField] = useState("");
+    const [batchEntityType, setBatchEntityType] = useState("general");
+    const [batchLimit, setBatchLimit] = useState(20);
+    const [resolving, setResolving] = useState(false);
+    const [resolveResult, setResolveResult] = useState<string | null>(null);
+
+    // Auto-select first string field for batch resolve
+    useEffect(() => {
+        if (activeDomain && !batchField) {
+            const firstStr = activeDomain.attributes.find((a: any) => a.type === "string");
+            if (firstStr) setBatchField(firstStr.name);
+        }
+    }, [activeDomain, batchField]);
+
+    const fetchSummary = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await apiFetch("/authority/queue/summary");
+            if (res.ok) setSummary(await res.json());
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const fetchRecords = useCallback(async () => {
+        setLoadingRecords(true);
+        try {
+            const params = new URLSearchParams({ status: statusFilter });
+            if (fieldFilter) params.set("field_name", fieldFilter);
+            const res = await apiFetch(`/authority/records?${params}&limit=100`);
+            if (res.ok) {
+                const data = await res.json();
+                setRecords(data);
+                setSelected(new Set());
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoadingRecords(false);
+        }
+    }, [statusFilter, fieldFilter]);
+
+    useEffect(() => { fetchSummary(); }, [fetchSummary]);
+    useEffect(() => { fetchRecords(); }, [fetchRecords]);
+
+    function toggleSelect(id: number) {
+        setSelected(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    }
+
+    function toggleSelectAll() {
+        if (selected.size === records.length) {
+            setSelected(new Set());
+        } else {
+            setSelected(new Set(records.map(r => r.id)));
+        }
+    }
+
+    async function bulkAction(action: "bulk-confirm" | "bulk-reject") {
+        if (selected.size === 0) return;
+        setActing(true);
+        try {
+            const res = await apiFetch(`/authority/records/${action}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: Array.from(selected), also_create_rules: true }),
+            });
+            if (res.ok) {
+                await fetchSummary();
+                await fetchRecords();
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setActing(false);
+        }
+    }
+
+    async function batchResolve() {
+        if (!batchField) return;
+        setResolving(true);
+        setResolveResult(null);
+        try {
+            const res = await apiFetch("/authority/resolve/batch", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    field_name: batchField,
+                    entity_type: batchEntityType,
+                    limit: batchLimit,
+                }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setResolveResult(
+                    `Resolved ${data.resolved_count} values, created ${data.records_created} records` +
+                    (data.already_existed_count ? `, ${data.already_existed_count} already existed` : "")
+                );
+                await fetchSummary();
+                await fetchRecords();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                setResolveResult(`Error: ${err.detail || res.statusText}`);
+            }
+        } catch (e) {
+            console.error(e);
+            setResolveResult("Network error");
+        } finally {
+            setResolving(false);
+        }
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Summary cards */}
+            {summary && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Pending Review</p>
+                        <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{summary.total_pending}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Confirmed</p>
+                        <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">{summary.total_confirmed}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Rejected</p>
+                        <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">{summary.total_rejected}</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Per-field breakdown */}
+            {summary && summary.by_field.length > 0 && (
+                <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+                    <div className="border-b border-gray-200 px-5 py-3 dark:border-gray-800">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">By Field</h3>
+                    </div>
+                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {summary.by_field.map(f => (
+                            <div key={f.field_name} className="flex items-center justify-between px-5 py-3">
+                                <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{f.field_name}</span>
+                                <div className="flex items-center gap-4 text-xs">
+                                    <span className="text-amber-600">{f.pending} pending</span>
+                                    <span className="text-green-600">{f.confirmed} confirmed</span>
+                                    <span className="text-red-600">{f.rejected} rejected</span>
+                                    <span className="text-gray-400">avg {(f.avg_confidence * 100).toFixed(0)}%</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Batch resolve panel */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+                <h3 className="mb-3 text-sm font-medium text-gray-900 dark:text-white">Batch Resolve</h3>
+                <div className="flex flex-wrap items-end gap-4">
+                    <div className="min-w-[160px]">
+                        <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Field</label>
+                        <select
+                            value={batchField}
+                            onChange={e => setBatchField(e.target.value)}
+                            className="h-9 w-full rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        >
+                            {activeDomain ? (
+                                activeDomain.attributes
+                                    .filter((a: any) => a.type === "string")
+                                    .map((attr: any) => (
+                                        <option key={attr.name} value={attr.name}>{attr.label}</option>
+                                    ))
+                            ) : (
+                                <option value="">Loading...</option>
+                            )}
+                        </select>
+                    </div>
+                    <div className="min-w-[130px]">
+                        <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Entity Type</label>
+                        <select
+                            value={batchEntityType}
+                            onChange={e => setBatchEntityType(e.target.value)}
+                            className="h-9 w-full rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        >
+                            {["general", "person", "organization", "concept", "institution"].map(t => (
+                                <option key={t} value={t}>{t}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="w-20">
+                        <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Limit</label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={batchLimit}
+                            onChange={e => setBatchLimit(Number(e.target.value))}
+                            className="h-9 w-full rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        />
+                    </div>
+                    <button
+                        onClick={batchResolve}
+                        disabled={resolving || !batchField}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        {resolving ? (
+                            <>
+                                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                Resolving...
+                            </>
+                        ) : "Resolve All"}
+                    </button>
+                </div>
+                {resolveResult && (
+                    <p className={`mt-3 text-sm ${resolveResult.startsWith("Error") ? "text-red-600" : "text-green-600 dark:text-green-400"}`}>
+                        {resolveResult}
+                    </p>
+                )}
+            </div>
+
+            {/* Records filter + bulk actions */}
+            <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-3 dark:border-gray-800">
+                    <div className="flex items-center gap-3">
+                        <select
+                            value={statusFilter}
+                            onChange={e => setStatusFilter(e.target.value)}
+                            className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        >
+                            <option value="pending">Pending</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                        <select
+                            value={fieldFilter}
+                            onChange={e => setFieldFilter(e.target.value)}
+                            className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        >
+                            <option value="">All fields</option>
+                            {summary?.by_field.map(f => (
+                                <option key={f.field_name} value={f.field_name}>{f.field_name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    {statusFilter === "pending" && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => bulkAction("bulk-confirm")}
+                                disabled={acting || selected.size === 0}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-green-600 px-3 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                            >
+                                Confirm ({selected.size})
+                            </button>
+                            <button
+                                onClick={() => bulkAction("bulk-reject")}
+                                disabled={acting || selected.size === 0}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                            >
+                                Reject ({selected.size})
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Records table */}
+                {loadingRecords ? (
+                    <div className="flex items-center justify-center py-12">
+                        <svg className="h-6 w-6 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                    </div>
+                ) : records.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                        <p className="text-sm text-gray-400 dark:text-gray-500">
+                            No {statusFilter} records found
+                        </p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-gray-100 text-left text-xs font-medium text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                                    {statusFilter === "pending" && (
+                                        <th className="px-4 py-2 w-10">
+                                            <input
+                                                type="checkbox"
+                                                checked={selected.size === records.length && records.length > 0}
+                                                onChange={toggleSelectAll}
+                                                className="rounded border-gray-300"
+                                            />
+                                        </th>
+                                    )}
+                                    <th className="px-4 py-2">Original Value</th>
+                                    <th className="px-4 py-2">Canonical Label</th>
+                                    <th className="px-4 py-2">Source</th>
+                                    <th className="px-4 py-2">Confidence</th>
+                                    <th className="px-4 py-2">Field</th>
+                                    <th className="px-4 py-2">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                                {records.map(rec => (
+                                    <tr key={rec.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                        {statusFilter === "pending" && (
+                                            <td className="px-4 py-2.5">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selected.has(rec.id)}
+                                                    onChange={() => toggleSelect(rec.id)}
+                                                    className="rounded border-gray-300"
+                                                />
+                                            </td>
+                                        )}
+                                        <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-white">
+                                            {rec.original_value}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">
+                                            <div className="flex items-center gap-2">
+                                                {rec.canonical_label}
+                                                {rec.uri && (
+                                                    <a
+                                                        href={rec.uri}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-500 hover:text-blue-600"
+                                                        title="View in authority source"
+                                                    >
+                                                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                        </svg>
+                                                    </a>
+                                                )}
+                                            </div>
+                                            {rec.description && (
+                                                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500 truncate max-w-xs">
+                                                    {rec.description}
+                                                </p>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${SOURCE_COLORS[rec.authority_source] || "bg-gray-100 text-gray-600"}`}>
+                                                {rec.authority_source}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                                                    <div
+                                                        className={`h-full rounded-full ${rec.confidence >= 0.8 ? "bg-green-500" : rec.confidence >= 0.5 ? "bg-amber-500" : "bg-red-500"}`}
+                                                        style={{ width: `${rec.confidence * 100}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-xs text-gray-500">{(rec.confidence * 100).toFixed(0)}%</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{rec.field_name}</td>
+                                        <td className="px-4 py-2.5">
+                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                                rec.status === "confirmed"
+                                                    ? "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400"
+                                                    : rec.status === "rejected"
+                                                    ? "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400"
+                                                    : "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+                                            }`}>
+                                                {rec.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Disambiguation Tab (existing)
+// ═════════════════════════════════════════════════════════════════════════════
+
+function DisambiguationTab({ activeDomain }: { activeDomain: any }) {
     const [field, setField] = useState("");
 
-    // Auto-select first string field
     useEffect(() => {
         if (activeDomain && !field) {
-            const firstStr = activeDomain.attributes.find(a => a.type === "string");
+            const firstStr = activeDomain.attributes.find((a: any) => a.type === "string");
             if (firstStr) setField(firstStr.name);
         }
     }, [activeDomain, field]);
+
     const [data, setData] = useState<AuthorityResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [applying, setApplying] = useState(false);
@@ -51,10 +496,7 @@ export default function AuthorityPage() {
     const [page, setPage] = useState(0);
     const [limit, setLimit] = useState(20);
 
-    // Reset pagination when data changes
-    useEffect(() => {
-        setPage(0);
-    }, [data]);
+    useEffect(() => { setPage(0); }, [data]);
 
     const visibleGroups = data ? data.groups.slice(page * limit, (page + 1) * limit) : [];
 
@@ -68,15 +510,9 @@ export default function AuthorityPage() {
             if (!res.ok) throw new Error("Failed to fetch");
             const json: AuthorityResponse = await res.json();
             setData(json);
-
-            // Initialize group states
             const states: Record<number, GroupState> = {};
             json.groups.forEach((g, idx) => {
-                states[idx] = {
-                    canonical: g.resolved_to || g.main,
-                    excluded: new Set<string>(),
-                    saved: g.has_rules,
-                };
+                states[idx] = { canonical: g.resolved_to || g.main, excluded: new Set<string>(), saved: g.has_rules };
             });
             setGroupStates(states);
         } catch (error) {
@@ -88,20 +524,13 @@ export default function AuthorityPage() {
     }
 
     function updateCanonical(idx: number, value: string) {
-        setGroupStates((prev) => ({
-            ...prev,
-            [idx]: { ...prev[idx], canonical: value, saved: false },
-        }));
+        setGroupStates(prev => ({ ...prev, [idx]: { ...prev[idx], canonical: value, saved: false } }));
     }
 
     function toggleExclude(idx: number, variation: string) {
-        setGroupStates((prev) => {
+        setGroupStates(prev => {
             const excluded = new Set(prev[idx].excluded);
-            if (excluded.has(variation)) {
-                excluded.delete(variation);
-            } else {
-                excluded.add(variation);
-            }
+            if (excluded.has(variation)) excluded.delete(variation); else excluded.add(variation);
             return { ...prev, [idx]: { ...prev[idx], excluded, saved: false } };
         });
     }
@@ -110,24 +539,16 @@ export default function AuthorityPage() {
         if (!data) return;
         const group = data.groups[idx];
         const state = groupStates[idx];
-        const activeVariations = group.variations.filter((v) => !state.excluded.has(v));
-
+        const activeVariations = group.variations.filter(v => !state.excluded.has(v));
         setSavingGroup(idx);
         try {
             const res = await apiFetch("/rules/bulk", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    field_name: field,
-                    canonical_value: state.canonical,
-                    variations: activeVariations,
-                }),
+                body: JSON.stringify({ field_name: field, canonical_value: state.canonical, variations: activeVariations }),
             });
             if (!res.ok) throw new Error("Failed to save rules");
-            setGroupStates((prev) => ({
-                ...prev,
-                [idx]: { ...prev[idx], saved: true },
-            }));
+            setGroupStates(prev => ({ ...prev, [idx]: { ...prev[idx], saved: true } }));
         } catch (error) {
             console.error(error);
             alert("Error saving rules");
@@ -140,12 +561,9 @@ export default function AuthorityPage() {
         setApplying(true);
         setApplyResult(null);
         try {
-            const res = await apiFetch(`/rules/apply?field_name=${field}`, {
-                method: "POST",
-            });
+            const res = await apiFetch(`/rules/apply?field_name=${field}`, { method: "POST" });
             if (!res.ok) throw new Error("Failed to apply rules");
-            const json: ApplyResult = await res.json();
-            setApplyResult(json);
+            setApplyResult(await res.json());
         } catch (error) {
             console.error(error);
             alert("Error applying rules");
@@ -154,7 +572,7 @@ export default function AuthorityPage() {
         }
     }
 
-    const savedCount = Object.values(groupStates).filter((s) => s.saved).length;
+    const savedCount = Object.values(groupStates).filter(s => s.saved).length;
 
     return (
         <div className="space-y-6">
@@ -167,13 +585,13 @@ export default function AuthorityPage() {
                         </label>
                         <select
                             value={field}
-                            onChange={(e) => setField(e.target.value)}
+                            onChange={e => setField(e.target.value)}
                             className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         >
                             {activeDomain ? (
                                 activeDomain.attributes
-                                    .filter(a => a.type === 'string')
-                                    .map(attr => (
+                                    .filter((a: any) => a.type === "string")
+                                    .map((attr: any) => (
                                         <option key={attr.name} value={attr.name}>{attr.label}</option>
                                     ))
                             ) : (
@@ -224,52 +642,28 @@ export default function AuthorityPage() {
                 </div>
             )}
 
-
-
             {/* Groups list */}
             {data && (
                 <div className="space-y-4">
                     {visibleGroups.map((group, idx) => {
-                        // Adjust index for visible groups to match original data index
                         const originalIdx = page * limit + idx;
                         const state = groupStates[originalIdx];
                         if (!state) return null;
-
                         return (
-                            <div
-                                key={originalIdx}
-                                className={`rounded-2xl border bg-white p-5 transition-shadow hover:shadow-md dark:bg-gray-900 ${state.saved
-                                    ? "border-green-200 dark:border-green-800"
-                                    : "border-gray-200 dark:border-gray-800"
-                                    }`}
-                            >
-                                {/* Group header */}
+                            <div key={originalIdx} className={`rounded-2xl border bg-white p-5 transition-shadow hover:shadow-md dark:bg-gray-900 ${state.saved ? "border-green-200 dark:border-green-800" : "border-gray-200 dark:border-gray-800"}`}>
                                 <div className="mb-4 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${state.saved
-                                            ? "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400"
-                                            : "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
-                                            }`}>
+                                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${state.saved ? "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400" : "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"}`}>
                                             {state.saved ? "Resolved" : "Pending"}
                                         </span>
-                                        <span className="text-xs text-gray-400 dark:text-gray-500">
-                                            {group.count} variations
-                                        </span>
+                                        <span className="text-xs text-gray-400 dark:text-gray-500">{group.count} variations</span>
                                     </div>
                                     <button
                                         onClick={() => saveGroupRules(originalIdx)}
                                         disabled={savingGroup === originalIdx}
                                         className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
                                     >
-                                        {savingGroup === originalIdx ? (
-                                            <>
-                                                <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                                </svg>
-                                                Saving...
-                                            </>
-                                        ) : (
+                                        {savingGroup === originalIdx ? "Saving..." : (
                                             <>
                                                 <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -279,25 +673,17 @@ export default function AuthorityPage() {
                                         )}
                                     </button>
                                 </div>
-
-                                {/* Canonical value input */}
                                 <div className="mb-3">
-                                    <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                                        Canonical Value
-                                    </label>
+                                    <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Canonical Value</label>
                                     <input
                                         type="text"
                                         value={state.canonical}
-                                        onChange={(e) => updateCanonical(originalIdx, e.target.value)}
+                                        onChange={e => updateCanonical(originalIdx, e.target.value)}
                                         className="h-9 w-full max-w-md rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                                     />
                                 </div>
-
-                                {/* Variations */}
                                 <div>
-                                    <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                                        Variations (click to exclude)
-                                    </label>
+                                    <label className="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">Variations (click to exclude)</label>
                                     <div className="flex flex-wrap gap-2">
                                         {group.variations.map((v, i) => {
                                             const isExcluded = state.excluded.has(v);
@@ -305,28 +691,17 @@ export default function AuthorityPage() {
                                             return (
                                                 <button
                                                     key={i}
-                                                    onClick={() => {
-                                                        if (!isCanonical) toggleExclude(originalIdx, v);
-                                                    }}
+                                                    onClick={() => { if (!isCanonical) toggleExclude(originalIdx, v); }}
                                                     className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-sm transition-colors ${isCanonical
                                                         ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
                                                         : isExcluded
                                                             ? "border-gray-200 bg-gray-50 text-gray-300 line-through dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-600"
                                                             : "border-gray-200 bg-gray-50 text-gray-700 hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-red-700 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                                                        }`}
+                                                    }`}
                                                     title={isCanonical ? "Canonical value" : isExcluded ? "Click to include" : "Click to exclude"}
                                                 >
                                                     {v}
-                                                    {isCanonical && (
-                                                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                        </svg>
-                                                    )}
-                                                    {isExcluded && (
-                                                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                                        </svg>
-                                                    )}
+                                                    {isCanonical && <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
                                                 </button>
                                             );
                                         })}
@@ -336,54 +711,31 @@ export default function AuthorityPage() {
                         );
                     })}
 
-                    {/* Pagination Controls */}
+                    {/* Pagination */}
                     {data.groups.length > 0 && (
                         <div className="flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-800">
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500 dark:text-gray-400">Rows per page:</span>
                                 <select
                                     value={limit}
-                                    onChange={(e) => {
-                                        setLimit(Number(e.target.value));
-                                        setPage(0);
-                                    }}
+                                    onChange={e => { setLimit(Number(e.target.value)); setPage(0); }}
                                     className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
                                 >
-                                    <option value={10}>10</option>
-                                    <option value={20}>20</option>
-                                    <option value={50}>50</option>
-                                    <option value={100}>100</option>
+                                    {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
                                 </select>
                             </div>
-
                             <div className="flex items-center gap-4">
-                                <button
-                                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                                    disabled={page === 0}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-                                >
-                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                    </svg>
+                                <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                                     Previous
                                 </button>
                                 <div className="flex items-center gap-2">
-                                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-medium text-white">
-                                        {page + 1}
-                                    </span>
-                                    <span className="text-sm text-gray-500">
-                                        of {Math.ceil(data.groups.length / limit)}
-                                    </span>
+                                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-medium text-white">{page + 1}</span>
+                                    <span className="text-sm text-gray-500">of {Math.ceil(data.groups.length / limit)}</span>
                                 </div>
-                                <button
-                                    onClick={() => setPage((p) => p + 1)}
-                                    disabled={(page + 1) * limit >= data.groups.length}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-                                >
+                                <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * limit >= data.groups.length} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
                                     Next
-                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                                 </button>
                             </div>
                         </div>
@@ -451,6 +803,46 @@ export default function AuthorityPage() {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Main Page with Tabs
+// ═════════════════════════════════════════════════════════════════════════════
+
+export default function AuthorityPage() {
+    const { activeDomain } = useDomain();
+    const [tab, setTab] = useState<"disambiguation" | "review">("disambiguation");
+
+    const tabs = [
+        { id: "disambiguation" as const, label: "Disambiguation" },
+        { id: "review" as const, label: "Review Queue" },
+    ];
+
+    return (
+        <div className="space-y-6">
+            {/* Tab navigation */}
+            <div className="border-b border-gray-200 dark:border-gray-800">
+                <nav className="-mb-px flex gap-6">
+                    {tabs.map(t => (
+                        <button
+                            key={t.id}
+                            onClick={() => setTab(t.id)}
+                            className={`border-b-2 pb-3 text-sm font-medium transition-colors ${
+                                tab === t.id
+                                    ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+                                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                            }`}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </nav>
+            </div>
+
+            {tab === "disambiguation" && <DisambiguationTab activeDomain={activeDomain} />}
+            {tab === "review" && <ReviewQueueTab activeDomain={activeDomain} />}
         </div>
     );
 }

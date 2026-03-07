@@ -136,17 +136,17 @@ export default function TopicsPage() {
     setLoading(true);
     try {
       if (t === "topics") {
-        const d = await apiFetch(`/analyzers/topics/${domainId}?top_n=30`);
-        setTopicsData(d);
+        const r = await apiFetch(`/analyzers/topics/${domainId}?top_n=30`);
+        setTopicsData(await r.json());
       } else if (t === "cooccurrence") {
-        const d = await apiFetch(`/analyzers/cooccurrence/${domainId}?top_n=20`);
-        setCooccData(d);
+        const r = await apiFetch(`/analyzers/cooccurrence/${domainId}?top_n=20`);
+        setCooccData(await r.json());
       } else if (t === "clusters") {
-        const d = await apiFetch(`/analyzers/clusters/${domainId}?n_clusters=6`);
-        setClustersData(d);
+        const r = await apiFetch(`/analyzers/clusters/${domainId}?n_clusters=6`);
+        setClustersData(await r.json());
       } else if (t === "correlation") {
-        const d = await apiFetch(`/analyzers/correlation/${domainId}?top_n=20`);
-        setCorrelationData(d);
+        const r = await apiFetch(`/analyzers/correlation/${domainId}?top_n=20`);
+        setCorrelationData(await r.json());
       }
     } catch (err) {
       console.error("Topic analysis error:", err);

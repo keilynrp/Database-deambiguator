@@ -1436,6 +1436,207 @@ def resolve_authority(
     return [_serialize_authority_record(r) for r in records]
 
 
+@app.post("/authority/resolve/batch", status_code=201, tags=["authority"])
+def resolve_authority_batch(
+    payload: schemas.BatchResolveRequest,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+):
+    """
+    Resolve all distinct values of a field against external authority sources.
+
+    Finds every unique non-null value in raw_entities.{field_name}, optionally
+    skips those that already have a pending or confirmed record, and resolves
+    up to `limit` values sequentially (to avoid API rate-limiting).
+    Returns a summary and the newly created AuthorityRecords.
+    """
+    field = payload.field_name
+    entity_type = payload.entity_type.value
+
+    # Validate field name against the SQL identifier regex (re-use existing check)
+    _FIELD_RE = re.compile(r'^[a-z][a-z0-9_]{0,63}$')
+    if not _FIELD_RE.match(field):
+        raise HTTPException(status_code=422, detail=f"Invalid field name: {field!r}")
+
+    # Confirm the column actually exists in the raw_entities table
+    _entity_cols = {col["name"] for col in inspect(database.engine).get_columns("raw_entities")}
+    if field not in _entity_cols:
+        raise HTTPException(status_code=422, detail=f"Field '{field}' not found in entity table")
+
+    # Fetch all distinct non-null values for the field
+    rows = db.execute(
+        text(f'SELECT DISTINCT "{field}" FROM raw_entities WHERE "{field}" IS NOT NULL AND "{field}" != \'\'')
+    ).fetchall()
+
+    all_values = [row[0] for row in rows if row[0]]
+
+    # Filter out values that already have a pending or confirmed record
+    already_existed = 0
+    if payload.skip_existing and all_values:
+        existing_values = {
+            r.original_value
+            for r in db.query(models.AuthorityRecord.original_value).filter(
+                models.AuthorityRecord.field_name == field,
+                models.AuthorityRecord.status.in_(["pending", "confirmed"]),
+            ).all()
+        }
+        filtered = [v for v in all_values if v not in existing_values]
+        already_existed = len(all_values) - len(filtered)
+        all_values = filtered
+
+    to_resolve = all_values[:payload.limit]
+    skipped = len(all_values) - len(to_resolve)
+
+    ctx = _AuthorityContext()
+    new_records: list[models.AuthorityRecord] = []
+
+    for value in to_resolve:
+        candidates = _authority_resolve_all(value, entity_type, ctx)
+        for c in candidates:
+            rec = models.AuthorityRecord(
+                field_name=field,
+                original_value=value,
+                authority_source=c.authority_source,
+                authority_id=c.authority_id,
+                canonical_label=c.canonical_label,
+                aliases=json.dumps(c.aliases),
+                description=c.description,
+                confidence=c.confidence,
+                uri=c.uri,
+                status="pending",
+                resolution_status=c.resolution_status,
+                score_breakdown=json.dumps(c.score_breakdown),
+                evidence=json.dumps(c.evidence),
+                merged_sources=json.dumps(c.merged_sources),
+            )
+            db.add(rec)
+            new_records.append(rec)
+
+    db.commit()
+    for rec in new_records:
+        db.refresh(rec)
+
+    return {
+        "field_name": field,
+        "entity_type": entity_type,
+        "resolved_count": len(to_resolve),
+        "skipped_count": skipped,
+        "already_existed_count": already_existed,
+        "records_created": len(new_records),
+        "records": [_serialize_authority_record(r) for r in new_records],
+    }
+
+
+@app.get("/authority/queue/summary", tags=["authority"])
+def authority_queue_summary(
+    db: Session = Depends(get_db),
+    _: models.User = Depends(get_current_user),
+):
+    """
+    Aggregated queue stats by field: pending / confirmed / rejected counts
+    and average confidence per field.  Also returns workspace-level totals.
+    """
+    rows = db.query(
+        models.AuthorityRecord.field_name,
+        models.AuthorityRecord.status,
+        func.count(models.AuthorityRecord.id),
+        func.avg(models.AuthorityRecord.confidence),
+    ).group_by(
+        models.AuthorityRecord.field_name,
+        models.AuthorityRecord.status,
+    ).all()
+
+    # Build per-field aggregates
+    field_map: dict[str, dict] = {}
+    totals = {"pending": 0, "confirmed": 0, "rejected": 0}
+
+    for field_name, status, count, avg_conf in rows:
+        if field_name not in field_map:
+            field_map[field_name] = {"field_name": field_name, "pending": 0, "confirmed": 0, "rejected": 0, "avg_confidence": 0.0}
+        if status in field_map[field_name]:
+            field_map[field_name][status] = count
+        if status in totals:
+            totals[status] += count
+
+    # avg_confidence: re-query per field (simpler than weighted average above)
+    avg_rows = db.query(
+        models.AuthorityRecord.field_name,
+        func.avg(models.AuthorityRecord.confidence),
+    ).group_by(models.AuthorityRecord.field_name).all()
+    for field_name, avg_conf in avg_rows:
+        if field_name in field_map:
+            field_map[field_name]["avg_confidence"] = round(float(avg_conf or 0.0), 3)
+
+    by_field = sorted(field_map.values(), key=lambda x: x["pending"], reverse=True)
+
+    return {
+        "total_pending":   totals["pending"],
+        "total_confirmed": totals["confirmed"],
+        "total_rejected":  totals["rejected"],
+        "by_field":        by_field,
+    }
+
+
+@app.post("/authority/records/bulk-confirm", tags=["authority"])
+def bulk_confirm_authority_records(
+    payload: schemas.BulkActionRequest,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+):
+    """Confirm multiple authority records in one request. Optionally create NormalizationRules."""
+    confirmed = 0
+    rules_created = 0
+    now = datetime.now(timezone.utc).isoformat()
+
+    for record_id in payload.ids:
+        rec = db.query(models.AuthorityRecord).filter(
+            models.AuthorityRecord.id == record_id
+        ).first()
+        if rec is None or rec.status == "confirmed":
+            continue
+        rec.status = "confirmed"
+        rec.confirmed_at = now
+        confirmed += 1
+
+        if payload.also_create_rules:
+            existing = db.query(models.NormalizationRule).filter(
+                models.NormalizationRule.field_name == rec.field_name,
+                models.NormalizationRule.original_value == rec.original_value,
+            ).first()
+            if not existing:
+                db.add(models.NormalizationRule(
+                    field_name=rec.field_name,
+                    original_value=rec.original_value,
+                    normalized_value=rec.canonical_label,
+                    is_regex=False,
+                ))
+                rules_created += 1
+
+    db.commit()
+    return {"confirmed": confirmed, "rules_created": rules_created}
+
+
+@app.post("/authority/records/bulk-reject", tags=["authority"])
+def bulk_reject_authority_records(
+    payload: schemas.BulkActionRequest,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+):
+    """Reject multiple authority records in one request."""
+    rejected = 0
+    for record_id in payload.ids:
+        rec = db.query(models.AuthorityRecord).filter(
+            models.AuthorityRecord.id == record_id
+        ).first()
+        if rec is None or rec.status == "rejected":
+            continue
+        rec.status = "rejected"
+        rejected += 1
+
+    db.commit()
+    return {"rejected": rejected}
+
+
 @app.get("/authority/records", tags=["authority"])
 def list_authority_records(
     field_name: Optional[str] = Query(None, max_length=64),
