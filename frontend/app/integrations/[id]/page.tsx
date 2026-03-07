@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { PageHeader, TabNav, Badge } from "../../components/ui";
 
 const PLATFORM_META: Record<string, { label: string; color: string; bgColor: string }> = {
     woocommerce: { label: "WooCommerce", color: "text-purple-700 dark:text-purple-400", bgColor: "bg-purple-50 dark:bg-purple-500/10" },
@@ -144,53 +145,39 @@ export default function StoreDetailPage() {
 
     const meta = PLATFORM_META[store.platform] || PLATFORM_META.custom;
 
-    const statusBadge = (status: string) => {
-        const colors: Record<string, string> = {
-            pending: "bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400",
-            approved: "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400",
-            rejected: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400",
-            applied: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
-            synced: "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400",
-            error: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400",
-            success: "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400",
-        };
-        return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${colors[status] || "bg-gray-100 text-gray-600"}`}>{status}</span>;
-    };
+    const statusBadgeVariant = (status: string) =>
+        status === "approved" || status === "synced" || status === "success" ? "success" as const :
+        status === "rejected" || status === "error" ? "error" as const :
+        status === "pending" ? "warning" as const :
+        status === "applied" ? "info" as const : "default" as const;
 
     return (
-        <div className="space-y-6 p-8">
-            {/* Header */}
-            <div className="flex items-start justify-between">
-                <div>
-                    <div className="mb-1 flex items-center gap-3">
-                        <Link href="/integrations" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                        </Link>
-                        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">{store.name}</h1>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${meta.bgColor} ${meta.color}`}>{meta.label}</span>
-                        {store.is_active ?
-                            <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-500/10 dark:text-green-400">Active</span> :
-                            <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">Inactive</span>
-                        }
+        <div className="space-y-6">
+            <PageHeader
+                breadcrumbs={[
+                    { label: "Home", href: "/" },
+                    { label: "Integrations", href: "/integrations" },
+                    { label: store.name },
+                ]}
+                title={store.name}
+                description={store.base_url}
+                actions={
+                    <div className="flex items-center gap-2">
+                        <button onClick={handleTest} disabled={testing}
+                            className="flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                        >
+                            {testing ? <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> : null}
+                            Test Connection
+                        </button>
+                        <button onClick={handlePull} disabled={pulling || !store.is_active}
+                            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {pulling ? <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> : <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>}
+                            Pull Products
+                        </button>
                     </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{store.base_url}</p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <button onClick={handleTest} disabled={testing}
-                        className="flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-                    >
-                        {testing ? <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> : null}
-                        Test Connection
-                    </button>
-                    <button onClick={handlePull} disabled={pulling || !store.is_active}
-                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-                    >
-                        {pulling ? <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> : <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>}
-                        Pull Products
-                    </button>
-                </div>
-            </div>
+                }
+            />
 
             {/* Test / Pull result banners */}
             {testResult && (
@@ -226,25 +213,22 @@ export default function StoreDetailPage() {
                     { label: "Sync Direction", value: store.sync_direction === "bidirectional" ? "↔ Both" : store.sync_direction === "pull" ? "← Pull" : "Push →", icon: "🔄" },
                     { label: "Last Sync", value: store.last_sync_at ? new Date(store.last_sync_at).toLocaleDateString() : "Never", icon: "🕐" },
                 ].map((s) => (
-                    <div key={s.label} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                    <div key={s.label} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <p className="text-xs text-gray-500 dark:text-gray-400">{s.icon} {s.label}</p>
                         <p className="mt-1 text-lg font-bold text-gray-900 dark:text-white">{s.value}</p>
                     </div>
                 ))}
             </div>
 
-            {/* Tabs */}
-            <div className="border-b border-gray-200 dark:border-gray-800">
-                <div className="flex gap-6">
-                    {(["queue", "mappings", "logs"] as Tab[]).map((t) => (
-                        <button key={t} onClick={() => setTab(t)}
-                            className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${tab === t ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400"}`}
-                        >
-                            {t === "queue" ? `Review Queue (${queueTotal})` : t === "mappings" ? `Mappings (${mappingsTotal})` : "Sync Logs"}
-                        </button>
-                    ))}
-                </div>
-            </div>
+            <TabNav
+                tabs={[
+                    { id: "queue", label: "Review Queue", badge: queueTotal },
+                    { id: "mappings", label: "Mappings", badge: mappingsTotal },
+                    { id: "logs", label: "Sync Logs" },
+                ]}
+                activeTab={tab}
+                onTabChange={(id) => setTab(id as Tab)}
+            />
 
             {/* Tab Content */}
             {tab === "queue" && (
@@ -295,7 +279,7 @@ export default function StoreDetailPage() {
                                             </td>
                                             <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-[150px] truncate">{item.local_value || <span className="italic text-gray-400">empty</span>}</td>
                                             <td className="px-4 py-3 text-gray-900 dark:text-white font-medium max-w-[150px] truncate">{item.remote_value || <span className="italic text-gray-400">empty</span>}</td>
-                                            <td className="px-4 py-3">{statusBadge(item.status)}</td>
+                                            <td className="px-4 py-3"><Badge variant={statusBadgeVariant(item.status)}>{item.status}</Badge></td>
                                             <td className="px-4 py-3 text-right">
                                                 {item.status === "pending" && (
                                                     <div className="flex justify-end gap-1">
@@ -346,7 +330,7 @@ export default function StoreDetailPage() {
                                             <td className="px-4 py-3 text-gray-600 dark:text-gray-400 font-mono text-xs">{m.remote_sku || "—"}</td>
                                             <td className="px-4 py-3 text-gray-900 dark:text-white">{m.remote_price || "—"}</td>
                                             <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{m.remote_stock || "—"}</td>
-                                            <td className="px-4 py-3">{statusBadge(m.sync_status)}</td>
+                                            <td className="px-4 py-3"><Badge variant={statusBadgeVariant(m.sync_status)}>{m.sync_status}</Badge></td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -365,7 +349,7 @@ export default function StoreDetailPage() {
                     ) : (
                         <div className="space-y-3">
                             {logs.map((l) => (
-                                <div key={l.id} className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                                <div key={l.id} className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                                     <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${l.status === "success" ? "bg-green-50 text-green-600 dark:bg-green-500/10" :
                                             l.status === "error" ? "bg-red-50 text-red-600 dark:bg-red-500/10" :
                                                 "bg-yellow-50 text-yellow-600 dark:bg-yellow-500/10"
@@ -376,7 +360,7 @@ export default function StoreDetailPage() {
                                         <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">{l.action}</p>
                                         <p className="text-xs text-gray-500 dark:text-gray-400">{l.records_affected} records · {l.executed_at ? new Date(l.executed_at).toLocaleString() : ""}</p>
                                     </div>
-                                    {statusBadge(l.status)}
+                                    <Badge variant={statusBadgeVariant(l.status)}>{l.status}</Badge>
                                 </div>
                             ))}
                         </div>

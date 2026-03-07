@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import AIIntegrations from "./AIIntegrations";
 import { apiFetch } from "@/lib/api";
+import { PageHeader, TabNav, Badge } from "../components/ui";
 
 interface StoreConnection {
     id: number;
@@ -146,28 +147,20 @@ export default function IntegrationsPage() {
     const labelClass = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
 
     return (
-        <div className="space-y-6 p-8">
-            {/* Header & Tabs */}
-            <div className="border-b border-gray-200 pb-5 dark:border-gray-800">
-                <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">API Integrations</h1>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Connect external e-commerce stores or configure predictive Semantic Generative AI (RAG).
-                </p>
-                <div className="mt-6 flex space-x-6">
-                    <button
-                        onClick={() => setActiveTab("stores")}
-                        className={`border-b-2 pb-3 text-sm font-medium transition-colors ${activeTab === 'stores' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                    >
-                        🛒 E-commerce Stores
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("ai")}
-                        className={`border-b-2 pb-3 text-sm font-medium transition-colors ${activeTab === 'ai' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                    >
-                        🧠 AI Language Models
-                    </button>
-                </div>
-            </div>
+        <div className="space-y-6">
+            <PageHeader
+                breadcrumbs={[{ label: "Home", href: "/" }, { label: "Integrations" }]}
+                title="Integrations"
+                description="Connect external e-commerce stores or configure predictive Semantic Generative AI (RAG)."
+            />
+            <TabNav
+                tabs={[
+                    { id: "stores", label: "🛒 E-commerce Stores" },
+                    { id: "ai", label: "🧠 AI Language Models" },
+                ]}
+                activeTab={activeTab}
+                onTabChange={(id) => setActiveTab(id as "stores" | "ai")}
+            />
 
             {activeTab === "ai" && <AIIntegrations />}
 
@@ -357,7 +350,7 @@ export default function IntegrationsPage() {
                                 return (
                                     <div
                                         key={store.id}
-                                        className={`group relative rounded-2xl border bg-white p-5 transition-all hover:shadow-md dark:bg-gray-900 ${store.is_active
+                                        className={`group relative rounded-2xl border bg-white p-5 shadow-sm transition-all hover:shadow-md dark:bg-gray-900 ${store.is_active
                                             ? "border-gray-200 dark:border-gray-800"
                                             : "border-gray-200/60 opacity-60 dark:border-gray-800/60"
                                             }`}
@@ -373,12 +366,9 @@ export default function IntegrationsPage() {
                                                     <span className={`text-xs font-medium ${meta.color}`}>{meta.label}</span>
                                                 </div>
                                             </div>
-                                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${store.is_active
-                                                ? "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400"
-                                                : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500"
-                                                }`}>
+                                            <Badge variant={store.is_active ? "success" : "default"} dot>
                                                 {store.is_active ? "Active" : "Inactive"}
-                                            </span>
+                                            </Badge>
                                         </div>
 
                                         {/* Info */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PageHeader, Badge } from "../components/ui";
 import { apiFetch } from "@/lib/api";
 
 interface HarmonizationChange {
@@ -246,20 +247,11 @@ export default function HarmonizationPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header card with Load Pipeline button */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 dark:bg-purple-500/10">
-                            <svg className="h-5 w-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Harmonization Pipeline</h2>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">5-step automated data cleaning and consolidation</p>
-                        </div>
-                    </div>
+            <PageHeader
+                breadcrumbs={[{ label: "Home", href: "/" }, { label: "Harmonization" }]}
+                title="Data Harmonization"
+                description="Automated pipeline for cleaning and consolidating entity data"
+                actions={
                     <button
                         onClick={fetchPipeline}
                         disabled={loading}
@@ -274,25 +266,25 @@ export default function HarmonizationPage() {
                             </>
                         )}
                     </button>
-                </div>
-            </div>
+                }
+            />
 
             {/* Stats row */}
             {pipeline && (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Products</p>
                         <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{pipeline.total_products.toLocaleString()}</p>
                     </div>
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Steps Completed</p>
                         <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">{completedCount} <span className="text-sm font-normal text-gray-400">/ {pipeline.steps.length}</span></p>
                     </div>
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Steps Pending</p>
                         <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{pipeline.steps.length - completedCount}</p>
                     </div>
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Records Modified</p>
                         <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">{totalModified.toLocaleString()}</p>
                     </div>
@@ -358,14 +350,10 @@ export default function HarmonizationPage() {
                                                 <div className="flex items-center gap-2">
                                                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{step.name}</h3>
                                                     {isCompleted && (
-                                                        <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-500/10 dark:text-green-400">
-                                                            Completed
-                                                        </span>
+                                                        <Badge variant="success">Completed</Badge>
                                                     )}
                                                     {hasPreview && !isCompleted && (
-                                                        <span className="inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">
-                                                            Previewed
-                                                        </span>
+                                                        <Badge variant="info">Previewed</Badge>
                                                     )}
                                                 </div>
                                                 <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{step.description}</p>
@@ -533,9 +521,7 @@ export default function HarmonizationPage() {
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-sm font-medium text-gray-900 dark:text-white">{log.step_name}</span>
                                                         {log.reverted && (
-                                                            <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                                                                Reverted
-                                                            </span>
+                                                            <Badge variant="default">Reverted</Badge>
                                                         )}
                                                     </div>
                                                     <p className="text-xs text-gray-500 dark:text-gray-400">

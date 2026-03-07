@@ -2,23 +2,23 @@
 
 import { useLanguage } from "../contexts/LanguageContext";
 import { useTheme } from "../contexts/ThemeContext";
+import { PageHeader } from "../components/ui";
 
 export default function SettingsPage() {
     const { language, setLanguage, t } = useLanguage();
     const { theme, setTheme } = useTheme();
 
     return (
-        <div className="max-w-4xl p-8">
-            <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
-                {t('settings.title')}
-            </h1>
-            <p className="mb-8 text-sm text-gray-500 dark:text-gray-400">
-                {t('settings.subtitle')}
-            </p>
+        <div className="space-y-6">
+            <PageHeader
+                breadcrumbs={[{ label: "Home", href: "/" }, { label: "Settings" }]}
+                title={t('settings.title')}
+                description={t('settings.subtitle')}
+            />
 
             <div className="space-y-6">
                 {/* Language */}
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                     <div className="flex items-start justify-between">
                         <div>
                             <h3 className="text-base font-medium text-gray-900 dark:text-white">
@@ -55,7 +55,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Theme */}
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                     <div className="flex items-start justify-between">
                         <div>
                             <h3 className="text-base font-medium text-gray-900 dark:text-white">

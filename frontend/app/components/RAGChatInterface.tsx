@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
+import { Badge } from "./ui";
 
 interface Message {
     role: "user" | "assistant" | "system";
@@ -108,7 +109,7 @@ export default function RAGChatInterface() {
     };
 
     return (
-        <div className="flex h-[calc(100vh-200px)] flex-col rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
+        <div className="flex h-[calc(100vh-200px)] flex-col rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 dark:border-gray-800">
                 <div className="flex items-center gap-2.5">
@@ -120,9 +121,9 @@ export default function RAGChatInterface() {
                 </div>
                 <div className="flex items-center gap-3">
                     {indexStats !== null && (
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${indexStats.total_indexed > 0 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'}`}>
+                        <Badge variant={indexStats.total_indexed > 0 ? "success" : "warning"} dot>
                             {indexStats.total_indexed > 0 ? `${indexStats.total_indexed} entities indexed` : "Not indexed yet"}
-                        </span>
+                        </Badge>
                     )}
                     <button
                         onClick={handleIndex}

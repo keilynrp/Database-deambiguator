@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useDomain } from "../contexts/DomainContext";
 import { apiFetch } from "@/lib/api";
+import { Badge } from "./ui";
 
 interface VariationGroup {
     main: string;
@@ -195,7 +196,7 @@ export default function DisambiguationTool() {
     return (
         <div className="space-y-6">
             {/* Controls card */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <div className="flex flex-wrap items-end gap-4">
                     <div className="flex-1 min-w-[200px]">
                         <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -259,15 +260,15 @@ export default function DisambiguationTool() {
             {/* Results summary */}
             {groups.length > 0 && (
                 <div className="flex gap-4">
-                    <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+                    <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <p className="text-sm text-gray-500 dark:text-gray-400">Resolved Groups</p>
                         <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{totalGroups}</p>
                     </div>
-                    <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+                    <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <p className="text-sm text-gray-500 dark:text-gray-400">Attribute</p>
                         <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{fieldLabel}</p>
                     </div>
-                    <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+                    <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <p className="text-sm text-gray-500 dark:text-gray-400">Lexical Variations</p>
                         <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
                             {groups.reduce((acc, g) => acc + g.count, 0)}
@@ -279,14 +280,12 @@ export default function DisambiguationTool() {
             {/* Variation groups */}
             <div className="space-y-4">
                 {groups.map((group, idx) => (
-                    <div key={idx} className="rounded-2xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+                    <div key={idx} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                                 {group.main}
                             </h3>
-                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">
-                                {group.count} variants matched
-                            </span>
+                            <Badge variant="info">{group.count} variants matched</Badge>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             {group.variations.map((v, i) => (
@@ -406,9 +405,13 @@ export default function DisambiguationTool() {
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${style.bg} ${style.text}`}>
-                                                            {style.label}
-                                                        </span>
+                                                        <Badge variant={
+                                                            rec.authority_source === "wikidata" ? "warning" :
+                                                            rec.authority_source === "viaf" ? "info" :
+                                                            rec.authority_source === "orcid" ? "success" :
+                                                            rec.authority_source === "dbpedia" ? "error" :
+                                                            rec.authority_source === "openalex" ? "purple" : "default"
+                                                        }>{style.label}</Badge>
                                                         <span className="text-sm font-medium text-gray-900 truncate dark:text-white">
                                                             {rec.canonical_label}
                                                         </span>
@@ -462,14 +465,10 @@ export default function DisambiguationTool() {
                                                     </div>
                                                 )}
                                                 {rec.status === "confirmed" && (
-                                                    <span className="shrink-0 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-500/20 dark:text-green-400">
-                                                        Confirmed
-                                                    </span>
+                                                    <Badge variant="success">Confirmed</Badge>
                                                 )}
                                                 {rec.status === "rejected" && (
-                                                    <span className="shrink-0 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-                                                        Rejected
-                                                    </span>
+                                                    <Badge variant="default">Rejected</Badge>
                                                 )}
                                             </div>
                                         </div>

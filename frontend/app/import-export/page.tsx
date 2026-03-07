@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { PageHeader } from "../components/ui";
 import DataSourceSchemaAnalyzer from "../components/DataSourceSchemaAnalyzer";
 import { useDomain } from "../contexts/DomainContext";
 import { apiFetch } from "@/lib/api";
@@ -140,9 +141,14 @@ export default function ImportExportPage() {
 
     return (
         <div className="space-y-6">
+            <PageHeader
+                breadcrumbs={[{ label: "Home", href: "/" }, { label: "Import / Export" }]}
+                title="Import / Export"
+                description="Upload and download dataset in Excel, CSV, JSON-LD, Parquet, and RDF formats"
+            />
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 {/* Import section */}
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                     <div className="mb-5 flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100 dark:bg-green-500/10">
                             <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -247,7 +253,7 @@ export default function ImportExportPage() {
                 <DataSourceSchemaAnalyzer />
 
                 {/* Export section */}
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                     <div className="mb-5 flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-500/10">
                             <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -416,7 +422,7 @@ export default function ImportExportPage() {
             </div>
 
             {/* Column mapping reference */}
-            <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
                     <h3 className="text-base font-semibold text-gray-900 dark:text-white">Column Format Reference</h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Expected Excel columns mapped to database fields</p>

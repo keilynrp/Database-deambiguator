@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PageHeader, Badge } from "../components/ui";
 import { useDomain, DomainSchema, DomainAttribute } from "../contexts/DomainContext";
 import { useAuth } from "../contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
@@ -129,16 +130,12 @@ export default function DomainsPage() {
   };
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Domain Registry</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            {domains.length} domain{domains.length !== 1 ? "s" : ""} registered · Active: <span className="font-medium text-blue-600 dark:text-blue-400">{activeDomainId}</span>
-          </p>
-        </div>
-        {isAdmin && (
+    <div className="flex h-full flex-col gap-6">
+      <PageHeader
+        breadcrumbs={[{ label: "Home", href: "/" }, { label: "Domain Registry" }]}
+        title="Domain Registry"
+        description={`${domains.length} domain${domains.length !== 1 ? "s" : ""} registered · Active: ${activeDomainId}`}
+        actions={isAdmin ? (
           <button
             onClick={() => { setShowForm(true); resetForm(); }}
             className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
@@ -146,8 +143,8 @@ export default function DomainsPage() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             New Domain
           </button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* Feedback banner */}
       {feedback && (
@@ -167,7 +164,7 @@ export default function DomainsPage() {
               className={`w-full text-left rounded-xl border p-4 transition-all ${
                 selectedId === d.id
                   ? "border-blue-500 bg-blue-50 dark:bg-blue-900/10 ring-1 ring-blue-500"
-                  : "border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-700"
+                  : "border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-700"
               }`}
             >
               <div className="flex items-start justify-between gap-2">
@@ -181,10 +178,10 @@ export default function DomainsPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm text-gray-900 dark:text-white truncate">{d.name}</span>
                       {activeDomainId === d.id && (
-                        <span className="flex-shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Active</span>
+                        <Badge variant="info" dot>Active</Badge>
                       )}
                       {BUILTIN_IDS.has(d.id) && (
-                        <span className="flex-shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">built-in</span>
+                        <Badge variant="default">built-in</Badge>
                       )}
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{d.primary_entity} · {d.attributes.length} attributes</p>
@@ -216,7 +213,7 @@ export default function DomainsPage() {
         </div>
 
         {/* Attributes panel */}
-        <div className="col-span-2 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden flex flex-col">
+        <div className="col-span-2 rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 overflow-hidden flex flex-col">
           {selectedDomain ? (
             <>
               <div className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-800 px-6 py-4">
@@ -249,9 +246,15 @@ export default function DomainsPage() {
                         <td className="px-6 py-3 font-mono text-xs text-gray-700 dark:text-gray-300">{attr.name}</td>
                         <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{attr.label}</td>
                         <td className="px-4 py-3">
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLORS[attr.type] ?? "bg-gray-100 text-gray-600"}`}>
+                          <Badge variant={
+                            attr.type === "string"  ? "info" :
+                            attr.type === "integer" ? "purple" :
+                            attr.type === "float"   ? "warning" :
+                            attr.type === "boolean" ? "success" :
+                            attr.type === "array"   ? "error" : "default"
+                          }>
                             {attr.type}
-                          </span>
+                          </Badge>
                         </td>
                         <td className="px-4 py-3 text-center">
                           {attr.required
@@ -260,7 +263,7 @@ export default function DomainsPage() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           {attr.is_core
-                            ? <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">core</span>
+                            ? <Badge variant="info">core</Badge>
                             : <span className="text-gray-300 dark:text-gray-600">–</span>}
                         </td>
                       </tr>
