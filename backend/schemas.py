@@ -241,3 +241,38 @@ class BatchResolveRequest(BaseModel):
 class BulkActionRequest(BaseModel):
     ids:              List[int] = Field(min_length=1, max_length=100)
     also_create_rules: bool     = True  # only relevant for bulk-confirm
+
+
+# ── Webhooks ─────────────────────────────────────────────────────────────────
+
+WEBHOOK_EVENTS = [
+    "upload",
+    "entity.update",
+    "entity.delete",
+    "entity.bulk_delete",
+    "harmonization.apply",
+    "authority.confirm",
+    "authority.reject",
+]
+
+class WebhookCreate(BaseModel):
+    url:    str       = Field(min_length=8, max_length=2048)
+    events: List[str] = Field(min_length=1, max_length=20)
+    secret: Optional[str] = Field(None, max_length=256)
+
+class WebhookUpdate(BaseModel):
+    url:       Optional[str]       = Field(None, min_length=8, max_length=2048)
+    events:    Optional[List[str]] = Field(None, min_length=1, max_length=20)
+    secret:    Optional[str]       = Field(None, max_length=256)
+    is_active: Optional[bool]      = None
+
+class WebhookResponse(BaseModel):
+    id:                int
+    url:               str
+    events:            List[str]
+    is_active:         bool
+    created_at:        Optional[str] = None
+    last_triggered_at: Optional[str] = None
+    last_status:       Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)

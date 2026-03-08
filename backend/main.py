@@ -495,6 +495,7 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
         db.bulk_save_objects(objects[i : i + _CHUNK_SIZE])
     _audit(db, "upload", user_id=current_user.id, details={"filename": file.filename, "rows": len(objects)})
     db.commit()
+    _dispatch_webhook("upload", {"filename": file.filename, "rows": len(objects)}, database.SessionLocal)
 
     return {
         "message": f"Successfully imported {len(objects)} entities",
@@ -903,6 +904,7 @@ def delete_entity(entity_id: int = Path(..., ge=1), db: Session = Depends(get_db
     db.delete(entity)
     _audit(db, "entity.delete", user_id=current_user.id, entity_type="entity", entity_id=entity_id)
     db.commit()
+    _dispatch_webhook("entity.delete", {"entity_id": entity_id}, database.SessionLocal)
     return {"message": "Entity deleted", "id": entity_id}
 
 
@@ -2197,6 +2199,7 @@ def apply_harmonization_step(step_id: str, db: Session = Depends(get_db), curren
 
     _audit(db, "harmonization.apply", user_id=current_user.id, details={"step_id": step_id, "step_name": step_def["name"], "records_updated": len(changes)})
     db.commit()
+    _dispatch_webhook("harmonization.apply", {"step_id": step_id, "records_updated": len(changes)}, database.SessionLocal)
 
     return {
         "step_id": step_id,
@@ -2984,6 +2987,158 @@ def rag_clear_index(_: models.User = Depends(require_role("super_admin", "admin"
 
 
 # ── Activity Feed ────────────────────────────────────────────────────────────
+
+# ── Webhook dispatcher ────────────────────────────────────────────────────────
+
+import hashlib
+import hmac
+import threading
+import urllib.request as _urllib_req
+
+
+def _dispatch_webhook(action: str, payload: dict, db_factory) -> None:
+    """Fire-and-forget: send POST to every active webhook subscribed to *action*.
+    Runs in a daemon thread so it never blocks the request path.
+    """
+    def _worker():
+        with db_factory() as db:
+            hooks = db.query(models.Webhook).filter(
+                models.Webhook.is_active == True  # noqa: E712
+            ).all()
+            body = json.dumps({"event": action, "data": payload}).encode()
+            for hook in hooks:
+                try:
+                    events = json.loads(hook.events or "[]")
+                except Exception:
+                    events = []
+                if action not in events:
+                    continue
+                headers = {"Content-Type": "application/json", "X-UKIP-Event": action}
+                if hook.secret:
+                    sig = hmac.new(hook.secret.encode(), body, hashlib.sha256).hexdigest()
+                    headers["X-UKIP-Signature"] = f"sha256={sig}"
+                req = _urllib_req.Request(hook.url, data=body, headers=headers, method="POST")
+                status = 0
+                try:
+                    with _urllib_req.urlopen(req, timeout=10) as resp:
+                        status = resp.status
+                except Exception as exc:
+                    logger.warning("Webhook %s delivery failed: %s", hook.url, exc)
+                hook.last_triggered_at = datetime.now(timezone.utc)
+                hook.last_status = status
+            db.commit()
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+
+
+# ── Webhook CRUD ──────────────────────────────────────────────────────────────
+
+def _serialize_webhook(w: models.Webhook) -> dict:
+    events: list = []
+    try:
+        events = json.loads(w.events or "[]")
+    except Exception:
+        pass
+    return {
+        "id": w.id,
+        "url": w.url,
+        "events": events,
+        "is_active": w.is_active,
+        "created_at": w.created_at.isoformat() if w.created_at else None,
+        "last_triggered_at": w.last_triggered_at.isoformat() if w.last_triggered_at else None,
+        "last_status": w.last_status,
+    }
+
+
+@app.post("/webhooks", status_code=201, tags=["webhooks"])
+def create_webhook(
+    payload: schemas.WebhookCreate,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin")),
+):
+    hook = models.Webhook(
+        url=payload.url,
+        events=json.dumps(payload.events),
+        secret=payload.secret,
+        is_active=True,
+    )
+    db.add(hook)
+    db.commit()
+    db.refresh(hook)
+    return _serialize_webhook(hook)
+
+
+@app.get("/webhooks", tags=["webhooks"])
+def list_webhooks(
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin")),
+):
+    return [_serialize_webhook(h) for h in db.query(models.Webhook).order_by(models.Webhook.id).all()]
+
+
+@app.get("/webhooks/{webhook_id}", tags=["webhooks"])
+def get_webhook(
+    webhook_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin")),
+):
+    hook = db.get(models.Webhook, webhook_id)
+    if hook is None:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    return _serialize_webhook(hook)
+
+
+@app.put("/webhooks/{webhook_id}", tags=["webhooks"])
+def update_webhook(
+    webhook_id: int = Path(..., ge=1),
+    payload: schemas.WebhookUpdate = ...,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin")),
+):
+    hook = db.get(models.Webhook, webhook_id)
+    if hook is None:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    if payload.url is not None:
+        hook.url = payload.url
+    if payload.events is not None:
+        hook.events = json.dumps(payload.events)
+    if payload.secret is not None:
+        hook.secret = payload.secret
+    if payload.is_active is not None:
+        hook.is_active = payload.is_active
+    db.commit()
+    db.refresh(hook)
+    return _serialize_webhook(hook)
+
+
+@app.delete("/webhooks/{webhook_id}", tags=["webhooks"])
+def delete_webhook(
+    webhook_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin")),
+):
+    hook = db.get(models.Webhook, webhook_id)
+    if hook is None:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    db.delete(hook)
+    db.commit()
+    return {"deleted": webhook_id}
+
+
+@app.post("/webhooks/{webhook_id}/test", tags=["webhooks"])
+def test_webhook(
+    webhook_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin")),
+):
+    """Send a synthetic ping payload to verify the endpoint is reachable."""
+    hook = db.get(models.Webhook, webhook_id)
+    if hook is None:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    _dispatch_webhook("ping", {"message": "UKIP webhook test"}, database.SessionLocal)
+    return {"queued": True}
+
 
 _ACTION_ICONS: dict[str, str] = {
     "upload": "📥",

@@ -231,6 +231,24 @@ class AuthorityRecord(Base):
     merged_sources    = Column(Text, nullable=True)   # JSON array of "source:id" refs merged into this record
 
 
+class Webhook(Base):
+    """
+    Outbound webhook registration.
+    events: JSON array of action strings, e.g. ["upload", "entity.delete"]
+    secret: optional HMAC-SHA256 signing key sent in X-UKIP-Signature header
+    """
+    __tablename__ = "webhooks"
+
+    id                = Column(Integer, primary_key=True, index=True)
+    url               = Column(String, nullable=False)
+    events            = Column(Text, nullable=False)           # JSON array
+    secret            = Column(String, nullable=True)
+    is_active         = Column(Boolean, default=True)
+    created_at        = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    last_triggered_at = Column(DateTime, nullable=True)
+    last_status       = Column(Integer, nullable=True)         # HTTP status of last delivery
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
