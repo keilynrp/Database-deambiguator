@@ -229,3 +229,15 @@ class AuthorityRecord(Base):
     score_breakdown   = Column(Text, nullable=True)   # JSON: {identifiers, name, affiliation, coauthorship, topic}
     evidence          = Column(Text, nullable=True)   # JSON array of signal strings
     merged_sources    = Column(Text, nullable=True)   # JSON array of "source:id" refs merged into this record
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    action      = Column(String, index=True)          # e.g. "upload", "entity.delete", "harmonization.apply"
+    entity_type = Column(String, nullable=True)       # "entity", "authority_record", "rule", …
+    entity_id   = Column(Integer, nullable=True)
+    user_id     = Column(Integer, nullable=True)
+    details     = Column(Text, nullable=True)         # JSON blob with extra context
+    created_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)

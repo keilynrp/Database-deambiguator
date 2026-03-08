@@ -49,6 +49,26 @@ _correlation_analyzer = CorrelationAnalyzer()
 
 logger = logging.getLogger(__name__)
 
+
+def _audit(
+    db: Session,
+    action: str,
+    user_id: int | None = None,
+    entity_type: str | None = None,
+    entity_id: int | None = None,
+    details: dict | None = None,
+) -> None:
+    """Append a row to audit_logs (does not commit — caller must commit)."""
+    entry = models.AuditLog(
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        user_id=user_id,
+        details=json.dumps(details) if details else None,
+    )
+    db.add(entry)
+
+
 models.Base.metadata.create_all(bind=database.engine)
 
 # Lightweight migration: add columns introduced after initial schema creation
@@ -335,7 +355,7 @@ COLUMN_MAPPING = {
 }
 
 @app.post("/upload", status_code=201)
-async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db), _: models.User = Depends(require_role("super_admin", "admin", "editor"))):
+async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: models.User = Depends(require_role("super_admin", "admin", "editor"))):
     _MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
 
     filename = file.filename.lower()
@@ -473,6 +493,7 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
     _CHUNK_SIZE = 10_000
     for i in range(0, len(objects), _CHUNK_SIZE):
         db.bulk_save_objects(objects[i : i + _CHUNK_SIZE])
+    _audit(db, "upload", user_id=current_user.id, details={"filename": file.filename, "rows": len(objects)})
     db.commit()
 
     return {
@@ -820,7 +841,7 @@ def get_entity(
 
 
 @app.put("/entities/{entity_id}", response_model=schemas.Entity)
-def update_entity(entity_id: int = Path(..., ge=1), payload: schemas.EntityBase = ..., db: Session = Depends(get_db), _: models.User = Depends(require_role("super_admin", "admin", "editor"))):
+def update_entity(entity_id: int = Path(..., ge=1), payload: schemas.EntityBase = ..., db: Session = Depends(get_db), current_user: models.User = Depends(require_role("super_admin", "admin", "editor"))):
     entity = db.query(models.RawEntity).filter(models.RawEntity.id == entity_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
@@ -829,6 +850,7 @@ def update_entity(entity_id: int = Path(..., ge=1), payload: schemas.EntityBase 
     for field, value in update_data.items():
         setattr(entity, field, value)
 
+    _audit(db, "entity.update", user_id=current_user.id, entity_type="entity", entity_id=entity_id, details={"fields": list(update_data.keys())})
     db.commit()
     db.refresh(entity)
     return entity
@@ -844,12 +866,13 @@ class _BulkIdsPayload(BaseModel):
 def delete_entities_bulk(
     payload: _BulkIdsPayload,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Delete a specific list of entities by id."""
     if not payload.ids:
         raise HTTPException(status_code=422, detail="ids list is empty")
     deleted = db.query(models.RawEntity).filter(models.RawEntity.id.in_(payload.ids)).delete(synchronize_session=False)
+    _audit(db, "entity.bulk_delete", user_id=current_user.id, entity_type="entity", details={"ids": payload.ids, "deleted": deleted})
     db.commit()
     return {"deleted": deleted}
 
@@ -873,11 +896,12 @@ def purge_all_entities(include_rules: bool = Query(False), db: Session = Depends
 
 
 @app.delete("/entities/{entity_id}")
-def delete_entity(entity_id: int = Path(..., ge=1), db: Session = Depends(get_db), _: models.User = Depends(require_role("super_admin", "admin", "editor"))):
+def delete_entity(entity_id: int = Path(..., ge=1), db: Session = Depends(get_db), current_user: models.User = Depends(require_role("super_admin", "admin", "editor"))):
     entity = db.query(models.RawEntity).filter(models.RawEntity.id == entity_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
     db.delete(entity)
+    _audit(db, "entity.delete", user_id=current_user.id, entity_type="entity", entity_id=entity_id)
     db.commit()
     return {"message": "Entity deleted", "id": entity_id}
 
@@ -1712,7 +1736,7 @@ def confirm_authority_record(
     record_id: int = Path(ge=1),
     payload: schemas.AuthorityConfirmRequest = schemas.AuthorityConfirmRequest(),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """
     Confirm a candidate as the authoritative form.
@@ -1741,6 +1765,7 @@ def confirm_authority_record(
             db.add(rule)
             rule_created = True
 
+    _audit(db, "authority.confirm", user_id=current_user.id, entity_type="authority_record", entity_id=record_id, details={"canonical_label": rec.canonical_label, "rule_created": rule_created})
     db.commit()
     db.refresh(rec)
     return {**_serialize_authority_record(rec), "rule_created": rule_created}
@@ -1750,7 +1775,7 @@ def confirm_authority_record(
 def reject_authority_record(
     record_id: int = Path(ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Mark a candidate as rejected."""
     rec = db.get(models.AuthorityRecord, record_id)
@@ -1758,6 +1783,7 @@ def reject_authority_record(
         raise HTTPException(status_code=404, detail="AuthorityRecord not found")
 
     rec.status = "rejected"
+    _audit(db, "authority.reject", user_id=current_user.id, entity_type="authority_record", entity_id=record_id)
     db.commit()
     db.refresh(rec)
     return _serialize_authority_record(rec)
@@ -2139,7 +2165,7 @@ def preview_harmonization_step(step_id: str, db: Session = Depends(get_db), _: m
 
 
 @app.post("/harmonization/apply/{step_id}")
-def apply_harmonization_step(step_id: str, db: Session = Depends(get_db), _: models.User = Depends(require_role("super_admin", "admin", "editor"))):
+def apply_harmonization_step(step_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(require_role("super_admin", "admin", "editor"))):
     if step_id not in STEP_FUNCTIONS:
         raise HTTPException(status_code=400, detail=f"Unknown step: {step_id}")
 
@@ -2169,6 +2195,7 @@ def apply_harmonization_step(step_id: str, db: Session = Depends(get_db), _: mod
             new_value=c["new_value"],
         ))
 
+    _audit(db, "harmonization.apply", user_id=current_user.id, details={"step_id": step_id, "step_name": step_def["name"], "records_updated": len(changes)})
     db.commit()
 
     return {
@@ -2954,3 +2981,44 @@ def rag_clear_index(_: models.User = Depends(require_role("super_admin", "admin"
     """Clears the entire vector index. Use with caution."""
     VectorStoreService.clear_all()
     return {"message": "Vector index cleared."}
+
+
+# ── Activity Feed ────────────────────────────────────────────────────────────
+
+_ACTION_ICONS: dict[str, str] = {
+    "upload": "📥",
+    "entity.update": "✏️",
+    "entity.delete": "🗑️",
+    "entity.bulk_delete": "🗑️",
+    "harmonization.apply": "⚙️",
+    "authority.confirm": "✅",
+    "authority.reject": "❌",
+}
+
+
+@app.get("/audit/feed", tags=["audit"])
+def get_audit_feed(
+    limit: int = Query(default=50, ge=1, le=200),
+    action: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(get_current_user),
+):
+    """Return recent audit log entries, newest first."""
+    q = db.query(models.AuditLog)
+    if action:
+        q = q.filter(models.AuditLog.action == action)
+    entries = q.order_by(models.AuditLog.created_at.desc()).limit(limit).all()
+
+    result = []
+    for e in entries:
+        result.append({
+            "id": e.id,
+            "action": e.action,
+            "icon": _ACTION_ICONS.get(e.action, "📋"),
+            "entity_type": e.entity_type,
+            "entity_id": e.entity_id,
+            "user_id": e.user_id,
+            "details": json.loads(e.details) if e.details else None,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        })
+    return result

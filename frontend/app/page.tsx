@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import EntityTable from "./components/EntityTable";
 import EntityVariantView from "./components/EntityVariantView";
+import ActivityFeed from "./components/ActivityFeed";
 import { PageHeader, StatCard } from "./components/ui";
 import { useDomain } from "./contexts/DomainContext";
 import { apiFetch } from "../lib/api";
@@ -167,8 +168,15 @@ export default function Home() {
         </Link>
       </div>
 
-      {/* Entity browser */}
-      {viewMode === "table" ? <EntityTable /> : <EntityVariantView />}
+      {/* Activity feed + Entity browser */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_280px]">
+        <div>
+          {viewMode === "table" ? <EntityTable /> : <EntityVariantView />}
+        </div>
+        <div>
+          <ActivityFeed />
+        </div>
+      </div>
     </div>
   );
 }
