@@ -11,7 +11,7 @@
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![DuckDB](https://img.shields.io/badge/DuckDB-OLAP-FFF000?style=for-the-badge&logo=duckdb&logoColor=black)](https://duckdb.org/)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20DB-ff6b35?style=for-the-badge)](https://www.trychroma.com/)
-[![Tests](https://img.shields.io/badge/Tests-470%20passing-brightgreen?style=for-the-badge)](backend/tests/)
+[![Tests](https://img.shields.io/badge/Tests-470%2B%20passing-brightgreen?style=for-the-badge)](backend/tests/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge)](LICENSE)
 
 A domain-agnostic intelligence platform that ingests raw data, harmonizes it, enriches it against global knowledge bases, runs OLAP analytics and stochastic simulations, and lets you query everything through a RAG-powered AI assistant.
@@ -24,15 +24,16 @@ A domain-agnostic intelligence platform that ingests raw data, harmonizes it, en
 
 ## Why UKIP?
 
-Most data platforms force you to choose: clean your data **or** analyze it. UKIP does both in a single pipeline. It started as a catalog deduplication tool and evolved into a full research intelligence engine across 19 development sprints.
+Most data platforms force you to choose: clean your data **or** analyze it. UKIP does both in a single pipeline. It started as a catalog deduplication tool and evolved into a full research intelligence engine across 37 development sprints.
 
 **What it does:**
 
 1. **Ingest** any structured data (Excel, CSV, JSON-LD, XML, BibTeX, RIS, Parquet).
 2. **Harmonize** messy records with fuzzy matching, authority resolution against 5 global knowledge bases (Wikidata, VIAF, ORCID, DBpedia, OpenAlex), and bulk normalization rules.
 3. **Enrich** every record against academic APIs (OpenAlex, Google Scholar, Web of Science).
-4. **Analyze** with OLAP cubes (DuckDB), Monte Carlo simulations, topic modeling, and correlation analysis.
+4. **Analyze** with OLAP cubes (DuckDB), Monte Carlo simulations, topic modeling, correlation analysis, and I+D ROI projections.
 5. **Query** your entire dataset in natural language through a RAG assistant powered by any LLM provider.
+6. **Observe** every action through a real-time activity feed, audit log, and outbound webhooks.
 
 ### Design Philosophy
 
@@ -48,6 +49,7 @@ One rule: **Justified Complexity** ([details](docs/ARCHITECTURE.md)).
 
 ### Data Operations
 - **Entity Catalog** — Browse, search, inline-edit, and delete records across any domain. Dynamic pagination, structured identifier fields.
+- **Entity Detail Page** — Dedicated route (`/entities/:id`) with three tabs: Overview (inline editing), Enrichment (Monte Carlo chart + concepts), and Authority (candidate review with confirm/reject).
 - **Multi-format Import/Export** — Excel, CSV, JSON, XML. Drag-and-drop pre-analyzer for JSON-LD, RDF, Parquet, BibTeX, RIS.
 - **Domain Registry** — Define custom schemas (Science, Healthcare, Business, or your own) with YAML-based configurations.
 
@@ -58,9 +60,10 @@ One rule: **Justified Complexity** ([details](docs/ARCHITECTURE.md)).
 
 ### Analytics
 - **OLAP Cube Explorer** — DuckDB-powered multi-dimensional queries with drill-down navigation and Excel pivot export.
-- **Monte Carlo Projections** — Geometric Brownian Motion model simulates 5,000 citation trajectories per record. Interactive area charts.
-- **Topic Modeling** — LDA-based topic extraction with co-occurrence networks and cluster analysis.
-- **Correlation Analysis** — Multi-variable statistical analysis across catalog fields.
+- **Monte Carlo Citation Projections** — Geometric Brownian Motion model simulates 5,000 citation trajectories per record. Interactive area charts.
+- **ROI Calculator** — Monte Carlo I+D projection engine. Models adoption uncertainty (Normal distribution, configurable σ) across 3–20 year horizons. Returns P5–P95 percentiles, break-even probability, year-by-year ROI trajectory, and final distribution histogram.
+- **Topic Modeling** — Concept frequency, co-occurrence (PMI), topic clusters, and Cramér's V field correlations.
+- **Report Builder** — Self-contained, print-ready HTML reports generated server-side. Select any combination of sections: entity stats, enrichment coverage, top brands, topic clusters, harmonization log.
 
 ### Scientometric Enrichment
 Three-phase cascading enrichment worker:
@@ -86,12 +89,22 @@ Three-phase cascading enrichment worker:
 - **ChromaDB** vector store with OpenAI or local `all-MiniLM-L6-v2` embeddings.
 - Natural language queries return grounded, source-attributed answers with similarity scores.
 
+### Observability & Automation
+- **Activity Feed** — Real-time audit timeline on the home dashboard. Every upload, edit, harmonization, and authority action is logged with actor, timestamp, and context. Auto-refreshes every 30 seconds.
+- **Webhooks** — Outbound HTTP callbacks for any platform event. HMAC-SHA256 request signing, per-event subscription, fire-and-forget delivery with status tracking. Configurable from the Settings panel (admin+).
+- **Audit Log** — Persistent `AuditLog` table records actor, entity type, entity ID, and structured details for every mutating operation.
+
 ### Security
 - **JWT authentication** with bcrypt password hashing.
 - **Role-based access control** — `super_admin`, `admin`, `editor`, `viewer`.
-- **Account lockout** after failed login attempts.
-- **AES encryption** for sensitive data at rest.
-- **Circuit breaker** pattern for external API resilience.
+- **Account lockout** after 5 failed login attempts (15-minute lockout window).
+- **AES encryption** for sensitive credentials at rest.
+- **Circuit breaker** pattern for external API resilience (CLOSED/OPEN/HALF-OPEN states).
+
+### Interface
+- **Responsive UI** — Full mobile support with slide-over sidebar drawer, hamburger navigation, and adaptive layouts from 320 px to 4K.
+- **Dark mode** — System-aware theme with manual toggle.
+- **i18n** — English and Spanish interface with per-component translation keys.
 
 ---
 
@@ -152,13 +165,14 @@ Open `http://localhost:3004`
 ### 4. (Optional) Configure providers
 
 - **AI Assistant**: Go to **Integrations > AI Language Models** and add your API key. For zero-cost: install [Ollama](https://ollama.ai) and point to `http://localhost:11434/v1`.
-- **Web of Science**: Set `WOS_API_KEY` as environment variable.
+- **Web of Science**: Set `WOS_API_KEY` as an environment variable.
+- **Webhooks**: Go to **Settings > Webhooks** to register outbound endpoints and subscribe to events.
 
 ### 5. Run tests
 
 ```bash
 python -m pytest backend/tests/ -x -q
-# 470 tests, all passing
+# 470+ tests, all passing
 ```
 
 ---
@@ -186,13 +200,20 @@ graph TD
     MC --> AN
     B --> TM[Topic Modeling]
     TM --> AN
+    B -->|I+D Params| ROI[ROI Calculator]
+    ROI --> AN
 
     B -->|Enriched Text| VDB[(ChromaDB)]
     VDB -->|Retrieval| RAG[RAG Engine]
     LLM[LLM Provider] --> RAG
     RAG --> CHAT[AI Chat]
 
+    B -->|Mutations| AUD[Audit Log]
+    AUD --> FEED[Activity Feed]
+    AUD --> WH[Webhooks]
+
     B -->|Export| G[Excel / CSV / JSON / XML]
+    B -->|Section Data| RPT[Report Builder]
 
     classDef db fill:#f9f,color:#000,stroke:#333,stroke-width:2px;
     class B,VDB,OLAP db;
@@ -201,27 +222,30 @@ graph TD
     classDef ai fill:#c7d2fe,color:#1e1b4b,stroke:#818cf8,stroke-width:2px;
     class RAG,LLM,CHAT ai;
     classDef analytics fill:#bbf7d0,color:#14532d,stroke:#4ade80,stroke-width:2px;
-    class MC,AN,TM analytics;
+    class MC,AN,TM,ROI analytics;
+    classDef obs fill:#fed7aa,color:#7c2d12,stroke:#f97316,stroke-width:2px;
+    class AUD,FEED,WH,RPT obs;
 ```
 
 ---
 
 ## API Overview
 
-86 endpoints across 12 functional groups. Full interactive docs at `/docs` (Swagger) or `/redoc`.
+97+ endpoints across 14 functional groups. Full interactive docs at `/docs` (Swagger) or `/redoc`.
 
 ### Authentication & Users
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/auth/token` | Login (OAuth2 password flow) |
 | `GET` | `/users/me` | Current user profile |
-| `POST` | `/users` | Create user (admin) |
+| `POST` | `/users` | Create user (super_admin) |
 | `POST` | `/users/me/password` | Change password |
 
 ### Entity Catalog
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/entities` | List entities (search, pagination, filters) |
+| `GET` | `/entities/{id}` | Single entity detail |
 | `POST` | `/upload` | Import file (Excel, CSV) |
 | `GET` | `/stats` | Aggregated system statistics |
 | `GET` | `/export` | Export data (CSV, Excel, JSON, XML) |
@@ -231,7 +255,7 @@ graph TD
 |--------|----------|-------------|
 | `GET` | `/domains` | List available domains |
 | `POST` | `/domains` | Create custom domain schema |
-| `GET` | `/domains/{id}` | Get domain details |
+| `DELETE` | `/domains/{id}` | Delete custom domain (built-ins protected) |
 
 ### Disambiguation & Harmonization
 | Method | Endpoint | Description |
@@ -245,26 +269,28 @@ graph TD
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/authority/resolve` | Resolve value against authority sources |
-| `POST` | `/authority/resolve/batch` | Batch resolve multiple values |
-| `GET` | `/authority/queue/summary` | Review queue summary (pending/confirmed/rejected) |
-| `POST` | `/authority/records/bulk-confirm` | Bulk confirm authority records |
-| `POST` | `/authority/records/bulk-reject` | Bulk reject authority records |
+| `GET` | `/authority/records` | List authority candidates with filters |
+| `POST` | `/authority/records/{id}/confirm` | Confirm candidate |
+| `POST` | `/authority/records/{id}/reject` | Reject candidate |
+| `GET` | `/authority/metrics` | ARL scoring and pipeline KPIs |
 
 ### OLAP & Analytics
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/cube/dimensions/{domain}` | Available OLAP dimensions |
 | `POST` | `/cube/query` | Multi-dimensional cube query |
-| `POST` | `/cube/export` | Export pivot table to Excel |
-| `GET` | `/analyzers/topics/{domain}` | Topic modeling analysis |
-| `GET` | `/analyzers/correlation/{domain}` | Correlation analysis |
+| `GET` | `/cube/export/{domain}` | Export pivot table to Excel |
+| `GET` | `/analyzers/topics/{domain}` | Concept frequency and co-occurrence |
+| `GET` | `/analyzers/clusters/{domain}` | Topic cluster analysis |
+| `GET` | `/analyzers/correlation/{domain}` | Cramér's V field correlations |
+| `POST` | `/analytics/roi` | Monte Carlo I+D ROI simulation |
 
 ### Scientometric Enrichment
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/enrich/bulk` | Queue bulk enrichment |
 | `GET` | `/enrich/stats` | Enrichment KPIs and concept cloud |
-| `GET` | `/enrich/montecarlo/{id}` | Monte Carlo 5-year projection |
+| `GET` | `/enrich/montecarlo/{id}` | Monte Carlo 5-year citation projection |
 
 ### Semantic RAG
 | Method | Endpoint | Description |
@@ -272,6 +298,26 @@ graph TD
 | `POST` | `/rag/index` | Vectorize catalog into ChromaDB |
 | `POST` | `/rag/query` | Natural language query |
 | `GET` | `/rag/stats` | Vector store statistics |
+
+### Report Builder
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/reports/sections` | List available report sections |
+| `POST` | `/reports/generate` | Generate and download HTML report |
+
+### Audit & Activity
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/audit/feed` | Paginated audit event timeline |
+
+### Webhooks
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/webhooks` | List configured webhooks |
+| `POST` | `/webhooks` | Register a new webhook |
+| `PUT` | `/webhooks/{id}` | Update webhook (url, events, secret) |
+| `DELETE` | `/webhooks/{id}` | Remove webhook |
+| `POST` | `/webhooks/{id}/test` | Send a test ping to endpoint |
 
 ### AI Provider Management
 | Method | Endpoint | Description |
@@ -298,8 +344,9 @@ ukip/
 │   │   ├── rag_engine.py         # RAG orchestration (index + query)
 │   │   └── vector_store.py       # ChromaDB vector store
 │   ├── analyzers/
-│   │   ├── topic_modeling.py     # LDA topic extraction
-│   │   └── correlation.py        # Multi-variable statistical analysis
+│   │   ├── topic_modeling.py     # Concept frequency, co-occurrence, PMI
+│   │   ├── correlation.py        # Cramér's V multi-variable analysis
+│   │   └── roi_calculator.py     # Monte Carlo I+D ROI simulation (numpy)
 │   ├── authority/
 │   │   ├── resolver.py           # Parallel authority resolution engine
 │   │   ├── scoring.py            # Weighted scoring & evidence
@@ -308,23 +355,37 @@ ukip/
 │   │   ├── default.yaml          # Universal catalog schema
 │   │   ├── science.yaml          # Scientific domain
 │   │   └── healthcare.yaml       # Healthcare domain
-│   ├── tests/                    # 470 tests across 26 files
-│   ├── auth.py                   # JWT + RBAC + lockout
+│   ├── tests/                    # 470+ tests across 26+ files
+│   ├── auth.py                   # JWT + RBAC + account lockout
 │   ├── circuit_breaker.py        # External API resilience
 │   ├── encryption.py             # AES encryption utilities
-│   ├── main.py                   # FastAPI app (86 endpoints)
-│   ├── models.py                 # SQLAlchemy ORM models
+│   ├── main.py                   # FastAPI app (97+ endpoints)
+│   ├── models.py                 # SQLAlchemy ORM models (incl. AuditLog, Webhook)
 │   ├── olap.py                   # DuckDB OLAP engine
+│   ├── report_builder.py         # HTML report generation (5 section builders)
 │   └── schema_registry.py        # Dynamic domain schema loader
 ├── frontend/
 │   ├── app/
-│   │   ├── analytics/            # Dashboard + OLAP Explorer + Topics
+│   │   ├── analytics/
+│   │   │   ├── olap/             # OLAP Cube Explorer
+│   │   │   ├── topics/           # Topic Modeling & Correlations
+│   │   │   ├── roi/              # ROI Calculator (Monte Carlo I+D)
+│   │   │   └── page.tsx          # Intelligence Dashboard
 │   │   ├── authority/            # Disambiguation + Review Queue
 │   │   ├── domains/              # Domain schema management
+│   │   ├── entities/
+│   │   │   └── [id]/             # Entity Detail Page (3-tab view)
 │   │   ├── harmonization/        # Data cleaning workflows
 │   │   ├── integrations/         # Store + AI provider config
 │   │   ├── rag/                  # Semantic RAG chat
-│   │   ├── components/           # Shared UI components
+│   │   ├── reports/              # Report Builder
+│   │   ├── settings/             # App settings + user management + webhooks
+│   │   ├── components/
+│   │   │   ├── ActivityFeed.tsx  # Real-time audit timeline
+│   │   │   ├── EntityTable.tsx   # Entity list with detail links
+│   │   │   ├── MonteCarloChart.tsx
+│   │   │   ├── RAGChatInterface.tsx
+│   │   │   └── ui/               # Shared design system components
 │   │   └── login/                # Authentication
 │   └── lib/                      # API client, utilities
 ├── docs/
@@ -344,29 +405,32 @@ ukip/
 
 | Sprint | Milestone |
 |--------|-----------|
-| 1-5 | Core catalog, fuzzy disambiguation, analytics dashboard |
-| 6-8 | Scientometric enrichment (OpenAlex, Scholar, Web of Science) |
+| 1–5 | Core catalog, fuzzy disambiguation, multi-format import/export, analytics dashboard |
+| 6–8 | Scientometric enrichment (OpenAlex, Scholar, Web of Science), circuit breaker |
 | 9 | Monte Carlo stochastic citation projections |
 | 10 | Semantic RAG with ChromaDB + multi-LLM BYOK panel |
-| 11-13 | E-commerce integrations (Shopify, WooCommerce, Bsale) |
-| 14 | Security hardening: JWT auth, RBAC, account lockout, password management |
-| 15-16 | Authority Resolution Layer with weighted scoring engine (Wikidata, VIAF, ORCID, DBpedia, OpenAlex) |
+| 11–13 | E-commerce integrations (Shopify, WooCommerce, Bsale); HTTP 201 on creation; export/upload caps |
+| 14 | Security hardening: JWT auth on all endpoints, RBAC, account lockout, password management, role-aware UI |
+| 15–16 | Authority Resolution Layer with weighted scoring engine (Wikidata, VIAF, ORCID, DBpedia, OpenAlex); ARL metrics endpoint |
 | 17a | Domain Registry with YAML-based schema designer |
-| 17b | OLAP Cube Explorer with DuckDB (multi-dimensional queries, drill-down, Excel pivot export) |
-| 18 | Topic modeling, co-occurrence networks, correlation analysis |
-| 19 | ARL Phase 2: batch resolution, review queue, bulk confirm/reject |
+| 17b | OLAP Cube Explorer powered by DuckDB (multi-dimensional queries, drill-down, Excel pivot export) |
+| 18 | Topic modeling, PMI co-occurrence networks, topic clusters, Cramér's V correlation analysis |
+| 19 | ARL Phase 2: batch resolution, review queue, bulk confirm/reject, `GET /authority/metrics` |
+| 20–22 | Webhook system (HMAC-SHA256 signing, per-event subscription, delivery tracking); Audit Log + Activity Feed (30-second auto-refresh); responsive UI (mobile sidebar drawer, hamburger navigation, adaptive layouts) |
+| 23 | Entity Detail Page (`/entities/:id`) with 3 tabs: Overview (inline editing), Enrichment (Monte Carlo + concepts), Authority (candidate confirm/reject) |
+| 36 | Report Builder — server-side HTML generation per domain with section toggles, print/PDF support |
+| 37 | ROI Calculator — Monte Carlo I+D projection with P5–P95 percentiles, break-even probability, year-by-year trajectory charts, distribution histogram, CSV export |
 
 ### Up Next
 
 | Priority | Feature |
 |----------|---------|
-| High | **Artifact Studio** — PDF/HTML report generation from OLAP and Monte Carlo results |
 | High | **Context Engineering Layer** — Structured LLM context builder with tool registry and persistent memory |
+| High | **Bulk Entity Editor** — Multi-select and batch-edit fields across filtered result sets |
 | Medium | **Knowledge Gap Analyzer** — Bibliometric gap detection across research corpora |
 | Medium | **Scopus Adapter** — Elsevier premium enrichment (BYOK) |
-| Medium | **ROI Calculator** — Multi-scenario return projections for research investment decisions |
+| Medium | **Scheduled Imports** — Automated ingestion from S3 / external APIs |
 | Low | **PostgreSQL/MySQL backends** — Production-grade database support |
-| Low | **Scheduled Imports** — Automated ingestion from S3 / external APIs |
 | Low | **SSO Integration** — OAuth2/SAML for institutional deployments |
 
 See [EVOLUTION_STRATEGY.md](docs/EVOLUTION_STRATEGY.md) for the full platform vision and phased roadmap.
