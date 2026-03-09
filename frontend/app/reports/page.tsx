@@ -6,6 +6,17 @@ import { apiFetch } from "../../lib/api";
 import { useDomain } from "../contexts/DomainContext";
 import { useToast } from "../components/ui";
 
+// ── Template types ─────────────────────────────────────────────────────────────
+
+interface ArtifactTemplate {
+  id: number;
+  name: string;
+  description: string;
+  sections: string[];
+  default_title: string;
+  is_builtin: boolean;
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Section {
@@ -31,12 +42,13 @@ const SECTION_DESCRIPTIONS: Record<string, string> = {
 
 // ── Format types ──────────────────────────────────────────────────────────────
 
-type ExportFormat = "html" | "pdf" | "excel";
+type ExportFormat = "html" | "pdf" | "excel" | "pptx";
 
 const FORMAT_OPTIONS: { value: ExportFormat; label: string; desc: string; icon: string }[] = [
-  { value: "html",  label: "HTML",  desc: "Preview in browser, Ctrl+P to print", icon: "🌐" },
-  { value: "pdf",   label: "PDF",   desc: "Professional branded PDF download",    icon: "📄" },
-  { value: "excel", label: "Excel", desc: "Multi-sheet workbook with KPIs, entities & concepts", icon: "📊" },
+  { value: "html",  label: "HTML",       desc: "Preview in browser, Ctrl+P to print",               icon: "🌐" },
+  { value: "pdf",   label: "PDF",        desc: "Professional branded PDF download",                  icon: "📄" },
+  { value: "excel", label: "Excel",      desc: "Multi-sheet workbook with KPIs, entities & concepts", icon: "📊" },
+  { value: "pptx",  label: "PowerPoint", desc: "Branded slide deck for presentations",               icon: "📑" },
 ];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -51,6 +63,13 @@ export default function ReportsPage() {
   const [format, setFormat] = useState<ExportFormat>("html");
   const [generating, setGenerating] = useState(false);
   const [loadingSections, setLoadingSections] = useState(true);
+
+  // Templates panel
+  const [templates, setTemplates] = useState<ArtifactTemplate[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
 
   // Fetch available sections from backend
   const loadSections = useCallback(async () => {
@@ -67,6 +86,55 @@ export default function ReportsPage() {
   }, []);
 
   useEffect(() => { loadSections(); }, [loadSections]);
+
+  const loadTemplates = useCallback(async () => {
+    if (templates.length > 0) return; // already loaded
+    setLoadingTemplates(true);
+    try {
+      const res = await apiFetch("/artifacts/templates");
+      if (res.ok) setTemplates(await res.json());
+    } finally {
+      setLoadingTemplates(false);
+    }
+  }, [templates.length]);
+
+  const applyTemplate = (tpl: ArtifactTemplate) => {
+    setSelected(new Set(tpl.sections));
+    if (tpl.default_title) setTitle(tpl.default_title);
+    setShowTemplates(false);
+    toast(`Template "${tpl.name}" applied`, "success");
+  };
+
+  const saveAsTemplate = async () => {
+    if (!newTemplateName.trim()) {
+      toast("Enter a template name", "warning");
+      return;
+    }
+    setSavingTemplate(true);
+    try {
+      const res = await apiFetch("/artifacts/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newTemplateName.trim(),
+          sections: Array.from(selected),
+          default_title: title || "",
+          description: "",
+        }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setTemplates((prev) => [...prev, created]);
+        setNewTemplateName("");
+        toast("Template saved", "success");
+      } else {
+        const err = await res.text();
+        toast(`Failed: ${err}`, "error");
+      }
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
 
   const toggleSection = (id: string) =>
     setSelected((prev) => {
@@ -88,6 +156,7 @@ export default function ReportsPage() {
       const endpoint =
         format === "pdf"   ? "/exports/pdf"     :
         format === "excel" ? "/exports/excel"   :
+        format === "pptx"  ? "/exports/pptx"    :
                              "/reports/generate";
 
       const res = await apiFetch(endpoint, {
@@ -107,8 +176,9 @@ export default function ReportsPage() {
 
       const buffer = await res.arrayBuffer();
       const mimeType =
-        format === "pdf"   ? "application/pdf"                                          :
+        format === "pdf"   ? "application/pdf" :
         format === "excel" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" :
+        format === "pptx"  ? "application/vnd.openxmlformats-officedocument.presentationml.presentation" :
                              "text/html";
       const blob = new Blob([buffer], { type: mimeType });
       const url  = URL.createObjectURL(blob);
@@ -118,6 +188,7 @@ export default function ReportsPage() {
       const defaultName =
         format === "pdf"   ? "ukip_report.pdf"  :
         format === "excel" ? "ukip_report.xlsx" :
+        format === "pptx"  ? "ukip_report.pptx" :
                              "ukip_report.html";
       a.href     = url;
       a.download = match ? match[1] : defaultName;
@@ -166,6 +237,87 @@ export default function ReportsPage() {
           </button>
         }
       />
+
+      {/* Templates panel */}
+      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <button
+          onClick={() => { setShowTemplates((v) => !v); if (!showTemplates) loadTemplates(); }}
+          className="flex w-full items-center justify-between px-5 py-4 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base">📐</span>
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">Templates</span>
+            {templates.length > 0 && (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
+                {templates.length}
+              </span>
+            )}
+          </div>
+          <svg
+            className={`h-4 w-4 text-gray-400 transition-transform ${showTemplates ? "rotate-180" : ""}`}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {showTemplates && (
+          <div className="border-t border-gray-100 px-5 pb-5 pt-4 dark:border-gray-800">
+            {loadingTemplates ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
+                ))}
+              </div>
+            ) : templates.length === 0 ? (
+              <p className="text-sm text-gray-400 dark:text-gray-500">No templates found.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {templates.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    onClick={() => applyTemplate(tpl)}
+                    className="flex flex-col items-start rounded-xl border border-gray-200 bg-gray-50 p-4 text-left transition-all hover:border-blue-300 hover:bg-blue-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-500/40 dark:hover:bg-blue-500/10"
+                  >
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">{tpl.name}</span>
+                      {tpl.is_builtin && (
+                        <span className="shrink-0 rounded-full bg-gray-200 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                          built-in
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{tpl.description}</p>
+                    <span className="mt-2 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
+                      {tpl.sections.length} section{tpl.sections.length !== 1 ? "s" : ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Save as template */}
+            {selected.size > 0 && (
+              <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
+                <input
+                  type="text"
+                  value={newTemplateName}
+                  onChange={(e) => setNewTemplateName(e.target.value)}
+                  placeholder="New template name…"
+                  className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+                />
+                <button
+                  onClick={saveAsTemplate}
+                  disabled={savingTemplate || !newTemplateName.trim()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-300"
+                >
+                  {savingTemplate ? "Saving…" : "Save"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         {/* Section picker */}

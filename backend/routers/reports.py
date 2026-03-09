@@ -19,6 +19,7 @@ from backend import report_builder as _report_builder
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
 from backend.exporters.excel_exporter import EnterpriseExcelExporter
+from backend.exporters.pptx_exporter import generate_pptx as _generate_pptx
 
 logger = logging.getLogger(__name__)
 
@@ -118,5 +119,51 @@ def export_excel(
     return Response(
         content=xlsx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/exports/pptx", tags=["exports"])
+def export_pptx(
+    payload: _ReportRequest,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+):
+    """Generate a branded PowerPoint presentation (python-pptx)."""
+    invalid = [s for s in payload.sections if s not in _report_builder.SECTION_BUILDERS]
+    if invalid:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown sections: {invalid}. Valid: {_ALL_REPORT_SECTIONS}",
+        )
+    # Fetch branding settings (use defaults if singleton not yet created)
+    from backend.routers.branding import _get_or_create_settings as _branding_settings
+    branding = _branding_settings(db)
+    branding_dict = {
+        "platform_name": branding.platform_name,
+        "logo_url":       branding.logo_url,
+        "accent_color":   branding.accent_color,
+        "footer_text":    branding.footer_text,
+    }
+    try:
+        pptx_bytes = _generate_pptx(
+            db=db,
+            domain_id=payload.domain_id,
+            sections=payload.sections,
+            title=payload.title,
+            branding=branding_dict,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=501,
+            detail="PowerPoint export requires python-pptx. Install with: pip install python-pptx",
+        ) from exc
+    filename = (
+        f"ukip_report_{payload.domain_id}_"
+        f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.pptx"
+    )
+    return Response(
+        content=pptx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

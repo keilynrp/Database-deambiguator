@@ -22,3 +22,5 @@ cryptography
 slowapi
 # ── Sprint 40: Enterprise Export ─────────────────────────────
 weasyprint
+# ── Phase 10 Sprint 47: PowerPoint Export ────────────────────
+python-pptx>=1.0.2

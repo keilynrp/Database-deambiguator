@@ -24,6 +24,7 @@ from backend.routers import (
     ai_rag,
     analytics,
     annotations,
+    artifacts,
     auth_users,
     authority,
     branding,
@@ -90,6 +91,34 @@ with database.engine.connect() as _conn:
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
+_BUILTIN_TEMPLATES = [
+    {
+        "name": "Executive Summary",
+        "sections": '["entity_stats","enrichment_coverage","top_brands"]',
+        "description": "KPIs + enrichment coverage + top brands for decision-makers",
+        "default_title": "Executive Summary Report",
+    },
+    {
+        "name": "Research Analysis",
+        "sections": '["topic_clusters","enrichment_coverage","entity_stats"]',
+        "description": "Concept clusters + semantic coverage for researchers",
+        "default_title": "Research Analysis Report",
+    },
+    {
+        "name": "Data Quality Audit",
+        "sections": '["entity_stats","harmonization_log","enrichment_coverage"]',
+        "description": "Validation status + harmonization trail + enrichment",
+        "default_title": "Data Quality Audit Report",
+    },
+    {
+        "name": "Full Report",
+        "sections": '["entity_stats","enrichment_coverage","top_brands","topic_clusters","harmonization_log"]',
+        "description": "All sections combined — comprehensive view",
+        "default_title": "Full Platform Report",
+    },
+]
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -107,6 +136,20 @@ async def lifespan(app: FastAPI):
             db.add(bootstrap_user)
             db.commit()
             logger.info("Bootstrap: super_admin '%s' created", bootstrap_user.username)
+
+        # Seed built-in artifact templates (only on first run)
+        if db.query(models.ArtifactTemplate).count() == 0:
+            import json as _json
+            for t in _BUILTIN_TEMPLATES:
+                db.add(models.ArtifactTemplate(
+                    name=t["name"],
+                    description=t["description"],
+                    sections=t["sections"],
+                    default_title=t["default_title"],
+                    is_builtin=True,
+                ))
+            db.commit()
+            logger.info("Bootstrap: %d built-in artifact templates seeded", len(_BUILTIN_TEMPLATES))
 
     def get_db_gen():
         while True:
@@ -162,3 +205,4 @@ app.include_router(demo.router)
 app.include_router(annotations.router)
 app.include_router(notifications.router)
 app.include_router(branding.router)
+app.include_router(artifacts.router)

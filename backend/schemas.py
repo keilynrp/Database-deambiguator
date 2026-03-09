@@ -350,3 +350,57 @@ class BrandingSettingsUpdate(BaseModel):
     logo_url:      Optional[str] = Field(None, max_length=500)
     accent_color:  Optional[str] = Field(None, pattern=r"^#[0-9a-fA-F]{6}$")
     footer_text:   Optional[str] = Field(None, max_length=200)
+
+
+# ── Phase 10 Sprint 45: Knowledge Gap Detector ───────────────────────────────
+
+class GapItemResponse(BaseModel):
+    category:      str
+    severity:      str
+    title:         str
+    description:   str
+    affected_count: int
+    total_count:   int
+    pct:           float
+    action:        str
+
+
+class GapReportResponse(BaseModel):
+    domain_id:    str
+    generated_at: datetime
+    summary:      dict   # {"critical": N, "warning": N, "ok": N, "total_entities": N}
+    gaps:         List[GapItemResponse]
+
+
+# ── Phase 10 Sprint 46: Artifact Templates ────────────────────────────────────
+
+VALID_SECTIONS = {
+    "entity_stats",
+    "enrichment_coverage",
+    "top_brands",
+    "topic_clusters",
+    "harmonization_log",
+}
+
+
+class ArtifactTemplateCreate(BaseModel):
+    name:          str       = Field(min_length=1, max_length=80)
+    description:   str       = Field(default="", max_length=300)
+    sections:      List[str] = Field(min_length=1)
+    default_title: str       = Field(default="", max_length=120)
+
+    @classmethod
+    def model_post_init(cls, values):  # Pydantic v2 validator placeholder
+        pass
+
+
+class ArtifactTemplateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id:            int
+    name:          str
+    description:   str
+    sections:      List[str]
+    default_title: str
+    is_builtin:    bool
+    created_at:    datetime

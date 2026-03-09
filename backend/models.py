@@ -323,3 +323,23 @@ class BrandingSettings(Base):
     logo_url      = Column(String, default="")
     accent_color  = Column(String, default="#6366f1")   # indigo-500
     footer_text   = Column(String, default="Universal Knowledge Intelligence Platform")
+
+
+# ── Phase 10 Sprint 46: Artifact Templates ────────────────────────────────────
+
+class ArtifactTemplate(Base):
+    """
+    Saved report configurations. 4 built-in templates are seeded in lifespan.
+    User-created templates have is_builtin=False and can be deleted.
+    sections stores a JSON array of section name strings.
+    """
+    __tablename__ = "artifact_templates"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    name          = Column(String, nullable=False)
+    description   = Column(String, default="")
+    sections      = Column(Text, nullable=False)       # JSON: ["entity_stats", ...]
+    default_title = Column(String, default="")
+    is_builtin    = Column(Boolean, default=False)
+    created_by    = Column(Integer, nullable=True)     # FK users.id (nullable for built-ins)
+    created_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
