@@ -146,6 +146,7 @@ _TABLES_TO_CLEAN = [
     "notification_settings",
     "branding_settings",
     "artifact_templates",
+    "analysis_contexts",
     # Note: "users" is intentionally excluded — the super_admin/editor/viewer
     # test accounts must persist across the entire test session.
 ]

@@ -21,6 +21,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   "/analytics/topics": { title: "Topic Modeling", subtitle: "Concept frequency, co-occurrence, clusters, and field correlations" },
   "/artifacts": { title: "Artifact Studio", subtitle: "Build and export strategic intelligence artifacts" },
   "/artifacts/gaps": { title: "Knowledge Gap Detector", subtitle: "Identify and prioritize data quality issues in your domain" },
+  "/context": { title: "Context Engineering", subtitle: "Domain context snapshots, sessions, and tool invocations" },
 };
 
 export default function Header() {

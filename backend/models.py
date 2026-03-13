@@ -343,3 +343,21 @@ class ArtifactTemplate(Base):
     is_builtin    = Column(Boolean, default=False)
     created_by    = Column(Integer, nullable=True)     # FK users.id (nullable for built-ins)
     created_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+# ── Phase 11 Sprint 48: Analysis Context Sessions ─────────────────────────────
+
+class AnalysisContext(Base):
+    """
+    Persisted domain context snapshot. Stores the assembled domain state
+    (entity stats, gaps, topics, schema) at a point in time.
+    Used by the Context Engineering Layer and context-aware RAG.
+    """
+    __tablename__ = "analysis_contexts"
+
+    id               = Column(Integer, primary_key=True, index=True)
+    domain_id        = Column(String, nullable=False, index=True)
+    user_id          = Column(Integer, nullable=True)     # FK users.id (nullable for system)
+    label            = Column(String, default="")         # user-defined name
+    context_snapshot = Column(Text, nullable=False)       # JSON from ContextEngine
+    created_at       = Column(DateTime, default=lambda: datetime.now(timezone.utc))

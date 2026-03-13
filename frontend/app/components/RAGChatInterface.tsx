@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { apiFetch } from "@/lib/api";
 import { Badge } from "./ui";
+import { useDomain } from "../contexts/DomainContext";
 
 interface Message {
     role: "user" | "assistant" | "system";
@@ -14,6 +15,7 @@ interface Message {
 }
 
 export default function RAGChatInterface() {
+    const { activeDomainId } = useDomain();
     const [messages, setMessages] = useState<Message[]>([
         {
             role: "system",
@@ -24,6 +26,7 @@ export default function RAGChatInterface() {
     const [isQuerying, setIsQuerying] = useState(false);
     const [isIndexing, setIsIndexing] = useState(false);
     const [indexStats, setIndexStats] = useState<{ total_indexed: number } | null>(null);
+    const [useContext, setUseContext] = useState(false);
     const bottomRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -74,7 +77,12 @@ export default function RAGChatInterface() {
             const res = await apiFetch("/rag/query", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ question: query, top_k: 5 })
+                body: JSON.stringify({
+                    question: query,
+                    top_k: 5,
+                    use_context: useContext,
+                    domain_id: useContext ? (activeDomainId || "default") : undefined,
+                })
             });
             const data = await res.json();
 
@@ -195,6 +203,28 @@ export default function RAGChatInterface() {
 
             {/* Input */}
             <div className="border-t border-gray-100 p-4 dark:border-gray-800">
+                {/* Context toggle */}
+                <div className="mb-2 flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setUseContext((v) => !v)}
+                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                            useContext
+                                ? "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-500/40 dark:bg-violet-500/10 dark:text-violet-300"
+                                : "border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                        }`}
+                    >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1 1 .03 2.798-1.414 2.798H4.212c-1.444 0-2.414-1.798-1.414-2.798L4.2 15.3" />
+                        </svg>
+                        {useContext ? "Context ON" : "Context OFF"}
+                    </button>
+                    {useContext && (
+                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                            Injecting domain context ({activeDomainId || "default"}) into prompt
+                        </span>
+                    )}
+                </div>
                 <form onSubmit={handleSend} className="flex gap-2">
                     <input
                         type="text"

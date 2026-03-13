@@ -44,8 +44,10 @@ class AIIntegrationUpdate(schemas.BaseModel):
 
 
 class RAGQueryPayload(BaseModel):
-    question: str = Field(min_length=1, max_length=5000)
-    top_k:    int = Field(default=5, ge=1, le=20)
+    question:    str          = Field(min_length=1, max_length=5000)
+    top_k:       int          = Field(default=5, ge=1, le=20)
+    use_context: bool         = Field(default=False)
+    domain_id:   str | None   = Field(default=None, max_length=64)
 
 
 # ── AI Integrations ───────────────────────────────────────────────────────────
@@ -197,13 +199,32 @@ def rag_query(
     db: Session = Depends(get_db),
     _: models.User = Depends(get_current_user),
 ):
-    """Phase 5: Natural language question answered using ChromaDB + active LLM provider."""
+    """
+    Phase 5 / 11: Natural language question answered using ChromaDB + active LLM.
+    When use_context=True, a structured domain context block is prepended to the
+    system prompt, grounding the LLM in the current data state.
+    """
     integration = _get_active_integration(db)
+
+    # Phase 11: optionally inject domain context into the system prompt
+    extra_system = None
+    if payload.use_context and payload.domain_id:
+        try:
+            from backend.context_engine import ContextEngine
+            ctx = ContextEngine().build_domain_context(payload.domain_id, db)
+            extra_system = ContextEngine().format_for_llm(ctx)
+        except Exception:
+            pass  # context injection is best-effort; fall back to plain RAG
+
     result = rag_engine.query_catalog(
         user_question=payload.question,
         integration_record=integration,
         top_k=payload.top_k,
+        extra_system_context=extra_system,
     )
+
+    # Annotate whether context was used
+    result["context_injected"] = extra_system is not None
     return result
 
 

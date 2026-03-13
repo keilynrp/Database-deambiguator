@@ -404,3 +404,22 @@ class ArtifactTemplateResponse(BaseModel):
     default_title: str
     is_builtin:    bool
     created_at:    datetime
+
+
+# ── Phase 11 Sprint 48: Analysis Context Sessions ─────────────────────────────
+
+class AnalysisContextCreate(BaseModel):
+    domain_id: str         = Field(min_length=1, max_length=64)
+    label:     str         = Field(default="", max_length=120)
+    # context_snapshot is generated server-side; not accepted from client
+
+
+class AnalysisContextResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id:               int
+    domain_id:        str
+    user_id:          Optional[int]
+    label:            str
+    context_snapshot: str   # raw JSON string
+    created_at:       datetime

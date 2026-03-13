@@ -28,6 +28,7 @@ from backend.routers import (
     auth_users,
     authority,
     branding,
+    context,
     demo,
     disambiguation,
     domains,
@@ -206,3 +207,4 @@ app.include_router(annotations.router)
 app.include_router(notifications.router)
 app.include_router(branding.router)
 app.include_router(artifacts.router)
+app.include_router(context.router)

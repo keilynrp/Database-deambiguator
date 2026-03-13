@@ -116,12 +116,20 @@ def index_entity(entity, integration_record) -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
-def query_catalog(user_question: str, integration_record, top_k: int = 5) -> Dict[str, Any]:
+def query_catalog(
+    user_question: str,
+    integration_record,
+    top_k: int = 5,
+    extra_system_context: Optional[str] = None,
+) -> Dict[str, Any]:
     """
-    Phase 5 / Generation Step:
+    Phase 5 / 11 — Generation Step:
     1. Embed the user's question
     2. Retrieve the most relevant catalog documents
     3. Send to LLM for grounded, context-aware generation
+
+    When extra_system_context is provided (Phase 11), it is prepended to the
+    system prompt so the model is aware of the current domain state.
     """
     adapter = _build_adapter(integration_record)
     if not adapter:
@@ -142,9 +150,13 @@ def query_catalog(user_question: str, integration_record, top_k: int = 5) -> Dic
 
         context_chunks = [doc["text"] for doc in retrieved_docs]
 
-        # Step 3: Generate answer with grounded context
+        # Step 3: Build system prompt, optionally enriched with domain context
+        system_prompt = SYSTEM_PROMPT
+        if extra_system_context:
+            system_prompt = extra_system_context + "\n\n" + SYSTEM_PROMPT
+
         answer = adapter.chat(
-            system_prompt=SYSTEM_PROMPT,
+            system_prompt=system_prompt,
             user_query=user_question,
             context_chunks=context_chunks
         )
