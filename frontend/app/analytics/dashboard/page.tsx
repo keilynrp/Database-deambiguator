@@ -41,6 +41,10 @@ interface DashboardData {
     citation_count: number;
     source: string | null;
   }[];
+  quality?: {
+    average: number | null;
+    distribution: { high: number; medium: number; low: number };
+  };
 }
 
 // ── Heatmap cell with violet color scale ─────────────────────────────────────
@@ -145,7 +149,7 @@ export default function ExecutiveDashboardPage() {
       )}
 
       {/* ── Section 1: Hero KPIs ── */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)
         ) : data ? (
@@ -160,6 +164,7 @@ export default function ExecutiveDashboardPage() {
               label="Total Entities"
               value={data.kpis.total_entities.toLocaleString()}
             />
+
             <StatCard
               iconColor="emerald"
               icon={
@@ -195,6 +200,38 @@ export default function ExecutiveDashboardPage() {
               label="Distinct Concepts"
               value={data.kpis.total_concepts.toLocaleString()}
             />
+            {/* Quality KPI */}
+            <div className="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm dark:border-indigo-500/20 dark:bg-gray-900">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10">
+                  <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Avg Quality</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {data.quality?.average != null ? `${Math.round(data.quality.average * 100)}%` : "—"}
+                  </p>
+                </div>
+              </div>
+              {data.quality?.distribution && (
+                <div className="mt-3 flex gap-1" title="High / Medium / Low quality distribution">
+                  {(() => {
+                    const { high, medium, low } = data.quality.distribution;
+                    const total = high + medium + low;
+                    if (total === 0) return <span className="text-xs text-gray-400">No scored entities</span>;
+                    return (
+                      <div className="flex w-full overflow-hidden rounded-full h-2 gap-px">
+                        {high > 0 && <div className="bg-emerald-500 h-2 rounded-l-full" style={{ width: `${(high / total) * 100}%` }} title={`High: ${high}`} />}
+                        {medium > 0 && <div className="bg-amber-400 h-2" style={{ width: `${(medium / total) * 100}%` }} title={`Medium: ${medium}`} />}
+                        {low > 0 && <div className="bg-red-500 h-2 rounded-r-full" style={{ width: `${(low / total) * 100}%` }} title={`Low: ${low}`} />}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
           </>
         ) : null}
       </div>

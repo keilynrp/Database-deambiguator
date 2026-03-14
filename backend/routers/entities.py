@@ -43,6 +43,9 @@ def get_entities(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
     search: str = None,
+    sort_by: str = Query(default="id", pattern="^(id|quality_score|primary_label|enrichment_status)$"),
+    order: str = Query(default="asc", pattern="^(asc|desc)$"),
+    min_quality: float = Query(default=None, ge=0.0, le=1.0),
     db: Session = Depends(get_db),
     _: models.User = Depends(get_current_user),
 ):
@@ -57,6 +60,20 @@ def get_entities(
                 models.RawEntity.entity_type.ilike(search_filter),
             )
         )
+
+    # Quality filter
+    if min_quality is not None:
+        query = query.filter(models.RawEntity.quality_score >= min_quality)
+
+    # Sorting
+    sort_col = {
+        "id": models.RawEntity.id,
+        "quality_score": models.RawEntity.quality_score,
+        "primary_label": models.RawEntity.primary_label,
+        "enrichment_status": models.RawEntity.enrichment_status,
+    }.get(sort_by, models.RawEntity.id)
+    query = query.order_by(sort_col.desc() if order == "desc" else sort_col.asc())
+
     total = query.count()
     entities = query.offset(skip).limit(limit).all()
     response.headers["X-Total-Count"] = str(total)

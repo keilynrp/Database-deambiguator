@@ -30,6 +30,9 @@ class UniversalEntity(Base):
     enrichment_source = Column(String, nullable=True)
     enrichment_status = Column(String, default="none", index=True)
 
+    # Sprint 72 — Quality Score
+    quality_score = Column(Float, nullable=True, index=True)
+
     # Provenance
     source = Column(String, default="user")
 

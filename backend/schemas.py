@@ -17,6 +17,7 @@ class EntityBase(BaseModel):
     enrichment_concepts: Optional[str] = None
     enrichment_source: Optional[str] = None
     enrichment_status: Optional[str] = "none"
+    quality_score: Optional[float] = None
 
 class Entity(EntityBase):
     id: int
@@ -25,6 +26,18 @@ class Entity(EntityBase):
     source: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+class QualityDimension(BaseModel):
+    weight: float
+    contribution: float
+
+
+class QualityBreakdown(BaseModel):
+    entity_id: int
+    score: float
+    stored_score: Optional[float] = None
+    breakdown: dict
+
 
 class RuleBase(BaseModel):
     field_name: str

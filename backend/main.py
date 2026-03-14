@@ -38,6 +38,7 @@ from backend.routers import (
     harmonization,
     ingest,
     notifications,
+    quality,
     relationships,
     reports,
     scheduled_imports,
@@ -73,6 +74,9 @@ with database.engine.connect() as _conn:
             _conn.commit()
         if "source" not in _cols:
             _conn.execute(text("ALTER TABLE raw_entities ADD COLUMN source VARCHAR DEFAULT 'user'"))
+            _conn.commit()
+        if "quality_score" not in _cols:
+            _conn.execute(text("ALTER TABLE raw_entities ADD COLUMN quality_score REAL"))
             _conn.commit()
 
     if "users" in _inspector.get_table_names():
@@ -311,6 +315,7 @@ app.include_router(auth_users.router)
 app.include_router(ingest.router)
 app.include_router(domains.router)
 app.include_router(analytics.router)
+app.include_router(quality.router)
 app.include_router(entities.router)
 app.include_router(disambiguation.router)
 app.include_router(harmonization.router)

@@ -20,6 +20,21 @@ interface Entity {
     source: string | null;
     attributes_json: string | null;
     normalized_json: string | null;
+    quality_score: number | null;
+}
+
+function QualityBadge({ score }: { score: number | null }) {
+    if (score === null || score === undefined) return <span className="text-xs text-gray-400">—</span>;
+    const pct = Math.round(score * 100);
+    const color = score >= 0.7 ? "bg-emerald-500" : score >= 0.3 ? "bg-amber-400" : "bg-red-500";
+    return (
+        <div className="flex items-center gap-1.5">
+            <div className="w-16 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700">
+                <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} />
+            </div>
+            <span className="text-xs tabular-nums text-gray-600 dark:text-gray-400">{pct}%</span>
+        </div>
+    );
 }
 
 type EditableFields = Pick<Entity, "primary_label" | "secondary_label" | "canonical_id" | "entity_type" | "domain" | "validation_status">;
@@ -49,6 +64,11 @@ export default function EntityTable() {
 
     const [enrichingId, setEnrichingId] = useState<number | null>(null);
 
+    // Quality filter and sort
+    const [minQuality, setMinQuality] = useState<string>("");
+    const [sortBy, setSortBy] = useState<string>("id");
+    const [sortOrder, setSortOrder] = useState<string>("asc");
+
     // Delete state
     const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -74,8 +94,11 @@ export default function EntityTable() {
             const queryParams = new URLSearchParams({
                 skip: (page * limit).toString(),
                 limit: limit.toString(),
+                sort_by: sortBy,
+                order: sortOrder,
             });
             if (debouncedSearch) queryParams.append("search", debouncedSearch);
+            if (minQuality) queryParams.append("min_quality", minQuality);
 
             const res = await apiFetch(`/entities?${queryParams}`);
             if (!res.ok) throw new Error(`Server responded with ${res.status}`);
@@ -87,7 +110,7 @@ export default function EntityTable() {
         } finally {
             setLoading(false);
         }
-    }, [debouncedSearch, page, limit, activeDomainId]);
+    }, [debouncedSearch, page, limit, activeDomainId, minQuality, sortBy, sortOrder]);
 
     useEffect(() => { fetchEntities(); }, [fetchEntities]);
 
@@ -242,19 +265,34 @@ export default function EntityTable() {
 
     return (
         <div className="space-y-6">
-            {/* Search bar */}
-            <div className="flex items-center justify-between">
-                <div className="relative">
-                    <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    <input
-                        type="text"
-                        placeholder="Search entities..."
-                        className="h-10 w-80 rounded-lg border border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-700 placeholder-gray-400 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:focus:border-blue-500"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
+            {/* Search bar + quality filter */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative">
+                        <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input
+                            type="text"
+                            placeholder="Search entities..."
+                            className="h-10 w-80 rounded-lg border border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-700 placeholder-gray-400 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:focus:border-blue-500"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Min Quality:</label>
+                        <select
+                            value={minQuality}
+                            onChange={(e) => { setMinQuality(e.target.value); setPage(0); }}
+                            className="h-10 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                        >
+                            <option value="">All</option>
+                            <option value="0.7">70%+</option>
+                            <option value="0.3">30%+</option>
+                            <option value="0.0">Under 30% (show all scored)</option>
+                        </select>
+                    </div>
                 </div>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                     Page {page + 1}
@@ -286,6 +324,21 @@ export default function EntityTable() {
                                     <th className={`${thClass} no-wrap`}>Primary Label</th>
                                 )}
                                 <th className={`${thClass} no-wrap`}>System Status</th>
+                                <th
+                                    className={`${thClass} no-wrap cursor-pointer select-none`}
+                                    onClick={() => {
+                                        if (sortBy === "quality_score") {
+                                            setSortOrder(o => o === "asc" ? "desc" : "asc");
+                                        } else {
+                                            setSortBy("quality_score");
+                                            setSortOrder("desc");
+                                        }
+                                        setPage(0);
+                                    }}
+                                    title="Sort by quality score"
+                                >
+                                    Quality {sortBy === "quality_score" ? (sortOrder === "desc" ? "↓" : "↑") : ""}
+                                </th>
                                 <th className={`${thClass} no-wrap text-right`}>Actions</th>
                             </tr>
                         </thead>
@@ -380,6 +433,9 @@ export default function EntityTable() {
                                                     </select>
                                                 </td>
                                                 <td className="px-5 py-2.5">
+                                                    <QualityBadge score={entity.quality_score} />
+                                                </td>
+                                                <td className="px-5 py-2.5">
                                                     <div className="flex items-center justify-end gap-1">
                                                         <button
                                                             onClick={saveEdit}
@@ -453,6 +509,9 @@ export default function EntityTable() {
                                                     entity.validation_status === "invalid" ? "error" :
                                                     entity.validation_status === "inactive" ? "default" : "warning"
                                                 }>{entity.validation_status}</Badge>
+                                            </td>
+                                            <td className="px-5 py-3.5">
+                                                <QualityBadge score={entity.quality_score} />
                                             </td>
                                             <td className="px-5 py-3.5">
                                                 <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">

@@ -122,6 +122,9 @@ export default function EntityDetailPage() {
     // Graph tab
     const [graphKey, setGraphKey] = useState(0);
 
+    // Quality score
+    const [qualityData, setQualityData] = useState<{ score: number; stored_score: number | null; breakdown: Record<string, any> } | null>(null);
+
     const fetchEntity = useCallback(async () => {
         setLoading(true);
         try {
@@ -150,6 +153,15 @@ export default function EntityDetailPage() {
             fetchAuthority();
         }
     }, [tab, entity]);
+
+    useEffect(() => {
+        if (tab === "overview" && entity && !qualityData) {
+            apiFetch(`/entities/${entity.id}/quality`)
+                .then((r) => r.ok ? r.json() : null)
+                .then((data) => { if (data) setQualityData(data); })
+                .catch(() => {});
+        }
+    }, [tab, entity, qualityData]);
 
     async function fetchAuthority() {
         if (!entity) return;
@@ -344,6 +356,64 @@ export default function EntityDetailPage() {
             {/* ── Overview ── */}
             {tab === "overview" && (
                 <div className="space-y-6">
+                    {/* Quality Score section */}
+                    {qualityData && (
+                        <div className="rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm dark:border-indigo-500/20 dark:bg-gray-900">
+                            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-400">
+                                Quality Score
+                            </h3>
+                            <div className="flex items-center gap-6 mb-5">
+                                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4 border-indigo-100 dark:border-indigo-500/20 bg-indigo-50 dark:bg-indigo-500/10">
+                                    <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                                        {Math.round(qualityData.score * 100)}%
+                                    </span>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Overall Quality Index</p>
+                                    <div className="mt-1 w-48 h-2 rounded-full bg-gray-100 dark:bg-gray-800">
+                                        <div
+                                            className={`h-2 rounded-full ${qualityData.score >= 0.7 ? "bg-emerald-500" : qualityData.score >= 0.3 ? "bg-amber-400" : "bg-red-500"}`}
+                                            style={{ width: `${Math.round(qualityData.score * 100)}%` }}
+                                        />
+                                    </div>
+                                    {qualityData.stored_score != null && (
+                                        <p className="mt-1 text-xs text-gray-400">Stored: {Math.round(qualityData.stored_score * 100)}%</p>
+                                    )}
+                                </div>
+                            </div>
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-gray-100 dark:border-gray-800">
+                                        <th className="pb-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Dimension</th>
+                                        <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Weight</th>
+                                        <th className="pb-2 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Contribution</th>
+                                        <th className="pb-2 pl-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Progress</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                                    {Object.entries(qualityData.breakdown).map(([key, dim]: [string, any]) => (
+                                        <tr key={key}>
+                                            <td className="py-2 text-xs font-medium text-gray-600 dark:text-gray-300">
+                                                {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                                            </td>
+                                            <td className="py-2 text-right text-xs text-gray-500">{Math.round((dim.weight ?? 0) * 100)}%</td>
+                                            <td className="py-2 text-right text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                                                +{Math.round((dim.contribution ?? 0) * 100)}%
+                                            </td>
+                                            <td className="py-2 pl-4">
+                                                <div className="w-24 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800">
+                                                    <div
+                                                        className="h-1.5 rounded-full bg-indigo-400"
+                                                        style={{ width: dim.weight > 0 ? `${((dim.contribution ?? 0) / dim.weight) * 100}%` : "0%" }}
+                                                    />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                             Core Fields

@@ -268,6 +268,21 @@ def _domain_snapshot(db: Session, domain_id: str, top_n_concepts: int = 10,
         "matrix": [[label_domain_raw[b].get(d, 0) for d in heatmap_domains] for b in top_labels],
     }
 
+    # ── Quality KPI ──────────────────────────────────────────────────────────
+    quality_rows = (
+        _q()
+        .with_entities(models.RawEntity.quality_score)
+        .filter(models.RawEntity.quality_score != None)
+        .all()
+    )
+    quality_values = [r[0] for r in quality_rows if r[0] is not None]
+    avg_quality = round(sum(quality_values) / len(quality_values), 3) if quality_values else None
+    quality_dist = {
+        "high":   sum(1 for v in quality_values if v >= 0.7),
+        "medium": sum(1 for v in quality_values if 0.3 <= v < 0.7),
+        "low":    sum(1 for v in quality_values if v < 0.3),
+    }
+
     return {
         "domain_id": domain_id,
         "kpis": {
@@ -282,6 +297,7 @@ def _domain_snapshot(db: Session, domain_id: str, top_n_concepts: int = 10,
         "brand_year_matrix":  brand_year_matrix,
         "top_concepts":       top_concepts,
         "top_entities":       top_entities,
+        "quality": {"average": avg_quality, "distribution": quality_dist},
     }
 
 
@@ -367,6 +383,20 @@ def get_stats(db: Session = Depends(get_db), _: models.User = Depends(get_curren
         .all()
     )
 
+    quality_rows = (
+        db.query(models.RawEntity.quality_score)
+        .filter(models.RawEntity.quality_score != None)
+        .all()
+    )
+    quality_values = [r[0] for r in quality_rows if r[0] is not None]
+    avg_quality = round(sum(quality_values) / len(quality_values), 3) if quality_values else None
+    quality_dist = {
+        "high":     sum(1 for v in quality_values if v >= 0.7),
+        "medium":   sum(1 for v in quality_values if 0.3 <= v < 0.7),
+        "low":      sum(1 for v in quality_values if v < 0.3),
+        "unscored": db.query(func.count(models.RawEntity.id)).filter(models.RawEntity.quality_score == None).scalar() or 0,
+    }
+
     return {
         "total_entities": total_entities,
         "unique_secondary_labels": unique_secondary_labels,
@@ -379,6 +409,7 @@ def get_stats(db: Session = Depends(get_db), _: models.User = Depends(get_curren
         "top_secondary_labels": [{"name": b[0], "count": b[1]} for b in top_secondary_labels],
         "type_distribution": [{"name": t[0], "count": t[1]} for t in type_distribution],
         "domain_distribution": [{"name": d[0], "count": d[1]} for d in domain_distribution],
+        "quality": {"average": avg_quality, "distribution": quality_dist},
     }
 
 

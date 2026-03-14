@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import List
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend import models
@@ -37,6 +38,7 @@ class GapAnalyzer:
         gaps += self._authority_gaps(db)
         gaps += self._concept_density(db)
         gaps += self._dimension_completeness(domain_id, db)
+        gaps += self._quality_gaps(db)
         # Sort: critical first, then by pct desc within each severity
         _order = {"critical": 0, "warning": 1, "ok": 2}
         return sorted(gaps, key=lambda g: (_order.get(g.severity, 3), -g.pct))
@@ -126,6 +128,45 @@ class GapAnalyzer:
             pct=pct,
             action="Re-enrich sparse entities or review enrichment source quality to improve concept coverage.",
         )]
+
+    # ── 5. Low-quality entities ───────────────────────────────────────────────
+
+    def _quality_gaps(self, db: Session) -> List[GapItem]:
+        total_with_score = db.query(func.count(models.RawEntity.id)).filter(
+            models.RawEntity.quality_score != None
+        ).scalar() or 0
+
+        if total_with_score > 0:
+            low_quality_count = db.query(func.count(models.RawEntity.id)).filter(
+                models.RawEntity.quality_score < 0.3,
+                models.RawEntity.quality_score != None,
+            ).scalar() or 0
+            low_quality_pct = low_quality_count / total_with_score
+            severity = "critical" if low_quality_pct > 0.3 else "warning" if low_quality_pct > 0.1 else "ok"
+            return [GapItem(
+                category="quality",
+                severity=severity,
+                title="Low-Quality Entities",
+                description=(
+                    f"{low_quality_count} of {total_with_score} scored entities "
+                    f"({round(low_quality_pct * 100, 1)}%) have a quality score below 0.3."
+                ),
+                affected_count=low_quality_count,
+                total_count=total_with_score,
+                pct=round(low_quality_pct * 100, 1),
+                action="Run 'Compute Quality Scores' and enrich or add metadata to entities below 0.3.",
+            )]
+        else:
+            return [GapItem(
+                category="quality",
+                severity="warning",
+                title="Low-Quality Entities",
+                description="Quality scores have not been computed yet.",
+                affected_count=0,
+                total_count=0,
+                pct=0,
+                action="Quality scores have not been computed yet. Run POST /entities/quality/compute.",
+            )]
 
     # ── 4. Dimension completeness ─────────────────────────────────────────────
 
