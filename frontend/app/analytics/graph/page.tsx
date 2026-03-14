@@ -5,6 +5,54 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { PageHeader, StatCard } from "../../components/ui";
 
+// ── Export helpers ────────────────────────────────────────────────────────────
+
+type ExportFormat = "graphml" | "cytoscape" | "jsonld";
+
+const EXPORT_FORMATS: { value: ExportFormat; label: string; ext: string; desc: string; color: string }[] = [
+  {
+    value: "graphml",
+    label: "GraphML",
+    ext: "graphml",
+    desc: "Gephi · yEd · igraph",
+    color: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400",
+  },
+  {
+    value: "cytoscape",
+    label: "Cytoscape JSON",
+    ext: "json",
+    desc: "Cytoscape.js · Cytoscape Desktop",
+    color: "bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:border-indigo-500/30 dark:text-indigo-400",
+  },
+  {
+    value: "jsonld",
+    label: "JSON-LD",
+    ext: "jsonld",
+    desc: "Semantic web · Linked Data",
+    color: "bg-violet-50 border-violet-200 text-violet-700 hover:bg-violet-100 dark:bg-violet-500/10 dark:border-violet-500/30 dark:text-violet-400",
+  },
+];
+
+async function downloadGraph(format: ExportFormat, domain: string) {
+  const params = new URLSearchParams({ format });
+  if (domain.trim()) params.set("domain", domain.trim());
+  const res = await apiFetch(`/export/graph?${params.toString()}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Export failed" }));
+    throw new Error(err.detail ?? `HTTP ${res.status}`);
+  }
+  const blob = await res.blob();
+  const fmt = EXPORT_FORMATS.find((f) => f.value === format)!;
+  const domainSlug = domain.trim() ? `_${domain.trim()}` : "";
+  const filename = `ukip_graph${domainSlug}.${fmt.ext}`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 interface GraphStats {
   total_nodes: number;
   total_edges: number;
@@ -33,6 +81,11 @@ export default function GraphAnalyticsPage() {
   const [loadingPath, setLoadingPath] = useState(false);
   const [pathError, setPathError] = useState<string | null>(null);
 
+  // Export state
+  const [exportDomain, setExportDomain] = useState("");
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+
   useEffect(() => {
     setLoadingStats(true);
     apiFetch("/graph/stats")
@@ -41,6 +94,18 @@ export default function GraphAnalyticsPage() {
       .catch((e) => setErrorStats(`Failed to load graph stats (${e})`))
       .finally(() => setLoadingStats(false));
   }, []);
+
+  async function handleExport(format: ExportFormat) {
+    setExportingFormat(format);
+    setExportError(null);
+    try {
+      await downloadGraph(format, exportDomain);
+    } catch (e: any) {
+      setExportError(e.message ?? "Export failed");
+    } finally {
+      setExportingFormat(null);
+    }
+  }
 
   async function findPath() {
     if (!fromId || !toId) return;
@@ -323,6 +388,75 @@ export default function GraphAnalyticsPage() {
             </div>
           )}
         </div>
+
+        {/* Export Graph */}
+        <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+          <h2 className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Export Graph</h2>
+          <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+            Download the knowledge graph in a standard format for external analysis tools.
+          </p>
+
+          {/* Domain filter */}
+          <div className="mb-4">
+            <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+              Domain filter <span className="font-normal text-gray-400">(leave blank for all domains)</span>
+            </label>
+            <input
+              type="text"
+              value={exportDomain}
+              onChange={(e) => setExportDomain(e.target.value)}
+              placeholder="e.g. science"
+              className="w-56 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+
+          {/* Format buttons */}
+          <div className="flex flex-wrap gap-3">
+            {EXPORT_FORMATS.map((fmt) => {
+              const isLoading = exportingFormat === fmt.value;
+              return (
+                <button
+                  key={fmt.value}
+                  onClick={() => handleExport(fmt.value)}
+                  disabled={exportingFormat !== null}
+                  className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-60 ${fmt.color}`}
+                >
+                  {isLoading ? (
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                  )}
+                  <div>
+                    <p className="text-xs font-semibold">{isLoading ? "Exporting…" : fmt.label}</p>
+                    <p className="text-[10px] opacity-70">{fmt.desc}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {exportError && (
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 dark:border-red-800 dark:bg-red-900/20">
+              <svg className="h-4 w-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <p className="text-xs text-red-700 dark:text-red-400">{exportError}</p>
+              <button onClick={() => setExportError(null)} className="ml-auto text-red-400 hover:text-red-600">
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
