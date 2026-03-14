@@ -115,12 +115,33 @@ async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> models.User:
-    """Decode the JWT and return the corresponding active User from the DB."""
+    """
+    Accepts either:
+      - A JWT Bearer token (standard login flow), OR
+      - A UKIP API key (starts with 'ukip_') for programmatic access.
+    Returns the corresponding active User from the DB.
+    """
     credentials_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired token",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # ── API Key path ──────────────────────────────────────────────────────────
+    if token.startswith("ukip_"):
+        from backend.routers.api_keys import verify_api_key
+        key_record = verify_api_key(token, db)
+        if not key_record:
+            raise credentials_exc
+        user = db.query(models.User).filter(
+            models.User.id == key_record.user_id,
+            models.User.is_active == True,  # noqa: E712
+        ).first()
+        if not user:
+            raise credentials_exc
+        return user
+
+    # ── JWT path ──────────────────────────────────────────────────────────────
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: Optional[str] = payload.get("sub")

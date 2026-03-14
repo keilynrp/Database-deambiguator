@@ -25,8 +25,10 @@ from backend.routers.limiter import limiter
 # ── Domain routers ────────────────────────────────────────────────────────────
 from backend.routers import (
     ai_rag,
+    alert_channels,
     analytics,
     annotations,
+    api_keys,
     artifacts,
     audit_log,
     auth_users,
@@ -266,6 +268,8 @@ _OPENAPI_TAGS = [
     {"name": "scheduled-imports",  "description": "Cron-style import schedules for connected stores."},
     {"name": "scheduled-reports",  "description": "Cron-style report schedules with email delivery."},
     {"name": "dashboards",         "description": "Per-user custom dashboards with drag-and-drop widget layout."},
+    {"name": "alert-channels",     "description": "Slack/Teams/Discord/webhook push notifications for platform events."},
+    {"name": "api-keys",           "description": "Long-lived API keys for programmatic access with scope control."},
     {"name": "search",         "description": "Full-text search index (FTS5) across entities and annotations."},
     {"name": "entity-linker",  "description": "Find and merge duplicate entity pairs."},
     {"name": "audit",          "description": "Immutable audit log of all mutating API calls."},
@@ -350,6 +354,8 @@ app.include_router(graph_export.router)
 app.include_router(nlq.router)
 app.include_router(scheduled_reports.router)
 app.include_router(dashboards.router)
+app.include_router(alert_channels.router)
+app.include_router(api_keys.router)
 
 # ── Static file serving (uploaded logos etc.) ─────────────────────────────────
 _static_dir = pathlib.Path("static")

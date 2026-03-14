@@ -414,6 +414,52 @@ class ScheduledImport(Base):
     created_at      = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+# ── Sprint 81: Alert Channels (Slack / Teams / Discord / Generic) ─────────────
+
+class AlertChannel(Base):
+    """
+    Push-notification channel for operational events.
+    type: slack | teams | discord | webhook
+    events: JSON list of subscribed event names
+    webhook_url: encrypted inbound webhook URL
+    """
+    __tablename__ = "alert_channels"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    name        = Column(String(200), nullable=False)
+    type        = Column(String(20), nullable=False, default="slack")  # slack|teams|discord|webhook
+    webhook_url = Column(Text, nullable=False)                          # Fernet-encrypted
+    events      = Column(Text, default="[]")                            # JSON list of event names
+    is_active   = Column(Boolean, default=True)
+    last_fired_at    = Column(DateTime, nullable=True)
+    last_fire_status = Column(String(10), nullable=True)                # ok | error
+    total_fired      = Column(Integer, default=0)
+    created_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+# ── Sprint 82: API Keys ────────────────────────────────────────────────────────
+
+class ApiKey(Base):
+    """
+    Long-lived API keys for programmatic access.
+    The full key is only shown once at creation time; only a SHA-256 hash is stored.
+    key_prefix: first 12 chars (e.g. 'ukip_xYzAbc') — shown in listings for identification.
+    scopes: JSON list — 'read', 'write', 'admin'
+    """
+    __tablename__ = "api_keys"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    user_id      = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name         = Column(String(200), nullable=False)
+    key_prefix   = Column(String(20), nullable=False)    # e.g. 'ukip_xYzAbcDeFgH'
+    key_hash     = Column(String(64), nullable=False, unique=True, index=True)  # SHA-256 hex
+    scopes       = Column(Text, default='["read"]')      # JSON list
+    expires_at   = Column(DateTime, nullable=True)
+    last_used_at = Column(DateTime, nullable=True)
+    is_active    = Column(Boolean, default=True)
+    created_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 # ── Sprint 80: Custom Dashboards ──────────────────────────────────────────────
 
 class UserDashboard(Base):
