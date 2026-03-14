@@ -11,6 +11,8 @@ interface UploadResult {
     total_rows: number;
     matched_columns: string[];
     unmatched_columns: string[];
+    format?: string;
+    domain?: string;
 }
 
 interface PurgeResult {
@@ -50,7 +52,7 @@ export default function ImportExportPage() {
     }, [uploadResult, purgeResult]);
 
     async function handleUpload(file: File) {
-        const allowed = [".xlsx", ".csv", ".json", ".xml", ".parquet", ".jsonld", ".rdf", ".ttl"];
+        const allowed = [".xlsx", ".csv", ".json", ".xml", ".parquet", ".jsonld", ".rdf", ".ttl", ".bib", ".ris"];
         const isAllowed = allowed.some(ext => file.name.toLowerCase().endsWith(ext));
         if (!isAllowed) {
             setUploadError(`Only supported formats (${allowed.join(", ")}) are allowed.`);
@@ -158,7 +160,7 @@ export default function ImportExportPage() {
                         </div>
                         <div>
                             <h3 className="text-base font-semibold text-gray-900 dark:text-white">Import Data</h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Upload Excel, CSV, JSON, XML, Parquet, or RDF files</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Excel, CSV, JSON, XML, Parquet, RDF · BibTeX, RIS (Science)</p>
                         </div>
                     </div>
 
@@ -176,7 +178,7 @@ export default function ImportExportPage() {
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept=".xlsx,.csv,.json,.xml,.parquet,.jsonld,.rdf,.ttl"
+                            accept=".xlsx,.csv,.json,.xml,.parquet,.jsonld,.rdf,.ttl,.bib,.ris"
                             onChange={handleFileSelect}
                             className="hidden"
                         />
@@ -196,7 +198,8 @@ export default function ImportExportPage() {
                                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                     Drop your file here or <span className="text-blue-600 dark:text-blue-400">browse</span>
                                 </p>
-                                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Supported formats: Excel, CSV, JSON, XML, Parquet, RDF</p>
+                                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Excel · CSV · JSON · XML · Parquet · RDF</p>
+                                <p className="mt-0.5 text-xs text-violet-500 dark:text-violet-400">BibTeX (.bib) · RIS (.ris) — auto-maps to Science domain</p>
                             </>
                         )}
                     </div>
@@ -209,16 +212,31 @@ export default function ImportExportPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 <span className="text-sm font-semibold text-green-800 dark:text-green-300">Import Successful</span>
+                                {uploadResult.domain === "science" && (
+                                    <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
+                                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1 1 .03 2.798-1.414 2.798H4.212c-1.444 0-2.414-1.798-1.414-2.798L4.2 15.3" />
+                                        </svg>
+                                        Science Domain · {uploadResult.format?.toUpperCase()}
+                                    </span>
+                                )}
                             </div>
                             <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
-                                    <span className="text-green-700 dark:text-green-400">Rows imported</span>
+                                    <span className="text-green-700 dark:text-green-400">Records imported</span>
                                     <span className="font-semibold text-green-900 dark:text-green-200">{uploadResult.total_rows.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-green-700 dark:text-green-400">Columns matched</span>
+                                    <span className="text-green-700 dark:text-green-400">Fields mapped</span>
                                     <span className="font-semibold text-green-900 dark:text-green-200">{uploadResult.matched_columns.length}</span>
                                 </div>
+                                {uploadResult.domain === "science" && (
+                                    <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-800">
+                                        <p className="text-xs text-green-600 dark:text-green-400">
+                                            Mapped: title → primary_label · DOI → canonical_id · first author → secondary_label · keywords → enrichment_concepts
+                                        </p>
+                                    </div>
+                                )}
                                 {uploadResult.unmatched_columns.length > 0 && (
                                     <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-800">
                                         <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">
@@ -419,6 +437,41 @@ export default function ImportExportPage() {
                             </div>
                         </div>
                     )}
+                </div>
+            </div>
+
+            {/* Science Import card */}
+            <div className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-500/5">
+                <div className="flex items-start gap-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-500/10">
+                        <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1 1 .03 2.798-1.414 2.798H4.212c-1.444 0-2.414-1.798-1.414-2.798L4.2 15.3" />
+                        </svg>
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="text-base font-semibold text-violet-900 dark:text-violet-200">Science Domain Import — BibTeX & RIS</h3>
+                        <p className="mt-1 text-sm text-violet-700 dark:text-violet-400">
+                            Drop a <strong>.bib</strong> (BibTeX) or <strong>.ris</strong> file exported from Zotero, Mendeley, EndNote, or any reference manager. UKIP auto-maps academic fields to the Science domain schema.
+                        </p>
+                        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            {[
+                                { from: "title", to: "primary_label" },
+                                { from: "doi", to: "canonical_id" },
+                                { from: "author / AU", to: "secondary_label" },
+                                { from: "keywords / KW", to: "enrichment_concepts" },
+                                { from: "journal / JO", to: "attrs · journal" },
+                                { from: "year / PY", to: "attrs · year" },
+                                { from: "abstract / AB", to: "attrs · abstract" },
+                                { from: "entry type / TY", to: "entity_type" },
+                            ].map(({ from, to }) => (
+                                <div key={from} className="rounded-lg border border-violet-200 bg-white px-3 py-2 dark:border-violet-800 dark:bg-gray-900">
+                                    <code className="block text-xs font-medium text-violet-600 dark:text-violet-400">{from}</code>
+                                    <span className="text-xs text-gray-400">→</span>
+                                    <code className="block text-xs text-gray-600 dark:text-gray-400">{to}</code>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
 

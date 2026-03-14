@@ -23,6 +23,9 @@ from backend import database, models
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
 from backend.datasource_analyzer import DataSourceAnalyzer
+from backend.parsers.bibtex_parser import parse_bibtex
+from backend.parsers.ris_parser import parse_ris
+from backend.parsers.science_mapper import science_record_to_entity
 from backend.routers.column_maps import COLUMN_MAPPING, EXPORT_COLUMN_MAPPING
 from backend.routers.deps import _audit, _dispatch_webhook
 
@@ -42,7 +45,11 @@ async def upload_file(
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     filename = file.filename.lower()
-    allowed_extensions = (".xlsx", ".csv", ".json", ".xml", ".parquet", ".jsonld", ".rdf", ".ttl")
+    allowed_extensions = (
+        ".xlsx", ".csv", ".json", ".xml", ".parquet",
+        ".jsonld", ".rdf", ".ttl",
+        ".bib", ".ris",  # Science domain: BibTeX and RIS
+    )
     if not any(filename.endswith(ext) for ext in allowed_extensions):
         raise HTTPException(
             status_code=400,
@@ -86,6 +93,50 @@ async def upload_file(
                     record[subchild.tag] = subchild.text
                 if record:
                     records.append(record)
+        elif filename.endswith(".bib"):
+            science_records = parse_bibtex(contents.decode("utf-8", errors="replace"))
+            objects = [
+                models.RawEntity(**science_record_to_entity(r))
+                for r in science_records
+            ]
+            for i in range(0, len(objects), _CHUNK_SIZE):
+                db.bulk_save_objects(objects[i : i + _CHUNK_SIZE])
+            _audit(db, "upload", user_id=current_user.id,
+                   details={"filename": file.filename, "rows": len(objects), "format": "bibtex"})
+            db.commit()
+            _dispatch_webhook("upload", {"filename": file.filename, "rows": len(objects)},
+                              database.SessionLocal)
+            return {
+                "message": f"Successfully imported {len(objects)} publications from BibTeX",
+                "total_rows": len(objects),
+                "format": "bibtex",
+                "domain": "science",
+                "matched_columns": ["title", "authors", "doi", "journal", "year", "keywords",
+                                    "abstract", "entity_type"],
+                "unmatched_columns": [],
+            }
+        elif filename.endswith(".ris"):
+            science_records = parse_ris(contents.decode("utf-8", errors="replace"))
+            objects = [
+                models.RawEntity(**science_record_to_entity(r))
+                for r in science_records
+            ]
+            for i in range(0, len(objects), _CHUNK_SIZE):
+                db.bulk_save_objects(objects[i : i + _CHUNK_SIZE])
+            _audit(db, "upload", user_id=current_user.id,
+                   details={"filename": file.filename, "rows": len(objects), "format": "ris"})
+            db.commit()
+            _dispatch_webhook("upload", {"filename": file.filename, "rows": len(objects)},
+                              database.SessionLocal)
+            return {
+                "message": f"Successfully imported {len(objects)} publications from RIS",
+                "total_rows": len(objects),
+                "format": "ris",
+                "domain": "science",
+                "matched_columns": ["title", "authors", "doi", "journal", "year", "keywords",
+                                    "abstract", "entity_type"],
+                "unmatched_columns": [],
+            }
         elif filename.endswith(".rdf") or filename.endswith(".ttl"):
             import rdflib
             g = rdflib.Graph()

@@ -1,6 +1,6 @@
 id: science
 name: Science & Research
-description: "Academic papers, publications, and scientific datasets"
+description: "Academic papers, publications, patents, and scientific datasets"
 primary_entity: "Publication"
 icon: "Microscope"
 attributes:
@@ -8,24 +8,64 @@ attributes:
     type: string
     required: true
     label: "Title"
-    is_core: false
+    is_core: true
   - name: authors
-    type: array
+    type: string
     label: "Authors"
-    is_core: false
+    is_core: true
   - name: doi
     type: string
     label: "DOI"
     is_core: true
   - name: journal
     type: string
-    label: "Journal/Venue"
-    is_core: false
+    label: "Journal / Venue"
+    is_core: true
   - name: year
     type: integer
     label: "Publication Year"
-    is_core: false
+    is_core: true
   - name: citations
     type: integer
     label: "Citation Count"
     is_core: true
+  - name: abstract
+    type: text
+    label: "Abstract"
+    is_core: false
+  - name: keywords
+    type: string
+    label: "Keywords"
+    is_core: false
+  - name: volume
+    type: string
+    label: "Volume"
+    is_core: false
+  - name: issue
+    type: string
+    label: "Issue"
+    is_core: false
+  - name: pages
+    type: string
+    label: "Pages"
+    is_core: false
+  - name: publisher
+    type: string
+    label: "Publisher"
+    is_core: false
+  - name: issn
+    type: string
+    label: "ISSN"
+    is_core: false
+  - name: url
+    type: string
+    label: "URL"
+    is_core: false
+  - name: language
+    type: string
+    label: "Language"
+    is_core: false
+  - name: institution
+    type: string
+    label: "Institution / School"
+    is_core: false
