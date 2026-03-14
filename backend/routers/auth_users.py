@@ -19,7 +19,7 @@ from backend.auth import authenticate_user, create_access_token, get_current_use
 from backend.database import get_db
 from backend.routers.limiter import limiter
 
-router = APIRouter()
+router = APIRouter(tags=["auth"])
 
 
 # ── Authentication ────────────────────────────────────────────────────────────

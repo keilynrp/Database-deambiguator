@@ -31,7 +31,7 @@ from backend.routers.deps import _audit, _dispatch_webhook
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["ingestion"])
 
 _MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
 _MAX_ROWS = 100_000

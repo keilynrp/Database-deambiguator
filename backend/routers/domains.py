@@ -23,7 +23,7 @@ from backend.schema_registry import DomainSchema, registry
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["domains"])
 
 
 @router.get("/domains", response_model=List[DomainSchema])

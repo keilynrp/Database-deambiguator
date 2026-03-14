@@ -30,7 +30,7 @@ from backend.routers.deps import _get_store_adapter
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["stores"])
 
 
 @router.get("/stores")

@@ -30,7 +30,7 @@ from backend.database import get_db
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["analytics"])
 
 _topic_analyzer = TopicAnalyzer()
 _correlation_analyzer = CorrelationAnalyzer()

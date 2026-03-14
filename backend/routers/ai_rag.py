@@ -26,7 +26,7 @@ from backend.routers.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["ai-rag"])
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────────

@@ -201,8 +201,73 @@ async def lifespan(app: FastAPI):
 
 # ── App ───────────────────────────────────────────────────────────────────────
 
+_OPENAPI_DESCRIPTION = """
+## Universal Knowledge Intelligence Platform
+
+UKIP is a multi-domain knowledge management and enrichment platform.
+It ingests structured data (CSV, Excel, BibTeX, RIS), harmonises and
+de-duplicates records, enriches them via external academic APIs, and
+exposes analytics, reporting, and RAG-based AI search.
+
+### Authentication
+All protected endpoints use **Bearer JWT** tokens.
+Obtain a token via `POST /auth/token` (OAuth2 password flow), then click
+**Authorize** above and paste the token.
+
+### Rate limiting
+Login endpoint: **5 requests / minute** per IP.
+
+### Roles
+| Role | Description |
+|---|---|
+| `viewer` | Read-only access to entities and analytics |
+| `editor` | Upload, edit entities, manage rules |
+| `admin` | Store integrations, AI config, RAG indexing |
+| `super_admin` | User management + all admin rights |
+"""
+
+_OPENAPI_TAGS = [
+    {"name": "auth",           "description": "Login, token refresh, and SSO."},
+    {"name": "users",          "description": "User management and profile (RBAC)."},
+    {"name": "entities",       "description": "Entity CRUD, search, enrichment, and Monte-Carlo scoring."},
+    {"name": "ingestion",      "description": "File upload (CSV, Excel, BibTeX, RIS), analysis, and export."},
+    {"name": "domains",        "description": "Domain registry, schema management, and OLAP cube."},
+    {"name": "harmonization",  "description": "Multi-step data-cleaning pipeline with undo/redo."},
+    {"name": "disambiguation", "description": "Cluster detection, AI resolution, and normalization rules."},
+    {"name": "authority",      "description": "External authority linking (Wikidata, VIAF, ORCID, DBpedia, OpenAlex)."},
+    {"name": "analytics",      "description": "KPI dashboard, domain comparison, topic modeling, and OLAP."},
+    {"name": "ai-rag",         "description": "AI integrations (OpenAI / Anthropic) and RAG vector search."},
+    {"name": "stores",         "description": "Store connector configuration and sync queue."},
+    {"name": "reports",        "description": "Report builder, PDF/Excel exports, and artifact templates."},
+    {"name": "annotations",    "description": "Free-form entity annotations and notes."},
+    {"name": "webhooks",       "description": "Outbound webhook subscriptions and delivery logs."},
+    {"name": "notifications",  "description": "In-app notification centre and per-user settings."},
+    {"name": "scheduled-imports", "description": "Cron-style import schedules for connected stores."},
+    {"name": "search",         "description": "Full-text search index (FTS5) across entities and annotations."},
+    {"name": "entity-linker",  "description": "Find and merge duplicate entity pairs."},
+    {"name": "audit",          "description": "Immutable audit log of all mutating API calls."},
+    {"name": "branding",       "description": "Platform branding and white-label settings."},
+    {"name": "context",        "description": "Contextual intelligence snippets for entities."},
+    {"name": "artifacts",      "description": "Report artifact storage and template library."},
+    {"name": "demo",           "description": "Demo-mode seed/reset for sandboxed evaluation."},
+    {"name": "sso",            "description": "OAuth2 / SAML single-sign-on flows."},
+    {"name": "exports",        "description": "One-click PDF and Excel exports."},
+]
+
 app = FastAPI(
     title="UKIP — Universal Knowledge Intelligence Platform",
+    version="1.0.0",
+    description=_OPENAPI_DESCRIPTION,
+    contact={"name": "UKIP Team", "url": "https://github.com/ukip"},
+    license_info={"name": "MIT"},
+    openapi_tags=_OPENAPI_TAGS,
+    swagger_ui_parameters={
+        "persistAuthorization": True,
+        "tryItOutEnabled": False,
+        "displayRequestDuration": True,
+        "filter": True,
+        "syntaxHighlight.theme": "monokai",
+    },
     lifespan=lifespan,
 )
 

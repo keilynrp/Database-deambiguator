@@ -28,7 +28,7 @@ from backend.notifications.email_sender import send_notification
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["notifications"])
 
 # ── Action metadata (shared with feed) ────────────────────────────────────────
 

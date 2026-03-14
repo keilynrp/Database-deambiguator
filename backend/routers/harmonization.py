@@ -25,7 +25,7 @@ from backend.routers.deps import _audit, _dispatch_webhook
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["harmonization"])
 
 # ── Harmonization pipeline metadata ──────────────────────────────────────────
 

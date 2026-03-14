@@ -20,7 +20,7 @@ from backend.auth import get_current_user, require_role
 from backend.database import get_db
 from backend.routers.deps import _dispatch_webhook, _dispatch_webhook_sync
 
-router = APIRouter()
+router = APIRouter(tags=["webhooks"])
 
 
 def _serialize_webhook(w: models.Webhook) -> dict:

@@ -34,7 +34,7 @@ def _make_pdf(html: str) -> bytes:
             detail="PDF export requires weasyprint. Install it with: pip install weasyprint",
         )
 
-router = APIRouter()
+router = APIRouter(tags=["reports"])
 
 _ALL_REPORT_SECTIONS = list(_report_builder.SECTION_LABELS.keys())
 

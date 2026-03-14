@@ -25,7 +25,7 @@ from backend.routers.deps import _build_disambig_groups
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["disambiguation"])
 
 
 # ── Disambiguation ────────────────────────────────────────────────────────────

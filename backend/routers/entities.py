@@ -32,7 +32,7 @@ from backend import enrichment_worker
 from backend import entity_linker as _entity_linker
 from backend.routers.deps import _audit, _dispatch_webhook
 
-router = APIRouter()
+router = APIRouter(tags=["entities"])
 
 
 # ── Entity list endpoints (must come before wildcard /{entity_id}) ────────────

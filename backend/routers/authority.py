@@ -31,7 +31,7 @@ from backend.routers.deps import _audit, _build_disambig_groups, _serialize_auth
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["authority"])
 
 _FIELD_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
