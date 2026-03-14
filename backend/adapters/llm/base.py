@@ -3,7 +3,7 @@ Phase 5: Abstract base class for all LLM adapters.
 All providers (OpenAI, Anthropic, DeepSeek, xAI, Google, Local) must implement this interface.
 """
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 class BaseLLMAdapter(ABC):
@@ -27,6 +27,34 @@ class BaseLLMAdapter(ABC):
         produce a grounded answer (RAG generation step).
         """
         pass
+
+    def chat_with_tools(
+        self,
+        system_prompt: str,
+        user_query: str,
+        context_chunks: List[str],
+        tools: List[Dict[str, Any]],
+        tool_invoker: Callable[[str, Dict[str, Any]], Any],
+        max_iterations: int = 5,
+    ) -> Dict[str, Any]:
+        """
+        Sprint 69C — Agentic Tool Loop.
+        Providers that support function calling override this method.
+        Default implementation falls back to plain chat() (no tool use).
+
+        Returns:
+            {
+                "answer": str,          # final LLM text response
+                "tools_used": [...],    # list of {tool, params, result} dicts
+                "iterations": int,
+            }
+        """
+        answer = self.chat(
+            system_prompt=system_prompt,
+            user_query=user_query,
+            context_chunks=context_chunks,
+        )
+        return {"answer": answer, "tools_used": [], "iterations": 1}
 
     @property
     @abstractmethod

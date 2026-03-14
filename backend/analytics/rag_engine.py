@@ -172,3 +172,72 @@ def query_catalog(
     except Exception as e:
         logger.error(f"RAGEngine query error: {e}")
         return {"error": str(e)}
+
+
+def query_catalog_agentic(
+    user_question: str,
+    integration_record,
+    db,
+    top_k: int = 5,
+    extra_system_context: Optional[str] = None,
+    max_iterations: int = 5,
+) -> Dict[str, Any]:
+    """
+    Sprint 69C — Agentic RAG with function calling.
+    Same as query_catalog() but calls chat_with_tools() so the LLM can
+    autonomously invoke tool-registry functions mid-reasoning.
+    """
+    from backend.tool_registry import get_registry
+
+    adapter = _build_adapter(integration_record)
+    if not adapter:
+        return {"error": "No active AI provider configured."}
+
+    try:
+        query_embedding = adapter.get_embedding(user_question)
+        retrieved_docs = VectorStoreService.query(query_embedding, top_k=top_k)
+
+        if not retrieved_docs:
+            return {
+                "answer": "The catalog knowledge base is empty. Please index your catalog records first.",
+                "sources": [],
+                "tools_used": [],
+                "iterations": 0,
+                "agentic": True,
+            }
+
+        context_chunks = [doc["text"] for doc in retrieved_docs]
+
+        system_prompt = SYSTEM_PROMPT
+        if extra_system_context:
+            system_prompt = extra_system_context + "\n\n" + SYSTEM_PROMPT
+
+        registry = get_registry()
+        tools = registry.list_tools()
+
+        def _invoke(name: str, params: Dict[str, Any]) -> Any:
+            return registry.invoke(name, params, db)
+
+        agentic_result = adapter.chat_with_tools(
+            system_prompt=system_prompt,
+            user_query=user_question,
+            context_chunks=context_chunks,
+            tools=tools,
+            tool_invoker=_invoke,
+            max_iterations=max_iterations,
+        )
+
+        return {
+            "answer":               agentic_result["answer"],
+            "provider":             adapter.provider_name,
+            "model":                getattr(adapter, "_model_name", "unknown"),
+            "sources":              retrieved_docs,
+            "context_chunks_used":  len(context_chunks),
+            "tools_used":           agentic_result["tools_used"],
+            "iterations":           agentic_result["iterations"],
+            "agentic":              True,
+        }
+
+    except Exception as e:
+        logger.error(f"RAGEngine agentic query error: {e}")
+        return {"error": str(e)}

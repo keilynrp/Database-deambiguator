@@ -50,6 +50,7 @@ class RAGQueryPayload(BaseModel):
     use_context: bool         = Field(default=False)
     domain_id:   str | None   = Field(default=None, max_length=64)
     session_id:  int | None   = Field(default=None, ge=1)
+    use_tools:   bool         = Field(default=False)
 
 
 # ── AI Integrations ───────────────────────────────────────────────────────────
@@ -235,12 +236,21 @@ def rag_query(
         except Exception:
             pass
 
-    result = rag_engine.query_catalog(
-        user_question=payload.question,
-        integration_record=integration,
-        top_k=payload.top_k,
-        extra_system_context=extra_system,
-    )
+    if payload.use_tools:
+        result = rag_engine.query_catalog_agentic(
+            user_question=payload.question,
+            integration_record=integration,
+            db=db,
+            top_k=payload.top_k,
+            extra_system_context=extra_system,
+        )
+    else:
+        result = rag_engine.query_catalog(
+            user_question=payload.question,
+            integration_record=integration,
+            top_k=payload.top_k,
+            extra_system_context=extra_system,
+        )
 
     result["context_injected"]    = extra_system is not None
     result["memory_session_id"]   = payload.session_id

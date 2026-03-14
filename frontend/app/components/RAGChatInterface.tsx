@@ -5,6 +5,12 @@ import { apiFetch } from "@/lib/api";
 import { Badge } from "./ui";
 import { useDomain } from "../contexts/DomainContext";
 
+interface ToolCall {
+    tool: string;
+    params: Record<string, any>;
+    result: any;
+}
+
 interface Message {
     role: "user" | "assistant" | "system";
     content: string;
@@ -12,6 +18,9 @@ interface Message {
     provider?: string;
     model?: string;
     isLoading?: boolean;
+    toolsUsed?: ToolCall[];
+    iterations?: number;
+    agentic?: boolean;
 }
 
 export default function RAGChatInterface() {
@@ -27,6 +36,7 @@ export default function RAGChatInterface() {
     const [isIndexing, setIsIndexing] = useState(false);
     const [indexStats, setIndexStats] = useState<{ total_indexed: number } | null>(null);
     const [useContext, setUseContext] = useState(false);
+    const [useTools, setUseTools] = useState(false);
     const bottomRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -82,6 +92,7 @@ export default function RAGChatInterface() {
                     top_k: 5,
                     use_context: useContext,
                     domain_id: useContext ? (activeDomainId || "default") : undefined,
+                    use_tools: useTools,
                 })
             });
             const data = await res.json();
@@ -96,6 +107,9 @@ export default function RAGChatInterface() {
                     sources: data.sources,
                     provider: data.provider,
                     model: data.model,
+                    toolsUsed: data.tools_used,
+                    iterations: data.iterations,
+                    agentic: data.agentic,
                 };
                 return next;
             });
@@ -193,7 +207,34 @@ export default function RAGChatInterface() {
                                             via {msg.provider} / {msg.model}
                                         </span>
                                     )}
+                                    {msg.agentic && msg.iterations !== undefined && (
+                                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-400">
+                                            agentic · {msg.iterations} iter
+                                        </span>
+                                    )}
                                 </div>
+                            )}
+
+                            {/* Tool calls accordion */}
+                            {msg.toolsUsed && msg.toolsUsed.length > 0 && (
+                                <details className="mt-1 rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2 dark:border-amber-500/20 dark:bg-amber-500/5">
+                                    <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                                        {msg.toolsUsed.length} tool call{msg.toolsUsed.length > 1 ? "s" : ""} made
+                                    </summary>
+                                    <div className="mt-2 space-y-1.5">
+                                        {msg.toolsUsed.map((tc, j) => (
+                                            <div key={j} className="rounded border border-amber-100 bg-white px-2 py-1.5 text-[10px] dark:border-amber-500/20 dark:bg-gray-800">
+                                                <span className="font-mono font-bold text-amber-700 dark:text-amber-300">{tc.tool}</span>
+                                                {Object.keys(tc.params).length > 0 && (
+                                                    <span className="ml-1 text-gray-400">({JSON.stringify(tc.params)})</span>
+                                                )}
+                                                <div className="mt-0.5 truncate text-gray-500 dark:text-gray-400">
+                                                    → {typeof tc.result === "object" ? JSON.stringify(tc.result).slice(0, 120) : String(tc.result)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </details>
                             )}
                         </div>
                     </div>
@@ -203,8 +244,8 @@ export default function RAGChatInterface() {
 
             {/* Input */}
             <div className="border-t border-gray-100 p-4 dark:border-gray-800">
-                {/* Context toggle */}
-                <div className="mb-2 flex items-center gap-2">
+                {/* Toggles */}
+                <div className="mb-2 flex flex-wrap items-center gap-2">
                     <button
                         type="button"
                         onClick={() => setUseContext((v) => !v)}
@@ -219,9 +260,29 @@ export default function RAGChatInterface() {
                         </svg>
                         {useContext ? "Context ON" : "Context OFF"}
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => setUseTools((v) => !v)}
+                        title="Agentic mode: LLM can call analytics tools mid-reasoning"
+                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                            useTools
+                                ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
+                                : "border-gray-200 bg-gray-50 text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                        }`}
+                    >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l5.653-4.655m0 0l-2.03 1.208a3.562 3.562 0 01-.766 1.208" />
+                        </svg>
+                        {useTools ? "Agentic ON" : "Agentic OFF"}
+                    </button>
                     {useContext && (
                         <span className="text-xs text-gray-400 dark:text-gray-500">
-                            Injecting domain context ({activeDomainId || "default"}) into prompt
+                            Domain context: {activeDomainId || "default"}
+                        </span>
+                    )}
+                    {useTools && (
+                        <span className="text-xs text-amber-500 dark:text-amber-400">
+                            LLM may call analytics tools autonomously
                         </span>
                     )}
                 </div>
