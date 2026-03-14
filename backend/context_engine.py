@@ -125,3 +125,75 @@ class ContextEngine:
     def snapshot_json(self, ctx: Dict[str, Any]) -> str:
         """Serialise context to a compact JSON string (for DB storage)."""
         return json.dumps(ctx, ensure_ascii=False)
+
+    def diff_snapshots(self, json_a: str, json_b: str) -> Dict[str, Any]:
+        """
+        Compare two stored context JSON strings (A = older, B = newer).
+        Returns a delta dict with before/after/change for entity_stats, gaps,
+        and a merged top_topics list.
+        """
+        a = json.loads(json_a)
+        b = json.loads(json_b)
+
+        def _delta(section: str, key: str) -> Dict[str, Any]:
+            va = a.get(section, {}).get(key, 0)
+            vb = b.get(section, {}).get(key, 0)
+            return {"before": va, "after": vb, "change": round(vb - va, 4)}
+
+        topics_a = {t["concept"]: t["count"] for t in a.get("top_topics", [])}
+        topics_b = {t["concept"]: t["count"] for t in b.get("top_topics", [])}
+        all_concepts = sorted(set(topics_a) | set(topics_b))
+        topics_delta = [
+            {
+                "concept": c,
+                "before":  topics_a.get(c, 0),
+                "after":   topics_b.get(c, 0),
+                "change":  topics_b.get(c, 0) - topics_a.get(c, 0),
+            }
+            for c in all_concepts
+        ]
+
+        return {
+            "snapshot_a_domain":    a.get("domain_id"),
+            "snapshot_b_domain":    b.get("domain_id"),
+            "snapshot_a_generated": a.get("generated_at"),
+            "snapshot_b_generated": b.get("generated_at"),
+            "entity_stats": {
+                "total":        _delta("entity_stats", "total"),
+                "enriched":     _delta("entity_stats", "enriched"),
+                "pct_enriched": _delta("entity_stats", "pct_enriched"),
+            },
+            "gaps": {
+                "critical": _delta("gaps", "critical"),
+                "warning":  _delta("gaps", "warning"),
+                "ok":       _delta("gaps", "ok"),
+            },
+            "top_topics": topics_delta,
+        }
+
+    def build_recall_prompt(self, label: str, context_json: str, user_query: str) -> str:
+        """
+        Format a persisted session snapshot + the incoming user query into a
+        structured block for prepending to an LLM system prompt.
+        """
+        ctx    = json.loads(context_json)
+        stats  = ctx.get("entity_stats", {})
+        gaps   = ctx.get("gaps", {})
+        topics = ctx.get("top_topics", [])
+
+        topic_str = ", ".join(t["concept"] for t in topics) if topics else "none"
+
+        lines = [
+            "=== MEMORY CONTEXT ===",
+            f"Recalled session : {label or 'Unnamed'}",
+            f"Domain           : {ctx.get('domain_id', 'unknown')}",
+            f"Snapshot taken   : {ctx.get('generated_at', 'unknown')}",
+            f"Entities         : {stats.get('total', 0):,} total, "
+            f"{stats.get('enriched', 0):,} enriched ({stats.get('pct_enriched', 0)}%)",
+            f"Data gaps        : {gaps.get('critical', 0)} critical · "
+            f"{gaps.get('warning', 0)} warnings · {gaps.get('ok', 0)} ok",
+            f"Top concepts     : {topic_str}",
+            "======================",
+            f"User query: {user_query}",
+        ]
+        return "\n".join(lines)

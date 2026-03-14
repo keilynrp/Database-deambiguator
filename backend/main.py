@@ -107,6 +107,13 @@ with database.engine.connect() as _conn:
             _conn.execute(text("ALTER TABLE audit_logs ADD COLUMN ip_address VARCHAR"))
             _conn.commit()
 
+    if "analysis_contexts" in _inspector.get_table_names():
+        _cols = [c["name"] for c in _inspector.get_columns("analysis_contexts")]
+        if "notes" not in _cols:
+            _conn.execute(text("ALTER TABLE analysis_contexts ADD COLUMN notes TEXT"))
+            _conn.execute(text("ALTER TABLE analysis_contexts ADD COLUMN pinned BOOLEAN DEFAULT 0"))
+            _conn.commit()
+
     # ── Sprint 53: FTS5 search index ─────────────────────────────────────────
     _conn.execute(text("""
         CREATE VIRTUAL TABLE IF NOT EXISTS search_index

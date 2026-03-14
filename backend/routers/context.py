@@ -10,7 +10,7 @@ Phase 11 — Context Engineering Layer
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 
 from backend import models, schemas
@@ -77,6 +77,63 @@ def create_session(
         context_snapshot=_engine.snapshot_json(ctx),
     )
     db.add(record)
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+@router.get("/sessions/diff")
+def diff_sessions(
+    a: int = Query(..., ge=1, description="ID of the older session"),
+    b: int = Query(..., ge=1, description="ID of the newer session"),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(get_current_user),
+):
+    """Return a structured KPI delta between two saved sessions (A = older, B = newer)."""
+    session_a = db.get(models.AnalysisContext, a)
+    session_b = db.get(models.AnalysisContext, b)
+    if not session_a:
+        raise HTTPException(status_code=404, detail=f"Session {a} not found")
+    if not session_b:
+        raise HTTPException(status_code=404, detail=f"Session {b} not found")
+    return _engine.diff_snapshots(session_a.context_snapshot, session_b.context_snapshot)
+
+
+@router.get("/sessions/{session_id}")
+def get_session(
+    session_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(get_current_user),
+):
+    """Return a single saved session; context_snapshot is returned as a parsed dict."""
+    record = db.get(models.AnalysisContext, session_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {
+        "id":               record.id,
+        "domain_id":        record.domain_id,
+        "user_id":          record.user_id,
+        "label":            record.label,
+        "notes":            record.notes,
+        "pinned":           record.pinned,
+        "context_snapshot": json.loads(record.context_snapshot),
+        "created_at":       record.created_at,
+    }
+
+
+@router.patch("/sessions/{session_id}")
+def update_session(
+    payload: schemas.AnalysisContextUpdate,
+    session_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+):
+    """Update a session's label, notes, or pinned flag."""
+    record = db.get(models.AnalysisContext, session_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Session not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(record, field, value)
     db.commit()
     db.refresh(record)
     return record

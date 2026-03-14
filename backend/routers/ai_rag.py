@@ -49,6 +49,7 @@ class RAGQueryPayload(BaseModel):
     top_k:       int          = Field(default=5, ge=1, le=20)
     use_context: bool         = Field(default=False)
     domain_id:   str | None   = Field(default=None, max_length=64)
+    session_id:  int | None   = Field(default=None, ge=1)
 
 
 # ── AI Integrations ───────────────────────────────────────────────────────────
@@ -209,15 +210,30 @@ def rag_query(
     """
     integration = _get_active_integration(db)
 
-    # Phase 11: optionally inject domain context into the system prompt
+    # Phase 11 / 69A: inject context into the system prompt (memory recall takes priority)
     extra_system = None
-    if payload.use_context and payload.domain_id:
+
+    if payload.session_id is not None:
+        # Priority 1: recalled memory session
+        session = db.get(models.AnalysisContext, payload.session_id)
+        if session:
+            try:
+                from backend.context_engine import ContextEngine
+                extra_system = ContextEngine().build_recall_prompt(
+                    label=session.label,
+                    context_json=session.context_snapshot,
+                    user_query=payload.question,
+                )
+            except Exception:
+                pass  # best-effort; fall back to plain RAG
+    elif payload.use_context and payload.domain_id:
+        # Priority 2: live domain context
         try:
             from backend.context_engine import ContextEngine
             ctx = ContextEngine().build_domain_context(payload.domain_id, db)
             extra_system = ContextEngine().format_for_llm(ctx)
         except Exception:
-            pass  # context injection is best-effort; fall back to plain RAG
+            pass
 
     result = rag_engine.query_catalog(
         user_question=payload.question,
@@ -226,8 +242,8 @@ def rag_query(
         extra_system_context=extra_system,
     )
 
-    # Annotate whether context was used
-    result["context_injected"] = extra_system is not None
+    result["context_injected"]    = extra_system is not None
+    result["memory_session_id"]   = payload.session_id
     return result
 
 

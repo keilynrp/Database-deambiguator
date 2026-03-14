@@ -606,6 +606,8 @@ class AnalysisContext(Base):
     user_id          = Column(Integer, nullable=True)     # FK users.id (nullable for system)
     label            = Column(String, default="")         # user-defined name
     context_snapshot = Column(Text, nullable=False)       # JSON from ContextEngine
+    notes            = Column(Text, nullable=True)
+    pinned           = Column(Boolean, default=False)
     created_at       = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 

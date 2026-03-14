@@ -447,6 +447,12 @@ class AnalysisContextCreate(BaseModel):
     # context_snapshot is generated server-side; not accepted from client
 
 
+class AnalysisContextUpdate(BaseModel):
+    label:  Optional[str]  = Field(default=None, max_length=120)
+    notes:  Optional[str]  = None
+    pinned: Optional[bool] = None
+
+
 class AnalysisContextResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -455,4 +461,6 @@ class AnalysisContextResponse(BaseModel):
     user_id:          Optional[int]
     label:            str
     context_snapshot: str   # raw JSON string
+    notes:            Optional[str]
+    pinned:           bool
     created_at:       datetime
