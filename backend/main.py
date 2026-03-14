@@ -33,6 +33,7 @@ from backend.routers import (
     authority,
     branding,
     context,
+    dashboards,
     demo,
     disambiguation,
     domains,
@@ -264,6 +265,7 @@ _OPENAPI_TAGS = [
     {"name": "notifications",  "description": "In-app notification centre and per-user settings."},
     {"name": "scheduled-imports",  "description": "Cron-style import schedules for connected stores."},
     {"name": "scheduled-reports",  "description": "Cron-style report schedules with email delivery."},
+    {"name": "dashboards",         "description": "Per-user custom dashboards with drag-and-drop widget layout."},
     {"name": "search",         "description": "Full-text search index (FTS5) across entities and annotations."},
     {"name": "entity-linker",  "description": "Find and merge duplicate entity pairs."},
     {"name": "audit",          "description": "Immutable audit log of all mutating API calls."},
@@ -347,6 +349,7 @@ app.include_router(relationships.router)
 app.include_router(graph_export.router)
 app.include_router(nlq.router)
 app.include_router(scheduled_reports.router)
+app.include_router(dashboards.router)
 
 # ── Static file serving (uploaded logos etc.) ─────────────────────────────────
 _static_dir = pathlib.Path("static")

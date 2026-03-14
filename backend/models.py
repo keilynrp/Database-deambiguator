@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float
+from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, DateTime, Text, Float
 from .database import Base
 
 
@@ -412,6 +412,24 @@ class ScheduledImport(Base):
     total_runs      = Column(Integer, default=0)
     total_entities_imported = Column(Integer, default=0)
     created_at      = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+# ── Sprint 80: Custom Dashboards ──────────────────────────────────────────────
+
+class UserDashboard(Base):
+    """
+    Per-user custom dashboard: a named collection of widgets with a JSON layout.
+    Each user can have multiple dashboards; one can be marked is_default.
+    """
+    __tablename__ = "user_dashboards"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name       = Column(String(200), nullable=False)
+    layout     = Column(Text, default="[]")    # JSON list of WidgetConfig objects
+    is_default = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 # ── Sprint 79: Scheduled Reports ──────────────────────────────────────────────
