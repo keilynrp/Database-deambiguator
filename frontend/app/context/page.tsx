@@ -149,6 +149,13 @@ export default function ContextPage() {
   const [editingNotes, setEditingNotes]   = useState<Record<number, string>>({});
   const [savingNotes, setSavingNotes]     = useState<Record<number, boolean>>({});
 
+  // Insights
+  const [sessionInsights, setSessionInsights]     = useState<Record<number, string>>({});
+  const [loadingInsights, setLoadingInsights]     = useState<Record<number, boolean>>({});
+  const [diffInsights, setDiffInsights]           = useState<string | null>(null);
+  const [loadingDiffInsights, setLoadingDiffInsights] = useState(false);
+  const [insightsError, setInsightsError]         = useState<string | null>(null);
+
   // Diff
   const [diffA, setDiffA]           = useState<number | "">("");
   const [diffB, setDiffB]           = useState<number | "">("");
@@ -242,6 +249,34 @@ export default function ContextPage() {
   const sortedSessions = [...sessions].sort(
     (a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
+
+  // ── Insights ────────────────────────────────────────────────────────────────
+
+  const fetchSessionInsights = async (id: number) => {
+    setLoadingInsights((p) => ({ ...p, [id]: true }));
+    setInsightsError(null);
+    try {
+      const res = await apiFetch(`/context/sessions/${id}/insights`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { setInsightsError(data.detail ?? "Failed to get insights"); return; }
+      setSessionInsights((p) => ({ ...p, [id]: data.analysis }));
+    } catch { setInsightsError("Network error"); }
+    finally { setLoadingInsights((p) => ({ ...p, [id]: false })); }
+  };
+
+  const fetchDiffInsights = async () => {
+    if (!diffA || !diffB) return;
+    setLoadingDiffInsights(true);
+    setDiffInsights(null);
+    setInsightsError(null);
+    try {
+      const res = await apiFetch(`/context/sessions/diff/insights?a=${diffA}&b=${diffB}`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { setInsightsError(data.detail ?? "Failed to get insights"); return; }
+      setDiffInsights(data.analysis);
+    } catch { setInsightsError("Network error"); }
+    finally { setLoadingDiffInsights(false); }
+  };
 
   // ── Diff ────────────────────────────────────────────────────────────────────
 
@@ -440,6 +475,13 @@ export default function ContextPage() {
                       Details
                     </button>
                     <button
+                      onClick={() => fetchSessionInsights(s.id)}
+                      disabled={loadingInsights[s.id]}
+                      className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-900/10 dark:text-violet-400"
+                    >
+                      {loadingInsights[s.id] ? "…" : "AI Insights"}
+                    </button>
+                    <button
                       onClick={() => deleteSession(s.id)}
                       className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-900/10 dark:text-red-400"
                     >
@@ -470,26 +512,44 @@ export default function ContextPage() {
           </div>
 
           {/* Detail panel */}
-          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
-            {loadingDetail && <div className="h-48 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-700" />}
-            {!loadingDetail && !selectedSession && (
-              <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-12">Select a session to view details</p>
-            )}
-            {selectedSession && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                    {selectedSession.label || `Snapshot #${selectedSession.id}`}
-                  </p>
-                  <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                    {selectedSession.domain_id}
-                  </span>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+              {loadingDetail && <div className="h-48 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-700" />}
+              {!loadingDetail && !selectedSession && (
+                <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-12">Select a session to view details</p>
+              )}
+              {selectedSession && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                      {selectedSession.label || `Snapshot #${selectedSession.id}`}
+                    </p>
+                    <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                      {selectedSession.domain_id}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400">{new Date(selectedSession.created_at).toLocaleString()}</p>
+                  {selectedSession.notes && (
+                    <p className="text-xs italic text-gray-500 dark:text-gray-400">{selectedSession.notes}</p>
+                  )}
+                  <SnapshotCards snap={selectedSession.context_snapshot} />
                 </div>
-                <p className="text-xs text-gray-400">{new Date(selectedSession.created_at).toLocaleString()}</p>
-                {selectedSession.notes && (
-                  <p className="text-xs italic text-gray-500 dark:text-gray-400">{selectedSession.notes}</p>
-                )}
-                <SnapshotCards snap={selectedSession.context_snapshot} />
+              )}
+            </div>
+
+            {/* AI Insights panel for selected session */}
+            {selectedSession && sessionInsights[selectedSession.id] && (
+              <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-800 dark:bg-violet-500/5">
+                <p className="mb-2 text-xs font-semibold text-violet-700 dark:text-violet-300">AI Insights</p>
+                <p className="whitespace-pre-wrap text-xs leading-relaxed text-violet-900 dark:text-violet-200">
+                  {sessionInsights[selectedSession.id]}
+                </p>
+              </div>
+            )}
+
+            {insightsError && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                {insightsError}
               </div>
             )}
           </div>
@@ -543,6 +603,29 @@ export default function ContextPage() {
 
           {diffResult && (
             <div className="space-y-4">
+              {/* AI Insights button */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={fetchDiffInsights}
+                  disabled={loadingDiffInsights}
+                  className="inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-700 dark:bg-violet-500/10 dark:text-violet-300"
+                >
+                  {loadingDiffInsights ? "Analyzing…" : "✦ AI Analysis of Changes"}
+                </button>
+                {insightsError && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400">{insightsError}</span>
+                )}
+              </div>
+
+              {diffInsights && (
+                <div className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-800 dark:bg-violet-500/5">
+                  <p className="mb-2 text-xs font-semibold text-violet-700 dark:text-violet-300">AI Analysis</p>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-violet-900 dark:text-violet-200">
+                    {diffInsights}
+                  </p>
+                </div>
+              )}
+
               {/* Header */}
               <div className="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400">
                 <span>A: <strong>{diffResult.snapshot_a_domain}</strong> · {new Date(diffResult.snapshot_a_generated).toLocaleString()}</span>

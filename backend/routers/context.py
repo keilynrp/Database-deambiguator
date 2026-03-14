@@ -17,6 +17,7 @@ from backend import models, schemas
 from backend.auth import get_current_user, require_role
 from backend.context_engine import ContextEngine
 from backend.database import get_db
+from backend.routers.deps import _get_active_integration
 from backend.schema_registry import SchemaRegistry
 
 logger = logging.getLogger(__name__)
@@ -151,6 +152,93 @@ def delete_session(
         raise HTTPException(status_code=404, detail="Session not found")
     db.delete(record)
     db.commit()
+
+
+# ── AI Insights endpoints ──────────────────────────────────────────────────────
+
+_INSIGHTS_SYSTEM = (
+    "You are a senior data intelligence analyst specializing in knowledge management platforms. "
+    "Respond in clear, structured prose. Be specific, concise, and actionable. "
+    "Use the language of the domain provided in the context."
+)
+
+
+def _run_insights(prompt: str, db: Session) -> str:
+    """Call the active LLM with the given analysis prompt and return its response."""
+    from backend.analytics import rag_engine as _rag
+    integration = _get_active_integration(db)
+    if not integration:
+        raise HTTPException(
+            status_code=400,
+            detail="No active AI provider. Configure one in Integrations → AI Language Models.",
+        )
+    adapter = _rag._build_adapter(integration)
+    if not adapter:
+        raise HTTPException(status_code=400, detail="Could not initialise AI adapter.")
+    try:
+        return adapter.chat(
+            system_prompt=_INSIGHTS_SYSTEM,
+            user_query=prompt,
+            context_chunks=[],
+        )
+    except Exception as exc:
+        logger.error("Insights LLM call failed: %s", exc)
+        raise HTTPException(status_code=502, detail=f"LLM call failed: {exc}")
+
+
+@router.post("/sessions/diff/insights")
+def diff_insights(
+    a: int = Query(..., ge=1, description="ID of the older session"),
+    b: int = Query(..., ge=1, description="ID of the newer session"),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(get_current_user),
+):
+    """
+    Generate AI-written analysis of the delta between two saved sessions.
+    Requires an active AI provider.
+    """
+    session_a = db.get(models.AnalysisContext, a)
+    session_b = db.get(models.AnalysisContext, b)
+    if not session_a:
+        raise HTTPException(status_code=404, detail=f"Session {a} not found")
+    if not session_b:
+        raise HTTPException(status_code=404, detail=f"Session {b} not found")
+
+    diff = _engine.diff_snapshots(session_a.context_snapshot, session_b.context_snapshot)
+    prompt = _engine.build_diff_analysis_prompt(diff)
+    analysis = _run_insights(prompt, db)
+
+    return {
+        "session_a_id": a,
+        "session_b_id": b,
+        "diff_summary":  diff,
+        "analysis":      analysis,
+    }
+
+
+@router.post("/sessions/{session_id}/insights")
+def session_insights(
+    session_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(get_current_user),
+):
+    """
+    Generate AI-written insights and recommendations for a single saved session.
+    Requires an active AI provider.
+    """
+    record = db.get(models.AnalysisContext, session_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    prompt = _engine.build_analysis_prompt(record.context_snapshot)
+    analysis = _run_insights(prompt, db)
+
+    return {
+        "session_id": session_id,
+        "domain_id":  record.domain_id,
+        "label":      record.label,
+        "analysis":   analysis,
+    }
 
 
 # ── Tool Registry endpoints ─────────────────────────────────────────────────────

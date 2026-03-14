@@ -5,7 +5,7 @@ POST /context/invoke
 """
 import pytest
 
-_EXPECTED_TOOLS = {"get_entity_stats", "get_gaps", "get_topics", "get_harmonization_log", "get_enrichment_stats"}
+_EXPECTED_TOOLS = {"get_entity_stats", "get_gaps", "get_topics", "get_harmonization_log", "get_enrichment_stats", "analyze_domain"}
 
 
 def test_list_tools_requires_auth(client):

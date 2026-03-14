@@ -186,5 +186,48 @@ def _build_registry() -> ToolRegistry:
         parameters={"domain_id": {"type": "string", "default": "default"}},
         handler=_tool_enrichment_stats,
     )
+    r.register(
+        name="analyze_domain",
+        description=(
+            "Runs GapAnalyzer and TopicAnalyzer for a domain and returns a combined "
+            "health summary: critical/warning/ok counts, top 5 concepts, and recommended actions."
+        ),
+        parameters={"domain_id": {"type": "string", "default": "default"}},
+        handler=_tool_analyze_domain,
+    )
 
     return r
+
+
+def _tool_analyze_domain(params: Dict[str, Any], db: Session) -> Dict[str, Any]:
+    from backend.analyzers.gap_detector import GapAnalyzer
+    from backend.analyzers.topic_modeling import TopicAnalyzer
+
+    domain_id = params.get("domain_id", "default")
+
+    # Gaps
+    try:
+        gaps = GapAnalyzer().analyze(domain_id, db)
+        gap_summary = {
+            "critical": sum(1 for g in gaps if g.severity == "critical"),
+            "warning":  sum(1 for g in gaps if g.severity == "warning"),
+            "ok":       sum(1 for g in gaps if g.severity == "ok"),
+            "actions":  [g.action for g in gaps if g.severity == "critical"][:3],
+        }
+    except Exception as exc:
+        gap_summary = {"error": str(exc)}
+
+    # Topics
+    try:
+        result   = TopicAnalyzer().top_topics(domain_id, top_n=5)
+        top_concepts = [t["concept"] for t in result.get("topics", [])]
+    except Exception as exc:
+        top_concepts = []
+
+    return {
+        "domain_id":    domain_id,
+        "gap_summary":  gap_summary,
+        "top_concepts": top_concepts,
+        "health_score": max(0, 100 - gap_summary.get("critical", 0) * 20 - gap_summary.get("warning", 0) * 5)
+        if isinstance(gap_summary, dict) and "critical" in gap_summary else None,
+    }

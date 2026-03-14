@@ -171,6 +171,83 @@ class ContextEngine:
             "top_topics": topics_delta,
         }
 
+    def build_analysis_prompt(self, context_json: str) -> str:
+        """
+        Format a session snapshot into a structured analysis request for the LLM.
+        Returns the user-side message (the system prompt is kept generic in the caller).
+        """
+        ctx    = json.loads(context_json)
+        stats  = ctx.get("entity_stats", {})
+        gaps   = ctx.get("gaps", {})
+        topics = ctx.get("top_topics", [])
+        schema = ctx.get("schema", {})
+
+        topic_str = ", ".join(t["concept"] for t in topics[:10]) if topics else "none"
+
+        return (
+            "You are a data analyst reviewing a knowledge management platform snapshot.\n\n"
+            "=== DOMAIN SNAPSHOT ===\n"
+            f"Domain        : {ctx.get('domain_id', 'unknown')}\n"
+            f"Schema        : {schema.get('name', '')} ({schema.get('primary_entity', '')})\n"
+            f"Taken at      : {ctx.get('generated_at', 'unknown')}\n"
+            f"Total entities: {stats.get('total', 0):,}\n"
+            f"Enriched      : {stats.get('enriched', 0):,} ({stats.get('pct_enriched', 0)}%)\n"
+            f"Critical gaps : {gaps.get('critical', 0)}\n"
+            f"Warnings      : {gaps.get('warning', 0)}\n"
+            f"Top concepts  : {topic_str}\n"
+            "=======================\n\n"
+            "Please provide:\n"
+            "1. A 2-3 sentence summary of the current data health.\n"
+            "2. The top 3 risks or data quality issues that need immediate attention.\n"
+            "3. Three specific, actionable recommendations to improve data quality and enrichment coverage.\n"
+            "4. A brief outlook: what the domain will look like in 3 months if no action is taken.\n\n"
+            "Be concise, specific, and prioritize by impact."
+        )
+
+    def build_diff_analysis_prompt(self, diff: Dict[str, Any]) -> str:
+        """
+        Format a diff result into a structured change-analysis request for the LLM.
+        """
+        es   = diff.get("entity_stats", {})
+        gaps = diff.get("gaps", {})
+
+        def _fmt(d: Dict[str, Any]) -> str:
+            c = d.get("change", 0)
+            sign = "+" if c > 0 else ""
+            return f"{d.get('before', 0)} → {d.get('after', 0)} ({sign}{c})"
+
+        changed_topics = [
+            t for t in diff.get("top_topics", []) if t.get("change", 0) != 0
+        ]
+        topic_lines = "\n".join(
+            f"  {t['concept']}: {t['before']} → {t['after']} ({'+' if t['change'] > 0 else ''}{t['change']})"
+            for t in sorted(changed_topics, key=lambda x: abs(x["change"]), reverse=True)[:8]
+        ) or "  (no changes)"
+
+        return (
+            "You are a data analyst reviewing changes between two knowledge platform snapshots.\n\n"
+            "=== SNAPSHOT DELTA ===\n"
+            f"From domain   : {diff.get('snapshot_a_domain', '?')}  [{diff.get('snapshot_a_generated', '?')}]\n"
+            f"To domain     : {diff.get('snapshot_b_domain', '?')}  [{diff.get('snapshot_b_generated', '?')}]\n\n"
+            "Entity stats:\n"
+            f"  Total    : {_fmt(es.get('total', {}))}\n"
+            f"  Enriched : {_fmt(es.get('enriched', {}))}\n"
+            f"  Enriched%: {_fmt(es.get('pct_enriched', {}))}\n\n"
+            "Data gaps:\n"
+            f"  Critical : {_fmt(gaps.get('critical', {}))}\n"
+            f"  Warnings : {_fmt(gaps.get('warning', {}))}\n"
+            f"  OK       : {_fmt(gaps.get('ok', {}))}\n\n"
+            "Concept changes:\n"
+            f"{topic_lines}\n"
+            "======================\n\n"
+            "Please provide:\n"
+            "1. A 2-3 sentence narrative of what changed between the two snapshots.\n"
+            "2. Whether the overall data health improved, deteriorated, or stayed the same — and why.\n"
+            "3. The most significant change and its likely cause or implication.\n"
+            "4. Two concrete next steps based on the observed trends.\n\n"
+            "Be concise and data-driven."
+        )
+
     def build_recall_prompt(self, label: str, context_json: str, user_query: str) -> str:
         """
         Format a persisted session snapshot + the incoming user query into a
