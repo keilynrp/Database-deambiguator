@@ -51,10 +51,10 @@ def get_entities(
         search_filter = f"%{search}%"
         query = query.filter(
             or_(
-                models.RawEntity.entity_name.ilike(search_filter),
-                models.RawEntity.brand_capitalized.ilike(search_filter),
-                models.RawEntity.model.ilike(search_filter),
-                models.RawEntity.sku.ilike(search_filter),
+                models.RawEntity.primary_label.ilike(search_filter),
+                models.RawEntity.canonical_id.ilike(search_filter),
+                models.RawEntity.secondary_label.ilike(search_filter),
+                models.RawEntity.entity_type.ilike(search_filter),
             )
         )
     total = query.count()
@@ -78,23 +78,23 @@ def get_entities_grouped(
     """
     variant_counts = (
         db.query(
-            models.RawEntity.entity_name,
+            models.RawEntity.primary_label,
             func.count(models.RawEntity.id).label("variant_count"),
         )
-        .filter(models.RawEntity.entity_name != None)
-        .group_by(models.RawEntity.entity_name)
+        .filter(models.RawEntity.primary_label != None)
+        .group_by(models.RawEntity.primary_label)
         .subquery()
     )
 
     query = (
-        db.query(models.RawEntity.entity_name, variant_counts.c.variant_count)
-        .join(variant_counts, models.RawEntity.entity_name == variant_counts.c.entity_name)
-        .group_by(models.RawEntity.entity_name, variant_counts.c.variant_count)
+        db.query(models.RawEntity.primary_label, variant_counts.c.variant_count)
+        .join(variant_counts, models.RawEntity.primary_label == variant_counts.c.primary_label)
+        .group_by(models.RawEntity.primary_label, variant_counts.c.variant_count)
     )
 
     if search:
         search_filter = f"%{search}%"
-        query = query.filter(models.RawEntity.entity_name.ilike(search_filter))
+        query = query.filter(models.RawEntity.primary_label.ilike(search_filter))
 
     query = query.order_by(variant_counts.c.variant_count.desc())
 
@@ -109,7 +109,7 @@ def get_entities_grouped(
 
     all_variants = (
         db.query(models.RawEntity)
-        .filter(models.RawEntity.entity_name.in_(entity_names))
+        .filter(models.RawEntity.primary_label.in_(entity_names))
         .all()
     )
 
