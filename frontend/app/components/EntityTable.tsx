@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import MonteCarloChart from "./MonteCarloChart";
 import { useDomain } from "../contexts/DomainContext";
@@ -77,6 +77,26 @@ export default function EntityTable() {
     const [bulkDeleting, setBulkDeleting] = useState(false);
     const [bulkEnriching, setBulkEnriching] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
+
+    // Virtual scrolling (Sprint 83)
+    const VIRTUAL_THRESHOLD = 50;   // enable virtualization when rows > this
+    const ROW_HEIGHT        = 52;   // px per row (py-3.5 rows)
+    const VIEWPORT_HEIGHT   = 620;  // px — fixed height of scrollable tbody area
+    const OVERSCAN          = 5;    // extra rows above/below viewport
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [scrollTop, setScrollTop] = useState(0);
+
+    const shouldVirtualize = entities.length > VIRTUAL_THRESHOLD;
+
+    // Visible row window (no-op when shouldVirtualize is false)
+    const editIdx = editingId !== null ? entities.findIndex(e => e.id === editingId) : -1;
+    let visStart = shouldVirtualize ? Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN) : 0;
+    let visEnd   = shouldVirtualize ? Math.min(entities.length, Math.ceil((scrollTop + VIEWPORT_HEIGHT) / ROW_HEIGHT) + OVERSCAN) : entities.length;
+    // Always keep the editing row in the visible slice
+    if (editIdx >= 0) { visStart = Math.min(visStart, editIdx); visEnd = Math.max(visEnd, editIdx + 1); }
+    const visibleEntities = entities.slice(visStart, visEnd);
+    const paddingTop    = shouldVirtualize ? visStart * ROW_HEIGHT : 0;
+    const paddingBottom = shouldVirtualize ? (entities.length - visEnd) * ROW_HEIGHT : 0;
 
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -301,9 +321,14 @@ export default function EntityTable() {
 
             {/* Table card */}
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <div className="table-container">
+                <div
+                    ref={scrollContainerRef}
+                    className="table-container"
+                    style={shouldVirtualize ? { maxHeight: VIEWPORT_HEIGHT, overflowY: "auto" } : undefined}
+                    onScroll={shouldVirtualize ? (e) => setScrollTop((e.currentTarget).scrollTop) : undefined}
+                >
                     <table className="w-full min-w-[1200px] text-left text-sm">
-                        <thead>
+                        <thead className={shouldVirtualize ? "sticky top-0 z-10 bg-white dark:bg-gray-900" : undefined}>
                             <tr className="border-b border-gray-200 dark:border-gray-800">
                                 <th className="w-10 px-4 py-3.5">
                                     <input
@@ -385,7 +410,9 @@ export default function EntityTable() {
                                     </td>
                                 </tr>
                             ) : (
-                                entities.map((entity) => {
+                                <>
+                                {paddingTop > 0 && <tr><td colSpan={99} style={{ height: paddingTop, padding: 0 }} /></tr>}
+                                {visibleEntities.map((entity) => {
                                     const isEditing = editingId === entity.id;
 
                                     let parsedJson: Record<string, any> = {};
@@ -585,7 +612,9 @@ export default function EntityTable() {
                                             </td>
                                         </tr>
                                     );
-                                })
+                                })}
+                                {paddingBottom > 0 && <tr><td colSpan={99} style={{ height: paddingBottom, padding: 0 }} /></tr>}
+                                </>
                             )}
                         </tbody>
                     </table>
@@ -656,6 +685,7 @@ export default function EntityTable() {
                             <option value={20}>20</option>
                             <option value={50}>50</option>
                             <option value={100}>100</option>
+                            <option value={200}>200</option>
                         </select>
                     </div>
 

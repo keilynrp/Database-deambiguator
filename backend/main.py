@@ -46,10 +46,12 @@ from backend.routers import (
     ingest,
     nlq,
     notifications,
+    organizations,
     scheduled_reports,
     quality,
     relationships,
     reports,
+    sales_deck,
     scheduled_imports,
     search,
     stores,
@@ -102,6 +104,13 @@ with database.engine.connect() as _conn:
             _conn.execute(text("ALTER TABLE users ADD COLUMN bio TEXT"))
             _conn.commit()
 
+    # ── Sprint 85: Multi-tenancy ──────────────────────────────────────────────
+    if "users" in _inspector.get_table_names():
+        _cols = [c["name"] for c in _inspector.get_columns("users")]
+        if "org_id" not in _cols:
+            _conn.execute(text("ALTER TABLE users ADD COLUMN org_id INTEGER"))
+            _conn.commit()
+
     if "authority_records" in _inspector.get_table_names():
         _cols = [c["name"] for c in _inspector.get_columns("authority_records")]
         if "resolution_status" not in _cols:
@@ -126,6 +135,16 @@ with database.engine.connect() as _conn:
         if "notes" not in _cols:
             _conn.execute(text("ALTER TABLE analysis_contexts ADD COLUMN notes TEXT"))
             _conn.execute(text("ALTER TABLE analysis_contexts ADD COLUMN pinned BOOLEAN DEFAULT 0"))
+            _conn.commit()
+
+    # ── Sprint 86: Annotation resolve + emoji reactions ───────────────────────
+    if "annotations" in _inspector.get_table_names():
+        _cols = [c["name"] for c in _inspector.get_columns("annotations")]
+        if "is_resolved" not in _cols:
+            _conn.execute(text("ALTER TABLE annotations ADD COLUMN is_resolved BOOLEAN DEFAULT 0"))
+            _conn.execute(text("ALTER TABLE annotations ADD COLUMN resolved_at DATETIME"))
+            _conn.execute(text("ALTER TABLE annotations ADD COLUMN resolved_by_id INTEGER"))
+            _conn.execute(text("ALTER TABLE annotations ADD COLUMN emoji_reactions TEXT DEFAULT '{}'"))
             _conn.commit()
 
     # ── Sprint 53: FTS5 search index ─────────────────────────────────────────
@@ -356,6 +375,8 @@ app.include_router(scheduled_reports.router)
 app.include_router(dashboards.router)
 app.include_router(alert_channels.router)
 app.include_router(api_keys.router)
+app.include_router(sales_deck.router)
+app.include_router(organizations.router)
 
 # ── Static file serving (uploaded logos etc.) ─────────────────────────────────
 _static_dir = pathlib.Path("static")

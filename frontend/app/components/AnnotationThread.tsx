@@ -14,6 +14,10 @@ interface Annotation {
   content: string;
   created_at: string;
   updated_at: string;
+  is_resolved: boolean;
+  resolved_at: string | null;
+  resolved_by_id: number | null;
+  emoji_reactions: Record<string, number[]>;
 }
 
 function timeAgo(iso: string): string {
@@ -23,6 +27,8 @@ function timeAgo(iso: string): string {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
 }
+
+const REACTIONS = ["👍", "❤️", "🚀", "👀", "✅", "😄", "🎉"] as const;
 
 interface AnnotationThreadProps {
   entityId?: number;
@@ -87,6 +93,16 @@ export default function AnnotationThread({ entityId, authorityId }: AnnotationTh
     load();
   };
 
+  const resolve = async (id: number) => {
+    await apiFetch(`/annotations/${id}/resolve`, { method: "POST" });
+    load();
+  };
+
+  const react = async (id: number, emoji: string) => {
+    await apiFetch(`/annotations/${id}/react?emoji=${encodeURIComponent(emoji)}`, { method: "POST" });
+    load();
+  };
+
   const topLevel = annotations.filter(a => a.parent_id === null);
   const replies = (parentId: number) => annotations.filter(a => a.parent_id === parentId);
 
@@ -129,6 +145,11 @@ export default function AnnotationThread({ entityId, authorityId }: AnnotationTh
                 </span>
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{ann.author_name}</span>
                 <span className="text-xs text-gray-400">{timeAgo(ann.created_at)}</span>
+                {ann.is_resolved && (
+                  <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    Resolved
+                  </span>
+                )}
               </div>
               {user && (user.username === ann.author_name || ["admin", "super_admin"].includes(user.role)) && (
                 <div className="flex items-center gap-1">
@@ -170,6 +191,43 @@ export default function AnnotationThread({ entityId, authorityId }: AnnotationTh
             ) : (
               <p className="mt-1.5 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{ann.content}</p>
             )}
+
+            {/* Resolve button + reactions */}
+            <div className="mt-2 flex items-center gap-3 flex-wrap">
+              {isEditorOrAbove && ann.parent_id === null && (
+                <button
+                  onClick={() => resolve(ann.id)}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                    ann.is_resolved
+                      ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400"
+                  }`}
+                >
+                  {ann.is_resolved ? "✅ Resolved" : "Mark resolved"}
+                </button>
+              )}
+              {/* Emoji reactions */}
+              <div className="flex items-center gap-1 flex-wrap">
+                {REACTIONS.map(emoji => {
+                  const users = ann.emoji_reactions?.[emoji] ?? [];
+                  const hasReacted = user && users.includes(user.id);
+                  return (
+                    <button
+                      key={emoji}
+                      onClick={() => react(ann.id, emoji)}
+                      title={`${users.length} reaction${users.length !== 1 ? "s" : ""}`}
+                      className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-xs transition-colors ${
+                        hasReacted
+                          ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                      }`}
+                    >
+                      {emoji}{users.length > 0 && <span className="font-semibold">{users.length}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Replies */}
             <div className="mt-2 space-y-2 pl-4 border-l-2 border-gray-200 dark:border-gray-700">

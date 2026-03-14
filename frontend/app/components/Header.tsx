@@ -36,8 +36,10 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   "/dashboards":          { title: "My Dashboards",          subtitle: "Personalised widget dashboards — build your own data view" },
   "/settings/alerts":    { title: "Alert Channels",         subtitle: "Push platform events to Slack, Teams, Discord, or any webhook" },
   "/settings/api-keys":  { title: "API Keys",               subtitle: "Generate and manage long-lived API keys for programmatic access" },
+  "/settings/organizations": { title: "Organizations", subtitle: "Manage multi-tenant workspaces and member access" },
   "/settings/users":   { title: "User Management",       subtitle: "Manage user accounts, roles, and platform access" },
   "/profile":          { title: "My Profile",             subtitle: "Manage your personal information, avatar, and password" },
+  "/demo/sales":       { title: "Sales Deck",             subtitle: "Executive narrative — printable to PDF for prospects and stakeholders" },
 };
 
 // ── Search result type ─────────────────────────────────────────────────────────

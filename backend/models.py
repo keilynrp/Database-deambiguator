@@ -188,6 +188,7 @@ class User(Base):
     avatar_url      = Column(Text, nullable=True)       # data URL (base64), Sprint 58
     display_name    = Column(String(100), nullable=True)  # optional full name, Sprint 59
     bio             = Column(Text, nullable=True)          # short bio, Sprint 59
+    org_id          = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
 
 
 # ── Authority Resolution Layer ──────────────────────────────────────────────
@@ -306,6 +307,11 @@ class Annotation(Base):
     created_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc),
                           onupdate=lambda: datetime.now(timezone.utc))
+    # Sprint 86 — resolve workflow + emoji reactions
+    is_resolved     = Column(Boolean, default=False)
+    resolved_at     = Column(DateTime, nullable=True)
+    resolved_by_id  = Column(Integer, nullable=True)   # FK users.id
+    emoji_reactions = Column(Text, default="{}")        # JSON: {"👍": [uid, ...], "❤️": [...]}
 
 
 # ── Sprint 43: Email Notification Settings (singleton, id=1) ────────────────
@@ -504,3 +510,35 @@ class ScheduledReport(Base):
     total_sent       = Column(Integer, default=0)
     created_at       = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+
+# ── Sprint 85: Multi-tenant Organizations ─────────────────────────────────────
+
+class Organization(Base):
+    """
+    Top-level tenant workspace. Users belong to one or more organizations.
+    Data scoped per organization when org_id is set.
+    """
+    __tablename__ = "organizations"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    name        = Column(String(200), nullable=False)
+    slug        = Column(String(100), nullable=False, unique=True, index=True)  # URL-safe identifier
+    description = Column(Text, nullable=True)
+    plan        = Column(String(20), default="free")  # free | pro | enterprise
+    owner_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    is_active   = Column(Boolean, default=True)
+    created_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class OrganizationMember(Base):
+    """
+    Membership link between a User and an Organization.
+    role: owner | admin | member
+    """
+    __tablename__ = "organization_members"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    org_id      = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    role        = Column(String(20), default="member")  # owner | admin | member
+    joined_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))

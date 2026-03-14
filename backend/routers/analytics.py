@@ -25,8 +25,10 @@ from backend import models
 from backend.analyzers.correlation import CorrelationAnalyzer
 from backend.analyzers.roi_calculator import ROIParams, simulate as _roi_simulate
 from backend.analyzers.topic_modeling import TopicAnalyzer
-from backend.auth import get_current_user
+from backend.auth import get_current_user, require_role
 from backend.database import get_db
+import time
+from threading import Lock
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,40 @@ router = APIRouter(tags=["analytics"])
 
 _topic_analyzer = TopicAnalyzer()
 _correlation_analyzer = CorrelationAnalyzer()
+
+# ── In-memory TTL analytics cache (Sprint 83) ─────────────────────────────────
+
+class _SimpleCache:
+    """Thread-safe in-memory TTL cache for expensive analytics computations."""
+
+    def __init__(self, ttl_seconds: int = 300):
+        self._store: dict[str, tuple[float, object]] = {}
+        self._lock = Lock()
+        self._ttl = ttl_seconds
+
+    def get(self, key: str):
+        with self._lock:
+            if key in self._store:
+                ts, val = self._store[key]
+                if time.time() - ts < self._ttl:
+                    return val
+                del self._store[key]
+        return None
+
+    def set(self, key: str, value: object) -> None:
+        with self._lock:
+            self._store[key] = (time.time(), value)
+
+    def invalidate(self, prefix: str = "") -> int:
+        with self._lock:
+            keys = [k for k in self._store if k.startswith(prefix)] if prefix else list(self._store.keys())
+            for k in keys:
+                del self._store[k]
+            return len(keys)
+
+
+_analytics_cache = _SimpleCache(ttl_seconds=300)   # 5 min — topic / correlation
+_dashboard_cache = _SimpleCache(ttl_seconds=120)   # 2 min — dashboard snapshots
 
 
 # ── ROI Calculator ────────────────────────────────────────────────────────────
@@ -99,8 +135,14 @@ def analyzer_topics(
     _: models.User = Depends(get_current_user),
 ):
     """Top concepts by frequency across enriched entities in a domain."""
+    _key = f"topics_{domain_id}_{top_n}"
+    cached = _analytics_cache.get(_key)
+    if cached is not None:
+        return cached
     try:
-        return _topic_analyzer.top_topics(domain_id, top_n=top_n)
+        result = _topic_analyzer.top_topics(domain_id, top_n=top_n)
+        _analytics_cache.set(_key, result)
+        return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception:
@@ -115,8 +157,14 @@ def analyzer_cooccurrence(
     _: models.User = Depends(get_current_user),
 ):
     """Concept co-occurrence pairs with PMI score."""
+    _key = f"cooccurrence_{domain_id}_{top_n}"
+    cached = _analytics_cache.get(_key)
+    if cached is not None:
+        return cached
     try:
-        return _topic_analyzer.cooccurrence(domain_id, top_n=top_n)
+        result = _topic_analyzer.cooccurrence(domain_id, top_n=top_n)
+        _analytics_cache.set(_key, result)
+        return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception:
@@ -131,8 +179,14 @@ def analyzer_clusters(
     _: models.User = Depends(get_current_user),
 ):
     """Greedy concept clusters seeded by top concepts."""
+    _key = f"clusters_{domain_id}_{n_clusters}"
+    cached = _analytics_cache.get(_key)
+    if cached is not None:
+        return cached
     try:
-        return _topic_analyzer.topic_clusters(domain_id, n_clusters=n_clusters)
+        result = _topic_analyzer.topic_clusters(domain_id, n_clusters=n_clusters)
+        _analytics_cache.set(_key, result)
+        return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception:
@@ -147,8 +201,14 @@ def analyzer_correlation(
     _: models.User = Depends(get_current_user),
 ):
     """Cramér's V pairwise field correlations for categorical columns in a domain."""
+    _key = f"correlation_{domain_id}_{top_n}"
+    cached = _analytics_cache.get(_key)
+    if cached is not None:
+        return cached
     try:
-        return _correlation_analyzer.top_correlations(domain_id, top_n=top_n)
+        result = _correlation_analyzer.top_correlations(domain_id, top_n=top_n)
+        _analytics_cache.set(_key, result)
+        return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception:
@@ -170,7 +230,13 @@ def dashboard_summary(
     _: models.User = Depends(get_current_user),
 ):
     """Aggregated KPIs + timeline + heatmap + concepts for the Executive Dashboard."""
-    return _domain_snapshot(db, domain_id, top_n_concepts=30, top_n_entities=10)
+    _key = f"dashboard_{domain_id}"
+    cached = _dashboard_cache.get(_key)
+    if cached is not None:
+        return cached
+    result = _domain_snapshot(db, domain_id, top_n_concepts=30, top_n_entities=10)
+    _dashboard_cache.set(_key, result)
+    return result
 
 
 def _domain_snapshot(db: Session, domain_id: str, top_n_concepts: int = 10,
@@ -327,6 +393,31 @@ def dashboard_compare(
             for did in domain_ids
         ]
     }
+
+
+# ── Cache management ──────────────────────────────────────────────────────────
+
+@router.post("/analytics/cache/invalidate", tags=["analytics"])
+def invalidate_analytics_cache(
+    prefix: str = Query(default="", description="Optional key prefix to target specific domain"),
+    _: models.User = Depends(require_role("super_admin", "admin")),
+):
+    """Manually bust the analytics in-memory cache (admin+). Called automatically on data mutations."""
+    n1 = _analytics_cache.invalidate(prefix)
+    n2 = _dashboard_cache.invalidate(prefix)
+    return {"invalidated": n1 + n2, "prefix": prefix or "(all)"}
+
+
+def invalidate_analytics_for_domain(domain_id: str) -> None:
+    """
+    Call this from ingest/entity routers after mutations to keep analytics fresh.
+    Invalidates only entries matching the affected domain.
+    """
+    _analytics_cache.invalidate(f"topics_{domain_id}")
+    _analytics_cache.invalidate(f"cooccurrence_{domain_id}")
+    _analytics_cache.invalidate(f"clusters_{domain_id}")
+    _analytics_cache.invalidate(f"correlation_{domain_id}")
+    _dashboard_cache.invalidate(f"dashboard_{domain_id}")
 
 
 # ── Global stats and lookup endpoints ────────────────────────────────────────

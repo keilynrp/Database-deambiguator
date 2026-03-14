@@ -321,6 +321,35 @@ class AnnotationResponse(BaseModel):
     content:      str
     created_at:   datetime
     updated_at:   datetime
+    # Sprint 86 — resolve workflow + emoji reactions
+    is_resolved:     bool = False
+    resolved_at:     Optional[str] = None
+    resolved_by_id:  Optional[int] = None
+    emoji_reactions: dict = {}
+
+    @field_validator("emoji_reactions", mode="before")
+    @classmethod
+    def _parse_emoji_reactions(cls, v):
+        """Coerce the TEXT column JSON string to a dict."""
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except Exception:
+                return {}
+        if v is None:
+            return {}
+        return v
+
+    @field_validator("resolved_at", mode="before")
+    @classmethod
+    def _coerce_resolved_at(cls, v):
+        """Convert DateTime objects to ISO string."""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return v
+        # DateTime object
+        return v.isoformat()
 
 
 # ── Sprint 43: Notification Settings ─────────────────────────────────────────

@@ -8,7 +8,9 @@ Collaborative Annotations endpoints (Sprint 42).
 """
 from __future__ import annotations
 
+import json as _json
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -83,6 +85,39 @@ def create_annotation(
     return schemas.AnnotationResponse.model_validate(ann)
 
 
+# ── GET /annotations/stats/{entity_id} ────────────────────────────────────────
+# NOTE: must be registered BEFORE /annotations/{ann_id} to avoid route shadowing
+
+@router.get("/annotations/stats/{entity_id}", tags=["annotations"])
+def annotation_stats(
+    entity_id: int,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(get_current_user),
+):
+    """Thread statistics for an entity: total / resolved / unresolved top-level threads."""
+    threads = (
+        db.query(models.Annotation)
+        .filter(
+            models.Annotation.entity_id == entity_id,
+            models.Annotation.parent_id.is_(None),
+        )
+        .all()
+    )
+    total = len(threads)
+    resolved = sum(1 for t in threads if t.is_resolved)
+    total_reactions = sum(
+        sum(len(v) for v in _json.loads(t.emoji_reactions or "{}").values())
+        for t in threads
+    )
+    return {
+        "entity_id": entity_id,
+        "total_threads": total,
+        "resolved_threads": resolved,
+        "unresolved_threads": total - resolved,
+        "total_reactions": total_reactions,
+    }
+
+
 # ── GET /annotations/{id} ─────────────────────────────────────────────────────
 
 @router.get("/annotations/{ann_id}", tags=["annotations"])
@@ -125,3 +160,70 @@ def delete_annotation(
     db.commit()
     logger.info("Annotation %d deleted by %s", ann_id, current_user.username)
     return {"deleted": ann_id}
+
+
+# ── POST /annotations/{id}/resolve ────────────────────────────────────────────
+
+@router.post("/annotations/{ann_id}/resolve", tags=["annotations"])
+def toggle_resolve(
+    ann_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
+):
+    """Toggle the resolved state of a top-level annotation thread."""
+    ann = _get_or_404(ann_id, db)
+    if ann.parent_id is not None:
+        raise HTTPException(status_code=400, detail="Only top-level annotations can be resolved")
+    ann.is_resolved = not ann.is_resolved
+    if ann.is_resolved:
+        ann.resolved_at = datetime.now(timezone.utc)
+        ann.resolved_by_id = current_user.id
+    else:
+        ann.resolved_at = None
+        ann.resolved_by_id = None
+    db.commit()
+    db.refresh(ann)
+    logger.info("Annotation %d resolved=%s by %s", ann_id, ann.is_resolved, current_user.username)
+    return schemas.AnnotationResponse.model_validate(ann)
+
+
+# ── POST /annotations/{id}/react ──────────────────────────────────────────────
+
+_ALLOWED_REACTIONS = {"👍", "❤️", "🚀", "👀", "✅", "😄", "🎉"}
+
+
+@router.post("/annotations/{ann_id}/react", tags=["annotations"])
+def react_to_annotation(
+    ann_id: int,
+    emoji: str = Query(..., description="Emoji character, e.g. 👍"),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Add or remove an emoji reaction (toggle).
+    Pass ?emoji=👍 (URL-encoded) as a query param.
+    Allowed: 👍 ❤️ 🚀 👀 ✅ 😄 🎉
+    """
+    if emoji not in _ALLOWED_REACTIONS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Emoji '{emoji}' not allowed. Use: {sorted(_ALLOWED_REACTIONS)}",
+        )
+    ann = _get_or_404(ann_id, db)
+    try:
+        reactions: dict = _json.loads(ann.emoji_reactions or "{}")
+    except Exception:
+        reactions = {}
+    users = reactions.get(emoji, [])
+    if current_user.id in users:
+        users.remove(current_user.id)   # toggle off
+    else:
+        users.append(current_user.id)   # toggle on
+    if users:
+        reactions[emoji] = users
+    else:
+        reactions.pop(emoji, None)
+    ann.emoji_reactions = _json.dumps(reactions, ensure_ascii=False)
+    db.commit()
+    db.refresh(ann)
+    return schemas.AnnotationResponse.model_validate(ann)
