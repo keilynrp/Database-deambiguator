@@ -19,10 +19,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     bind = op.get_bind()
-    existing = bind.execute(sa.text(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='embed_widgets'"
-    )).fetchone()
-    if existing is None:
+    if not sa.inspect(bind).has_table("embed_widgets"):
         op.create_table(
             'embed_widgets',
             sa.Column('id', sa.Integer, primary_key=True),

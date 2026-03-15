@@ -30,7 +30,7 @@ def upgrade() -> None:
         sa.Column("avatar_url", sa.Text, nullable=True),
         sa.Column("password_hash", sa.String, nullable=False),
         sa.Column("role", sa.String, nullable=False, server_default="viewer"),
-        sa.Column("is_active", sa.Boolean, nullable=False, server_default="1"),
+        sa.Column("is_active", sa.Boolean, nullable=False, server_default=sa.text("true")),
         sa.Column("failed_attempts", sa.Integer, nullable=True, server_default="0"),
         sa.Column("locked_until", sa.String, nullable=True),
         sa.Column("org_id", sa.Integer, nullable=True),
@@ -44,7 +44,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String, nullable=False),
         sa.Column("slug", sa.String, unique=True, nullable=False),
         sa.Column("plan", sa.String, nullable=True, server_default="free"),
-        sa.Column("is_active", sa.Boolean, nullable=False, server_default="1"),
+        sa.Column("is_active", sa.Boolean, nullable=False, server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime, nullable=True),
         sa.Column("settings_json", sa.Text, nullable=True),
     )
@@ -83,7 +83,7 @@ def upgrade() -> None:
         sa.Column("original_value", sa.String, nullable=False),
         sa.Column("canonical_value", sa.String, nullable=False),
         sa.Column("rule_type", sa.String, nullable=True, server_default="literal"),
-        sa.Column("is_active", sa.Boolean, nullable=True, server_default="1"),
+        sa.Column("is_active", sa.Boolean, nullable=True, server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime, nullable=True),
     )
 
@@ -95,7 +95,7 @@ def upgrade() -> None:
         sa.Column("step_params", sa.Text, nullable=True),
         sa.Column("affected_count", sa.Integer, nullable=True),
         sa.Column("snapshot_json", sa.Text, nullable=True),
-        sa.Column("reverted", sa.Boolean, nullable=True, server_default="0"),
+        sa.Column("reverted", sa.Boolean, nullable=True, server_default=sa.text("false")),
         sa.Column("created_at", sa.DateTime, nullable=True),
     )
 
@@ -132,7 +132,7 @@ def upgrade() -> None:
         sa.Column("consumer_secret", sa.String, nullable=True),
         sa.Column("api_token", sa.String, nullable=True),
         sa.Column("custom_headers", sa.Text, nullable=True),
-        sa.Column("is_active", sa.Boolean, nullable=True, server_default="1"),
+        sa.Column("is_active", sa.Boolean, nullable=True, server_default=sa.text("true")),
         sa.Column("last_sync", sa.DateTime, nullable=True),
         sa.Column("created_at", sa.DateTime, nullable=True),
     )
@@ -155,7 +155,7 @@ def upgrade() -> None:
         sa.Column("provider", sa.String, nullable=False),
         sa.Column("api_key", sa.String, nullable=False),
         sa.Column("model_name", sa.String, nullable=True),
-        sa.Column("is_active", sa.Boolean, nullable=True, server_default="1"),
+        sa.Column("is_active", sa.Boolean, nullable=True, server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime, nullable=True),
     )
 
@@ -191,7 +191,7 @@ def upgrade() -> None:
         sa.Column("entity_id", sa.Integer, sa.ForeignKey("raw_entities.id"), nullable=False),
         sa.Column("user_id", sa.Integer, nullable=True),
         sa.Column("text", sa.Text, nullable=False),
-        sa.Column("is_resolved", sa.Boolean, nullable=True, server_default="0"),
+        sa.Column("is_resolved", sa.Boolean, nullable=True, server_default=sa.text("false")),
         sa.Column("resolved_at", sa.DateTime, nullable=True),
         sa.Column("resolved_by_id", sa.Integer, nullable=True),
         sa.Column("emoji_reactions", sa.Text, nullable=True, server_default="{}"),
@@ -206,7 +206,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Integer, nullable=True),
         sa.Column("context_text", sa.Text, nullable=True),
         sa.Column("notes", sa.Text, nullable=True),
-        sa.Column("pinned", sa.Boolean, nullable=True, server_default="0"),
+        sa.Column("pinned", sa.Boolean, nullable=True, server_default=sa.text("false")),
         sa.Column("created_at", sa.DateTime, nullable=True),
     )
 
@@ -228,7 +228,7 @@ def upgrade() -> None:
         sa.Column("url", sa.String, nullable=False),
         sa.Column("events", sa.Text, nullable=True),
         sa.Column("secret", sa.String, nullable=True),
-        sa.Column("is_active", sa.Boolean, nullable=True, server_default="1"),
+        sa.Column("is_active", sa.Boolean, nullable=True, server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime, nullable=True),
     )
 
@@ -250,7 +250,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Integer, nullable=True),
         sa.Column("title", sa.String, nullable=False),
         sa.Column("body", sa.Text, nullable=True),
-        sa.Column("is_read", sa.Boolean, nullable=True, server_default="0"),
+        sa.Column("is_read", sa.Boolean, nullable=True, server_default=sa.text("false")),
         sa.Column("created_at", sa.DateTime, nullable=True),
     )
 
@@ -273,7 +273,7 @@ def upgrade() -> None:
         sa.Column("description", sa.Text, nullable=True),
         sa.Column("sections", sa.Text, nullable=True),
         sa.Column("default_title", sa.String, nullable=True),
-        sa.Column("is_builtin", sa.Boolean, nullable=True, server_default="0"),
+        sa.Column("is_builtin", sa.Boolean, nullable=True, server_default=sa.text("false")),
         sa.Column("created_at", sa.DateTime, nullable=True),
     )
 
@@ -295,7 +295,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Integer, nullable=False),
         sa.Column("name", sa.String, nullable=False),
         sa.Column("layout_json", sa.Text, nullable=True),
-        sa.Column("is_default", sa.Boolean, nullable=True, server_default="0"),
+        sa.Column("is_default", sa.Boolean, nullable=True, server_default=sa.text("false")),
         sa.Column("created_at", sa.DateTime, nullable=True),
     )
 
@@ -306,7 +306,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String, nullable=False),
         sa.Column("channel_type", sa.String, nullable=False),
         sa.Column("config_json", sa.Text, nullable=True),
-        sa.Column("is_active", sa.Boolean, nullable=True, server_default="1"),
+        sa.Column("is_active", sa.Boolean, nullable=True, server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime, nullable=True),
     )
 
@@ -319,7 +319,7 @@ def upgrade() -> None:
         sa.Column("key_hash", sa.String, nullable=False, unique=True),
         sa.Column("prefix", sa.String, nullable=False),
         sa.Column("scopes", sa.Text, nullable=True),
-        sa.Column("is_active", sa.Boolean, nullable=True, server_default="1"),
+        sa.Column("is_active", sa.Boolean, nullable=True, server_default=sa.text("true")),
         sa.Column("last_used_at", sa.DateTime, nullable=True),
         sa.Column("expires_at", sa.DateTime, nullable=True),
         sa.Column("created_at", sa.DateTime, nullable=True),
@@ -331,7 +331,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer, primary_key=True, index=True),
         sa.Column("store_id", sa.Integer, sa.ForeignKey("store_connections.id"), nullable=False),
         sa.Column("cron_expr", sa.String, nullable=False),
-        sa.Column("is_active", sa.Boolean, nullable=True, server_default="1"),
+        sa.Column("is_active", sa.Boolean, nullable=True, server_default=sa.text("true")),
         sa.Column("last_run_at", sa.DateTime, nullable=True),
         sa.Column("next_run_at", sa.DateTime, nullable=True),
         sa.Column("created_at", sa.DateTime, nullable=True),
@@ -344,27 +344,53 @@ def upgrade() -> None:
         sa.Column("template_id", sa.Integer, sa.ForeignKey("artifact_templates.id"), nullable=True),
         sa.Column("cron_expr", sa.String, nullable=False),
         sa.Column("recipients", sa.Text, nullable=True),
-        sa.Column("is_active", sa.Boolean, nullable=True, server_default="1"),
+        sa.Column("is_active", sa.Boolean, nullable=True, server_default=sa.text("true")),
         sa.Column("last_run_at", sa.DateTime, nullable=True),
         sa.Column("created_at", sa.DateTime, nullable=True),
     )
 
-    # ── FTS5 virtual table (raw SQL — not tracked by SQLAlchemy metadata) ─────
-    op.execute("""
-        CREATE VIRTUAL TABLE IF NOT EXISTS search_index
-        USING fts5(
-            doc_type,
-            doc_id   UNINDEXED,
-            title,
-            body,
-            href     UNINDEXED
-        )
-    """)
+    # ── Full-text search table (dialect-conditional) ──────────────────────────
+    bind = op.get_bind()
+    if bind.dialect.name == "sqlite":
+        # SQLite: FTS5 virtual table for high-performance prefix matching
+        op.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS search_index
+            USING fts5(
+                doc_type,
+                doc_id   UNINDEXED,
+                title,
+                body,
+                href     UNINDEXED
+            )
+        """)
+    else:
+        # PostgreSQL: regular table with GIN index on tsvector for native FTS
+        op.execute("""
+            CREATE TABLE IF NOT EXISTS search_index (
+                doc_type TEXT,
+                doc_id   INTEGER,
+                title    TEXT,
+                body     TEXT,
+                href     TEXT
+            )
+        """)
+        op.execute("""
+            CREATE INDEX IF NOT EXISTS ix_search_index_vector
+            ON search_index
+            USING GIN (
+                to_tsvector('english',
+                    COALESCE(title, '') || ' ' || COALESCE(body, ''))
+            )
+        """)
 
 
 def downgrade() -> None:
     # Drop in reverse FK order
-    op.execute("DROP TABLE IF EXISTS search_index")
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute("DROP TABLE IF EXISTS search_index CASCADE")
+    else:
+        op.execute("DROP TABLE IF EXISTS search_index")
     op.drop_table("scheduled_reports")
     op.drop_table("scheduled_imports")
     op.drop_table("api_keys")

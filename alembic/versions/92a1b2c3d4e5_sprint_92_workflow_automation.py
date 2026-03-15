@@ -20,11 +20,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     bind = op.get_bind()
+    inspector = sa.inspect(bind)
 
-    existing_wf = bind.execute(sa.text(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='workflows'"
-    )).fetchone()
-    if existing_wf is None:
+    if not inspector.has_table("workflows"):
         op.create_table(
             'workflows',
             sa.Column('id', sa.Integer, primary_key=True),
@@ -42,10 +40,7 @@ def upgrade() -> None:
             sa.Column('last_run_status', sa.String(20), nullable=True),
         )
 
-    existing_wr = bind.execute(sa.text(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='workflow_runs'"
-    )).fetchone()
-    if existing_wr is None:
+    if not inspector.has_table("workflow_runs"):
         op.create_table(
             'workflow_runs',
             sa.Column('id', sa.Integer, primary_key=True),

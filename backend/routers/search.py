@@ -1,7 +1,12 @@
 """
-Phase 12 Sprint 53 — Full-Text Search (FTS5)
+Phase 12 Sprint 53 — Full-Text Search
   GET  /search          — global search across entities + authority + annotations
   POST /search/rebuild  — rebuild FTS index (admin+)
+
+Dialect support
+---------------
+SQLite  : FTS5 virtual table with MATCH + prefix wildcards
+PostgreSQL : regular table with GIN tsvector index + plainto_tsquery
 """
 import logging
 import re
@@ -12,13 +17,15 @@ from sqlalchemy.orm import Session
 
 from backend import models
 from backend.auth import get_current_user, require_role
-from backend.database import get_db
+from backend.database import get_db, SQLALCHEMY_DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/search", tags=["search"])
 
-# ── FTS helpers ───────────────────────────────────────────────────────────────
+_IS_SQLITE = SQLALCHEMY_DATABASE_URL.startswith("sqlite")
+
+# ── FTS helpers (SQLite / FTS5) ───────────────────────────────────────────────
 
 _UNSAFE_RE = re.compile(r'[^\w\s\-]', re.UNICODE)
 
@@ -36,8 +43,10 @@ def _fts_query(raw: str) -> str:
     return " ".join(f'"{t}"*' for t in tokens)
 
 
+# ── Common INSERT helpers ─────────────────────────────────────────────────────
+
 def _rebuild(db: Session) -> int:
-    """Drop + repopulate the search_index FTS5 table. Returns row count."""
+    """Drop + repopulate the search_index table. Returns indexed row count."""
     db.execute(text("DELETE FROM search_index"))
 
     db.execute(text("""
@@ -95,36 +104,60 @@ def global_search(
     """
     Full-text search across entities, authority records, and annotations.
     Returns ranked results with navigation hrefs.
+    Dialect-aware: FTS5 on SQLite, tsvector on PostgreSQL.
     """
-    fts_expr = _fts_query(q)
-
+    params: dict = {}
     type_filter = ""
-    params: dict = {"expr": fts_expr}
+
     if doc_type:
         type_filter = "AND doc_type = :doc_type"
         params["doc_type"] = doc_type
 
-    count_sql = text(f"""
-        SELECT COUNT(*)
-        FROM search_index
-        WHERE search_index MATCH :expr {type_filter}
-    """)
-    rows_sql = text(f"""
-        SELECT doc_type, doc_id, title, body, href, rank
-        FROM search_index
-        WHERE search_index MATCH :expr {type_filter}
-        ORDER BY rank
-        LIMIT :limit OFFSET :skip
-    """)
     params["limit"] = limit
     params["skip"]  = skip
 
     try:
+        if _IS_SQLITE:
+            # ── SQLite FTS5 ───────────────────────────────────────────────────
+            fts_expr = _fts_query(q)
+            params["expr"] = fts_expr
+
+            count_sql = text(f"""
+                SELECT COUNT(*)
+                FROM search_index
+                WHERE search_index MATCH :expr {type_filter}
+            """)
+            rows_sql = text(f"""
+                SELECT doc_type, doc_id, title, body, href, rank
+                FROM search_index
+                WHERE search_index MATCH :expr {type_filter}
+                ORDER BY rank
+                LIMIT :limit OFFSET :skip
+            """)
+        else:
+            # ── PostgreSQL tsvector ───────────────────────────────────────────
+            params["q"] = q
+            _vec = "to_tsvector('english', COALESCE(title,'') || ' ' || COALESCE(body,''))"
+            _qry = "plainto_tsquery('english', :q)"
+
+            count_sql = text(f"""
+                SELECT COUNT(*)
+                FROM search_index
+                WHERE {_vec} @@ {_qry} {type_filter}
+            """)
+            rows_sql = text(f"""
+                SELECT doc_type, doc_id, title, body, href
+                FROM search_index
+                WHERE {_vec} @@ {_qry} {type_filter}
+                ORDER BY ts_rank({_vec}, {_qry}) DESC
+                LIMIT :limit OFFSET :skip
+            """)
+
         total = db.execute(count_sql, params).fetchone()[0]
         rows  = db.execute(rows_sql,  params).fetchall()
+
     except Exception as exc:
-        # FTS5 parse error (rare after sanitisation)
-        logger.warning("FTS5 query failed for %r: %s", q, exc)
+        logger.warning("Search query failed for %r: %s", q, exc)
         raise HTTPException(status_code=422, detail=f"Invalid search query: {exc}")
 
     items = [
@@ -146,6 +179,6 @@ def rebuild_index(
     db: Session    = Depends(get_db),
     _:  models.User = Depends(require_role("super_admin", "admin")),
 ):
-    """Force a full rebuild of the FTS5 search index. Admin+ only."""
+    """Force a full rebuild of the search index. Admin+ only."""
     count = _rebuild(db)
     return {"indexed": count}

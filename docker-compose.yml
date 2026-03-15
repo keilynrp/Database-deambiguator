@@ -1,35 +1,84 @@
-version: '3.8'
+version: "3.9"
+
+# ── UKIP — Universal Knowledge Intelligence Platform ─────────────────────────
+# Production-ready docker-compose with PostgreSQL 16.
+#
+# Quick start:
+#   cp .env.example .env          # fill in JWT_SECRET_KEY and other secrets
+#   docker compose up -d
+#   docker compose logs -f ukip-backend
+#
+# Access:
+#   Backend API  → http://localhost:8000
+#   API docs     → http://localhost:8000/docs
+#   Frontend     → http://localhost:3004
 
 services:
-  # The core backend application
-  backend:
-    build:
-      context: .
-      dockerfile: ./backend/Dockerfile  # You will need to create a Dockerfile for production
-    ports:
-      - "8000:8000"
-    environment:
-      # Switch to PostgreSQL backend defined below (Sprint 64)
-      - DATABASE_URL=postgresql+psycopg2://ukip:ukip_password@db:5432/ukip
-      - DB_POOL_SIZE=20
-      - DB_MAX_OVERFLOW=10
-    depends_on:
-      - db
-    volumes:
-      - ./backend:/app
 
-  # Production-grade PostgreSQL Database (Sprint 64)
-  db:
-    image: postgres:15-alpine
-    restart: always
+  # ── PostgreSQL 16 ───────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: ukip
-      POSTGRES_PASSWORD: ukip_password
-      POSTGRES_DB: ukip
-    ports:
-      - "5432:5432"
+      POSTGRES_DB:       ${POSTGRES_DB:-ukip}
+      POSTGRES_USER:     ${POSTGRES_USER:-ukip}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ukip_secret}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ukip} -d ${POSTGRES_DB:-ukip}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── UKIP Backend (FastAPI + Uvicorn) ────────────────────────────────────────
+  ukip-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL:       postgresql+psycopg2://${POSTGRES_USER:-ukip}:${POSTGRES_PASSWORD:-ukip_secret}@postgres:5432/${POSTGRES_DB:-ukip}
+      DB_POOL_SIZE:       ${DB_POOL_SIZE:-20}
+      DB_MAX_OVERFLOW:    ${DB_MAX_OVERFLOW:-10}
+      ADMIN_USERNAME:     ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD:     ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      JWT_SECRET_KEY:     ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
+      ENCRYPTION_KEY:     ${ENCRYPTION_KEY:-}
+      ALLOWED_ORIGINS:    ${ALLOWED_ORIGINS:-http://localhost:3004}
+      SESSION_SECRET_KEY: ${SESSION_SECRET_KEY:-changeit}
+      LOG_LEVEL:          ${LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+    volumes:
+      - static_files:/app/static
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── UKIP Frontend (Next.js) ─────────────────────────────────────────────────
+  ukip-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    restart: unless-stopped
+    depends_on:
+      - ukip-backend
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "3004:3004"
 
 volumes:
   postgres_data:
+  static_files:
