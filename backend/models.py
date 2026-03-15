@@ -613,3 +613,27 @@ class WorkflowRun(Base):
     error        = Column(Text, nullable=True)
     started_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     completed_at = Column(DateTime, nullable=True)
+
+
+# ── Sprint 93: Embed Widgets (Widget SDK) ─────────────────────────────────────
+
+class EmbedWidget(Base):
+    """
+    Embeddable data widget with a public token.
+    widget_type: entity_stats | top_concepts | recent_entities | quality_score
+    public_token: UUID — used in the public /embed/{token}/data endpoint (no auth)
+    allowed_origins: comma-separated list of allowed embed origins, or "*"
+    """
+    __tablename__ = "embed_widgets"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    name            = Column(String(200), nullable=False)
+    widget_type     = Column(String(50), nullable=False, index=True)
+    config          = Column(Text, default="{}")          # JSON: domain, limit, title, theme, etc.
+    public_token    = Column(String(36), unique=True, index=True, nullable=False)
+    allowed_origins = Column(Text, default="*")           # "*" or comma-separated origins
+    is_active       = Column(Boolean, default=True, index=True)
+    view_count      = Column(Integer, default=0)
+    created_by      = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at      = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    last_viewed_at  = Column(DateTime, nullable=True)
