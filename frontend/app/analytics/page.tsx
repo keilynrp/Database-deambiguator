@@ -141,7 +141,6 @@ export default function AnalyticsPage() {
             if (!res.ok) throw new Error("Failed");
             setStats(await res.json());
         } catch (e) {
-            console.error(e);
         } finally {
             setLoading(false);
         }
@@ -153,7 +152,6 @@ export default function AnalyticsPage() {
             if (!res.ok) throw new Error("Failed");
             setEnrichStats(await res.json());
         } catch (e) {
-            console.error(e);
         } finally {
             setEnrichLoading(false);
         }
@@ -175,7 +173,6 @@ export default function AnalyticsPage() {
             // Refresh enrichment stats after a short delay
             setTimeout(fetchEnrichStats, 1500);
         } catch (e) {
-            console.error(e);
         } finally {
             setBulkQueuing(false);
         }

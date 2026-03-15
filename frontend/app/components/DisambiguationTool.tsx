@@ -110,7 +110,6 @@ export default function DisambiguationTool() {
             setTotalGroups(data.total_groups);
             setAuthorityCandidates({});
         } catch (error) {
-            console.error(error);
             toast("Error analyzing data", "error");
         } finally {
             setLoading(false);
@@ -129,7 +128,6 @@ export default function DisambiguationTool() {
             const data = await res.json();
             setResolutions(prev => ({ ...prev, [idx]: data }));
         } catch (error) {
-            console.error(error);
             toast("Error from AI resolution endpoint", "error");
         } finally {
             setResolvingIdx(null);
@@ -148,7 +146,6 @@ export default function DisambiguationTool() {
             await apiFetch(`/rules/apply?field_name=${field}`, { method: "POST" });
             analyze();
         } catch (error) {
-            console.error(error);
             toast("Error applying rules", "error");
         } finally {
             setProcessingRule(null);
@@ -171,7 +168,6 @@ export default function DisambiguationTool() {
             const records: AuthorityRecord[] = await res.json();
             setAuthorityCandidates(prev => ({ ...prev, [idx]: records }));
         } catch (error) {
-            console.error(error);
             toast("Error querying authority sources", "error");
         } finally {
             setAuthorityLoading(prev => ({ ...prev, [idx]: false }));
@@ -194,7 +190,6 @@ export default function DisambiguationTool() {
             }));
             toast("Candidate confirmed", "success");
         } catch (error) {
-            console.error(error);
             toast("Error confirming candidate", "error");
         } finally {
             setAuthorityAction(prev => ({ ...prev, [groupIdx]: null }));
@@ -214,7 +209,6 @@ export default function DisambiguationTool() {
             }));
             toast("Candidate rejected", "warning");
         } catch (error) {
-            console.error(error);
             toast("Error rejecting candidate", "error");
         } finally {
             setAuthorityAction(prev => ({ ...prev, [groupIdx]: null }));

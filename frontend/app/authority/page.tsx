@@ -110,7 +110,6 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
             const res = await apiFetch("/authority/queue/summary");
             if (res.ok) setSummary(await res.json());
         } catch (e) {
-            console.error(e);
         } finally {
             setLoading(false);
         }
@@ -128,7 +127,6 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                 setSelected(new Set());
             }
         } catch (e) {
-            console.error(e);
         } finally {
             setLoadingRecords(false);
         }
@@ -167,7 +165,6 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                 await fetchRecords();
             }
         } catch (e) {
-            console.error(e);
         } finally {
             setActing(false);
         }
@@ -200,7 +197,6 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                 setResolveResult(`Error: ${err.detail || res.statusText}`);
             }
         } catch (e) {
-            console.error(e);
             setResolveResult("Network error");
         } finally {
             setResolving(false);
@@ -535,7 +531,6 @@ function DisambiguationTab({ activeDomain }: { activeDomain: any }) {
             });
             setGroupStates(states);
         } catch (error) {
-            console.error(error);
             toast("Error fetching authority data", "error");
         } finally {
             setLoading(false);
@@ -569,7 +564,6 @@ function DisambiguationTab({ activeDomain }: { activeDomain: any }) {
             if (!res.ok) throw new Error("Failed to save rules");
             setGroupStates(prev => ({ ...prev, [idx]: { ...prev[idx], saved: true } }));
         } catch (error) {
-            console.error(error);
             toast("Error saving rules", "error");
         } finally {
             setSavingGroup(null);
@@ -584,7 +578,6 @@ function DisambiguationTab({ activeDomain }: { activeDomain: any }) {
             if (!res.ok) throw new Error("Failed to apply rules");
             setApplyResult(await res.json());
         } catch (error) {
-            console.error(error);
             toast("Error applying rules", "error");
         } finally {
             setApplying(false);

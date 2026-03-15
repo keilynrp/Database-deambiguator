@@ -43,7 +43,6 @@ export default function AIIntegrations() {
             const res = await apiFetch("/ai-integrations");
             if (res.ok) setIntegrations(await res.json());
         } catch (error) {
-            console.error(error);
         } finally {
             setLoading(false);
         }
@@ -92,7 +91,6 @@ export default function AIIntegrations() {
             resetForm();
             fetchIntegrations();
         } catch (error) {
-            console.error(error);
         } finally {
             setSaving(false);
         }
@@ -103,7 +101,6 @@ export default function AIIntegrations() {
             await apiFetch(`/ai-integrations/${id}/activate`, { method: "POST" });
             fetchIntegrations();
         } catch (error) {
-            console.error("Error activating:", error);
         }
     }
 
@@ -113,7 +110,6 @@ export default function AIIntegrations() {
             await apiFetch(`/ai-integrations/${id}`, { method: "DELETE" });
             fetchIntegrations();
         } catch (error) {
-            console.error("Error deleting:", error);
         }
     }
 

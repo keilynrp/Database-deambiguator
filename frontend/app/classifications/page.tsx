@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { SkeletonCardGrid, ErrorBanner, EmptyState } from "../components/ui";
 
 interface Classification {
     name: string;
@@ -12,23 +13,25 @@ interface Classification {
 export default function ClassificationsPage() {
     const [classifications, setClassifications] = useState<Classification[]>([]);
     const [loading, setLoading] = useState(true);
+    const [fetchError, setFetchError] = useState<string | null>(null);
     const [search, setSearch] = useState("");
 
-    useEffect(() => {
-        async function fetchClassifications() {
-            try {
-                const res = await apiFetch("/classifications");
-                if (!res.ok) throw new Error("Failed to fetch classifications");
-                const data = await res.json();
-                setClassifications(data);
-            } catch (error) {
-                console.error("Error fetching classifications:", error);
-            } finally {
-                setLoading(false);
-            }
+    async function fetchClassifications() {
+        setLoading(true);
+        setFetchError(null);
+        try {
+            const res = await apiFetch("/classifications");
+            if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+            const data = await res.json();
+            setClassifications(data);
+        } catch (err) {
+            setFetchError(err instanceof Error ? err.message : "Failed to load classifications");
+        } finally {
+            setLoading(false);
         }
-        fetchClassifications();
-    }, []);
+    }
+
+    useEffect(() => { fetchClassifications(); }, []);
 
     const filteredClassifications = classifications.filter((item) =>
         item.name.toLowerCase().includes(search.toLowerCase())
@@ -74,16 +77,17 @@ export default function ClassificationsPage() {
             </div>
 
             {loading ? (
-                <div className="flex h-64 items-center justify-center">
-                    <svg className="h-8 w-8 animate-spin text-purple-600" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                </div>
+                <SkeletonCardGrid count={8} lines={2} />
+            ) : fetchError ? (
+                <ErrorBanner message="Failed to load classifications" detail={fetchError} onRetry={fetchClassifications} />
             ) : filteredClassifications.length === 0 ? (
-                <div className="rounded-xl border border-gray-200 bg-white p-12 text-center dark:border-gray-800 dark:bg-gray-900">
-                    <p className="text-gray-500 dark:text-gray-400">No classifications found matching "{search}"</p>
-                </div>
+                <EmptyState
+                    icon="search"
+                    color="slate"
+                    title={search ? `No results for "${search}"` : "No classifications yet"}
+                    description={search ? "Try a different search term." : "Classifications appear here after entities are imported and enriched."}
+                    size="card"
+                />
             ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {filteredClassifications.map((item) => (

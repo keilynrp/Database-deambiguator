@@ -55,7 +55,6 @@ export default function EntityVariantView() {
                 const data = await res.json();
                 setEntityGroups(data);
             } catch (error) {
-                console.error("Error fetching products:", error);
             } finally {
                 setLoading(false);
             }

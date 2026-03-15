@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useDomain } from "../../contexts/DomainContext";
 import { apiFetch } from "@/lib/api";
+import { SkeletonList, ErrorBanner, EmptyState as UiEmptyState } from "../../components/ui";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -126,6 +127,7 @@ export default function TopicsPage() {
   const { activeDomainId } = useDomain();
   const [tab, setTab] = useState<TabKey>("topics");
   const [loading, setLoading] = useState(false);
+  const [tabError, setTabError] = useState<string | null>(null);
 
   const [topicsData,      setTopicsData]      = useState<TopicsResult | null>(null);
   const [cooccData,       setCooccData]        = useState<CooccResult | null>(null);
@@ -134,22 +136,27 @@ export default function TopicsPage() {
 
   const fetchTab = useCallback(async (t: TabKey, domainId: string) => {
     setLoading(true);
+    setTabError(null);
     try {
       if (t === "topics") {
         const r = await apiFetch(`/analyzers/topics/${domainId}?top_n=30`);
+        if (!r.ok) throw new Error(`Server responded with ${r.status}`);
         setTopicsData(await r.json());
       } else if (t === "cooccurrence") {
         const r = await apiFetch(`/analyzers/cooccurrence/${domainId}?top_n=20`);
+        if (!r.ok) throw new Error(`Server responded with ${r.status}`);
         setCooccData(await r.json());
       } else if (t === "clusters") {
         const r = await apiFetch(`/analyzers/clusters/${domainId}?n_clusters=6`);
+        if (!r.ok) throw new Error(`Server responded with ${r.status}`);
         setClustersData(await r.json());
       } else if (t === "correlation") {
         const r = await apiFetch(`/analyzers/correlation/${domainId}?top_n=20`);
+        if (!r.ok) throw new Error(`Server responded with ${r.status}`);
         setCorrelationData(await r.json());
       }
     } catch (err) {
-      console.error("Topic analysis error:", err);
+      setTabError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
       setLoading(false);
     }
@@ -198,15 +205,24 @@ export default function TopicsPage() {
         </nav>
       </div>
 
-      {/* Loading overlay */}
+      {/* Loading skeleton */}
       {loading && (
-        <div className="flex h-48 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+        <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
+          <SkeletonList rows={10} />
         </div>
       )}
 
+      {/* Error state */}
+      {!loading && tabError && (
+        <ErrorBanner
+          message="Failed to load analysis data"
+          detail={tabError}
+          onRetry={() => fetchTab(tab, activeDomainId)}
+        />
+      )}
+
       {/* ── Tab: Top Concepts ────────────────────────────────────────────────── */}
-      {!loading && tab === "topics" && topicsData && (
+      {!loading && !tabError && tab === "topics" && topicsData && (
         <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -215,7 +231,7 @@ export default function TopicsPage() {
             </span>
           </div>
           {topicsData.topics.length === 0 ? (
-            <EmptyState message="No enriched concepts found. Run the enrichment pipeline first." />
+            <UiEmptyState icon="sparkles" color="blue" title="No concepts yet" description="Run the enrichment pipeline first to populate topic data." size="compact" />
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {topicsData.topics.map((t, i) => {
@@ -246,7 +262,7 @@ export default function TopicsPage() {
       )}
 
       {/* ── Tab: Co-occurrence ───────────────────────────────────────────────── */}
-      {!loading && tab === "cooccurrence" && cooccData && (
+      {!loading && !tabError && tab === "cooccurrence" && cooccData && (
         <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
           <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -255,7 +271,7 @@ export default function TopicsPage() {
             </span>
           </div>
           {cooccData.pairs.length === 0 ? (
-            <EmptyState message="No co-occurrences found. Entities need at least 2 concepts each." />
+            <UiEmptyState icon="sparkles" color="violet" title="No co-occurrences found" description="Entities need at least 2 enriched concepts each to compute pairs." size="compact" />
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {cooccData.pairs.map((p, i) => {
@@ -290,11 +306,11 @@ export default function TopicsPage() {
       )}
 
       {/* ── Tab: Topic Clusters ──────────────────────────────────────────────── */}
-      {!loading && tab === "clusters" && clustersData && (
+      {!loading && !tabError && tab === "clusters" && clustersData && (
         <div>
           {clustersData.clusters.length === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-              <EmptyState message="No concept clusters found. Enrich entities to populate topics." />
+              <UiEmptyState icon="sparkles" color="amber" title="No clusters found" description="Enrich entities to populate topic clusters." size="compact" />
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -340,7 +356,7 @@ export default function TopicsPage() {
       )}
 
       {/* ── Tab: Field Correlation ───────────────────────────────────────────── */}
-      {!loading && tab === "correlation" && correlationData && (
+      {!loading && !tabError && tab === "correlation" && correlationData && (
         <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -360,7 +376,7 @@ export default function TopicsPage() {
             </div>
           </div>
           {correlationData.correlations.length === 0 ? (
-            <EmptyState message="No significant correlations found (Cramér's V < 0.05 for all pairs)." />
+            <UiEmptyState icon="chart" color="slate" title="No significant correlations" description="Cramér's V < 0.05 for all field pairs. More diverse data may reveal patterns." size="compact" />
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {correlationData.correlations.map((c, i) => (
@@ -399,15 +415,3 @@ export default function TopicsPage() {
   );
 }
 
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="flex flex-col items-center gap-3 px-4 py-16 text-center">
-      <svg className="h-12 w-12 text-gray-300 dark:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m1.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-        />
-      </svg>
-      <p className="max-w-sm text-sm text-gray-500 dark:text-gray-400">{message}</p>
-    </div>
-  );
-}

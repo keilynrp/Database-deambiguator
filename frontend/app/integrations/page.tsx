@@ -59,8 +59,8 @@ export default function IntegrationsPage() {
             if (!res.ok) throw new Error("Failed");
             const data = await res.json();
             setStores(data);
-        } catch (error) {
-            console.error("Error fetching stores:", error);
+        } catch {
+            toast("Failed to load store connections", "error");
         } finally {
             setLoading(false);
         }
@@ -116,10 +116,11 @@ export default function IntegrationsPage() {
                 return;
             }
 
+            toast(editingStore ? "Store updated" : "Store connected", "success");
             resetForm();
             fetchStores();
-        } catch (error) {
-            console.error("Error saving store:", error);
+        } catch {
+            toast("Failed to save store connection", "error");
         } finally {
             setSaving(false);
         }
@@ -128,19 +129,22 @@ export default function IntegrationsPage() {
     async function handleDelete(store: StoreConnection) {
         if (!confirm(`Delete "${store.name}" and all its sync data?`)) return;
         try {
-            await apiFetch(`/stores/${store.id}`, { method: "DELETE" });
+            const res = await apiFetch(`/stores/${store.id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error();
+            toast(`"${store.name}" deleted`, "success");
             fetchStores();
-        } catch (error) {
-            console.error("Error deleting store:", error);
+        } catch {
+            toast("Failed to delete store", "error");
         }
     }
 
     async function handleToggle(store: StoreConnection) {
         try {
-            await apiFetch(`/stores/${store.id}/toggle`, { method: "POST" });
+            const res = await apiFetch(`/stores/${store.id}/toggle`, { method: "POST" });
+            if (!res.ok) throw new Error();
             fetchStores();
-        } catch (error) {
-            console.error("Error toggling store:", error);
+        } catch {
+            toast("Failed to update store status", "error");
         }
     }
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import MonteCarloChart from "./MonteCarloChart";
 import { useDomain } from "../contexts/DomainContext";
 import { apiFetch } from "@/lib/api";
-import { Badge, useToast } from "./ui";
+import { Badge, useToast, SkeletonTableBody, ErrorBanner } from "./ui";
 import FacetPanel, { ActiveFacets } from "./FacetPanel";
 
 interface Entity {
@@ -136,7 +136,6 @@ export default function EntityTable() {
         } catch (error) {
             const msg = error instanceof Error ? error.message : "Unknown error";
             setFetchError(msg);
-            console.error("Error fetching entities:", error);
         } finally {
             setLoading(false);
         }
@@ -179,7 +178,6 @@ export default function EntityTable() {
             setEntities((prev) => prev.map((e) => (e.id === editingId ? updated : e)));
             setEditingId(null);
         } catch (error) {
-            console.error(error);
             toast("Error updating entity", "error");
         } finally {
             setSaving(false);
@@ -194,7 +192,6 @@ export default function EntityTable() {
             setEntities((prev) => prev.filter((e) => e.id !== id));
             toast("Entity deleted", "success");
         } catch (error) {
-            console.error(error);
             toast("Error deleting entity", "error");
         } finally {
             setDeletingId(null);
@@ -210,7 +207,6 @@ export default function EntityTable() {
             setEntities((prev) => prev.map((e) => (e.id === id ? { ...e, ...enriched } : e)));
             toast("Enrichment complete", "success");
         } catch (error) {
-            console.error(error);
             toast("Error enriching entity", "error");
         } finally {
             setEnrichingId(null);
@@ -409,34 +405,17 @@ export default function EntityTable() {
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                             {fetchError ? (
                                 <tr>
-                                    <td colSpan={11} className="px-5 py-12 text-center">
-                                        <div className="flex flex-col items-center gap-3">
-                                            <svg className="h-8 w-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                                            </svg>
-                                            <span className="text-sm font-medium text-red-600 dark:text-red-400">Failed to load entities</span>
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">{fetchError}</span>
-                                            <button
-                                                onClick={fetchEntities}
-                                                className="mt-1 rounded-md bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/40"
-                                            >
-                                                Retry
-                                            </button>
-                                        </div>
+                                    <td colSpan={11} className="px-5">
+                                        <ErrorBanner
+                                            variant="row"
+                                            message="Failed to load entities"
+                                            detail={fetchError}
+                                            onRetry={fetchEntities}
+                                        />
                                     </td>
                                 </tr>
                             ) : loading ? (
-                                <tr>
-                                    <td colSpan={11} className="px-5 py-12 text-center">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <svg className="h-6 w-6 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                            </svg>
-                                            <span className="text-sm text-gray-500 dark:text-gray-400">Loading entities...</span>
-                                        </div>
-                                    </td>
-                                </tr>
+                                <SkeletonTableBody rows={limit} cols={7} />
                             ) : entities.length === 0 ? (
                                 <tr>
                                     <td colSpan={11} className="px-5 py-12 text-center">
