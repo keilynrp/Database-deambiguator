@@ -54,6 +54,7 @@ from backend.routers import (
     scheduled_imports,
     search,
     stores,
+    transformations,
     webhooks,
 )
 
@@ -290,6 +291,7 @@ app.include_router(alert_channels.router)
 app.include_router(api_keys.router)
 app.include_router(sales_deck.router)
 app.include_router(organizations.router)
+app.include_router(transformations.router)
 
 # ── Static file serving (uploaded logos etc.) ─────────────────────────────────
 _static_dir = pathlib.Path("static")
