@@ -50,8 +50,8 @@ function KPICard({ label, values, colorIdx, formatter = String }: {
   colorIdx: number;
   formatter?: (v: string | number) => string;
 }) {
-  const winner = values.reduce((best, v, i) =>
-    Number(v) > Number(values[best]) ? i : best, 0);
+  const winner = values.reduce<number>((best, v, i) =>
+    Number(v) > Number(values[best] ?? 0) ? i : best, 0);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">

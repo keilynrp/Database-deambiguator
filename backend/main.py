@@ -17,7 +17,6 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from sqlalchemy import inspect, text
 
 from backend import database, enrichment_worker, models
 from backend.routers.limiter import limiter
@@ -61,104 +60,18 @@ from backend.routers import (
 logger = logging.getLogger(__name__)
 
 
-# ── Schema creation + lightweight migrations ──────────────────────────────────
+# ── Schema migrations via Alembic ─────────────────────────────────────────────
 
-models.Base.metadata.create_all(bind=database.engine)
+def _run_migrations() -> None:
+    """Run alembic upgrade head at startup. Idempotent and safe to call every boot."""
+    from alembic import command
+    from alembic.config import Config as AlembicConfig
 
-with database.engine.connect() as _conn:
-    _inspector = inspect(database.engine)
+    alembic_cfg = AlembicConfig("alembic.ini")
+    command.upgrade(alembic_cfg, "head")
+    logger.info("Alembic migrations applied (upgrade head)")
 
-    if "harmonization_logs" in _inspector.get_table_names():
-        _cols = [c["name"] for c in _inspector.get_columns("harmonization_logs")]
-        if "reverted" not in _cols:
-            _conn.execute(text("ALTER TABLE harmonization_logs ADD COLUMN reverted BOOLEAN DEFAULT 0"))
-            _conn.commit()
-
-    if "raw_entities" in _inspector.get_table_names():
-        _cols = [c["name"] for c in _inspector.get_columns("raw_entities")]
-        if "enrichment_doi" not in _cols:
-            _conn.execute(text("ALTER TABLE raw_entities ADD COLUMN enrichment_doi VARCHAR"))
-            _conn.execute(text("ALTER TABLE raw_entities ADD COLUMN enrichment_citation_count INTEGER DEFAULT 0"))
-            _conn.execute(text("ALTER TABLE raw_entities ADD COLUMN enrichment_concepts TEXT"))
-            _conn.execute(text("ALTER TABLE raw_entities ADD COLUMN enrichment_source VARCHAR"))
-            _conn.execute(text("ALTER TABLE raw_entities ADD COLUMN enrichment_status VARCHAR DEFAULT 'none'"))
-            _conn.commit()
-        if "source" not in _cols:
-            _conn.execute(text("ALTER TABLE raw_entities ADD COLUMN source VARCHAR DEFAULT 'user'"))
-            _conn.commit()
-        if "quality_score" not in _cols:
-            _conn.execute(text("ALTER TABLE raw_entities ADD COLUMN quality_score REAL"))
-            _conn.commit()
-
-    if "users" in _inspector.get_table_names():
-        _cols = [c["name"] for c in _inspector.get_columns("users")]
-        if "failed_attempts" not in _cols:
-            _conn.execute(text("ALTER TABLE users ADD COLUMN failed_attempts INTEGER DEFAULT 0"))
-            _conn.execute(text("ALTER TABLE users ADD COLUMN locked_until VARCHAR"))
-            _conn.commit()
-        if "avatar_url" not in _cols:
-            _conn.execute(text("ALTER TABLE users ADD COLUMN avatar_url TEXT"))
-            _conn.commit()
-        if "display_name" not in _cols:
-            _conn.execute(text("ALTER TABLE users ADD COLUMN display_name VARCHAR(100)"))
-            _conn.execute(text("ALTER TABLE users ADD COLUMN bio TEXT"))
-            _conn.commit()
-
-    # ── Sprint 85: Multi-tenancy ──────────────────────────────────────────────
-    if "users" in _inspector.get_table_names():
-        _cols = [c["name"] for c in _inspector.get_columns("users")]
-        if "org_id" not in _cols:
-            _conn.execute(text("ALTER TABLE users ADD COLUMN org_id INTEGER"))
-            _conn.commit()
-
-    if "authority_records" in _inspector.get_table_names():
-        _cols = [c["name"] for c in _inspector.get_columns("authority_records")]
-        if "resolution_status" not in _cols:
-            _conn.execute(text("ALTER TABLE authority_records ADD COLUMN resolution_status VARCHAR DEFAULT 'unresolved'"))
-            _conn.execute(text("ALTER TABLE authority_records ADD COLUMN score_breakdown TEXT"))
-            _conn.execute(text("ALTER TABLE authority_records ADD COLUMN evidence TEXT"))
-            _conn.execute(text("ALTER TABLE authority_records ADD COLUMN merged_sources TEXT"))
-            _conn.commit()
-
-    if "audit_logs" in _inspector.get_table_names():
-        _cols = [c["name"] for c in _inspector.get_columns("audit_logs")]
-        if "username" not in _cols:
-            _conn.execute(text("ALTER TABLE audit_logs ADD COLUMN username VARCHAR"))
-            _conn.execute(text("ALTER TABLE audit_logs ADD COLUMN endpoint VARCHAR"))
-            _conn.execute(text("ALTER TABLE audit_logs ADD COLUMN method VARCHAR"))
-            _conn.execute(text("ALTER TABLE audit_logs ADD COLUMN status_code INTEGER"))
-            _conn.execute(text("ALTER TABLE audit_logs ADD COLUMN ip_address VARCHAR"))
-            _conn.commit()
-
-    if "analysis_contexts" in _inspector.get_table_names():
-        _cols = [c["name"] for c in _inspector.get_columns("analysis_contexts")]
-        if "notes" not in _cols:
-            _conn.execute(text("ALTER TABLE analysis_contexts ADD COLUMN notes TEXT"))
-            _conn.execute(text("ALTER TABLE analysis_contexts ADD COLUMN pinned BOOLEAN DEFAULT 0"))
-            _conn.commit()
-
-    # ── Sprint 86: Annotation resolve + emoji reactions ───────────────────────
-    if "annotations" in _inspector.get_table_names():
-        _cols = [c["name"] for c in _inspector.get_columns("annotations")]
-        if "is_resolved" not in _cols:
-            _conn.execute(text("ALTER TABLE annotations ADD COLUMN is_resolved BOOLEAN DEFAULT 0"))
-            _conn.execute(text("ALTER TABLE annotations ADD COLUMN resolved_at DATETIME"))
-            _conn.execute(text("ALTER TABLE annotations ADD COLUMN resolved_by_id INTEGER"))
-            _conn.execute(text("ALTER TABLE annotations ADD COLUMN emoji_reactions TEXT DEFAULT '{}'"))
-            _conn.commit()
-
-    # ── Sprint 53: FTS5 search index ─────────────────────────────────────────
-    _conn.execute(text("""
-        CREATE VIRTUAL TABLE IF NOT EXISTS search_index
-        USING fts5(
-            doc_type,
-            doc_id   UNINDEXED,
-            title,
-            body,
-            href     UNINDEXED
-        )
-    """))
-    _conn.commit()
+_run_migrations()
 
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────

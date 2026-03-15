@@ -47,8 +47,11 @@ def _audit(
 
 # ── Disambiguation helper ─────────────────────────────────────────────────────
 
-def _build_disambig_groups(field: str, threshold: int, db: Session):
-    """Shared disambiguation logic reused by /disambiguate and /authority."""
+def _build_disambig_groups(field: str, threshold: int, db: Session, algorithm: str = "token_sort"):
+    """
+    Shared disambiguation logic.
+    algorithm: "token_sort" | "fingerprint" | "ngram" | "phonetic"
+    """
     if not _FIELD_RE.match(field):
         raise ValueError(
             f"Invalid field name '{field}'. Must be 1–64 lowercase alphanumeric/underscore "
@@ -59,7 +62,6 @@ def _build_disambig_groups(field: str, threshold: int, db: Session):
         entries = db.query(column).distinct().filter(column != None).all()
         values = [v[0] for v in entries if v[0] and str(v[0]).strip()]
     else:
-        # Fallback to normalized JSON data using SQLite JSON extraction function
         json_col = func.json_extract(models.RawEntity.normalized_json, f"$.{field}")
         entries = db.query(json_col).distinct().filter(
             models.RawEntity.normalized_json != None,
@@ -68,26 +70,87 @@ def _build_disambig_groups(field: str, threshold: int, db: Session):
         values = [v[0] for v in entries if v[0] and str(v[0]).strip()]
 
     values.sort(key=len, reverse=True)
-
     groups = []
-    processed = set()
 
-    for val in values:
-        if val in processed:
-            continue
-        matches = process.extract(val, values, scorer=fuzz.token_sort_ratio, limit=50)
-        group_members = [m[0] for m in matches if m[1] >= threshold]
+    if algorithm == "token_sort":
+        # Original thefuzz token_sort_ratio clustering
+        processed = set()
+        for val in values:
+            if val in processed:
+                continue
+            matches = process.extract(val, values, scorer=fuzz.token_sort_ratio, limit=50)
+            group_members = [m[0] for m in matches if m[1] >= threshold]
+            if len(group_members) > 1:
+                groups.append({
+                    "main": val,
+                    "variations": group_members,
+                    "count": len(group_members),
+                    "algorithm_used": "token_sort",
+                })
+                for g in group_members:
+                    processed.add(g)
+            else:
+                processed.add(val)
 
-        if len(group_members) > 1:
-            groups.append({
-                "main": val,
-                "variations": group_members,
-                "count": len(group_members),
-            })
-            for g in group_members:
-                processed.add(g)
-        else:
+    elif algorithm == "fingerprint":
+        # Group by canonical fingerprint — threshold not used (exact match)
+        from backend.clustering.algorithms import fingerprint as _fp
+        buckets: dict = {}
+        for val in values:
+            key = _fp(val)
+            if key:
+                buckets.setdefault(key, []).append(val)
+        for key, members in buckets.items():
+            if len(members) > 1:
+                # main = longest value in group
+                main = max(members, key=len)
+                groups.append({
+                    "main": main,
+                    "variations": members,
+                    "count": len(members),
+                    "algorithm_used": "fingerprint",
+                })
+
+    elif algorithm == "ngram":
+        # Pairwise Jaccard bigram similarity clustering
+        from backend.clustering.algorithms import ngram_similarity as _ng
+        processed = set()
+        for val in values:
+            if val in processed:
+                continue
+            group_members = [val]
             processed.add(val)
+            for other in values:
+                if other in processed:
+                    continue
+                if _ng(val, other) >= threshold:
+                    group_members.append(other)
+                    processed.add(other)
+            if len(group_members) > 1:
+                groups.append({
+                    "main": val,
+                    "variations": group_members,
+                    "count": len(group_members),
+                    "algorithm_used": "ngram",
+                })
+
+    elif algorithm == "phonetic":
+        # Group by phonetic code (tries Cologne first, fallback Metaphone)
+        from backend.clustering.algorithms import cologne_phonetic as _col, metaphone as _met
+        buckets: dict = {}
+        for val in values:
+            code = _col(val) or _met(val)
+            if code:
+                buckets.setdefault(code, []).append(val)
+        for code, members in buckets.items():
+            if len(members) > 1:
+                main = max(members, key=len)
+                groups.append({
+                    "main": main,
+                    "variations": members,
+                    "count": len(members),
+                    "algorithm_used": "phonetic",
+                })
 
     return groups
 

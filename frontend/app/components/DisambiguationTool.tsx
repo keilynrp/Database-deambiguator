@@ -11,11 +11,13 @@ interface VariationGroup {
     count: number;
     has_rules?: boolean;
     resolved_to?: string | null;
+    algorithm_used?: string;
 }
 
 interface DisambiguationResponse {
     groups: VariationGroup[];
     total_groups: number;
+    algorithm?: string;
 }
 
 interface AuthorityRecord {
@@ -38,6 +40,29 @@ const SOURCE_STYLES: Record<string, { label: string; bg: string; text: string }>
     openalex:  { label: "OpenAlex",  bg: "bg-violet-100 dark:bg-violet-500/20", text: "text-violet-800 dark:text-violet-300" },
 };
 
+const ALGORITHMS = [
+    {
+        value: "token_sort",
+        label: "Token Sort",
+        tip: "Agrupa variantes por orden de palabras: 'Smith John' ≈ 'John Smith'. Ideal para nombres de personas y marcas.",
+    },
+    {
+        value: "fingerprint",
+        label: "Fingerprint",
+        tip: "Normaliza puntuación y mayúsculas antes de comparar: 'Apple, Inc.' ≈ 'inc apple'. Ideal para datos inconsistentes.",
+    },
+    {
+        value: "ngram",
+        label: "N-gram",
+        tip: "Similitud por bigramas de caracteres (Jaccard). Robusto ante errores tipográficos y OCR: 'colour' ≈ 'color'.",
+    },
+    {
+        value: "phonetic",
+        label: "Fonético",
+        tip: "Agrupa por sonido (Cologne + Metaphone): 'Müller' ≈ 'Mueller'. Ideal para nombres europeos con grafías distintas.",
+    },
+];
+
 const ENTITY_TYPES = [
     { value: "general",     label: "General" },
     { value: "organization", label: "Organization / Brand" },
@@ -50,7 +75,9 @@ export default function DisambiguationTool() {
     const { activeDomain } = useDomain();
     const { toast } = useToast();
     const [field, setField] = useState("");
+    const [threshold, setThreshold] = useState<number>(80);
     const [entityType, setEntityType] = useState("general");
+    const [algorithm, setAlgorithm] = useState<string>("token_sort");
 
     useEffect(() => {
         if (activeDomain && !field) {
@@ -76,7 +103,7 @@ export default function DisambiguationTool() {
     async function analyze() {
         setLoading(true);
         try {
-            const res = await apiFetch(`/disambiguate/${field}`);
+            const res = await apiFetch(`/disambiguate/${field}?threshold=${threshold}&algorithm=${algorithm}`);
             if (!res.ok) throw new Error("Failed to fetch analysis");
             const data: DisambiguationResponse = await res.json();
             setGroups(data.groups);
@@ -235,6 +262,19 @@ export default function DisambiguationTool() {
                             ))}
                         </select>
                     </div>
+                    <div className="min-w-[180px]">
+                        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Threshold: {threshold}%
+                        </label>
+                        <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={threshold}
+                            onChange={(e) => setThreshold(Number(e.target.value))}
+                            className="w-full accent-blue-600"
+                        />
+                    </div>
                     <button
                         onClick={analyze}
                         disabled={loading}
@@ -257,6 +297,42 @@ export default function DisambiguationTool() {
                             </>
                         )}
                     </button>
+                </div>
+                {/* Algorithm selector */}
+                <div className="mt-4 flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Algoritmo</label>
+                    <div className="flex flex-wrap gap-2">
+                        {ALGORITHMS.map((alg) => (
+                            <div key={alg.value} className="relative group">
+                                <button
+                                    type="button"
+                                    onClick={() => setAlgorithm(alg.value)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                                        algorithm === alg.value
+                                            ? "bg-indigo-600 text-white border-indigo-600"
+                                            : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-indigo-400"
+                                    }`}
+                                >
+                                    {alg.label}
+                                </button>
+                                {/* Tooltip */}
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 rounded-lg bg-gray-900 dark:bg-gray-700 px-3 py-2 text-[11px] text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                    {alg.tip}
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {algorithm === "fingerprint" && (
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                            Fingerprint usa coincidencia exacta — el slider de threshold no aplica.
+                        </p>
+                    )}
+                    {algorithm === "phonetic" && (
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                            Fonético usa código fonético exacto — el slider de threshold no aplica.
+                        </p>
+                    )}
                 </div>
             </div>
 
@@ -285,9 +361,16 @@ export default function DisambiguationTool() {
                 {groups.map((group, idx) => (
                     <div key={idx} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
                         <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                                {group.main}
-                            </h3>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                                    {group.main}
+                                </h3>
+                                {group.algorithm_used && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-mono">
+                                        {group.algorithm_used}
+                                    </span>
+                                )}
+                            </div>
                             <Badge variant="info">{group.count} variants matched</Badge>
                         </div>
                         <div className="flex flex-wrap gap-2">

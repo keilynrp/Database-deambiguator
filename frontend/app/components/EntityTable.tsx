@@ -6,6 +6,7 @@ import MonteCarloChart from "./MonteCarloChart";
 import { useDomain } from "../contexts/DomainContext";
 import { apiFetch } from "@/lib/api";
 import { Badge, useToast } from "./ui";
+import FacetPanel, { ActiveFacets } from "./FacetPanel";
 
 interface Entity {
     id: number;
@@ -78,6 +79,10 @@ export default function EntityTable() {
     const [bulkEnriching, setBulkEnriching] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
 
+    // Facet filtering (Sprint 87)
+    const [activeFacets, setActiveFacets] = useState<ActiveFacets>({});
+    const [facetRefreshKey, setFacetRefreshKey] = useState(0);
+
     // Virtual scrolling (Sprint 83)
     const VIRTUAL_THRESHOLD = 50;   // enable virtualization when rows > this
     const ROW_HEIGHT        = 52;   // px per row (py-3.5 rows)
@@ -119,6 +124,11 @@ export default function EntityTable() {
             });
             if (debouncedSearch) queryParams.append("search", debouncedSearch);
             if (minQuality) queryParams.append("min_quality", minQuality);
+            if (activeFacets.entity_type)       queryParams.append("ft_entity_type", activeFacets.entity_type);
+            if (activeFacets.domain)            queryParams.append("ft_domain", activeFacets.domain);
+            if (activeFacets.validation_status) queryParams.append("ft_validation_status", activeFacets.validation_status);
+            if (activeFacets.enrichment_status) queryParams.append("ft_enrichment_status", activeFacets.enrichment_status);
+            if (activeFacets.source)            queryParams.append("ft_source", activeFacets.source);
 
             const res = await apiFetch(`/entities?${queryParams}`);
             if (!res.ok) throw new Error(`Server responded with ${res.status}`);
@@ -130,9 +140,14 @@ export default function EntityTable() {
         } finally {
             setLoading(false);
         }
-    }, [debouncedSearch, page, limit, activeDomainId, minQuality, sortBy, sortOrder]);
+    }, [debouncedSearch, page, limit, activeDomainId, minQuality, sortBy, sortOrder, activeFacets]);
 
     useEffect(() => { fetchEntities(); }, [fetchEntities]);
+
+    function handleFacetChange(field: string, value: string | null) {
+        setActiveFacets(prev => ({ ...prev, [field]: value }));
+        setPage(0);
+    }
 
     function startEdit(entity: Entity) {
         setEditingId(entity.id);
@@ -284,7 +299,31 @@ export default function EntityTable() {
     const inputClass = "h-8 w-full rounded border border-gray-200 bg-white px-2 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
 
     return (
+        <div className="flex gap-4 items-start">
+            <FacetPanel
+                activeFacets={activeFacets}
+                onFacetChange={handleFacetChange}
+                refreshKey={facetRefreshKey}
+            />
+            <div className="flex-1 min-w-0">
         <div className="space-y-6">
+            {/* Active facet pills */}
+            {Object.entries(activeFacets).some(([, v]) => v) && (
+                <div className="flex flex-wrap gap-1.5 px-1 mb-2">
+                    {Object.entries(activeFacets).filter(([, v]) => v).map(([field, value]) => (
+                        <span
+                            key={field}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700"
+                        >
+                            <span className="font-medium">{field.replace(/_/g, " ")}:</span> {value}
+                            <button
+                                onClick={() => handleFacetChange(field, null)}
+                                className="ml-0.5 hover:text-indigo-600 font-bold leading-none"
+                            >×</button>
+                        </span>
+                    ))}
+                </div>
+            )}
             {/* Search bar + quality filter */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-3">
@@ -451,7 +490,7 @@ export default function EntityTable() {
                                                 <td className="px-5 py-2.5">
                                                     <select
                                                         className={inputClass}
-                                                        value={editData.validation_status}
+                                                        value={editData.validation_status ?? ""}
                                                         onChange={(e) => setEditData({ ...editData, validation_status: e.target.value })}
                                                     >
                                                         <option value="pending">pending</option>
@@ -786,6 +825,8 @@ export default function EntityTable() {
                     </div>
                 </div>
             )}
+        </div>
+            </div>
         </div>
     );
 }

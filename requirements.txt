@@ -1,6 +1,7 @@
 pandas
 openpyxl
 fastapi
+alembic
 uvicorn[standard]
 sqlalchemy
 python-multipart

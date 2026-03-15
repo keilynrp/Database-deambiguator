@@ -34,12 +34,13 @@ router = APIRouter(tags=["disambiguation"])
 def disambiguate_field(
     field: str,
     threshold: int = Query(default=80, ge=0, le=100),
+    algorithm: str = Query(default="token_sort", pattern="^(token_sort|fingerprint|ngram|phonetic)$"),
     db: Session = Depends(get_db),
     _: models.User = Depends(get_current_user),
 ):
     try:
-        groups = _build_disambig_groups(field, threshold, db)
-        return {"groups": groups, "total_groups": len(groups)}
+        groups = _build_disambig_groups(field, threshold, db, algorithm=algorithm)
+        return {"groups": groups, "total_groups": len(groups), "algorithm": algorithm}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

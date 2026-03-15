@@ -118,7 +118,7 @@ export function EnrichmentCoverageWidget({ config }: { config: WidgetConfig }) {
           <Pie data={data} dataKey="value" cx="50%" cy="50%" innerRadius="40%" outerRadius="70%">
             {data.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
           </Pie>
-          <Tooltip formatter={(v: number) => [v, ""]} />
+          <Tooltip formatter={(v: number | undefined) => [v ?? 0, ""]} />
         </PieChart>
       </ResponsiveContainer>
     </WidgetShell>
@@ -209,7 +209,7 @@ export function ConceptCloudWidget({ config }: { config: WidgetConfig }) {
       .finally(() => setLoading(false));
   }, [domain]);
 
-  if (loading) return <WidgetShell title={config.title || "Concept Cloud"} loading />;
+  if (loading) return <WidgetShell title={config.title || "Concept Cloud"} loading>{null}</WidgetShell>;
 
   const max = Math.max(...concepts.map((c) => c.count), 1);
 

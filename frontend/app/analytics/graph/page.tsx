@@ -132,7 +132,7 @@ export default function GraphAnalyticsPage() {
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <PageHeader
           title="Graph Analytics"
-          subtitle="Centrality scores, connected components, and shortest paths across the knowledge graph."
+          description="Centrality scores, connected components, and shortest paths across the knowledge graph."
         />
 
         {/* Stats cards */}

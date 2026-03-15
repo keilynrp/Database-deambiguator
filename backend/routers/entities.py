@@ -17,7 +17,7 @@ Entity CRUD, enrichment, and entity-linker endpoints.
   GET  /enrich/montecarlo/{entity_id}
 """
 from collections import defaultdict
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from pydantic import BaseModel, Field
@@ -37,6 +37,43 @@ router = APIRouter(tags=["entities"])
 
 # ── Entity list endpoints (must come before wildcard /{entity_id}) ────────────
 
+_FACET_FIELDS = {
+    "entity_type":        models.RawEntity.entity_type,
+    "domain":             models.RawEntity.domain,
+    "validation_status":  models.RawEntity.validation_status,
+    "enrichment_status":  models.RawEntity.enrichment_status,
+    "source":             models.RawEntity.source,
+}
+
+
+@router.get("/entities/facets")
+def get_entity_facets(
+    fields: str = Query(default="entity_type,domain,validation_status,enrichment_status,source"),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(get_current_user),
+):
+    """
+    Returns value counts for the requested facet fields.
+    Response: { field: [{value, count}, ...], ... }
+    Unknown fields are silently ignored.
+    """
+    requested = [f.strip() for f in fields.split(",") if f.strip()]
+    result = {}
+    for field in requested:
+        col = _FACET_FIELDS.get(field)
+        if col is None:
+            continue
+        rows = (
+            db.query(col, func.count(models.RawEntity.id).label("cnt"))
+            .filter(col != None, col != "")
+            .group_by(col)
+            .order_by(func.count(models.RawEntity.id).desc())
+            .all()
+        )
+        result[field] = [{"value": r[0], "count": r[1]} for r in rows]
+    return result
+
+
 @router.get("/entities", response_model=List[schemas.Entity])
 def get_entities(
     response: Response,
@@ -46,6 +83,11 @@ def get_entities(
     sort_by: str = Query(default="id", pattern="^(id|quality_score|primary_label|enrichment_status)$"),
     order: str = Query(default="asc", pattern="^(asc|desc)$"),
     min_quality: float = Query(default=None, ge=0.0, le=1.0),
+    ft_entity_type:       Optional[str] = Query(default=None),
+    ft_domain:            Optional[str] = Query(default=None),
+    ft_validation_status: Optional[str] = Query(default=None),
+    ft_enrichment_status: Optional[str] = Query(default=None),
+    ft_source:            Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
     _: models.User = Depends(get_current_user),
 ):
@@ -64,6 +106,18 @@ def get_entities(
     # Quality filter
     if min_quality is not None:
         query = query.filter(models.RawEntity.quality_score >= min_quality)
+
+    # Facet filters
+    if ft_entity_type:
+        query = query.filter(models.RawEntity.entity_type == ft_entity_type)
+    if ft_domain:
+        query = query.filter(models.RawEntity.domain == ft_domain)
+    if ft_validation_status:
+        query = query.filter(models.RawEntity.validation_status == ft_validation_status)
+    if ft_enrichment_status:
+        query = query.filter(models.RawEntity.enrichment_status == ft_enrichment_status)
+    if ft_source:
+        query = query.filter(models.RawEntity.source == ft_source)
 
     # Sorting
     sort_col = {
