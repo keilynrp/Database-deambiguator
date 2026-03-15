@@ -11,7 +11,7 @@
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![DuckDB](https://img.shields.io/badge/DuckDB-OLAP-FFF000?style=for-the-badge&logo=duckdb&logoColor=black)](https://duckdb.org/)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20DB-ff6b35?style=for-the-badge)](https://www.trychroma.com/)
-[![Tests](https://img.shields.io/badge/Tests-1148%20passing-brightgreen?style=for-the-badge)](backend/tests/)
+[![Tests](https://img.shields.io/badge/Tests-1254%20passing-brightgreen?style=for-the-badge)](backend/tests/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge)](LICENSE)
 
 A domain-agnostic intelligence platform that ingests raw data, harmonizes it, enriches it against global knowledge bases, runs OLAP analytics and stochastic simulations, builds entity relationship graphs, and lets you query everything through an agentic RAG-powered AI assistant — with custom dashboards, scheduled reports, Slack/Teams alerts, and a public API ecosystem.
@@ -24,13 +24,13 @@ A domain-agnostic intelligence platform that ingests raw data, harmonizes it, en
 
 ## Why UKIP?
 
-Most data platforms force you to choose: clean your data **or** analyze it. UKIP does both in a single pipeline. It started as a catalog deduplication tool and evolved into a full research intelligence engine across **86 development sprints**.
+Most data platforms force you to choose: clean your data **or** analyze it. UKIP does both in a single pipeline. It started as a catalog deduplication tool and evolved into a full research intelligence engine across **90 development sprints**.
 
 **What it does:**
 
 1. **Ingest** any structured data (Excel, CSV, JSON-LD, XML, BibTeX, RIS, Parquet) through a 5-step wizard with AI-assisted column mapping or direct API.
 2. **Harmonize** messy records with fuzzy matching, authority resolution against 5 global knowledge bases (Wikidata, VIAF, ORCID, DBpedia, OpenAlex), and bulk normalization rules.
-3. **Enrich** every record against academic APIs (OpenAlex, Google Scholar, Web of Science, Scopus).
+3. **Enrich** every record against academic APIs (OpenAlex, Google Scholar, Web of Science, Scopus) and custom **web scraper** configs using CSS/XPath selectors.
 4. **Graph** relationships between entities — citations, authorship, membership, and semantic links — with BFS subgraph traversal and SVG visualization.
 5. **Analyze** with OLAP cubes (DuckDB), Monte Carlo simulations, topic modeling, correlation analysis, and I+D ROI projections.
 6. **Query** your entire dataset in natural language — either through the agentic RAG assistant or the **NLQ engine** that translates plain English directly to OLAP queries.
@@ -71,6 +71,10 @@ One rule: **Justified Complexity** ([details](docs/ARCHITECTURE.md)).
 - **Fuzzy Disambiguation** — `token_sort_ratio` + Levenshtein grouping of typos, casings, and synonyms.
 - **Authority Resolution Layer** — Weighted ARL scoring engine resolves against Wikidata, VIAF, ORCID, DBpedia, and OpenAlex. Batch resolution queue, bulk confirm/reject, evidence tracking.
 - **Harmonization Pipeline** — Universal normalization steps with full undo/redo history.
+- **Dynamic Faceting** — Filter the entity table by any field (entity type, domain, validation status, enrichment status, source) with live facet counts. Collapsible `FacetPanel` sidebar, active-facet pills, and clear-all button.
+- **Clustering Algorithms** — Four grouping strategies for disambiguation: `token_sort` (Levenshtein), `fingerprint` (NFD normalize + sort tokens), `n-gram Jaccard` (bigram similarity), and `phonetic` (Cologne Phonetic + simplified Metaphone). All stdlib-only, no external ML. Algorithm selector with hover tooltips in the disambiguation UI.
+- **Column Transformations** — Safe mini-language (`trim`, `upper`, `lower`, `title`, `replace`, `prefix`, `suffix`, `strip_html`, `to_number`, `slice`, `split[n]`, `strip`) applied in bulk to 8 transformable entity fields. Preview before/after diff, confirmation modal, transformation history panel. Zero `eval()`/`exec()` — expression evaluated by a hand-written parser.
+- **Web Scraper Enrichment** — Define URL-based enrichment sources with CSS or XPath selectors. The scraper uses `httpx` + `lxml`, enforces per-config rate limiting, integrates with the circuit breaker, and falls back from academic APIs automatically. CRUD UI with live test panel and bulk run endpoint.
 
 ### Analytics & Intelligence
 - **Natural Language Query (NLQ)** — Ask your data in plain English. The active LLM translates the question to an OLAP query (`group_by` + `filters`), validates dimension names, and returns live results — with a "Edit in OLAP Explorer →" shortcut and 6 example question chips.
@@ -143,6 +147,7 @@ Four-phase cascading enrichment worker:
 | 2 | Google Scholar | Scraping via rotating proxies |
 | 3 | [Web of Science](https://clarivate.com/) | BYOK (institutional API key) |
 | 4 | [Scopus](https://www.elsevier.com/products/scopus) | BYOK (Elsevier institutional key) |
+| 5 | Web Scraper | Custom CSS/XPath per-site configs with rate limiting |
 
 ### Semantic RAG Assistant
 - **6 LLM providers** with BYOK support:
@@ -195,6 +200,7 @@ Four-phase cascading enrichment worker:
 | **AI/RAG** | openai, anthropic, ChromaDB, sentence-transformers, function calling |
 | **Export** | openpyxl (Excel), WeasyPrint (PDF), python-pptx (PowerPoint) |
 | **Notifications** | smtplib + TLS STARTTLS (email), urllib (Slack/Teams/Discord webhooks) |
+| **Migrations** | Alembic (revision-based schema migrations, render_as_batch for SQLite) |
 | **Frontend** | Next.js 16, React 19, TypeScript 5, Tailwind CSS 4, Recharts |
 
 ---
@@ -251,7 +257,7 @@ Open `http://localhost:3004`
 
 ```bash
 python -m pytest backend/tests/ -x -q
-# 1148 tests, all passing
+# 1254 tests, all passing
 ```
 
 ---
@@ -347,7 +353,7 @@ graph TD
 
 ## API Overview
 
-190+ endpoints across 31 functional routers. Full interactive docs at `/docs` (Swagger) or `/redoc`.
+200+ endpoints across 33 functional routers. Full interactive docs at `/docs` (Swagger) or `/redoc`.
 
 ### Authentication & Users
 | Method | Endpoint | Description |
@@ -473,7 +479,21 @@ graph TD
 | `GET` | `/exports/sales-deck` | Self-contained print-ready HTML sales deck (open → Print → PDF) |
 | `GET` | `/exports/sales-deck/data` | Live KPI payload used by the sales deck |
 
-*(Full table of all 190+ endpoints available in `/docs`)*
+### Web Scrapers & Transformations
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/scrapers` | Create scraper config (admin+) |
+| `GET` | `/scrapers` | List scraper configs |
+| `PUT` | `/scrapers/{id}` | Update scraper config |
+| `DELETE` | `/scrapers/{id}` | Delete scraper config |
+| `POST` | `/scrapers/{id}/test` | Dry-run scraper against a sample label |
+| `POST` | `/scrapers/{id}/run` | Bulk-enrich up to 500 entities |
+| `GET` | `/entities/facets` | Field-value counts for facet sidebar |
+| `POST` | `/transformations/preview` | Preview transformation on 20 sample records |
+| `POST` | `/transformations/apply` | Bulk-apply transformation to entity field |
+| `GET` | `/transformations/history` | Last transformations applied |
+
+*(Full table of all 200+ endpoints available in `/docs`)*
 
 ---
 
@@ -509,7 +529,7 @@ ukip/
 │   │   ├── bibtex_parser.py       # BibTeX → universal records
 │   │   ├── ris_parser.py          # RIS → universal records
 │   │   └── science_mapper.py      # Science record → UniversalEntity fields
-│   ├── routers/                   # 29 domain routers (175+ endpoints)
+│   ├── routers/                   # 33 domain routers (200+ endpoints)
 │   │   ├── ai_rag.py              # RAG index/query/stats + agentic mode
 │   │   ├── alert_channels.py      # Slack/Teams/Discord alert channels CRUD
 │   │   ├── analytics.py           # Dashboard, OLAP, ROI, topic analyzers
@@ -541,11 +561,15 @@ ukip/
 │   │   ├── stores.py              # Store connector management
 │   │   ├── organizations.py       # Multi-tenant org CRUD + member management
 │   │   ├── sales_deck.py          # Sales deck HTML + data endpoints
+│   │   ├── scrapers.py            # Web scraper configs CRUD + test + run
+│   │   ├── transformations.py     # Column transformation preview/apply/history
 │   │   └── webhooks.py            # Outbound webhook CRUD + delivery
-│   ├── tests/                     # 1148 tests across 48 files
+│   ├── tests/                     # 1254 tests across 52 files
 │   ├── audit.py                   # AuditMiddleware (HTTP-level interception)
 │   ├── auth.py                    # JWT + API Key + RBAC + account lockout
 │   ├── circuit_breaker.py         # External API resilience
+│   ├── clustering/                # Clustering algorithms (fingerprint, ngram, phonetic)
+│   └── transformations/           # Safe expression engine for bulk column transforms
 │   ├── encryption.py              # Fernet credential encryption
 │   ├── main.py                    # FastAPI app (slim orchestrator)
 │   ├── models.py                  # SQLAlchemy ORM (29 tables)
@@ -579,6 +603,7 @@ ukip/
 │   │   │   ├── bulk-edit/         # Bulk field editor
 │   │   │   └── link/              # Entity Linker
 │   │   ├── harmonization/         # Data cleaning workflows
+│   │   ├── transformations/       # Column Transformation UI with preview + history
 │   │   ├── import/                # Bulk Import Wizard (5-step)
 │   │   ├── integrations/          # Store + AI provider config
 │   │   ├── notifications/         # Notification Center
@@ -587,6 +612,7 @@ ukip/
 │   │   ├── reports/
 │   │   │   ├── page.tsx           # Report Builder
 │   │   │   └── scheduled/         # Scheduled Reports management
+│   │   ├── scrapers/              # Web Scraper config manager + live test panel
 │   │   ├── search/                # Full-text search results
 │   │   ├── demo/
 │   │   │   └── sales/             # Interactive Sales Deck (animated KPIs, PDF export)
@@ -683,12 +709,17 @@ ukip/
 | **84** | **Demo** | **Sales Deck generator — self-contained print-ready HTML (gradient hero, live KPIs, value props, capabilities checklist); `/demo/sales` interactive page with animated KPI counters** |
 | **85** | **Multi-tenancy** | **Organizations — `Organization` + `OrganizationMember` models; slug + plan (free/pro/enterprise); 9-endpoint router (CRUD + invite/remove + switch); `/settings/organizations` management UI** |
 | **86** | **Collaboration** | **Enhanced Annotations — emoji reactions (👍 ❤️ 🚀 👀 ✅ 😄 🎉) with per-user toggle; resolve/unresolve workflow (`is_resolved`, `resolved_at`); thread stats endpoint; reaction bar + resolve badge in UI** |
+| **86.5** | **Infrastructure** | **Alembic Integration — replaced 150-line manual ALTER TABLE bootstrap with revision-based migrations (`alembic upgrade head`); `render_as_batch` for SQLite; `env.py` wired to all UKIP models; FTS5 shadow table exclusion; baseline migration `0001`** |
+| **87** | **Data Quality** | **Dynamic Faceting — filter entity catalog by entity_type, domain, validation_status, enrichment_status, source with live counts; `FacetPanel` sidebar; active-facet pills with clear-all** |
+| **88** | **Data Quality** | **Clustering Algorithms — fingerprint (NFD + token sort), n-gram Jaccard, Cologne Phonetic, simplified Metaphone — all stdlib-only; algorithm selector with tooltips in disambiguation UI; `algorithm_used` badge on group cards** |
+| **89** | **Data Quality** | **Column Transformations — safe mini-language (12 functions, zero eval/exec); `POST /transformations/preview` + `/apply` + `/history`; before/after diff table; confirmation modal; transformation history panel** |
+| **90** | **Enrichment** | **Web Scraper Enrichment — CSS/XPath selector-based URL scraper using httpx + lxml; per-config rate limiting; circuit breaker integration; worker fallback after academic APIs; full CRUD UI with live test panel and bulk run** |
 
 ---
 
 ### Up Next 🔜
 
-The following sprints are proposed for the next development cycle (Sprints 87–94). Each is designed to compound on the platform's strengths — real-time collaboration, ecosystem growth, and intelligence.
+The following sprints are proposed for the next development cycle. Each is designed to compound on the platform's strengths — real-time collaboration, ecosystem growth, and intelligence.
 
 #### ✅ Sprint 83 — Performance Optimization
 In-memory TTL analytics cache (`_SimpleCache`, 5 min / 2 min) for all expensive topic/correlation/dashboard computations. Virtual scrolling in the entities table for pages > 50 rows (ROW_HEIGHT=52px, 620px viewport, sticky thead, editing-row pinning). Admin cache-invalidation endpoint. 200-row page size option.
@@ -702,28 +733,48 @@ In-memory TTL analytics cache (`_SimpleCache`, 5 min / 2 min) for all expensive 
 #### ✅ Sprint 86 — Collaborative Annotations (Enhanced)
 Annotation resolve/unresolve workflow (`is_resolved`, `resolved_at`, `resolved_by_id`). Emoji reactions (👍 ❤️ 🚀 👀 ✅ 😄 🎉) per annotation with per-user toggle. Thread statistics endpoint (`total_threads`, `resolved`, `unresolved`, `total_reactions`). UI: resolve badge, reaction bar with counts in `AnnotationThread.tsx`.
 
-#### Sprint 87 — Real-time Collaboration (WebSocket)
+#### ✅ Sprint 86.5 — Alembic Migration System
+Replaced 150 lines of manual `ALTER TABLE` bootstrap code with revision-controlled Alembic migrations. Configured `alembic.ini` + `env.py` (wired to all UKIP models, `render_as_batch` for SQLite, FTS5 shadow table exclusion). Baseline migration `0001_baseline.py` captures the full schema from Sprints 1–86. `_run_migrations()` called at every startup — idempotent and safe.
+
+#### ✅ Sprint 87 — Dynamic Faceting
+OpenRefine-inspired facet filters on the entity catalog. `GET /entities/facets` returns counts for each field value across entity_type, domain, validation_status, enrichment_status, and source. `FacetPanel` sidebar component with collapsible sections and color-coded chips. Active facets shown as dismissible pills above the table. Filtered params passed as `ft_*` query params to `GET /entities`.
+
+#### ✅ Sprint 88 — Clustering Algorithm Suite
+Extended disambiguation with four grouping strategies beyond the default Levenshtein `token_sort`:
+- **fingerprint** — NFD unicode normalization + accent strip + punctuation removal + token sort. OpenRefine-equivalent key collision algorithm.
+- **n-gram Jaccard** — Bigram character n-grams with Jaccard similarity (0–100 scale). Works well for short strings and typos.
+- **Cologne Phonetic** — German phonetic encoding for name disambiguation (Köln/Koeln → same group).
+- **Metaphone** — Simplified English/Spanish Metaphone for cross-language phonetic matching.
+All implemented in pure Python stdlib — zero ML dependencies. Algorithm selector dropdown with hover tooltips in the disambiguation UI. `algorithm_used` badge on each group card.
+
+#### ✅ Sprint 89 — Column Transformation Language
+A safe, `eval()`-free mini-language for bulk field transformations. Twelve built-in functions: `trim`, `upper`, `lower`, `title`, `replace(old,new)`, `prefix(text)`, `suffix(text)`, `strip_html`, `to_number`, `slice(start,end)`, `split(sep)[n]`, `strip(chars)`. Applied to 8 transformable entity fields. Endpoints: `POST /transformations/preview` (dry-run on 20 samples), `POST /transformations/apply` (bulk write + harmonization log entry), `GET /transformations/history`. Frontend: field selector, autocomplete expression input, before/after diff table, confirmation modal, last-10 history panel.
+
+#### ✅ Sprint 90 — Web Scraping as Enrichment Source
+Custom CSS/XPath-based URL scrapers as a 5th enrichment phase. `WebScraperConfig` model stores `url_template` (with `{primary_label}` placeholder), selector type, selector, field_map JSON, and rate limit. `backend/adapters/web_scraper.py` uses `httpx` + `lxml` with per-instance rate limiting. Circuit breaker integration: scraper trips after 3 failures, recovers after 60s. Enrichment worker automatically falls back to active scrapers after academic APIs fail. Endpoints: CRUD + `POST /scrapers/{id}/test` (dry-run, no DB writes) + `POST /scrapers/{id}/run` (bulk enrich up to 500 entities). Frontend: form with URL template interpolation preview, field-map editor (index → entity field), live test panel with before/after, run button with enrichment counter.
+
+#### Sprint 91 — Real-time Collaboration (WebSocket)
 Add live presence indicators and real-time co-editing signals using WebSockets. Users see who else is viewing the same entity, dashboard edits broadcast instantly, and scheduled report status updates push live without polling. Foundation for team-based workflows.
 
-#### Sprint 88 — Workflow Automation Engine
+#### Sprint 92 — Workflow Automation Engine
 Visual no-code workflow builder: trigger → condition → action chains. Triggers: scheduled time, entity imported, quality score drops below threshold, alert fired. Actions: run harmonization, send report, call webhook, notify Slack, enrich domain. Replaces one-off scripts with reusable, audited automations.
 
-#### Sprint 89 — Embedding & Widget SDK
+#### Sprint 93 — Embedding & Widget SDK
 A JavaScript SDK (`ukip-embed.js`) that lets external apps embed UKIP widgets (entity search, quality badge, concept cloud, OLAP mini-chart) as iframes or web components. API Key authentication. Configurable theme. Powers partner integrations and drives viral distribution across the developer ecosystem.
 
-#### Sprint 90 — AI-Powered Entity Recommendations
+#### Sprint 94 — AI-Powered Entity Recommendations
 "You might also want to enrich…" suggestion engine. Uses semantic similarity (ChromaDB cosine distance) + gap scores to surface entities that are related to recently-enriched ones but still unenriched. Delivered as a daily digest notification and a persistent "Recommended" section in the entity catalog.
 
-#### Sprint 91 — Collaborative Review Queues
+#### Sprint 95 — Collaborative Review Queues
 Structured review workflows for data quality tasks: assign an entity set to a user, set a deadline, track completion. Reviewers get a focused inbox of items awaiting their judgment (disambiguation clusters, authority candidates, gap remediations). Managers see a kanban-style board. Drives daily active usage.
 
-#### Sprint 92 — Data Marketplace & Sharing Hub
+#### Sprint 96 — Data Marketplace & Sharing Hub
 Export curated entity sets as shareable, versioned datasets. Generate a public or password-protected permalink (`/share/<token>`) with read-only access. Recipients can import the dataset into their own UKIP instance with one click. Enables knowledge transfer between organizations and creates network effects.
 
-#### Sprint 93 — Compliance & Data Governance Module
+#### Sprint 97 — Compliance & Data Governance Module
 GDPR/CCPA compliance tools: data subject access request (DSAR) report generator, right-to-erasure workflow, retention policy engine (auto-delete entities older than N days from specified domains), and a compliance dashboard. Required for regulated industries (healthcare, finance, research institutions).
 
-#### Sprint 94 — Fine-Tuning & Domain-Specific LLMs
+#### Sprint 98 — Fine-Tuning & Domain-Specific LLMs
 Allow admins to export their enriched, harmonized entity dataset as a fine-tuning corpus (JSONL format compatible with OpenAI and Hugging Face). Track fine-tuning jobs. Swap the active RAG provider to a domain-tuned local model. Transforms UKIP from an AI consumer into an AI producer — the ultimate lock-in for domain experts.
 
 ---
@@ -732,9 +783,9 @@ Allow admins to export their enriched, harmonized entity dataset as a fine-tunin
 
 | Horizon | Theme | Description |
 |---------|-------|-------------|
-| **Now** ✅ (Sprints 83–86) | Performance & Scale | Analytics cache, virtual scroll, multi-tenancy, sales deck, annotation workflows |
-| **Near** (Sprints 87–93) | Ecosystem & Intelligence | Real-time collab, workflow automation, embedded widgets, AI recommendations, data lineage, compliance |
-| **Far** (Sprints 94–98) | Intelligence Network | Fine-tuned domain models, marketplace, governance, network effects |
+| **Now** ✅ (Sprints 83–90) | OpenRefine Parity + Enrichment | Performance, multi-tenancy, Alembic migrations, dynamic faceting, clustering algorithms, column transforms, web scraping |
+| **Near** (Sprints 91–95) | Ecosystem & Collaboration | Real-time WebSocket collab, workflow automation, widget SDK, AI recommendations, collaborative review queues |
+| **Far** (Sprints 96–98) | Intelligence Network | Data marketplace & sharing hub, compliance & governance, domain-specific fine-tuned LLMs |
 
 *See [EVOLUTION_STRATEGY.md](docs/EVOLUTION_STRATEGY.md) for the full phase-by-phase platform vision.*
 
