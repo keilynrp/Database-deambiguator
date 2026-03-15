@@ -52,6 +52,7 @@ from backend.routers import (
     reports,
     sales_deck,
     scheduled_imports,
+    scrapers,
     search,
     stores,
     transformations,
@@ -292,6 +293,7 @@ app.include_router(api_keys.router)
 app.include_router(sales_deck.router)
 app.include_router(organizations.router)
 app.include_router(transformations.router)
+app.include_router(scrapers.router)
 
 # ── Static file serving (uploaded logos etc.) ─────────────────────────────────
 _static_dir = pathlib.Path("static")

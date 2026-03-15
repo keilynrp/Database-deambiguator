@@ -542,3 +542,32 @@ class OrganizationMember(Base):
     user_id     = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     role        = Column(String(20), default="member")  # owner | admin | member
     joined_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+# ── Sprint 90: Web Scraper Configs ────────────────────────────────────────────
+
+class WebScraperConfig(Base):
+    """
+    Configuration for a URL-based enrichment scraper.
+    url_template: URL with {primary_label} placeholder (e.g. https://example.com/search?q={primary_label})
+    selector_type: css | xpath
+    selector: CSS selector or XPath expression to target the data element
+    field_map: JSON dict mapping scraped keys to entity field names
+    rate_limit_secs: minimum seconds between requests (default 1)
+    is_active: if False the scraper is skipped by the enrichment worker
+    """
+    __tablename__ = "web_scraper_configs"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    name            = Column(String(200), nullable=False)
+    url_template    = Column(Text, nullable=False)         # e.g. https://site.com/search?q={primary_label}
+    selector_type   = Column(String(10), default="css")   # css | xpath
+    selector        = Column(Text, nullable=False)         # CSS selector or XPath expr
+    field_map       = Column(Text, default="{}")           # JSON: {"scraped_key": "entity_field"}
+    rate_limit_secs = Column(Float, default=1.0)           # min secs between requests
+    is_active       = Column(Boolean, default=True, index=True)
+    last_run_at     = Column(DateTime, nullable=True)
+    last_run_status = Column(String(20), nullable=True)    # ok | error | skipped
+    total_runs      = Column(Integer, default=0)
+    total_enriched  = Column(Integer, default=0)
+    created_at      = Column(DateTime, default=lambda: datetime.now(timezone.utc))

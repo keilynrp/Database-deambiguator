@@ -150,8 +150,11 @@ def enrich_single_record(db: Session, entity: models.RawEntity) -> models.RawEnt
             entity.enrichment_source = source
             entity.enrichment_status = "completed"
         else:
-            entity.enrichment_status = "failed"
-            entity.enrichment_source = "None"
+            # Fallback: try active web scraper configs
+            scraped = enrich_with_web_scrapers(db, entity)
+            if not scraped:
+                entity.enrichment_status = "failed"
+                entity.enrichment_source = "None"
 
     except (ValueError, KeyError, AttributeError) as e:
         # Domain / data errors — mark failed, log details
@@ -192,6 +195,48 @@ async def background_enrichment_worker(db_generator):
         except Exception as e:
             logger.error(f"Background worker loop error: {type(e).__name__}: {e}")
             await asyncio.sleep(10)
+
+
+def enrich_with_web_scrapers(db: Session, entity: models.RawEntity) -> bool:
+    """
+    Try active web scraper configs against *entity* in priority order.
+    Returns True if any scraper successfully enriched the entity.
+    Caller must commit after this returns.
+    """
+    from backend.adapters.web_scraper import ScrapeError, adapter_from_config
+    from backend.circuit_breaker import CircuitBreaker, CircuitOpenError
+
+    if not entity.primary_label:
+        return False
+
+    configs = (
+        db.query(models.WebScraperConfig)
+        .filter(models.WebScraperConfig.is_active == True)  # noqa: E712
+        .all()
+    )
+
+    for cfg in configs:
+        cb = CircuitBreaker(
+            name=f"web_scraper_{cfg.id}",
+            failure_threshold=3,
+            recovery_timeout=60,
+        )
+        adapter = adapter_from_config(cfg)
+        try:
+            fields = cb.call(adapter.scrape, entity.primary_label)
+            if fields:
+                for field, value in fields.items():
+                    if hasattr(entity, field):
+                        setattr(entity, field, value)
+                entity.enrichment_source = cfg.name
+                entity.enrichment_status = "completed"
+                return True
+        except CircuitOpenError as exc:
+            logger.warning("Circuit open for web_scraper_%s: %s", cfg.id, exc)
+        except ScrapeError as exc:
+            logger.warning("Scrape error (scraper=%s, entity=%s): %s", cfg.id, entity.id, exc)
+
+    return False
 
 
 def trigger_enrichment_bulk(db: Session, skip: int = 0, limit: int = 100) -> int:
