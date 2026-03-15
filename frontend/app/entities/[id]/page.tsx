@@ -9,6 +9,8 @@ import MonteCarloChart from "../../components/MonteCarloChart";
 import AnnotationThread from "../../components/AnnotationThread";
 import EntityGraph from "../../components/EntityGraph";
 import RelationshipManager from "../../components/RelationshipManager";
+import PresenceAvatars from "../../components/PresenceAvatars";
+import { useWebSocket } from "@/lib/useWebSocket";
 
 interface Entity {
     id: number;
@@ -98,6 +100,11 @@ export default function EntityDetailPage() {
     const params = useParams();
     const entityId = params.id as string;
     const { toast } = useToast();
+
+    // Real-time presence (Sprint 91)
+    const { presence, isConnected, send: wsSend } = useWebSocket(
+        entityId ? `entity-${entityId}` : null
+    );
 
     const [entity, setEntity] = useState<Entity | null>(null);
     const [loading, setLoading] = useState(true);
@@ -190,11 +197,13 @@ export default function EntityDetailPage() {
         CORE_FIELDS.forEach((f) => { data[f] = entity[f]; });
         setEditData(data);
         setIsEditing(true);
+        wsSend("entity.editing", { entity_id: Number(entityId), editing: true });
     }
 
     function cancelEdit() {
         setIsEditing(false);
         setEditData({});
+        wsSend("entity.editing", { entity_id: Number(entityId), editing: false });
     }
 
     async function handleSave() {
@@ -209,6 +218,7 @@ export default function EntityDetailPage() {
             setIsEditing(false);
             setEditData({});
             toast("Entity saved", "success");
+            wsSend("entity.saved", { entity_id: Number(entityId) });
         } catch {
             toast("Error saving entity", "error");
         } finally {
@@ -296,7 +306,8 @@ export default function EntityDetailPage() {
                 title={entity.entity_name ?? `Entity #${entityId}`}
                 description={description || undefined}
                 actions={
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
+                        <PresenceAvatars presence={presence} isConnected={isConnected} />
                         {isEditing ? (
                             <>
                                 <button

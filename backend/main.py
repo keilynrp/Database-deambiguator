@@ -57,6 +57,7 @@ from backend.routers import (
     stores,
     transformations,
     webhooks,
+    ws,
 )
 
 logger = logging.getLogger(__name__)
@@ -294,6 +295,7 @@ app.include_router(sales_deck.router)
 app.include_router(organizations.router)
 app.include_router(transformations.router)
 app.include_router(scrapers.router)
+app.include_router(ws.router)
 
 # ── Static file serving (uploaded logos etc.) ─────────────────────────────────
 _static_dir = pathlib.Path("static")

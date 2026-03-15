@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { apiFetch } from "@/lib/api";
 import { WIDGET_REGISTRY, type WidgetConfig } from "./widgets";
+import PresenceAvatars from "../components/PresenceAvatars";
+import { useWebSocket } from "@/lib/useWebSocket";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -198,6 +200,11 @@ export default function DashboardsPage() {
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [catalogue, setCatalogue]   = useState<WidgetType[]>([]);
   const [activeDash, setActiveDash] = useState<Dashboard | null>(null);
+
+  // Real-time presence (Sprint 91)
+  const { presence, isConnected } = useWebSocket(
+    activeDash ? `dashboard-${activeDash.id}` : null
+  );
   const [editLayout, setEditLayout] = useState<WidgetConfig[]>([]);
   const [editing, setEditing]       = useState(false);
   const [loading, setLoading]       = useState(true);
@@ -454,7 +461,8 @@ export default function DashboardsPage() {
                   {activeDash.updated_at && ` · saved ${new Date(activeDash.updated_at).toLocaleDateString()}`}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <PresenceAvatars presence={presence} isConnected={isConnected} />
                 {editing ? (
                   <>
                     <button
