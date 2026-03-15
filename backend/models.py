@@ -571,3 +571,45 @@ class WebScraperConfig(Base):
     total_runs      = Column(Integer, default=0)
     total_enriched  = Column(Integer, default=0)
     created_at      = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+# ── Sprint 92: Workflow Automation Engine ──────────────────────────────────────
+
+class Workflow(Base):
+    """
+    No-code automation workflow: trigger → conditions → actions chain.
+    trigger_type: entity.created | entity.enriched | entity.flagged | manual
+    conditions:   JSON array of {type, field, operator, value} objects
+    actions:      JSON array of {type, config} objects
+    """
+    __tablename__ = "workflows"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    name         = Column(String(200), nullable=False)
+    description  = Column(Text, nullable=True)
+    is_active    = Column(Boolean, default=True, index=True)
+    trigger_type = Column(String(50), nullable=False, index=True)
+    trigger_config = Column(Text, default="{}")   # JSON — extra trigger params
+    conditions   = Column(Text, default="[]")     # JSON array of condition objects
+    actions      = Column(Text, default="[]")     # JSON array of action objects
+    created_by   = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    last_run_at  = Column(DateTime, nullable=True)
+    run_count    = Column(Integer, default=0)
+    last_run_status = Column(String(20), nullable=True)  # success | error | skipped
+
+
+class WorkflowRun(Base):
+    """
+    Execution log for a single workflow invocation.
+    """
+    __tablename__ = "workflow_runs"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    workflow_id  = Column(Integer, ForeignKey("workflows.id"), nullable=False, index=True)
+    status       = Column(String(20), nullable=False, default="running")  # running|success|error|skipped
+    trigger_data = Column(Text, default="{}")   # JSON — entity id / event data
+    steps_log    = Column(Text, default="[]")   # JSON — per-action results
+    error        = Column(Text, nullable=True)
+    started_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime, nullable=True)

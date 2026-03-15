@@ -162,6 +162,16 @@ const navSections: NavSection[] = [
         ),
         translationKey: "nav.scrapers",
       },
+      {
+        label: "Workflow Automation",
+        href: "/workflows",
+        icon: (
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+          </svg>
+        ),
+        translationKey: "nav.workflows",
+      },
     ],
   },
   {
