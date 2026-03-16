@@ -13,7 +13,7 @@ import logging
 import re
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,7 @@ from backend import database, models
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
 from backend.routers.deps import _audit, _dispatch_webhook
+from backend.routers.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -275,7 +276,9 @@ def apply_harmonization_step(
 
 
 @router.post("/harmonization/apply-all")
+@limiter.limit("5/minute")
 def apply_all_harmonization_steps(
+    request: Request,
     db: Session = Depends(get_db),
     _: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):

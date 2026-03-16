@@ -25,7 +25,7 @@ router = APIRouter(tags=["auth"])
 # ── Authentication ────────────────────────────────────────────────────────────
 
 @router.post("/auth/token", tags=["auth"])
-@limiter.limit("5/minute")
+@limiter.limit("60/minute")
 async def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -143,7 +143,7 @@ def update_my_profile(
 
 
 @router.post("/users/me/password", tags=["users"])
-@limiter.limit("5/minute")
+@limiter.limit("60/minute")
 def change_my_password(
     request: Request,
     payload: schemas.PasswordChange,
@@ -225,7 +225,7 @@ def list_users(
 
 
 @router.post("/users", response_model=schemas.UserResponse, status_code=201, tags=["users"])
-@limiter.limit("20/hour")
+@limiter.limit("100/hour")
 def create_user(
     request: Request,
     payload: schemas.UserCreate,

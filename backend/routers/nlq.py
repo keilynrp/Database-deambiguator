@@ -10,7 +10,7 @@ POST /nlq/query
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -19,6 +19,7 @@ from backend.auth import get_current_user
 from backend.database import get_db
 from backend.encryption import decrypt
 from backend.olap import olap_engine
+from backend.routers.limiter import limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["nlq"])
@@ -75,7 +76,8 @@ class NLQRequest(BaseModel):
 # ── Endpoint ──────────────────────────────────────────────────────────────────
 
 @router.post("/nlq/query", dependencies=[Depends(get_current_user)])
-async def nlq_query(payload: NLQRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def nlq_query(request: Request, payload: NLQRequest, db: Session = Depends(get_db)):
     """
     Translate a natural language question into an OLAP query and return results.
 

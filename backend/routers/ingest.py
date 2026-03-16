@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 from typing import List, Optional
 
 import pandas as pd
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -27,6 +27,7 @@ from sqlalchemy import or_
 from backend import database, models
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
+from backend.routers.limiter import limiter
 from backend.datasource_analyzer import DataSourceAnalyzer
 from backend.parsers.bibtex_parser import parse_bibtex
 from backend.parsers.ris_parser import parse_ris
@@ -371,7 +372,9 @@ async def preview_upload(
 
 
 @router.post("/upload", status_code=201)
+@limiter.limit("60/minute")
 async def upload_file(
+    request: Request,
     file: UploadFile = File(...),
     domain: str = Form("default"),
     field_mapping: str = Form("{}"),

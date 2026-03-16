@@ -161,7 +161,7 @@ def delete_ai_integration(
 # ── RAG ───────────────────────────────────────────────────────────────────────
 
 @router.post("/rag/index")
-@limiter.limit("3/minute")
+@limiter.limit("60/minute")
 def rag_index_catalog(
     request: Request,
     db: Session = Depends(get_db),

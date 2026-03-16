@@ -18,7 +18,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy import func, update
 from sqlalchemy.orm import Session
 
@@ -27,6 +27,7 @@ from backend.auth import require_role
 from backend.database import get_db
 from backend.encryption import encrypt
 from backend.routers.deps import _get_store_adapter
+from backend.routers.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +225,9 @@ def get_stores_summary(
 # ── Sync engine ───────────────────────────────────────────────────────────────
 
 @router.post("/stores/{store_id}/test")
+@limiter.limit("10/minute")
 def test_store_connection(
+    request: Request,
     store_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
     _: models.User = Depends(require_role("super_admin", "admin")),
@@ -249,7 +252,9 @@ def test_store_connection(
 
 
 @router.post("/stores/{store_id}/pull")
+@limiter.limit("60/minute")
 def pull_entities_from_store(
+    request: Request,
     store_id: int = Path(..., ge=1),
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=50, ge=1, le=200),

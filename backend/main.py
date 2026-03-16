@@ -112,6 +112,18 @@ _BUILTIN_TEMPLATES = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # ── Startup env-var guard ────────────────────────────────────────────────
+    _insecure_defaults = {
+        "JWT_SECRET_KEY":   ("changeit", "dev_secret", "fallback"),
+        "SESSION_SECRET_KEY": ("changeit", "fallback_cookie_secret"),
+    }
+    for var, bad_values in _insecure_defaults.items():
+        val = os.environ.get(var, "")
+        if not val:
+            logger.warning("⚠ %s is not set — using insecure default. Set it in .env for production.", var)
+        elif any(val.startswith(b) for b in bad_values):
+            logger.warning("⚠ %s looks like a placeholder value. Replace it before going to production.", var)
+
     # Startup
     with database.SessionLocal() as db:
         enrichment_worker.reset_stale_processing_records(db)
@@ -242,6 +254,23 @@ app.add_middleware(SlowAPIMiddleware)
 
 from backend.audit import AuditMiddleware  # noqa: E402 — after app init
 app.add_middleware(AuditMiddleware)
+
+# ── Security headers middleware ────────────────────────────────────────────────
+
+from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+from starlette.requests import Request as StarletteRequest  # noqa: E402
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"]        = "DENY"
+        response.headers["X-XSS-Protection"]       = "1; mode=block"
+        response.headers["Referrer-Policy"]         = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"]      = "camera=(), microphone=(), geolocation=()"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 _cors_origins_env = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3004,http://localhost:3000")
 ALLOWED_ORIGINS = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]

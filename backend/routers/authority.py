@@ -18,7 +18,7 @@ import re
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import Session
 
@@ -28,6 +28,7 @@ from backend.authority.base import ResolveContext as _AuthorityContext
 from backend.authority.resolver import resolve_all as _authority_resolve_all
 from backend.database import get_db
 from backend.routers.deps import _audit, _build_disambig_groups, _serialize_authority_record
+from backend.routers.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,9 @@ _FIELD_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 # ── Authority resolution ──────────────────────────────────────────────────────
 
 @router.post("/authority/resolve", status_code=201, tags=["authority"])
+@limiter.limit("60/minute")
 def resolve_authority(
+    request: Request,
     payload: schemas.AuthorityResolveRequest,
     db: Session = Depends(get_db),
     _: models.User = Depends(require_role("super_admin", "admin", "editor")),

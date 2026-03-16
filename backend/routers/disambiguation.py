@@ -12,7 +12,7 @@ import logging
 import re
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import update
 from sqlalchemy.orm import Session
@@ -22,6 +22,7 @@ from backend.auth import get_current_user, require_role
 from backend.database import get_db
 from backend.llm_agent import resolve_canonical_name
 from backend.routers.deps import _build_disambig_groups
+from backend.routers.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,9 @@ class AIResolveRequest(BaseModel):
 
 
 @router.post("/disambiguate/ai-resolve")
+@limiter.limit("10/minute")
 def ai_resolve_variations(
+    request: Request,
     payload: AIResolveRequest,
     _: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):

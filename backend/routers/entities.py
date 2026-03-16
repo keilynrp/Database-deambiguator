@@ -19,7 +19,7 @@ Entity CRUD, enrichment, and entity-linker endpoints.
 from collections import defaultdict
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -31,6 +31,7 @@ from backend.database import get_db
 from backend import enrichment_worker
 from backend import entity_linker as _entity_linker
 from backend.routers.deps import _audit, _dispatch_webhook
+from backend.routers.limiter import limiter
 
 router = APIRouter(tags=["entities"])
 
@@ -469,7 +470,9 @@ def delete_entity(
 # ── Enrichment ────────────────────────────────────────────────────────────────
 
 @router.post("/enrich/row/{entity_id}", response_model=schemas.Entity)
+@limiter.limit("30/minute")
 def enrich_single_entity(
+    request: Request,
     entity_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
     _: models.User = Depends(require_role("super_admin", "admin", "editor")),
@@ -483,7 +486,9 @@ def enrich_single_entity(
 
 
 @router.post("/enrich/bulk")
+@limiter.limit("5/minute")
 def enrich_bulk_queue(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
