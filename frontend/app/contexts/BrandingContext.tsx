@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 export interface BrandingSettings {
   platform_name: string;
   logo_url: string;
+  favicon_url: string;
   accent_color: string;
   footer_text: string;
 }
@@ -12,6 +13,7 @@ export interface BrandingSettings {
 const DEFAULTS: BrandingSettings = {
   platform_name: "UKIP",
   logo_url: "",
+  favicon_url: "",
   accent_color: "#6366f1",
   footer_text: "Universal Knowledge Intelligence Platform",
 };

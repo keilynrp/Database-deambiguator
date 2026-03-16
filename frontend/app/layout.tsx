@@ -8,6 +8,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { DomainProvider } from "./contexts/DomainContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { BrandingProvider } from "./contexts/BrandingContext";
+import FaviconInjector from "./components/FaviconInjector";
 import { ToastProvider } from "./components/ui/Toast";
 
 const geistSans = Geist({
@@ -66,6 +67,7 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             <BrandingProvider>
+              <FaviconInjector />
               <LanguageProvider>
                 <DomainProvider>
                   <SidebarProvider>

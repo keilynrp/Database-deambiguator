@@ -339,6 +339,7 @@ class BrandingSettings(Base):
     id            = Column(Integer, primary_key=True, default=1)
     platform_name = Column(String, default="UKIP")
     logo_url      = Column(String, default="")
+    favicon_url   = Column(String, default="")          # custom favicon (ICO/PNG/SVG)
     accent_color  = Column(String, default="#6366f1")   # indigo-500
     footer_text   = Column(String, default="Universal Knowledge Intelligence Platform")
 

@@ -1,9 +1,11 @@
 """
-Custom Branding Settings endpoints (Sprint 44 / Sprint 76).
+Custom Branding Settings endpoints (Sprint 44 / Sprint 76 / Sprint 105).
   GET    /branding/settings  — PUBLIC (needed at app load before login)
   PUT    /branding/settings  — admin+
   POST   /branding/logo      — admin+  (drag-and-drop logo upload)
   DELETE /branding/logo      — admin+  (remove logo, revert to default icon)
+  POST   /branding/favicon   — admin+  (upload custom favicon ICO/PNG/SVG)
+  DELETE /branding/favicon   — admin+  (remove favicon, revert to app default)
 """
 from __future__ import annotations
 
@@ -24,6 +26,7 @@ router = APIRouter()
 
 _STATIC_DIR = pathlib.Path("static")
 _MAX_LOGO_BYTES = 2 * 1024 * 1024   # 2 MB
+_MAX_FAVICON_BYTES = 512 * 1024     # 512 KB — favicons are tiny
 _ALLOWED_MIME: dict[str, str] = {
     "image/png":     "png",
     "image/jpeg":    "jpg",
@@ -31,6 +34,12 @@ _ALLOWED_MIME: dict[str, str] = {
     "image/svg+xml": "svg",
     "image/webp":    "webp",
     "image/gif":     "gif",
+}
+_ALLOWED_FAVICON_MIME: dict[str, str] = {
+    "image/x-icon":      "ico",
+    "image/vnd.microsoft.icon": "ico",
+    "image/png":         "png",
+    "image/svg+xml":     "svg",
 }
 
 
@@ -48,6 +57,15 @@ def _delete_current_logo(settings: models.BrandingSettings) -> None:
     """Remove the previously uploaded logo file from disk (if any)."""
     url = settings.logo_url or ""
     if url.startswith("/static/logo"):
+        path = pathlib.Path(url.lstrip("/"))
+        if path.exists():
+            path.unlink(missing_ok=True)
+
+
+def _delete_current_favicon(settings: models.BrandingSettings) -> None:
+    """Remove the previously uploaded favicon file from disk (if any)."""
+    url = settings.favicon_url or ""
+    if url.startswith("/static/favicon_"):
         path = pathlib.Path(url.lstrip("/"))
         if path.exists():
             path.unlink(missing_ok=True)
@@ -145,3 +163,69 @@ def delete_logo(
     db.commit()
     logger.info("Logo removed — reverted to default icon")
     return {"logo_url": ""}
+
+
+# ── POST /branding/favicon ────────────────────────────────────────────────────
+
+@router.post("/branding/favicon", tags=["branding"])
+async def upload_favicon(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin")),
+):
+    """
+    Upload a custom favicon.
+    Accepts ICO, PNG, SVG up to 512 KB.
+    Saves to static/favicon_<token>.<ext>, updates branding_settings.favicon_url.
+    The frontend FaviconInjector component reads this URL and dynamically
+    updates <link rel="icon"> in the browser <head>.
+    """
+    content_type = (file.content_type or "").split(";")[0].strip().lower()
+    if content_type not in _ALLOWED_FAVICON_MIME:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported favicon type '{content_type}'. "
+                   f"Allowed: {', '.join(_ALLOWED_FAVICON_MIME)}",
+        )
+
+    contents = await file.read()
+    if len(contents) > _MAX_FAVICON_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large ({len(contents) // 1024} KB). Maximum is 512 KB.",
+        )
+
+    ext = _ALLOWED_FAVICON_MIME[content_type]
+    token = uuid.uuid4().hex[:8]
+    filename = f"favicon_{token}.{ext}"
+
+    _STATIC_DIR.mkdir(parents=True, exist_ok=True)
+
+    dest = _STATIC_DIR / filename
+    dest.write_bytes(contents)
+
+    s = _get_or_create_settings(db)
+    _delete_current_favicon(s)
+
+    favicon_url = f"/static/{filename}"
+    s.favicon_url = favicon_url
+    db.commit()
+
+    logger.info("Favicon uploaded: %s (%d bytes)", filename, len(contents))
+    return {"favicon_url": favicon_url, "filename": filename, "size_bytes": len(contents)}
+
+
+# ── DELETE /branding/favicon ──────────────────────────────────────────────────
+
+@router.delete("/branding/favicon", tags=["branding"])
+def delete_favicon(
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin")),
+):
+    """Remove the uploaded favicon and revert to the application default."""
+    s = _get_or_create_settings(db)
+    _delete_current_favicon(s)
+    s.favicon_url = ""
+    db.commit()
+    logger.info("Favicon removed — reverted to default")
+    return {"favicon_url": ""}

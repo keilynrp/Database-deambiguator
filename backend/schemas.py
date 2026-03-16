@@ -387,6 +387,7 @@ class BrandingSettingsResponse(BaseModel):
 
     platform_name: str
     logo_url:      str
+    favicon_url:   str
     accent_color:  str
     footer_text:   str
 
@@ -394,6 +395,7 @@ class BrandingSettingsResponse(BaseModel):
 class BrandingSettingsUpdate(BaseModel):
     platform_name: Optional[str] = Field(None, min_length=1, max_length=80)
     logo_url:      Optional[str] = Field(None, max_length=500)
+    favicon_url:   Optional[str] = Field(None, max_length=500)
     accent_color:  Optional[str] = Field(None, pattern=r"^#[0-9a-fA-F]{6}$")
     footer_text:   Optional[str] = Field(None, max_length=200)
 
