@@ -11,7 +11,7 @@
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![DuckDB](https://img.shields.io/badge/DuckDB-OLAP-FFF000?style=for-the-badge&logo=duckdb&logoColor=black)](https://duckdb.org/)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20DB-ff6b35?style=for-the-badge)](https://www.trychroma.com/)
-[![Tests](https://img.shields.io/badge/Tests-1329%20passing-brightgreen?style=for-the-badge)](backend/tests/)
+[![Tests](https://img.shields.io/badge/Tests-1330%20passing-brightgreen?style=for-the-badge)](backend/tests/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge)](LICENSE)
 
 A domain-agnostic intelligence platform that ingests raw data, harmonizes it, enriches it against global knowledge bases, runs OLAP analytics and stochastic simulations, builds entity relationship graphs, and lets you query everything through an agentic RAG-powered AI assistant — with custom dashboards, scheduled reports, Slack/Teams alerts, and a public API ecosystem.
@@ -24,7 +24,7 @@ A domain-agnostic intelligence platform that ingests raw data, harmonizes it, en
 
 ## Why UKIP?
 
-Most data platforms force you to choose: clean your data **or** analyze it. UKIP does both in a single pipeline. It started as a catalog deduplication tool and evolved into a full research intelligence engine across **98 development sprints**.
+Most data platforms force you to choose: clean your data **or** analyze it. UKIP does both in a single pipeline. It started as a catalog deduplication tool and evolved into a full research intelligence engine across **99 development sprints**.
 
 **What it does:**
 
@@ -257,7 +257,7 @@ Open `http://localhost:3004`
 
 ```bash
 python -m pytest backend/tests/ -x -q
-# 1329 tests, all passing
+# 1330 tests, all passing
 ```
 
 ---
@@ -564,7 +564,7 @@ ukip/
 │   │   ├── scrapers.py            # Web scraper configs CRUD + test + run
 │   │   ├── transformations.py     # Column transformation preview/apply/history
 │   │   └── webhooks.py            # Outbound webhook CRUD + delivery
-│   ├── tests/                     # 1329 tests across 52 files
+│   ├── tests/                     # 1330 tests across 52 files
 │   ├── audit.py                   # AuditMiddleware (HTTP-level interception)
 │   ├── auth.py                    # JWT + API Key + RBAC + account lockout
 │   ├── circuit_breaker.py         # External API resilience
@@ -786,6 +786,10 @@ Three new base UI components consumed everywhere: **`Skeleton`** (9 variants —
 Completed the design system rollout across all high-traffic pages. Executive Dashboard: local `Skeleton` function eliminated, replaced with `SkeletonCard` from the UI library; inline red error div replaced with `ErrorBanner` (with retry). Import/Export: upload error inline div → `ErrorBanner`; upload spinner → `aria-hidden`. Audit Log: `useToast` imported; silent export `catch {}` → `toast("Export failed")`; inline error text → `ErrorBanner`. Harmonization: inline SVG+text empty state → `EmptyState icon="document"`. Notifications: inline empty state → `EmptyState icon="bell"` with clear-filter CTA. Decorative SVG `aria-hidden` sweep across dashboard action buttons.
 
 ---
+#### ✅ Sprint 99 — Production Infrastructure
+Containerization and CI/CD hardening for production deployment. `frontend/Dockerfile`: multi-stage Node 20 build (deps→builder→runner), non-root `nextjs` user, `output: "standalone"`, port 3004. Three GitHub Actions workflows: `test.yml` (pytest matrix Python 3.11+3.12, coverage XML artifact), `lint.yml` (ruff backend, ESLint+tsc frontend), `docker.yml` (buildx validation for both images with GHA cache). `next.config.ts`: full security header suite (CSP, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy), `poweredByHeader: false`, `compress: true`. Backend `SecurityHeadersMiddleware` mirrors headers on all API responses. Env-var insecure-default warnings in lifespan (JWT_SECRET_KEY, SESSION_SECRET_KEY). Rate limiting via SlowAPI on 10 additional critical endpoints: `/upload`, `/enrich/row`, `/enrich/bulk`, `/stores/{id}/test`, `/stores/{id}/pull`, `/harmonization/apply-all`, `/authority/resolve`, `/disambiguate/ai-resolve`, `/nlq/query`, `/rag/query`. 1330 tests passing.
+
+
 
 ### Strategic Vision 🗺️
 
@@ -795,6 +799,7 @@ Completed the design system rollout across all high-traffic pages. Executive Das
 | ✅ Sprints 83–90 | OpenRefine Parity + Enrichment | Performance, multi-tenancy, Alembic, faceting, clustering, column transforms, web scraping |
 | ✅ Sprints 91–95 | Ecosystem & Collaboration | WebSocket presence, workflow automation, widget SDK, PostgreSQL hardening, onboarding |
 | ✅ Sprints 96–98 | UX Polish & Accessibility | Unified design system, WCAG-compliant ARIA, mobile responsive, consistency across all pages |
+| ✅ Sprint 99 | Production Infrastructure | Docker, GitHub Actions CI/CD, security headers, rate limiting on all critical endpoints |
 
 *See [EVOLUTION_STRATEGY.md](docs/EVOLUTION_STRATEGY.md) for the full phase-by-phase platform vision.*
 
