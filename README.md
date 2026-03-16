@@ -11,7 +11,7 @@
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![DuckDB](https://img.shields.io/badge/DuckDB-OLAP-FFF000?style=for-the-badge&logo=duckdb&logoColor=black)](https://duckdb.org/)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20DB-ff6b35?style=for-the-badge)](https://www.trychroma.com/)
-[![Tests](https://img.shields.io/badge/Tests-1254%20passing-brightgreen?style=for-the-badge)](backend/tests/)
+[![Tests](https://img.shields.io/badge/Tests-1329%20passing-brightgreen?style=for-the-badge)](backend/tests/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge)](LICENSE)
 
 A domain-agnostic intelligence platform that ingests raw data, harmonizes it, enriches it against global knowledge bases, runs OLAP analytics and stochastic simulations, builds entity relationship graphs, and lets you query everything through an agentic RAG-powered AI assistant — with custom dashboards, scheduled reports, Slack/Teams alerts, and a public API ecosystem.
@@ -24,7 +24,7 @@ A domain-agnostic intelligence platform that ingests raw data, harmonizes it, en
 
 ## Why UKIP?
 
-Most data platforms force you to choose: clean your data **or** analyze it. UKIP does both in a single pipeline. It started as a catalog deduplication tool and evolved into a full research intelligence engine across **90 development sprints**.
+Most data platforms force you to choose: clean your data **or** analyze it. UKIP does both in a single pipeline. It started as a catalog deduplication tool and evolved into a full research intelligence engine across **98 development sprints**.
 
 **What it does:**
 
@@ -257,7 +257,7 @@ Open `http://localhost:3004`
 
 ```bash
 python -m pytest backend/tests/ -x -q
-# 1254 tests, all passing
+# 1329 tests, all passing
 ```
 
 ---
@@ -564,7 +564,7 @@ ukip/
 │   │   ├── scrapers.py            # Web scraper configs CRUD + test + run
 │   │   ├── transformations.py     # Column transformation preview/apply/history
 │   │   └── webhooks.py            # Outbound webhook CRUD + delivery
-│   ├── tests/                     # 1254 tests across 52 files
+│   ├── tests/                     # 1329 tests across 52 files
 │   ├── audit.py                   # AuditMiddleware (HTTP-level interception)
 │   ├── auth.py                    # JWT + API Key + RBAC + account lockout
 │   ├── circuit_breaker.py         # External API resilience
@@ -714,10 +714,18 @@ ukip/
 | **88** | **Data Quality** | **Clustering Algorithms — fingerprint (NFD + token sort), n-gram Jaccard, Cologne Phonetic, simplified Metaphone — all stdlib-only; algorithm selector with tooltips in disambiguation UI; `algorithm_used` badge on group cards** |
 | **89** | **Data Quality** | **Column Transformations — safe mini-language (12 functions, zero eval/exec); `POST /transformations/preview` + `/apply` + `/history`; before/after diff table; confirmation modal; transformation history panel** |
 | **90** | **Enrichment** | **Web Scraper Enrichment — CSS/XPath selector-based URL scraper using httpx + lxml; per-config rate limiting; circuit breaker integration; worker fallback after academic APIs; full CRUD UI with live test panel and bulk run** |
+| **91** | **Real-time** | **WebSocket Collaboration — `ConnectionManager` singleton; per-room presence tracking (join/leave/broadcast); JWT + API-key auth via query param; `useWebSocket` hook with exponential back-off; `PresenceAvatars` component; entity editing signals; dashboard live updates** |
+| **92** | **Automation** | **Workflow Automation Engine — `Workflow` + `WorkflowRun` models; trigger→condition→action pipeline; 4 triggers (entity.created/enriched/flagged/manual), 4 conditions, 4 actions (webhook/tag/alert/log); visual no-code builder UI; run history panel** |
+| **93** | **Ecosystem** | **Embeddable Widget SDK — `EmbedWidget` model with UUID public token; 4 data providers (entity_stats, top_concepts, recent_entities, quality_score); origin-validated public endpoints; iframe + JS snippet generator; standalone `/embed/[token]` public page** |
+| **94** | **Infrastructure** | **PostgreSQL Hardening — cross-DB Alembic migrations (Boolean defaults, FTS5 → GIN index); dialect-aware search (FTS5 MATCH vs `plainto_tsquery`); Docker Compose with PostgreSQL 16-alpine + healthcheck; production-ready `Dockerfile.backend`** |
+| **95** | **UX** | **Onboarding Polish — `GET /onboarding/status` auto-detects 5-step completion; `WelcomeModal` 3-slide first-login carousel (localStorage persistence); `OnboardingChecklist` collapsible progress bar; empty-state hero with Import / Try Demo CTAs on first visit** |
+| **96** | **Design System** | **Unified State System — `Skeleton` (9 variants: table, card, grid, list, text); `EmptyState` (10 icon presets, 3 sizes, 6 color schemes, CTA buttons); `ErrorBanner` (inline/card/row variants, retry callback, `role="alert"`); 32 silent `console.error/warn` calls removed across 9 files** |
+| **97** | **Accessibility** | **ARIA + Mobile — `useFocusTrap<T>` hook (Tab/Shift-Tab cycle, focus restore); `role="dialog"` + `aria-modal` + `aria-labelledby` on all slide-overs; `htmlFor`/`id` on every form field; `aria-label` on all icon-only buttons; `aria-hidden` on decorative SVGs; `role="log"` + `aria-live` on chat; responsive grids + padding across 6 pages** |
+| **98** | **Consistency** | **Design System Adoption — `SkeletonCard` replaces local shimmer in executive dashboard; `ErrorBanner` replaces inline red divs in dashboard/import-export/audit-log; `EmptyState` replaces inline SVG+text in harmonization + notifications; silent export failure → `toast()`; `aria-hidden` sweep on remaining decorative SVGs** |
 
 ---
 
-### Up Next 🔜
+### All sprints complete ✅
 
 The following sprints are proposed for the next development cycle. Each is designed to compound on the platform's strengths — real-time collaboration, ecosystem growth, and intelligence.
 
@@ -753,29 +761,29 @@ A safe, `eval()`-free mini-language for bulk field transformations. Twelve built
 #### ✅ Sprint 90 — Web Scraping as Enrichment Source
 Custom CSS/XPath-based URL scrapers as a 5th enrichment phase. `WebScraperConfig` model stores `url_template` (with `{primary_label}` placeholder), selector type, selector, field_map JSON, and rate limit. `backend/adapters/web_scraper.py` uses `httpx` + `lxml` with per-instance rate limiting. Circuit breaker integration: scraper trips after 3 failures, recovers after 60s. Enrichment worker automatically falls back to active scrapers after academic APIs fail. Endpoints: CRUD + `POST /scrapers/{id}/test` (dry-run, no DB writes) + `POST /scrapers/{id}/run` (bulk enrich up to 500 entities). Frontend: form with URL template interpolation preview, field-map editor (index → entity field), live test panel with before/after, run button with enrichment counter.
 
-#### Sprint 91 — Real-time Collaboration (WebSocket)
-Add live presence indicators and real-time co-editing signals using WebSockets. Users see who else is viewing the same entity, dashboard edits broadcast instantly, and scheduled report status updates push live without polling. Foundation for team-based workflows.
+#### ✅ Sprint 91 — WebSocket Real-time Collaboration
+`ConnectionManager` singleton with per-room async presence tracking (connect/disconnect/broadcast). WebSocket endpoint `GET /ws/{room}?token=<jwt|api_key>` — supports both JWT and `ukip_` API keys via query param. Relay message types: `entity.editing`, `entity.saved`, `dashboard.updated`. Presence protocol: `presence.list`, `presence.join`, `presence.leave`. Ping/pong heartbeat (30s). Frontend: `useWebSocket` hook with exponential back-off reconnect (max 8 retries, 16s cap). `PresenceAvatars` component — colored avatar circles with initials, overflow `+N` badge, pulsing live dot. Entity Detail and Dashboards pages both broadcast real-time signals.
 
-#### Sprint 92 — Workflow Automation Engine
-Visual no-code workflow builder: trigger → condition → action chains. Triggers: scheduled time, entity imported, quality score drops below threshold, alert fired. Actions: run harmonization, send report, call webhook, notify Slack, enrich domain. Replaces one-off scripts with reusable, audited automations.
+#### ✅ Sprint 92 — Workflow Automation Engine
+No-code trigger → condition → action pipeline. `Workflow` + `WorkflowRun` models with Alembic migration. `backend/workflow_engine.py`: `fire_trigger()`, `run_workflow()`, condition evaluator, 4 action dispatchers. **Triggers**: `entity.created`, `entity.enriched`, `entity.flagged`, `manual`. **Conditions**: `field_equals`, `field_contains`, `field_empty`, `enrichment_status_is`. **Actions**: `send_webhook`, `tag_entity`, `send_alert`, `log_only`. Frontend: visual builder with trigger selector, dynamic condition rows, action rows with inline config. Run history panel, manual run dialog, active/inactive toggle. 9-endpoint CRUD router (admin+).
 
-#### Sprint 93 — Embedding & Widget SDK
-A JavaScript SDK (`ukip-embed.js`) that lets external apps embed UKIP widgets (entity search, quality badge, concept cloud, OLAP mini-chart) as iframes or web components. API Key authentication. Configurable theme. Powers partner integrations and drives viral distribution across the developer ecosystem.
+#### ✅ Sprint 93 — Embeddable Widget SDK
+`EmbedWidget` model with UUID `public_token`, `allowed_origins`, and `view_count` tracking. Three public (no-auth) embed endpoints: `GET /embed/{token}/config`, `GET /embed/{token}/data` (origin-validated), `GET /embed/{token}/snippet` (iframe + JS embed code). Four data providers: `entity_stats`, `top_concepts`, `recent_entities`, `quality_score`. Frontend `/widgets` management page: widget creator form, grid with token display, copy/embed actions, active toggle. `EmbedPanel` with tab-switched iframe/JS snippet + one-click copy. Standalone `/embed/[token]` public page (no auth, no sidebar) with 4 chart renderers.
 
-#### Sprint 94 — AI-Powered Entity Recommendations
-"You might also want to enrich…" suggestion engine. Uses semantic similarity (ChromaDB cosine distance) + gap scores to surface entities that are related to recently-enriched ones but still unenriched. Delivered as a daily digest notification and a persistent "Recommended" section in the entity catalog.
+#### ✅ Sprint 94 — PostgreSQL Hardening
+Full cross-database compatibility via dialect-aware Alembic migrations. Boolean `server_default` changed from integer literals `"1"`/`"0"` to `sa.text("true"/"false")` (PostgreSQL rejects integers for BOOLEAN DEFAULT). FTS5 virtual table replaced with dialect-conditional block: SQLite → FTS5 (unchanged), PostgreSQL → regular table + GIN index on `to_tsvector('english', ...)`. Sprints 90/92/93 migrations updated from `sqlite_master` checks to `sa.inspect(bind).has_table()` (cross-DB SQLAlchemy API). Search router detects dialect via `SQLALCHEMY_DATABASE_URL` prefix and routes to either FTS5 `MATCH` or `plainto_tsquery @@ to_tsvector`. `docker-compose.yml`: PostgreSQL 16-alpine service with healthcheck, env-var driven secrets, backend depends-on. `Dockerfile.backend`: python 3.13-slim, `alembic upgrade head` on container start.
 
-#### Sprint 95 — Collaborative Review Queues
-Structured review workflows for data quality tasks: assign an entity set to a user, set a deadline, track completion. Reviewers get a focused inbox of items awaiting their judgment (disambiguation clusters, authority candidates, gap remediations). Managers see a kanban-style board. Drives daily active usage.
+#### ✅ Sprint 95 — Onboarding Polish
+`GET /onboarding/status` auto-detects 5-step completion from existing DB tables — no new schema migration. Steps: upload entities, run enrichment, apply harmonization, create workflow, view analytics. `WelcomeModal.tsx`: 3-slide first-login carousel with gradient headers, slide-dot navigation, localStorage persistence (`ukip_welcomed_v1`). `OnboardingChecklist.tsx`: collapsible progress checklist with step icons, percent completion bar, strikethrough on done, localStorage dismiss. Home page `page.tsx`: integrates both components + empty-state hero (Import Data / Try Demo CTAs shown when entity count is 0).
 
-#### Sprint 96 — Data Marketplace & Sharing Hub
-Export curated entity sets as shareable, versioned datasets. Generate a public or password-protected permalink (`/share/<token>`) with read-only access. Recipients can import the dataset into their own UKIP instance with one click. Enables knowledge transfer between organizations and creates network effects.
+#### ✅ Sprint 96 — Unified Design System (State Components)
+Three new base UI components consumed everywhere: **`Skeleton`** (9 variants — `SkeletonText`, `SkeletonRow`, `SkeletonTableBody`, `SkeletonCard`, `SkeletonCardGrid`, `SkeletonList`, `SkeletonStat`, `SkeletonParagraph`, `SkeletonAvatar` — all `animate-pulse`, light + dark). **`EmptyState`** (10 icon presets, 3 sizes page/card/compact, 6 color schemes, CTA buttons/links). **`ErrorBanner`** (3 variants inline/card/row, optional retry callback, `role="alert"`). All exported from `frontend/app/components/ui/index.ts`. Applied immediately: `EntityTable` → `SkeletonTableBody` + `ErrorBanner`; topic modeling page → `SkeletonList`; classifications page → `SkeletonCardGrid` + `ErrorBanner`; integrations page → toast on all catch blocks. 32 `console.error`/`console.warn` calls removed from 9 files.
 
-#### Sprint 97 — Compliance & Data Governance Module
-GDPR/CCPA compliance tools: data subject access request (DSAR) report generator, right-to-erasure workflow, retention policy engine (auto-delete entities older than N days from specified domains), and a compliance dashboard. Required for regulated industries (healthcare, finance, research institutions).
+#### ✅ Sprint 97 — Accessibility + Mobile
+`useFocusTrap<T>` custom hook — traps Tab/Shift-Tab inside active dialogs, restores focus to previous element on close. All slide-overs: `role="dialog"`, `aria-modal="true"`, `aria-labelledby` referencing the panel `<h2>`. All form labels: `htmlFor`/`id` explicit association. All icon-only buttons: descriptive `aria-label`. All decorative SVGs: `aria-hidden="true"`. RAG chat: `role="log"`, `aria-live="polite"` on message list; `sr-only` label on input. Mobile responsive: `grid-cols-1 md:grid-cols-3` on domain cards, `h-[calc(100vh-160px)] sm:h-[calc(100vh-200px)]` on chat, `max-w-[90%] sm:max-w-[75%]` on message bubbles, `p-3 sm:p-6` on OLAP page. Covered: Sidebar, Header, RAGChatInterface, domains, settings/users, analytics/olap.
 
-#### Sprint 98 — Fine-Tuning & Domain-Specific LLMs
-Allow admins to export their enriched, harmonized entity dataset as a fine-tuning corpus (JSONL format compatible with OpenAI and Hugging Face). Track fine-tuning jobs. Swap the active RAG provider to a domain-tuned local model. Transforms UKIP from an AI consumer into an AI producer — the ultimate lock-in for domain experts.
+#### ✅ Sprint 98 — Design System Consistency
+Completed the design system rollout across all high-traffic pages. Executive Dashboard: local `Skeleton` function eliminated, replaced with `SkeletonCard` from the UI library; inline red error div replaced with `ErrorBanner` (with retry). Import/Export: upload error inline div → `ErrorBanner`; upload spinner → `aria-hidden`. Audit Log: `useToast` imported; silent export `catch {}` → `toast("Export failed")`; inline error text → `ErrorBanner`. Harmonization: inline SVG+text empty state → `EmptyState icon="document"`. Notifications: inline empty state → `EmptyState icon="bell"` with clear-filter CTA. Decorative SVG `aria-hidden` sweep across dashboard action buttons.
 
 ---
 
@@ -783,9 +791,10 @@ Allow admins to export their enriched, harmonized entity dataset as a fine-tunin
 
 | Horizon | Theme | Description |
 |---------|-------|-------------|
-| **Now** ✅ (Sprints 83–90) | OpenRefine Parity + Enrichment | Performance, multi-tenancy, Alembic migrations, dynamic faceting, clustering algorithms, column transforms, web scraping |
-| **Near** (Sprints 91–95) | Ecosystem & Collaboration | Real-time WebSocket collab, workflow automation, widget SDK, AI recommendations, collaborative review queues |
-| **Far** (Sprints 96–98) | Intelligence Network | Data marketplace & sharing hub, compliance & governance, domain-specific fine-tuned LLMs |
+| ✅ Sprints 1–82 | Foundation | Security, enrichment, analytics, RAG, dashboards, alerts, public API ecosystem |
+| ✅ Sprints 83–90 | OpenRefine Parity + Enrichment | Performance, multi-tenancy, Alembic, faceting, clustering, column transforms, web scraping |
+| ✅ Sprints 91–95 | Ecosystem & Collaboration | WebSocket presence, workflow automation, widget SDK, PostgreSQL hardening, onboarding |
+| ✅ Sprints 96–98 | UX Polish & Accessibility | Unified design system, WCAG-compliant ARIA, mobile responsive, consistency across all pages |
 
 *See [EVOLUTION_STRATEGY.md](docs/EVOLUTION_STRATEGY.md) for the full phase-by-phase platform vision.*
 
