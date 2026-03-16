@@ -31,8 +31,9 @@ jobs:
         env:
           ADMIN_USERNAME: testadmin
           ADMIN_PASSWORD: testpassword123
-          JWT_SECRET_KEY: test-jwt-secret-key-for-ci-only
-          ENCRYPTION_KEY: ""
+          JWT_SECRET_KEY: test-jwt-secret-key-for-ci-only-not-production
+          # Valid Fernet key (32 random bytes, base64) — CI only, never used in prod
+          ENCRYPTION_KEY: "vRHc0zVcTXbRfUBZEsKNal2lMCfINwDh90EXE8vu2Ew="
           DATABASE_URL: sqlite:///./test_ci.db
           ALLOWED_ORIGINS: "http://localhost:3004"
         run: |
