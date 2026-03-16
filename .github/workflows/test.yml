@@ -43,6 +43,7 @@ jobs:
             --cov=backend \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
+            --cov-fail-under=75 \
             -q
 
       - name: Upload coverage report

@@ -44,8 +44,8 @@ class EntityRelationship(Base):
     __tablename__ = "entity_relationships"
 
     id          = Column(Integer, primary_key=True, index=True)
-    source_id   = Column(Integer, index=True)   # FK to raw_entities.id
-    target_id   = Column(Integer, index=True)   # FK to raw_entities.id
+    source_id   = Column(Integer, ForeignKey("raw_entities.id"), index=True)
+    target_id   = Column(Integer, ForeignKey("raw_entities.id"), index=True)
     relation_type = Column(String, index=True)  # cites | authored-by | belongs-to | related-to
     weight      = Column(Float, default=1.0)
     notes       = Column(Text, nullable=True)
@@ -78,8 +78,8 @@ class HarmonizationChangeRecord(Base):
     __tablename__ = "harmonization_change_records"
 
     id = Column(Integer, primary_key=True, index=True)
-    log_id = Column(Integer, index=True)
-    record_id = Column(Integer, index=True)
+    log_id = Column(Integer, ForeignKey("harmonization_logs.id"), index=True)
+    record_id = Column(Integer, ForeignKey("raw_entities.id"), index=True)
     field = Column(String)
     old_value = Column(Text, nullable=True)
     new_value = Column(Text, nullable=True)

@@ -134,7 +134,7 @@ UKIP (Universal Knowledge Intelligence Platform) es una plataforma agnosótica d
 La aplicación está diseñada como un **monorepo** con dos módulos claramente separados:
 
 ```
-DBDesambiguador/
+ukip/
 ├── backend/          ← API REST (Python / FastAPI)
 │   ├── adapters/     ← Patrón Adapter para tiendas
 │   ├── main.py       ← Endpoints centralizados
@@ -612,7 +612,7 @@ class RemoteProduct:
 ### 7.2 — Monorepo Structure
 
 ```
-DBDesambiguador/
+ukip/
 ├── backend/       ← Módulo Python independiente
 ├── frontend/      ← Módulo Node.js independiente  
 ├── docs/          ← Documentación compartida

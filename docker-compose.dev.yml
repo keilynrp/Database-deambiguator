@@ -1,0 +1,55 @@
+version: "3.9"
+
+# ── UKIP — Development docker-compose ───────────────────────────────────────
+# Development-focused compose file utilizing SQLite instead of PostgreSQL.
+#
+# Quick start:
+#   docker compose -f docker-compose.dev.yml up -d
+#   docker compose logs -f ukip-backend
+
+services:
+  ukip-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL:       sqlite:///./ukip_dev.db
+      ADMIN_USERNAME:     admin
+      ADMIN_PASSWORD:     adminpassword123
+      JWT_SECRET_KEY:     dev_secret_jwt_key
+      ENCRYPTION_KEY:     "vRHc0zVcTXbRfUBZEsKNal2lMCfINwDh90EXE8vu2Ew="
+      ALLOWED_ORIGINS:    "http://localhost:3004"
+      SESSION_SECRET_KEY: dev_session_secret
+      LOG_LEVEL:          DEBUG
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend
+      - static_files:/app/static
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  ukip-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    restart: unless-stopped
+    depends_on:
+      - ukip-backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3004:3004"
+    volumes:
+      - ./frontend/app:/app/app
+      - ./frontend/components:/app/components
+
+volumes:
+  static_files:

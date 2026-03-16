@@ -98,4 +98,3 @@ jobs:
       - name: TypeScript check
         working-directory: frontend
         run: npx tsc --noEmit
-        continue-on-error: true

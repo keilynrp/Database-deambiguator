@@ -5,8 +5,10 @@ import Link from "next/link";
 import MonteCarloChart from "./MonteCarloChart";
 import { useDomain } from "../contexts/DomainContext";
 import { apiFetch } from "@/lib/api";
-import { Badge, useToast, SkeletonTableBody, ErrorBanner } from "./ui";
+import { Badge, useToast, SkeletonTableBody, ErrorBanner, QualityBadge } from "./ui";
 import FacetPanel, { ActiveFacets } from "./FacetPanel";
+import EntityTablePagination from "./EntityTablePagination";
+import EntityTableBulkActions from "./EntityTableBulkActions";
 
 interface Entity {
     id: number;
@@ -22,20 +24,6 @@ interface Entity {
     attributes_json: string | null;
     normalized_json: string | null;
     quality_score: number | null;
-}
-
-function QualityBadge({ score }: { score: number | null }) {
-    if (score === null || score === undefined) return <span className="text-xs text-gray-400">—</span>;
-    const pct = Math.round(score * 100);
-    const color = score >= 0.7 ? "bg-emerald-500" : score >= 0.3 ? "bg-amber-400" : "bg-red-500";
-    return (
-        <div className="flex items-center gap-1.5">
-            <div className="w-16 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700">
-                <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} />
-            </div>
-            <span className="text-xs tabular-nums text-gray-600 dark:text-gray-400">{pct}%</span>
-        </div>
-    );
 }
 
 type EditableFields = Pick<Entity, "primary_label" | "secondary_label" | "canonical_id" | "entity_type" | "domain" | "validation_status">;
@@ -688,122 +676,26 @@ export default function EntityTable() {
                 )}
 
                 {/* Pagination */}
-                <div className="flex items-center justify-between border-t border-gray-200 px-5 py-3.5 dark:border-gray-800">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-500 dark:text-gray-400">Rows per page:</span>
-                        <select
-                            value={limit}
-                            onChange={(e) => {
-                                setLimit(Number(e.target.value));
-                                setPage(0);
-                            }}
-                            className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                        >
-                            <option value={10}>10</option>
-                            <option value={20}>20</option>
-                            <option value={50}>50</option>
-                            <option value={100}>100</option>
-                            <option value={200}>200</option>
-                        </select>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        <button
-                            onClick={() => setPage(p => Math.max(0, p - 1))}
-                            disabled={page === 0 || loading}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-                        >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                            Previous
-                        </button>
-                        <div className="flex items-center gap-2">
-                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-medium text-white">
-                                {page + 1}
-                            </span>
-                        </div>
-                        <button
-                            onClick={() => setPage(p => p + 1)}
-                            disabled={entities.length < limit || loading}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-                        >
-                            Next
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
+                <EntityTablePagination
+                    totalEntitiesVisible={entities.length}
+                    limit={limit}
+                    page={page}
+                    loading={loading}
+                    onLimitChange={setLimit}
+                    onPageChange={setPage}
+                />
             </div>
 
             {/* Floating Bulk Action Bar */}
-            {selectedIds.size > 0 && (
-                <div className="toast-enter fixed bottom-6 left-1/2 z-[150] -translate-x-1/2">
-                    <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-3 shadow-xl dark:border-gray-700 dark:bg-gray-900">
-                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
-                            {selectedIds.size}
-                        </span>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 pr-1">
-                            {selectedIds.size === 1 ? "entity" : "entities"} selected
-                        </span>
-                        <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
-                        <button
-                            onClick={handleBulkEnrich}
-                            disabled={bulkEnriching}
-                            className="flex items-center gap-1.5 rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 transition-colors hover:bg-purple-100 disabled:opacity-60 dark:bg-purple-500/10 dark:text-purple-400 dark:hover:bg-purple-500/20"
-                        >
-                            {bulkEnriching ? (
-                                <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
-                            ) : (
-                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                                </svg>
-                            )}
-                            Enrich
-                        </button>
-                        <button
-                            onClick={handleBulkExport}
-                            className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100 dark:bg-green-500/10 dark:text-green-400 dark:hover:bg-green-500/20"
-                        >
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                            </svg>
-                            Export CSV
-                        </button>
-                        <button
-                            onClick={handleBulkDelete}
-                            disabled={bulkDeleting}
-                            className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-60 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
-                        >
-                            {bulkDeleting ? (
-                                <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
-                            ) : (
-                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                                </svg>
-                            )}
-                            Delete
-                        </button>
-                        <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
-                        <button
-                            onClick={() => setSelectedIds(new Set())}
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
-                            title="Clear selection"
-                        >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            )}
+            <EntityTableBulkActions
+                selectedCount={selectedIds.size}
+                bulkEnriching={bulkEnriching}
+                bulkDeleting={bulkDeleting}
+                onBulkEnrich={handleBulkEnrich}
+                onBulkExport={handleBulkExport}
+                onBulkDelete={handleBulkDelete}
+                onClearSelection={() => setSelectedIds(new Set())}
+            />
         </div>
             </div>
         </div>

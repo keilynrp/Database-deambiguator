@@ -15,7 +15,7 @@ class OpenAlexAdapter(BaseScientometricAdapter):
     
     BASE_URL = "https://api.openalex.org/works"
 
-    def __init__(self, polite_email: Optional[str] = "research@dbdesambiguador.com"):
+    def __init__(self, polite_email: Optional[str] = "research@ukip.dev"):
         self.client = httpx.Client(timeout=10.0)
         self.polite_email = polite_email
 

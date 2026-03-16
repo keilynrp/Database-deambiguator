@@ -42,7 +42,7 @@ The frontend runs at `http://localhost:3004` and the backend at `http://localhos
 ## Project Structure
 
 ```
-DBDesambiguador/
+ukip/
 ├── backend/          # FastAPI application
 │   ├── main.py       # API routes and business logic
 │   ├── models.py     # SQLAlchemy ORM models

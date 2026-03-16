@@ -25,7 +25,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self'",
-              "connect-src 'self' http://localhost:8000 https:",
+              `connect-src 'self' ${BACKEND_URL} ${BACKEND_URL.replace(/^http/, "ws")}`,
               "frame-ancestors 'none'",
             ].join("; "),
           },

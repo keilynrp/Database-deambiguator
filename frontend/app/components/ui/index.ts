@@ -6,6 +6,7 @@ export { default as DataTable } from "./DataTable";
 export { ToastProvider, useToast } from "./Toast";
 export { default as EmptyState } from "./EmptyState";
 export { default as ErrorBanner } from "./ErrorBanner";
+export { default as QualityBadge } from "./QualityBadge";
 export {
   SkeletonText,
   SkeletonAvatar,
