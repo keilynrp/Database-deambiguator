@@ -131,7 +131,7 @@ export default function RAGChatInterface() {
     };
 
     return (
-        <div className="flex h-[calc(100vh-200px)] flex-col rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
+        <div className="flex h-[calc(100vh-160px)] sm:h-[calc(100vh-200px)] flex-col rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 dark:border-gray-800">
                 <div className="flex items-center gap-2.5">
@@ -164,7 +164,7 @@ export default function RAGChatInterface() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-5 space-y-4" role="log" aria-label="Conversation" aria-live="polite">
                 {messages.map((msg, i) => (
                     <div key={i} className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
                         {msg.role !== "user" && (
@@ -172,7 +172,7 @@ export default function RAGChatInterface() {
                                 {msg.role === "system" ? "🧠" : "✨"}
                             </div>
                         )}
-                        <div className={`max-w-[75%] space-y-2 ${msg.role === "user" ? "items-end" : ""}`}>
+                        <div className={`max-w-[90%] sm:max-w-[75%] space-y-2 ${msg.role === "user" ? "items-end" : ""}`}>
                             <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === "user"
                                 ? "bg-indigo-600 text-white"
                                 : msg.role === "system"
@@ -287,26 +287,29 @@ export default function RAGChatInterface() {
                     )}
                 </div>
                 <form onSubmit={handleSend} className="flex gap-2">
+                    <label htmlFor="rag-input" className="sr-only">Ask a question about your knowledge hub</label>
                     <input
+                        id="rag-input"
                         type="text"
                         value={input}
                         onChange={e => setInput(e.target.value)}
                         disabled={isQuerying}
-                        placeholder="Ask something about your hub... e.g. 'Synthesize key attributes of Entities in the Deep Learning domain'"
+                        placeholder="Ask something about your hub..."
                         className="h-11 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm outline-none transition-colors focus:border-indigo-400 focus:bg-white focus:ring-1 focus:ring-indigo-400 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:bg-gray-800"
                     />
                     <button
                         type="submit"
                         disabled={isQuerying || !input.trim()}
+                        aria-label={isQuerying ? "Sending…" : "Send message"}
                         className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-white transition-colors hover:bg-indigo-700 disabled:opacity-40"
                     >
                         {isQuerying ? (
-                            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <svg className="h-4 w-4 animate-spin" aria-hidden="true" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                             </svg>
                         ) : (
-                            <svg className="h-4 w-4 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="h-4 w-4 rotate-90" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                             </svg>
                         )}

@@ -6,6 +6,7 @@ import { useToast } from "../../components/ui";
 import { apiFetch } from "../../../lib/api";
 import UserAvatar from "../../components/UserAvatar";
 import PasswordStrength from "../../components/PasswordStrength";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ function UserFormSlider({ initial, onClose, onSaved, toast }: UserFormProps) {
     role:     (initial?.role ?? "viewer") as UserRole,
   });
   const [saving, setSaving] = useState(false);
+  const trapRef = useFocusTrap<HTMLDivElement>(true);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -128,15 +130,21 @@ function UserFormSlider({ initial, onClose, onSaved, toast }: UserFormProps) {
   return (
     /* Backdrop */
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl dark:bg-gray-900">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} aria-hidden="true" />
+      <div
+        ref={trapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-form-title"
+        className="relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl dark:bg-gray-900"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-800">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+          <h2 id="user-form-title" className="text-base font-semibold text-gray-900 dark:text-white">
             {isEdit ? `Edit "${initial?.username}"` : "New User"}
           </h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+            <svg className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -147,10 +155,11 @@ function UserFormSlider({ initial, onClose, onSaved, toast }: UserFormProps) {
           <div className="space-y-4 flex-1">
             {!isEdit && (
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Username <span className="text-red-500">*</span>
+                <label htmlFor="user-username" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Username <span className="text-red-500" aria-label="required">*</span>
                 </label>
                 <input
+                  id="user-username"
                   className={inputCls}
                   value={form.username}
                   onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
@@ -159,13 +168,15 @@ function UserFormSlider({ initial, onClose, onSaved, toast }: UserFormProps) {
                   maxLength={50}
                   placeholder="johndoe"
                   autoComplete="username"
+                  autoFocus
                 />
               </div>
             )}
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
+              <label htmlFor="user-email" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
               <input
+                id="user-email"
                 type="email"
                 className={inputCls}
                 value={form.email ?? ""}
@@ -176,11 +187,12 @@ function UserFormSlider({ initial, onClose, onSaved, toast }: UserFormProps) {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="user-password" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 {isEdit ? "New password" : "Password"}{" "}
                 <span className="font-normal text-gray-400">{isEdit ? "(leave blank to keep)" : "*"}</span>
               </label>
               <input
+                id="user-password"
                 type="password"
                 className={inputCls}
                 value={form.password}
@@ -193,10 +205,11 @@ function UserFormSlider({ initial, onClose, onSaved, toast }: UserFormProps) {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Role <span className="text-red-500">*</span>
+              <label htmlFor="user-role" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Role <span className="text-red-500" aria-label="required">*</span>
               </label>
               <select
+                id="user-role"
                 className={inputCls}
                 value={form.role}
                 onChange={e => setForm(f => ({ ...f, role: e.target.value as UserRole }))}
@@ -234,7 +247,7 @@ function UserFormSlider({ initial, onClose, onSaved, toast }: UserFormProps) {
               className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
             >
               {saving && (
-                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 animate-spin" aria-hidden="true" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
@@ -398,12 +411,13 @@ export default function UsersManagementPage() {
       <div className="flex flex-wrap items-center gap-2">
         {/* Search */}
         <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <svg className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
             className="h-9 w-full rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             placeholder="Search users…"
+            aria-label="Search users"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -411,6 +425,7 @@ export default function UsersManagementPage() {
 
         {/* Role filter */}
         <select
+          aria-label="Filter by role"
           className="h-9 rounded-lg border border-gray-200 bg-white px-2.5 text-sm text-gray-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
           value={roleFilter}
           onChange={e => setRoleFilter(e.target.value as UserRole | "")}
@@ -424,6 +439,7 @@ export default function UsersManagementPage() {
 
         {/* Status filter */}
         <select
+          aria-label="Filter by status"
           className="h-9 rounded-lg border border-gray-200 bg-white px-2.5 text-sm text-gray-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value as "active" | "inactive" | "")}
@@ -450,14 +466,15 @@ export default function UsersManagementPage() {
       <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <svg className="h-6 w-6 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
+            <svg className="h-6 w-6 animate-spin text-blue-600" aria-hidden="true" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
+            <span className="sr-only">Loading users…</span>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-            <svg className="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-10 w-10" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             <p className="mt-2 text-sm">No users match your filters</p>
@@ -509,6 +526,7 @@ export default function UsersManagementPage() {
                           value={u.role}
                           onChange={e => handleRoleChange(u.id, e.target.value as UserRole)}
                           disabled={busy || !u.is_active}
+                          aria-label={`Change role for ${u.username}`}
                           className="h-7 rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium text-gray-700 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
                         >
                           <option value="viewer">Viewer</option>
@@ -544,10 +562,10 @@ export default function UsersManagementPage() {
                           <button
                             onClick={() => setSlideOver({ mode: "edit", user: u })}
                             disabled={busy}
+                            aria-label={`Edit ${u.username}`}
                             className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-                            title="Edit user"
                           >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>
                           </button>
@@ -558,26 +576,24 @@ export default function UsersManagementPage() {
                           <button
                             onClick={() => handleToggleActive(u)}
                             disabled={busy}
+                            aria-label={u.is_active ? `Deactivate ${u.username}` : `Reactivate ${u.username}`}
                             className={`rounded-lg p-1.5 disabled:opacity-40 transition-colors ${
                               u.is_active
                                 ? "text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
                                 : "text-gray-400 hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-500/10 dark:hover:text-green-400"
                             }`}
-                            title={u.is_active ? "Deactivate user" : "Reactivate user"}
                           >
                             {busy ? (
-                              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <svg className="h-4 w-4 animate-spin" aria-hidden="true" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                               </svg>
                             ) : u.is_active ? (
-                              /* Ban icon */
-                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                               </svg>
                             ) : (
-                              /* Check-circle icon */
-                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
                             )}

@@ -152,6 +152,10 @@ function GlobalSearch() {
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}
           placeholder="Search… (Enter for full results)"
+          aria-label="Search entities, annotations and authority records"
+          aria-autocomplete="list"
+          aria-expanded={showDropdown}
+          role="combobox"
           className="h-8 w-52 rounded-lg border border-gray-200 bg-white pl-7 pr-3 text-xs text-gray-700 placeholder-gray-400 outline-none transition-all focus:w-72 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:focus:border-blue-500"
         />
       </div>
@@ -220,7 +224,7 @@ export default function Header() {
             className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:hidden"
             aria-label="Open navigation"
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
           </button>
@@ -246,8 +250,10 @@ export default function Header() {
               <div className="h-9 w-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800"></div>
             ) : (
               <select
+                id="workspace-select"
                 value={activeDomainId}
                 onChange={(e) => setActiveDomainId(e.target.value)}
+                aria-label="Active workspace domain"
                 className="h-9 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-50 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
               >
                 {domains.map((domain) => (
@@ -264,8 +270,8 @@ export default function Header() {
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           >
             {theme === "dark" ? (
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

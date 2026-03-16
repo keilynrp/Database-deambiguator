@@ -160,15 +160,15 @@ export default function OLAPExplorerPage() {
   const hasMore = result ? visibleCount < result.rows.length : false;
 
   return (
-    <div className="flex h-full flex-col gap-6 p-6">
+    <div className="flex h-full flex-col gap-6 p-3 sm:p-6">
       {/* Top bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link
             href="/analytics"
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
             Analytics
@@ -184,9 +184,10 @@ export default function OLAPExplorerPage() {
         <button
           onClick={handleExport}
           disabled={!result || exporting}
+          aria-label={exporting ? "Exporting to Excel…" : "Export results to Excel"}
           className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 disabled:opacity-40 transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
           </svg>
           {exporting ? "Exporting…" : "Export Excel"}
@@ -203,11 +204,12 @@ export default function OLAPExplorerPage() {
       <div className="flex flex-wrap items-end gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
         {/* Primary dimension */}
         <div className="flex flex-col gap-1 min-w-[160px]">
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Primary Dimension</label>
+          <label htmlFor="olap-primary-dim" className="text-xs font-medium text-gray-500 dark:text-gray-400">Primary Dimension</label>
           {loadingDims ? (
             <div className="h-9 w-40 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
           ) : (
             <select
+              id="olap-primary-dim"
               value={primaryDim}
               onChange={e => setPrimaryDim(e.target.value)}
               className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -223,13 +225,14 @@ export default function OLAPExplorerPage() {
 
         {/* Secondary dimension */}
         <div className="flex flex-col gap-1 min-w-[160px]">
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          <label htmlFor="olap-secondary-dim" className="text-xs font-medium text-gray-500 dark:text-gray-400">
             Second Dimension <span className="font-normal opacity-60">(optional)</span>
           </label>
           {loadingDims ? (
             <div className="h-9 w-40 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
           ) : (
             <select
+              id="olap-secondary-dim"
               value={secondaryDim}
               onChange={e => setSecondaryDim(e.target.value)}
               className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -251,6 +254,7 @@ export default function OLAPExplorerPage() {
             <select
               value={filterInput.field}
               onChange={e => setFilterInput(f => ({ ...f, field: e.target.value }))}
+              aria-label="Filter field"
               className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="">Field…</option>
@@ -261,11 +265,13 @@ export default function OLAPExplorerPage() {
               onChange={e => setFilterInput(f => ({ ...f, value: e.target.value }))}
               onKeyDown={e => { if (e.key === "Enter") addFilter(); }}
               placeholder="Value…"
+              aria-label="Filter value"
               className="w-28 rounded-lg border border-gray-200 px-2 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <button
               onClick={addFilter}
               disabled={!filterInput.field || !filterInput.value}
+              aria-label="Add filter"
               className="rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors"
             >
               +
@@ -280,9 +286,9 @@ export default function OLAPExplorerPage() {
           className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors self-end"
         >
           {querying ? (
-            <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Running…</>
+            <><svg className="w-4 h-4 animate-spin" aria-hidden="true" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Running…</>
           ) : (
-            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" /></svg> Run Query</>
+            <><svg className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" /></svg> Run Query</>
           )}
         </button>
       </div>
@@ -293,7 +299,7 @@ export default function OLAPExplorerPage() {
           {Object.entries(filters).map(([k, v]) => (
             <span key={k} className="flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
               {dimensions.find(d => d.name === k)?.label ?? k} = {v}
-              <button onClick={() => removeFilter(k)} className="text-blue-400 hover:text-blue-600 dark:hover:text-blue-200">×</button>
+              <button onClick={() => removeFilter(k)} aria-label={`Remove filter ${dimensions.find(d => d.name === k)?.label ?? k}`} className="text-blue-400 hover:text-blue-600 dark:hover:text-blue-200">×</button>
             </span>
           ))}
         </div>
@@ -373,8 +379,8 @@ export default function OLAPExplorerPage() {
                           setSecondaryDim("");
                           setVisibleCount(PAGE_SIZE);
                         }}
+                        aria-label={`Drill down into ${row.values[result.group_by[0]] ?? "this group"}`}
                         className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-blue-100 hover:text-blue-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 transition-colors"
-                        title={`Drill down into ${row.values[result.group_by[0]]}`}
                       >
                         ↳ Drill
                       </button>
@@ -417,7 +423,7 @@ export default function OLAPExplorerPage() {
       {/* Empty state */}
       {!result && !querying && (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-gray-400 dark:text-gray-600">
-          <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-16 h-16" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={0.75} d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605" />
           </svg>
           <div className="text-center">

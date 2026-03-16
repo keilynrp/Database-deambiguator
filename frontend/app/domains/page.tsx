@@ -5,6 +5,7 @@ import { PageHeader, Badge } from "../components/ui";
 import { useDomain, DomainSchema, DomainAttribute } from "../contexts/DomainContext";
 import { useAuth } from "../contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 const BUILTIN_IDS = new Set(["default", "science", "healthcare"]);
 
@@ -62,6 +63,8 @@ export default function DomainsPage() {
   const [formEntity, setFormEntity] = useState("");
   const [formIcon, setFormIcon] = useState("Database");
   const [formAttrs, setFormAttrs] = useState<NewAttr[]>([emptyAttr()]);
+
+  const slideOverRef = useFocusTrap<HTMLDivElement>(showForm);
 
   const selectedDomain = domains.find(d => d.id === selectedId) ?? null;
 
@@ -154,7 +157,7 @@ export default function DomainsPage() {
       )}
 
       {/* Main layout */}
-      <div className="grid grid-cols-3 gap-6 flex-1 min-h-0">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6 flex-1 min-h-0">
         {/* Domain list */}
         <div className="flex flex-col gap-3 overflow-y-auto">
           {domains.map(d => (
@@ -284,13 +287,19 @@ export default function DomainsPage() {
       {/* New Domain slide-over */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-start justify-end">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowForm(false)} />
-          <div className="relative z-10 flex h-full w-full max-w-xl flex-col bg-white shadow-2xl dark:bg-gray-950 overflow-y-auto">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowForm(false)} aria-hidden="true" />
+          <div
+            ref={slideOverRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-domain-title"
+            className="relative z-10 flex h-full w-full max-w-xl flex-col bg-white shadow-2xl dark:bg-gray-950 overflow-y-auto"
+          >
             {/* Form header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-800">
-              <h3 className="font-semibold text-gray-900 dark:text-white">New Domain Schema</h3>
-              <button onClick={() => setShowForm(false)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              <h3 id="new-domain-title" className="font-semibold text-gray-900 dark:text-white">New Domain Schema</h3>
+              <button onClick={() => setShowForm(false)} aria-label="Close" className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+                <svg className="w-5 h-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
@@ -298,8 +307,9 @@ export default function DomainsPage() {
               {/* Basic info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Domain ID <span className="text-red-500">*</span></label>
+                  <label htmlFor="domain-id" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Domain ID <span className="text-red-500" aria-label="required">*</span></label>
                   <input
+                    id="domain-id"
                     value={formId} onChange={e => setFormId(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
                     placeholder="e.g. humanities"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -307,8 +317,9 @@ export default function DomainsPage() {
                   <p className="mt-1 text-xs text-gray-400">Lowercase, no spaces</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Name <span className="text-red-500">*</span></label>
+                  <label htmlFor="domain-name" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Name <span className="text-red-500" aria-label="required">*</span></label>
                   <input
+                    id="domain-name"
                     value={formName} onChange={e => setFormName(e.target.value)}
                     placeholder="e.g. Humanities"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -317,8 +328,9 @@ export default function DomainsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Description <span className="text-red-500">*</span></label>
+                <label htmlFor="domain-desc" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Description <span className="text-red-500" aria-label="required">*</span></label>
                 <input
+                  id="domain-desc"
                   value={formDesc} onChange={e => setFormDesc(e.target.value)}
                   placeholder="Short description of this domain"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -327,16 +339,18 @@ export default function DomainsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Primary Entity <span className="text-red-500">*</span></label>
+                  <label htmlFor="domain-entity" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Primary Entity <span className="text-red-500" aria-label="required">*</span></label>
                   <input
+                    id="domain-entity"
                     value={formEntity} onChange={e => setFormEntity(e.target.value)}
                     placeholder="e.g. Manuscript"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Icon</label>
+                  <label htmlFor="domain-icon" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Icon</label>
                   <select
+                    id="domain-icon"
                     value={formIcon} onChange={e => setFormIcon(e.target.value)}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
@@ -348,13 +362,13 @@ export default function DomainsPage() {
               {/* Attributes */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Attributes <span className="text-red-500">*</span></label>
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Attributes <span className="text-red-500" aria-label="required">*</span></span>
                   <button
                     onClick={() => setFormAttrs(p => [...p, emptyAttr()])}
                     className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
                   >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    Add
+                    <svg className="w-3 h-3" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    Add attribute
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -363,29 +377,33 @@ export default function DomainsPage() {
                       <input
                         value={attr.name} onChange={e => updateAttr(i, "name", e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
                         placeholder="field_name"
+                        aria-label={`Attribute ${i + 1} field name`}
                         className="col-span-3 rounded-lg border border-gray-300 px-2 py-1.5 text-xs font-mono dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                       <input
                         value={attr.label} onChange={e => updateAttr(i, "label", e.target.value)}
                         placeholder="Label"
+                        aria-label={`Attribute ${i + 1} display label`}
                         className="col-span-4 rounded-lg border border-gray-300 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                       <select
                         value={attr.type} onChange={e => updateAttr(i, "type", e.target.value)}
+                        aria-label={`Attribute ${i + 1} type`}
                         className="col-span-2 rounded-lg border border-gray-300 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                       >
                         {["string","integer","float","boolean","array"].map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
-                      <label className="col-span-1 flex items-center justify-center gap-1 text-xs text-gray-500 cursor-pointer" title="Required">
+                      <label className="col-span-1 flex items-center justify-center gap-1 text-xs text-gray-500 cursor-pointer">
                         <input type="checkbox" checked={attr.required} onChange={e => updateAttr(i, "required", e.target.checked)} className="rounded" />
                         <span>Req</span>
                       </label>
                       <button
                         onClick={() => setFormAttrs(p => p.filter((_, idx) => idx !== i))}
                         disabled={formAttrs.length === 1}
+                        aria-label={`Delete attribute ${i + 1}`}
                         className="col-span-2 flex justify-center text-gray-400 hover:text-red-500 disabled:opacity-30 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        <svg className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
                     </div>
                   ))}
