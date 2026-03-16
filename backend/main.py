@@ -113,16 +113,31 @@ _BUILTIN_TEMPLATES = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ── Startup env-var guard ────────────────────────────────────────────────
+    # Required vars that must be set in production
+    _required_vars = [
+        "JWT_SECRET_KEY",
+        "ENCRYPTION_KEY",
+        "ADMIN_USERNAME",
+        "ADMIN_PASSWORD",
+    ]
+    for var in _required_vars:
+        if not os.environ.get(var):
+            logger.warning("⚠ %s is not set. Set it in .env before deploying to production.", var)
+
+    # Vars that must not keep their insecure defaults
     _insecure_defaults = {
-        "JWT_SECRET_KEY":   ("changeit", "dev_secret", "fallback"),
+        "JWT_SECRET_KEY":     ("changeit", "dev_secret", "fallback", "secret"),
         "SESSION_SECRET_KEY": ("changeit", "fallback_cookie_secret"),
+        "ADMIN_PASSWORD":     ("changeit", "admin", "password", "123456"),
     }
     for var, bad_values in _insecure_defaults.items():
         val = os.environ.get(var, "")
-        if not val:
-            logger.warning("⚠ %s is not set — using insecure default. Set it in .env for production.", var)
-        elif any(val.startswith(b) for b in bad_values):
+        if val and any(val.lower().startswith(b.lower()) for b in bad_values):
             logger.warning("⚠ %s looks like a placeholder value. Replace it before going to production.", var)
+
+    # Warn if CORS is still open to all origins
+    if os.environ.get("ALLOWED_ORIGINS", "").strip() == "*":
+        logger.warning("⚠ ALLOWED_ORIGINS=* allows all origins. Restrict this in production.")
 
     # Startup
     with database.SessionLocal() as db:

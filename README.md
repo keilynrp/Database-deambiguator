@@ -24,7 +24,7 @@ A domain-agnostic intelligence platform that ingests raw data, harmonizes it, en
 
 ## Why UKIP?
 
-Most data platforms force you to choose: clean your data **or** analyze it. UKIP does both in a single pipeline. It started as a catalog deduplication tool and evolved into a full research intelligence engine across **99 development sprints**.
+Most data platforms force you to choose: clean your data **or** analyze it. UKIP does both in a single pipeline. It started as a catalog deduplication tool and evolved into a full research intelligence engine across **101 development sprints**.
 
 **What it does:**
 
@@ -787,7 +787,13 @@ Completed the design system rollout across all high-traffic pages. Executive Das
 
 ---
 #### ✅ Sprint 99 — Production Infrastructure
-Containerization and CI/CD hardening for production deployment. `frontend/Dockerfile`: multi-stage Node 20 build (deps→builder→runner), non-root `nextjs` user, `output: "standalone"`, port 3004. Three GitHub Actions workflows: `test.yml` (pytest matrix Python 3.11+3.12, coverage XML artifact), `lint.yml` (ruff backend, ESLint+tsc frontend), `docker.yml` (buildx validation for both images with GHA cache). `next.config.ts`: full security header suite (CSP, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy), `poweredByHeader: false`, `compress: true`. Backend `SecurityHeadersMiddleware` mirrors headers on all API responses. Env-var insecure-default warnings in lifespan (JWT_SECRET_KEY, SESSION_SECRET_KEY). Rate limiting via SlowAPI on 10 additional critical endpoints: `/upload`, `/enrich/row`, `/enrich/bulk`, `/stores/{id}/test`, `/stores/{id}/pull`, `/harmonization/apply-all`, `/authority/resolve`, `/disambiguate/ai-resolve`, `/nlq/query`, `/rag/query`. 1330 tests passing.
+Containerization and CI/CD hardening for production deployment.
+
+#### ✅ Sprint 100 — Frontend Testing Foundation
+Vitest + React Testing Library setup with 52 tests across 6 suites. `vitest.config.ts`: jsdom environment, `@vitejs/plugin-react`, `@/*` path alias, v8 coverage. `vitest.setup.tsx`: jest-dom matchers, `next/link`/`next/navigation` mocks. Test suites: `ui.EmptyState` (9 tests — title, description, link/button CTAs, size classes, preset icons), `ui.ErrorBanner` (7 — role=alert, retry callback across all 3 variants), `ui.Skeleton` (11 — aria-hidden on every primitive, correct row/cell/card counts), `AuthContext` (6 — login/logout flow, localStorage hydration, bad credentials), `RAGChatInterface` (7 — role=log, labeled input, query→response, error fallback), `EntityTable` (8 — skeleton/error/data/search/empty states). CI: `frontend-test` job added to `lint.yml`. `package.json`: `test`, `test:watch`, `test:coverage` scripts.
+
+#### ✅ Sprint 101 — Final Polish
+Error boundaries: root `app/error.tsx` (full-page centred error card with Try again + Go home), shared `RouteError` component, plus route-level `error.tsx` for 5 high-traffic routes (entities, analytics, rag, settings, import-export). Env-var validation extended in lifespan: required-var check for `JWT_SECRET_KEY`, `ENCRYPTION_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`; insecure-default check adds `ADMIN_PASSWORD` with common weak values; `ALLOWED_ORIGINS=*` wildcard warning. `API.md` regenerated from live OpenAPI schema — 248 endpoints across 35 tags, grouped by tag with auth indicator, params, response codes, and a rate-limits table. `poweredByHeader: false` + `compress: true` already active from Sprint 99. `frontend/Dockerfile`: multi-stage Node 20 build (deps→builder→runner), non-root `nextjs` user, `output: "standalone"`, port 3004. Three GitHub Actions workflows: `test.yml` (pytest matrix Python 3.11+3.12, coverage XML artifact), `lint.yml` (ruff backend, ESLint+tsc frontend), `docker.yml` (buildx validation for both images with GHA cache). `next.config.ts`: full security header suite (CSP, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy), `poweredByHeader: false`, `compress: true`. Backend `SecurityHeadersMiddleware` mirrors headers on all API responses. Env-var insecure-default warnings in lifespan (JWT_SECRET_KEY, SESSION_SECRET_KEY). Rate limiting via SlowAPI on 10 additional critical endpoints: `/upload`, `/enrich/row`, `/enrich/bulk`, `/stores/{id}/test`, `/stores/{id}/pull`, `/harmonization/apply-all`, `/authority/resolve`, `/disambiguate/ai-resolve`, `/nlq/query`, `/rag/query`. 1330 tests passing.
 
 
 
