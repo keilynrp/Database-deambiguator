@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { apiFetch } from "../../lib/api";
+import { EmptyState } from "../components/ui";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -250,28 +251,20 @@ export default function NotificationsPage() {
       {/* ── List ──────────────────────────────────────────────────────────── */}
       {loading && items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-          <svg className="mb-3 h-8 w-8 animate-spin" fill="none" viewBox="0 0 24 24">
+          <svg className="mb-3 h-8 w-8 animate-spin" aria-hidden="true" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
           <p className="text-sm">Loading notifications…</p>
         </div>
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 py-20 dark:border-gray-700">
-          <svg className="h-10 w-10 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-          </svg>
-          <p className="mt-3 text-sm font-medium text-gray-400 dark:text-gray-500">No notifications</p>
-          {action && (
-            <button
-              onClick={() => setAction("")}
-              className="mt-2 text-xs text-blue-600 hover:underline dark:text-blue-400"
-            >
-              Clear filter
-            </button>
-          )}
-        </div>
+        <EmptyState
+          icon="bell"
+          title="No notifications"
+          description="You're all caught up!"
+          size="page"
+          cta={action ? [{ label: "Clear filter", onClick: () => setAction("") }] : undefined}
+        />
       ) : (
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">

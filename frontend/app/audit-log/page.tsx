@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
+import { ErrorBanner, useToast } from "../components/ui";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -72,6 +73,7 @@ function fmtDate(iso: string | null) {
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function AuditLogPage() {
+  const { toast } = useToast();
   // ── Filter state
   const [filterAction,   setFilterAction]   = useState("");
   const [filterResource, setFilterResource] = useState("");
@@ -171,7 +173,7 @@ export default function AuditLogPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      // silent
+      toast("Export failed", "error");
     }
   }
 
@@ -370,7 +372,9 @@ export default function AuditLogPage() {
 
         {/* Error */}
         {error && (
-          <div className="px-4 py-4 text-sm text-red-600 dark:text-red-400">{error}</div>
+          <div className="p-4">
+            <ErrorBanner message={error} variant="inline" />
+          </div>
         )}
 
         {/* Loading skeleton */}

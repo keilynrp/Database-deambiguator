@@ -11,7 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { PageHeader, StatCard } from "../../components/ui";
+import { PageHeader, StatCard, ErrorBanner, SkeletonCard } from "../../components/ui";
 import ConceptCloud from "../../components/ConceptCloud";
 import { useDomain } from "../../contexts/DomainContext";
 import { apiFetch } from "@/lib/api";
@@ -83,14 +83,6 @@ function SourceBadge({ source }: { source: string | null }) {
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
       {source}
     </span>
-  );
-}
-
-// ── Loading skeleton ──────────────────────────────────────────────────────────
-
-function Skeleton({ className = "" }: { className?: string }) {
-  return (
-    <div className={`animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800 ${className}`} />
   );
 }
 
@@ -191,7 +183,7 @@ export default function ExecutiveDashboardPage() {
                   : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               }`}
             >
-              <svg className={`h-3.5 w-3.5 ${autoRefresh ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`h-3.5 w-3.5 ${autoRefresh ? "animate-spin" : ""}`} aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
               </svg>
               <span className="tabular-nums">{autoRefresh ? `${mm}:${ss}` : "Auto"}</span>
@@ -202,7 +194,7 @@ export default function ExecutiveDashboardPage() {
               onClick={fetchDashboard}
               className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
               </svg>
               Refresh
@@ -215,12 +207,12 @@ export default function ExecutiveDashboardPage() {
               className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-violet-700 disabled:opacity-50"
             >
               {exporting ? (
-                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 animate-spin" aria-hidden="true" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                 </svg>
               ) : (
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                 </svg>
               )}
@@ -230,16 +222,12 @@ export default function ExecutiveDashboardPage() {
         }
       />
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400">
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner message={error} onRetry={fetchDashboard} variant="card" />}
 
       {/* ── Section 1: Hero KPIs ── */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         {loading ? (
-          Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28" />)
+          Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} lines={2} />)
         ) : data ? (
           <>
             <StatCard
@@ -332,7 +320,7 @@ export default function ExecutiveDashboardPage() {
           Entity creation by year — extracted from <code>creation_date</code>
         </p>
         {loading ? (
-          <Skeleton className="h-52" />
+          <SkeletonCard lines={4} />
         ) : !data || data.entities_by_year.length === 0 ? (
           <div className="flex h-52 items-center justify-center text-sm text-gray-400">
             No date data available — upload entities with a <code>creation_date</code> field.
@@ -375,7 +363,7 @@ export default function ExecutiveDashboardPage() {
           Entity count per label × year — darker violet = higher volume
         </p>
         {loading ? (
-          <Skeleton className="h-40" />
+          <SkeletonCard lines={3} />
         ) : !data || data.brand_year_matrix.brands.length === 0 ? (
           <div className="flex h-40 items-center justify-center text-sm text-gray-400">
             No brand data available.
@@ -436,7 +424,7 @@ export default function ExecutiveDashboardPage() {
           )}
         </div>
         {loading ? (
-          <Skeleton className="h-32" />
+          <SkeletonCard lines={2} />
         ) : (
           <ConceptCloud concepts={data?.top_concepts ?? []} maxItems={40} />
         )}
@@ -461,7 +449,7 @@ export default function ExecutiveDashboardPage() {
           </Link>
         </div>
         {loading ? (
-          <Skeleton className="h-48" />
+          <SkeletonCard lines={4} />
         ) : !data || data.top_entities.length === 0 ? (
           <div className="flex h-32 items-center justify-center text-sm text-gray-400">
             No enriched entities yet. Run enrichment to populate this table.
