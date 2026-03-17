@@ -1,0 +1,39 @@
+# Traceability Matrix
+
+Matriz viva para conectar estrategia, ejecucion y evidencia.
+
+## Como usarla
+
+Cada fila debe poder seguir este hilo:
+
+`Vision -> Epic -> Historia -> Sprint -> Evidencia tecnica -> Evidencia funcional`
+
+## Matriz inicial
+
+| Vision / Objetivo | Epic | Historia | Sprint | Evidencia tecnica | Evidencia funcional | Estado |
+|---|---|---|---|---|---|---|
+| Plataforma agnostica de dominio | EPIC-001 | US-001 | SPRINT-102 | `backend/models.py`, `backend/domains/`, `docs/product/epics/EPIC-001-universal-data-engine.md` | Catalogo universal, domains registry | Done |
+| Ingesta confiable de datos | EPIC-002 | US-009 | SPRINT-102 | `backend/routers/ingest.py`, `frontend/app/import/`, `docs/product/epics/EPIC-002-ingestion-and-mapping.md` | Import wizard, preview, mapping | Done |
+| Calidad y normalizacion | EPIC-003 | US-003 | SPRINT-102 | `disambiguation.py`, `harmonization.py`, `quality.py`, `docs/product/epics/EPIC-003-data-quality-and-harmonization.md` | Disambiguation UI, transformations, quality score | Done |
+| Enriquecimiento y autoridad | EPIC-004 | US-011 | SPRINT-102 | `authority.py`, `enrichment_worker.py`, `scrapers.py`, `docs/product/epics/EPIC-004-authority-and-enrichment.md` | Authority review, enrichment stats | Done |
+| Inteligencia analitica | EPIC-006 | US-013 | SPRINT-102 | `analytics.py`, `nlq.py`, `olap.py`, `docs/product/epics/EPIC-006-analytics-and-decision-intelligence.md` | Dashboard, NLQ, OLAP explorer | Done |
+| AI contextual y RAG | EPIC-007 | US-005 | SPRINT-102 | `ai_rag.py`, `context.py`, `tool_registry.py`, `docs/product/epics/EPIC-007-ai-rag-and-context-engineering.md` | RAG chat, agentic mode | Done |
+| Automatizacion y entrega | EPIC-009 | US-015 | SPRINT-102 | `scheduled_reports.py`, `workflows.py`, `alert_channels.py`, `docs/product/epics/EPIC-009-automation-and-delivery.md` | Scheduled reports, workflows, alerts | Done |
+| Seguridad y plataforma | EPIC-010 | US-007, US-008 | SPRINT-102 | `auth_users.py`, `api_keys.py`, `audit_log.py`, `docs/DOCUMENTATION_GOVERNANCE.md`, `docs/product/sprints/SPRINT-102.md` | RBAC, API keys, audit log, gobernanza operativa | Done |
+
+## Regla de mantenimiento
+
+Cuando una historia se refine o se complete:
+
+- reemplaza `US-TBD` por su ID real
+- reemplaza `SPRINT-TBD` por el sprint real
+- enlaza archivos, endpoints o docs relevantes
+- actualiza el estado
+
+## Continuidad del backfill
+
+Siguiente recomendacion:
+
+1. descomponer cada epic en historias funcionales pequenas por flujo
+2. iniciar releases formales desde el siguiente sprint operativo
+3. decidir si se retro-documentan sprints historicos o solo se sigue hacia adelante
