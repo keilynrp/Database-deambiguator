@@ -14,9 +14,10 @@ Analytics, stats, and lookup endpoints.
 """
 import logging
 import re
+import time
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
@@ -25,10 +26,10 @@ from backend import models
 from backend.analyzers.correlation import CorrelationAnalyzer
 from backend.analyzers.roi_calculator import ROIParams, simulate as _roi_simulate
 from backend.analyzers.topic_modeling import TopicAnalyzer
+from backend.logging_utils import current_log_format
 from backend.services.analytics_service import AnalyticsService
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
-import time
 from threading import Lock
 
 logger = logging.getLogger(__name__)
@@ -347,12 +348,21 @@ def get_all_classifications(
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @router.get("/health")
-def health_check(db: Session = Depends(get_db)):
-    """Liveness + DB connectivity probe."""
+def health_check(request: Request, db: Session = Depends(get_db)):
+    """Liveness + DB connectivity probe with operational metadata."""
+    started = time.perf_counter()
     try:
         db.execute(text("SELECT 1"))
         db_status = "ok"
     except Exception:
         db_status = "error"
+        logger.exception("health_check_db_error")
     status = "ok" if db_status == "ok" else "degraded"
-    return {"status": status, "database": db_status}
+    return {
+        "status": status,
+        "service": "ukip-backend",
+        "database": db_status,
+        "request_id": getattr(request.state, "request_id", None),
+        "log_format": current_log_format(),
+        "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+    }

@@ -1,9 +1,9 @@
-import os
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from backend.db_config import resolve_database_url
 
 # Alembic Config object
 config = context.config
@@ -12,8 +12,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# ── UKIP: pull DATABASE_URL from environment, fall back to ini value ──────────
-_db_url = os.environ.get("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+# ── UKIP: use the same PostgreSQL-first resolution path as the runtime ────────
+_db_url = resolve_database_url()
 config.set_main_option("sqlalchemy.url", _db_url)
 
 # ── UKIP: import all models so autogenerate can detect schema changes ─────────

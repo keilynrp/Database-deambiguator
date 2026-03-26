@@ -11,7 +11,7 @@ echo.
 REM ── Check .venv exists ──────────────────────────────────────────────────────
 if not exist ".venv\Scripts\python.exe" (
     echo  [ERROR] Python virtual environment not found.
-    echo  Run: python -m venv .venv ^&^& .venv\Scripts\pip install -r requirements.txt
+    echo  Run: python -m venv .venv ^&^& .venv\Scripts\pip install -r requirements.lock
     pause
     exit /b 1
 )
@@ -30,13 +30,22 @@ if not exist "frontend\.env.local" (
     copy "frontend\.env.local.example" "frontend\.env.local" >nul
 )
 
+where docker >nul 2>&1
+if %errorlevel%==0 (
+    echo  [INFO] Ensuring local PostgreSQL is running via docker-compose.dev.yml...
+    docker compose -f docker-compose.dev.yml up -d postgres
+) else (
+    echo  [WARN] Docker not found in Windows PATH.
+    echo  [WARN] If Docker runs inside WSL Ubuntu, start PostgreSQL there before starting UKIP.
+)
+
 REM ── Kill any stale process on port 8000 ─────────────────────────────────────
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8000 " ^| findstr "LISTENING"') do (
     taskkill /F /PID %%a >nul 2>&1
 )
 
-echo  [1/2] Starting Backend  ^(FastAPI on port 8000^)...
-start "UKIP Backend" cmd /k "title UKIP Backend && cd /d %~dp0 && .venv\Scripts\python -m uvicorn backend.main:app --reload --port 8000"
+echo  [1/2] Applying migrations and starting Backend  ^(FastAPI on port 8000^)...
+start "UKIP Backend" cmd /k "title UKIP Backend && cd /d %~dp0 && .venv\Scripts\alembic upgrade head && .venv\Scripts\python -m uvicorn backend.main:app --reload --port 8000"
 
 echo  [2/2] Starting Frontend ^(Next.js on port 3004^)...
 start "UKIP Frontend" cmd /k "title UKIP Frontend && cd /d %~dp0\frontend && npm run dev"

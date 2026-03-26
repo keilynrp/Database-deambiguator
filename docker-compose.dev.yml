@@ -1,20 +1,40 @@
 version: "3.9"
 
 # ── UKIP — Development docker-compose ───────────────────────────────────────
-# Development-focused compose file utilizing SQLite instead of PostgreSQL.
+# Development-focused compose file aligned with the production PostgreSQL path.
 #
 # Quick start:
 #   docker compose -f docker-compose.dev.yml up -d
 #   docker compose logs -f ukip-backend
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ukip
+      POSTGRES_USER: ukip
+      POSTGRES_PASSWORD: ukip_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ukip -d ukip"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   ukip-backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
-      DATABASE_URL:       sqlite:///./ukip_dev.db
+      DATABASE_URL:       postgresql+psycopg2://ukip:ukip_secret@postgres:5432/ukip
       ADMIN_USERNAME:     admin
       ADMIN_PASSWORD:     adminpassword123
       JWT_SECRET_KEY:     dev_secret_jwt_key
@@ -52,4 +72,5 @@ services:
       - ./frontend/components:/app/components
 
 volumes:
+  postgres_dev_data:
   static_files:

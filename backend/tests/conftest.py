@@ -20,6 +20,9 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-not-for-production")
 os.environ.setdefault("ADMIN_USERNAME", "testadmin")
 os.environ.setdefault("ADMIN_PASSWORD", "testpassword")
 os.environ.setdefault("ENCRYPTION_KEY", "vRHc0zVcTXbRfUBZEsKNal2lMCfINwDh90EXE8vu2Ew=")
+os.environ.setdefault("DATABASE_URL", TEST_DATABASE_URL)
+os.environ.setdefault("UKIP_DB_MODE", "sqlite")
+os.environ.setdefault("UKIP_SKIP_STARTUP_SIDE_EFFECTS", "1")
 
 
 from sqlalchemy import text  # noqa: E402
@@ -70,8 +73,7 @@ import backend.audit as _audit_module  # noqa: E402
 _audit_module.SessionLocal = TestingSessionLocal
 
 # Seed the super_admin in the in-memory test DB so the login fixture works.
-# (The lifespan bootstrap uses database.SessionLocal which hits the real DB;
-#  this seeds the in-memory DB that test requests use via override_get_db.)
+# Startup side effects are disabled in tests, so seeding must happen explicitly.
 from backend.auth import hash_password as _hash_pw  # noqa: E402
 with TestingSessionLocal() as _seed_db:
     if _seed_db.query(models.User).count() == 0:

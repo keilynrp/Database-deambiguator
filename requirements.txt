@@ -1,3 +1,6 @@
+# Human-maintained dependency intent file.
+# Use requirements.lock for reproducible backend installs in CI or deployment-oriented environments.
+
 pandas
 openpyxl
 fastapi

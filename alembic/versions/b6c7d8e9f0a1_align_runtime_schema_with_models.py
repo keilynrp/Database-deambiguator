@@ -115,7 +115,7 @@ def upgrade() -> None:
         sa.text(
             """
             UPDATE scheduled_imports
-            SET name = COALESCE(NULLIF(name, ''), 'Scheduled import #' || id::text),
+            SET name = COALESCE(NULLIF(name, ''), 'Scheduled import #' || CAST(id AS TEXT)),
                 interval_minutes = COALESCE(interval_minutes, 60),
                 last_status = COALESCE(NULLIF(last_status, ''), 'pending'),
                 total_runs = COALESCE(total_runs, 0),
@@ -128,7 +128,7 @@ def upgrade() -> None:
         sa.text(
             """
             UPDATE scheduled_reports
-            SET name = COALESCE(NULLIF(name, ''), 'Scheduled report #' || id::text),
+            SET name = COALESCE(NULLIF(name, ''), 'Scheduled report #' || CAST(id AS TEXT)),
                 domain_id = COALESCE(NULLIF(domain_id, ''), 'default'),
                 format = COALESCE(NULLIF(format, ''), 'pdf'),
                 sections = COALESCE(NULLIF(sections, ''), '[]'),

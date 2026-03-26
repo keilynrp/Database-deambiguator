@@ -23,6 +23,9 @@ def _legacy_row_count(query: str) -> int:
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    is_sqlite = bind.dialect.name == "sqlite"
+
     op.execute(
         sa.text(
             """
@@ -80,7 +83,8 @@ def upgrade() -> None:
         batch_op.drop_column("cron_expr")
 
     with op.batch_alter_table("scheduled_reports") as batch_op:
-        batch_op.drop_constraint("scheduled_reports_template_id_fkey", type_="foreignkey")
+        if not is_sqlite:
+            batch_op.drop_constraint("scheduled_reports_template_id_fkey", type_="foreignkey")
         batch_op.drop_column("template_id")
         batch_op.drop_column("cron_expr")
         batch_op.drop_column("recipients")

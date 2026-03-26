@@ -19,6 +19,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from backend import database, enrichment_worker, models
+from backend.logging_utils import RequestLoggingMiddleware, configure_logging
 from backend.routers.limiter import limiter
 
 # ── Domain routers ────────────────────────────────────────────────────────────
@@ -63,21 +64,12 @@ from backend.routers import (
     ws,
 )
 
+configure_logging()
 logger = logging.getLogger(__name__)
 
 
-# ── Schema migrations via Alembic ─────────────────────────────────────────────
-
-def _run_migrations() -> None:
-    """Run alembic upgrade head at startup. Idempotent and safe to call every boot."""
-    from alembic import command
-    from alembic.config import Config as AlembicConfig
-
-    alembic_cfg = AlembicConfig("alembic.ini")
-    command.upgrade(alembic_cfg, "head")
-    logger.info("Alembic migrations applied (upgrade head)")
-
-_run_migrations()
+def _startup_side_effects_enabled() -> bool:
+    return os.environ.get("UKIP_SKIP_STARTUP_SIDE_EFFECTS", "0") != "1"
 
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
@@ -138,6 +130,11 @@ async def lifespan(app: FastAPI):
     # Warn if CORS is still open to all origins
     if os.environ.get("ALLOWED_ORIGINS", "").strip() == "*":
         logger.warning("⚠ ALLOWED_ORIGINS=* allows all origins. Restrict this in production.")
+
+    if not _startup_side_effects_enabled():
+        logger.info("Startup side effects disabled via UKIP_SKIP_STARTUP_SIDE_EFFECTS=1")
+        yield
+        return
 
     # Startup
     with database.SessionLocal() as db:
@@ -318,6 +315,7 @@ app.add_middleware(
     secret_key=os.environ.get("SESSION_SECRET_KEY", os.environ.get("JWT_SECRET_KEY", "fallback_cookie_secret")),
     max_age=3600
 )
+app.add_middleware(RequestLoggingMiddleware)
 
 # ── Register routers ──────────────────────────────────────────────────────────
 
