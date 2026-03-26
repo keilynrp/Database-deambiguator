@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 
 import json
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 from typing import Literal, Optional, List
 
 class EntityBase(BaseModel):
@@ -184,9 +184,15 @@ class UserResponse(BaseModel):
     avatar_url:   Optional[str] = None
     display_name: Optional[str] = None
     bio:          Optional[str] = None
-    created_at:   Optional[str] = None
+    created_at:   Optional[str | datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: Optional[str | datetime]) -> Optional[str]:
+        if isinstance(value, datetime):
+            return value.isoformat()
+        return value
 
 
 class ProfileUpdate(BaseModel):

@@ -23,6 +23,15 @@ from backend.routers.deps import _dispatch_webhook, _dispatch_webhook_sync
 router = APIRouter(tags=["webhooks"])
 
 
+def _parse_json_field(raw: str | None):
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except Exception:
+        return {"message": raw}
+
+
 def _serialize_webhook(w: models.Webhook) -> dict:
     events: list = []
     try:
@@ -237,7 +246,7 @@ def get_audit_feed(
             "entity_type": e.entity_type,
             "entity_id": e.entity_id,
             "user_id": e.user_id,
-            "details": json.loads(e.details) if e.details else None,
+            "details": _parse_json_field(e.details),
             "created_at": e.created_at.isoformat() if e.created_at else None,
         })
     return result
