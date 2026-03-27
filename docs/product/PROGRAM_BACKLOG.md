@@ -32,7 +32,7 @@ Fuentes estrategicas relacionadas:
 | EPIC-012 | Tenant Isolation and Access Control | Llevar multi-tenancy y control de acceso a aislamiento real de datos | Planned | modelos con `org_id`, filtros por tenant, RBAC/ABAC, quotas |
 | EPIC-013 | Commercial Readiness and Credibility | Alinear claims, onboarding y readiness comercial con la realidad del producto | Planned | `README.md`, docs comerciales, onboarding, compliance baseline |
 | EPIC-014 | Frontend Decomposition and Maintainability | Reducir componentes monoliticos y mejorar capacidad de evolucion del frontend | Planned | `EntityTable.tsx`, `Sidebar.tsx`, `RAGChatInterface.tsx`, `DisambiguationTool.tsx` |
-| EPIC-015 | Observability and Operations | Construir salud operativa, logging y telemetria minima de producto serio | Planned | health endpoints, logging, Sentry/telemetry, checks operativos |
+| EPIC-015 | Observability and Operations | Construir salud operativa, logging y telemetria minima de producto serio | Done | health endpoints, logging, Sentry/telemetry, checks operativos |
 
 ## Epicas futuras sugeridas
 

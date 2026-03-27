@@ -125,8 +125,8 @@ The list below is a capability inventory. Some areas are fully implemented, whil
 ### Automation & Delivery
 - **Scheduled Reports** — Create recurring report schedules (hourly to weekly). Automatically generate PDF, Excel, or HTML reports and deliver them as email attachments to one or more recipients. Background scheduler thread (60s poll loop). Manual "Send Now" trigger. Pause/Resume toggle. Full error tracking with inline error detail.
 - **Scheduled Imports** — Background thread imports from connected stores on configurable intervals (5 min to 7 days).
-- **Alert Channels** — Push platform events to Slack, Microsoft Teams, Discord, or any generic webhook. Platform-native payloads (Block Kit for Slack, MessageCard for Teams, embeds for Discord). 8 subscribable event types. Webhook URLs encrypted at rest (Fernet). "Test" button fires a real delivery.
-- **Event Catalogue** — `entities.imported`, `enrichment.completed`, `harmonization.applied`, `quality.low`, `report.sent`, `report.failed`, `import.scheduled`, `disambiguation.resolved`.
+- **Alert Channels** — Push platform events to Slack, Microsoft Teams, Discord, or any generic webhook. Platform-native payloads (Block Kit for Slack, MessageCard for Teams, embeds for Discord). 9 subscribable event types. Webhook URLs encrypted at rest (Fernet). "Test" button fires a real delivery.
+- **Event Catalogue** — `entities.imported`, `enrichment.completed`, `harmonization.applied`, `quality.low`, `report.sent`, `report.failed`, `import.scheduled`, `ops.check_failed`, `disambiguation.resolved`.
 
 ### Public API Keys
 - **Key Generation** — `ukip_<40 random chars>`. Shown exactly once at creation time.
@@ -275,6 +275,8 @@ Schema upgrades are now an explicit startup step. Importing `backend.main` no lo
 
 Operational checks:
 - `GET /health` returns service status, database status, request id, log format, and probe duration.
+- `GET /ops/checks` returns a repeatable runtime checklist for DB connectivity, scheduler heartbeat/overdue jobs, and alert-channel readiness.
+- `POST /ops/checks/run?notify=true` runs the same checks and dispatches `ops.check_failed` if the result is degraded or critical.
 - `LOG_FORMAT=json` enables structured JSON logs; `LOG_FORMAT=text` keeps the same fields in key=value form.
 - Sentry stays off by default. Enable it only with `SENTRY_ENABLED=1` plus `SENTRY_DSN`; tracing remains off unless `SENTRY_ENABLE_TRACING=1`.
 
@@ -293,6 +295,7 @@ Open `http://localhost:3004`
 - **AI Assistant**: Go to **Integrations > AI Language Models** and add your API key. For zero-cost: install [Ollama](https://ollama.ai) and point to `http://localhost:11434/v1`.
 - **Email / Scheduled Reports**: Configure SMTP in **Settings → Notifications**.
 - **Slack/Teams Alerts**: Go to **Settings → Alert Channels** and paste your incoming webhook URL.
+- **Operational Alerts**: Subscribe at least one alert channel to `ops.check_failed` and poll `POST /ops/checks/run?notify=true` from your scheduler or uptime tool.
 - **API Keys**: Go to **Settings → API Keys** and generate a programmatic access token.
 - **Web of Science / Scopus**: Set `WOS_API_KEY` / `SCOPUS_API_KEY` as environment variables.
 - **Google Analytics**: Set `NEXT_PUBLIC_GA_ID` in `frontend/.env.local`.

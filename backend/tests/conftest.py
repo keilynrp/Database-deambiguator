@@ -171,6 +171,7 @@ _TABLES_TO_CLEAN = [
     "artifact_templates",
     "analysis_contexts",
     "audit_logs",
+    "alert_channels",
     "search_index",
     "link_dismissals",
     "user_notification_states",

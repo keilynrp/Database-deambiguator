@@ -57,7 +57,7 @@ Excluye:
 |---|---|---|
 | US-051 | Health checks y structured logging | Done |
 | US-052 | Baseline de Sentry y telemetria operativa | Done |
-| US-053 | Verificaciones operativas y alertas base | Planned |
+| US-053 | Verificaciones operativas y alertas base | Done |
 
 ## 10. Sprint allocation
 

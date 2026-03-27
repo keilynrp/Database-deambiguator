@@ -27,6 +27,7 @@ from backend.analyzers.correlation import CorrelationAnalyzer
 from backend.analyzers.roi_calculator import ROIParams, simulate as _roi_simulate
 from backend.analyzers.topic_modeling import TopicAnalyzer
 from backend.logging_utils import current_log_format
+from backend.ops_checks import dispatch_operational_alert_if_needed, run_operational_checks
 from backend.telemetry import telemetry_status
 from backend.services.analytics_service import AnalyticsService
 from backend.auth import get_current_user, require_role
@@ -368,3 +369,28 @@ def health_check(request: Request, db: Session = Depends(get_db)):
         "telemetry": telemetry_status(),
         "duration_ms": round((time.perf_counter() - started) * 1000, 2),
     }
+
+
+@router.get("/ops/checks", tags=["analytics"])
+def operational_checks(
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin")),
+):
+    """Repeatable operational checklist for runtime, schedulers, and alert readiness."""
+    return run_operational_checks(db)
+
+
+@router.post("/ops/checks/run", tags=["analytics"])
+def run_operational_checks_now(
+    notify: bool = Query(default=False, description="Dispatch ops.check_failed when the result is not ok"),
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role("super_admin", "admin")),
+):
+    """Run operational checks on demand and optionally fan out a failure alert."""
+    report = run_operational_checks(db)
+    report["notification"] = (
+        dispatch_operational_alert_if_needed(db, report)
+        if notify
+        else {"attempted": False, "event": "ops.check_failed", "reason": "notify_disabled"}
+    )
+    return report

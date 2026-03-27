@@ -318,11 +318,53 @@ def _execute_import(schedule: models.ScheduledImport, db: Session) -> dict:
 # ── Background scheduler ─────────────────────────────────────────────────────
 
 _scheduler_thread: threading.Thread | None = None
+_scheduler_state_lock = threading.Lock()
+SCHEDULER_POLL_SECONDS = 30
+_scheduler_state = {
+    "started_at": None,
+    "last_heartbeat_at": None,
+    "last_success_at": None,
+    "last_loop_error": None,
+    "last_loop_error_at": None,
+}
+
+
+def _update_scheduler_state(**updates) -> None:
+    with _scheduler_state_lock:
+        _scheduler_state.update(updates)
+
+
+def get_scheduler_status(now: datetime | None = None) -> dict:
+    now = now or datetime.now(timezone.utc)
+    with _scheduler_state_lock:
+        snapshot = dict(_scheduler_state)
+
+    last_heartbeat_at = snapshot["last_heartbeat_at"]
+    heartbeat_age = None
+    if last_heartbeat_at is not None:
+        heartbeat_age = round((now - last_heartbeat_at).total_seconds(), 2)
+
+    return {
+        "alive": _scheduler_thread is not None and _scheduler_thread.is_alive(),
+        "poll_seconds": SCHEDULER_POLL_SECONDS,
+        "stale_after_seconds": SCHEDULER_POLL_SECONDS * 3,
+        "started_at": snapshot["started_at"].isoformat() if snapshot["started_at"] else None,
+        "last_heartbeat_at": last_heartbeat_at.isoformat() if last_heartbeat_at else None,
+        "last_heartbeat_age_seconds": heartbeat_age,
+        "last_success_at": snapshot["last_success_at"].isoformat() if snapshot["last_success_at"] else None,
+        "last_loop_error": snapshot["last_loop_error"],
+        "last_loop_error_at": (
+            snapshot["last_loop_error_at"].isoformat()
+            if snapshot["last_loop_error_at"]
+            else None
+        ),
+    }
 
 
 def _scheduler_loop():
     """Check for due imports every 30 seconds."""
     while True:
+        _update_scheduler_state(last_heartbeat_at=datetime.now(timezone.utc))
         try:
             with database.SessionLocal() as db:
                 now = datetime.now(timezone.utc)
@@ -338,9 +380,18 @@ def _scheduler_loop():
                         _execute_import(schedule, db)
                     except Exception:
                         logger.exception("Error executing scheduled import %d", schedule.id)
+                _update_scheduler_state(
+                    last_success_at=datetime.now(timezone.utc),
+                    last_loop_error=None,
+                    last_loop_error_at=None,
+                )
         except Exception:
             logger.exception("Scheduler loop error")
-        time.sleep(30)
+            _update_scheduler_state(
+                last_loop_error="scheduler_loop_error",
+                last_loop_error_at=datetime.now(timezone.utc),
+            )
+        time.sleep(SCHEDULER_POLL_SECONDS)
 
 
 def start_scheduler():
@@ -350,4 +401,5 @@ def start_scheduler():
         return
     _scheduler_thread = threading.Thread(target=_scheduler_loop, daemon=True, name="import-scheduler")
     _scheduler_thread.start()
+    _update_scheduler_state(started_at=datetime.now(timezone.utc))
     logger.info("Import scheduler started")

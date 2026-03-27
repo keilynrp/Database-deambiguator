@@ -23,6 +23,7 @@ ALL_EVENTS = [
     ("report.sent",            "Report delivered",        "Scheduled report successfully sent by email"),
     ("report.failed",          "Report delivery failed",  "Scheduled report email delivery failed"),
     ("import.scheduled",       "Scheduled import done",   "Scheduled store import completed"),
+    ("ops.check_failed",       "Operational check failed","Operational checks detected a degraded or critical runtime state"),
     ("disambiguation.resolved","Disambiguation resolved",  "AI disambiguation resolved entity clusters"),
 ]
 
