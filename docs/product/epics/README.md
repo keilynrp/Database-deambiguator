@@ -18,3 +18,8 @@ Aqui viven las epicas activas del programa.
 - `EPIC-007-ai-rag-and-context-engineering.md`
 - `EPIC-009-automation-and-delivery.md`
 - `EPIC-010-platform-security-and-collaboration.md`
+- `EPIC-011-hardening-and-runtime-reliability.md`
+- `EPIC-012-tenant-isolation-and-access-control.md`
+- `EPIC-013-commercial-readiness-and-credibility.md`
+- `EPIC-014-frontend-decomposition-and-maintainability.md`
+- `EPIC-015-observability-and-operations.md`

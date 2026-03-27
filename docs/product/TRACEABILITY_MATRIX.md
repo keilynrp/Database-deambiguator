@@ -20,6 +20,11 @@ Cada fila debe poder seguir este hilo:
 | AI contextual y RAG | EPIC-007 | US-005 | SPRINT-102 | `ai_rag.py`, `context.py`, `tool_registry.py`, `docs/product/epics/EPIC-007-ai-rag-and-context-engineering.md` | RAG chat, agentic mode | Done |
 | Automatizacion y entrega | EPIC-009 | US-015 | SPRINT-102 | `scheduled_reports.py`, `workflows.py`, `alert_channels.py`, `docs/product/epics/EPIC-009-automation-and-delivery.md` | Scheduled reports, workflows, alerts | Done |
 | Seguridad y plataforma | EPIC-010 | US-007, US-008 | SPRINT-102 | `auth_users.py`, `api_keys.py`, `audit_log.py`, `docs/DOCUMENTATION_GOVERNANCE.md`, `docs/product/sprints/SPRINT-102.md` | RBAC, API keys, audit log, gobernanza operativa | Done |
+| Runtime confiable y reproducible | EPIC-011 | US-039, US-040, US-041 | SPRINT-104 | `requirements.txt`, `backend/database.py`, `backend/main.py`, `docs/product/epics/EPIC-011-hardening-and-runtime-reliability.md` | Runtime mas predecible y mas creible para produccion | Planned |
+| Aislamiento real por tenant | EPIC-012 | US-043 | SPRINT-TBD | modelos con `org_id`, filtros por tenant, `docs/product/epics/EPIC-012-tenant-isolation-and-access-control.md` | Multi-tenancy real y control enterprise | Planned |
+| Credibilidad comercial y tecnica | EPIC-013 | US-046, US-047 | SPRINT-104 | `README.md`, onboarding, docs operativas, `docs/product/epics/EPIC-013-commercial-readiness-and-credibility.md` | Discurso alineado con producto real y salida a mercado mas creible | Planned |
+| Frontend mantenible | EPIC-014 | US-049 | SPRINT-TBD | `EntityTable.tsx`, `Sidebar.tsx`, `RAGChatInterface.tsx`, `docs/product/epics/EPIC-014-frontend-decomposition-and-maintainability.md` | Menor complejidad de UI y mejor velocidad de iteracion | Planned |
+| Observabilidad y operacion | EPIC-015 | US-051, US-052 | SPRINT-104 | logging, health checks, Sentry, `docs/product/epics/EPIC-015-observability-and-operations.md` | Mejor visibilidad operativa y readiness de producto serio | Planned |
 
 ## Regla de mantenimiento
 

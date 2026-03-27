@@ -47,3 +47,33 @@ Mapa funcional de historias activas por epic.
 - `US-036`: Administracion de usuarios, roles y acceso
 - `US-037`: Ciclo de vida de API keys
 - `US-038`: Colaboracion con anotaciones y notificaciones
+
+## EPIC-011 - Hardening and Runtime Reliability
+
+- `US-039`: Lockfile y reproducibilidad de dependencias
+- `US-040`: PostgreSQL-first runtime y despliegue
+- `US-041`: Ciclo seguro de migraciones y arranque
+- `US-042`: Plan de externalizacion de background jobs
+
+## EPIC-012 - Tenant Isolation and Access Control
+
+- `US-043`: Scoping de tenant en modelo de datos
+- `US-044`: Enforcements de tenant en queries y acceso
+- `US-045`: Limites y quotas por tenant o plan
+
+## EPIC-013 - Commercial Readiness and Credibility
+
+- `US-046`: Alinear README y claims con la implementacion real
+- `US-047`: Definir MVP comercial y onboarding real
+- `US-048`: Registrar gaps de compliance y readiness enterprise
+
+## EPIC-014 - Frontend Decomposition and Maintainability
+
+- `US-049`: Descomponer EntityTable en modulos manejables
+- `US-050`: Reducir componentes frontend gigantes del shell y AI UI
+
+## EPIC-015 - Observability and Operations
+
+- `US-051`: Health checks y structured logging
+- `US-052`: Baseline de Sentry y telemetria operativa
+- `US-053`: Verificaciones operativas y alertas base

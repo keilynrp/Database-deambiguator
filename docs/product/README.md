@@ -30,6 +30,7 @@ Este directorio contiene el sistema operativo de producto y delivery de UKIP.
 - historias iniciales en `docs/product/stories/`
 - sprint activo base en `docs/product/sprints/SPRINT-102.md`
 - siguiente sprint operativo en `docs/product/sprints/SPRINT-103.md`
+- siguiente sprint de hardening en `docs/product/sprints/SPRINT-104.md`
 
 ## Regla de oro
 

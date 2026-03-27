@@ -12,6 +12,7 @@ Artefactos operativos de cada sprint.
 
 - `SPRINT-102.md`
 - `SPRINT-103.md`
+- `SPRINT-104.md`
 - `SPRINT-103-AGENT-PLAN.md`
 - `SPRINT-DAILY-UPDATE-TEMPLATE.md`
 - `SPRINT-103-DAILY-LOG.md`

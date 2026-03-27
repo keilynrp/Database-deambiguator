@@ -23,7 +23,13 @@ python -m venv .venv
 source .venv/bin/activate
 
 # Install dependencies
-pip install -r requirements.txt
+pip install -r requirements.lock
+
+# Start local PostgreSQL
+docker compose -f docker-compose.dev.yml up -d postgres
+
+# Apply schema migrations
+alembic upgrade head
 
 # Start the API server
 uvicorn backend.main:app --reload
@@ -53,7 +59,8 @@ ukip/
 ├── scripts/          # Utility CLI scripts
 ├── data/             # Data files (gitignored .xlsx)
 ├── docs/             # Documentation
-└── requirements.txt  # Python dependencies
+├── requirements.txt  # Human-maintained dependency intent
+└── requirements.lock # Reproducible backend install lockfile
 ```
 
 ## Code Style

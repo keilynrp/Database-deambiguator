@@ -70,7 +70,7 @@ Piensa el sistema en 5 capas:
 
 - `.env.example`: variables de entorno backend.
 - `docker-compose.yml`: stack tipo produccion.
-- `docker-compose.dev.yml`: stack dev con SQLite.
+- `docker-compose.dev.yml`: stack dev alineado con PostgreSQL.
 - `start.bat`: arranque local rapido en Windows.
 - `alembic/`: migraciones.
 
@@ -79,8 +79,8 @@ Piensa el sistema en 5 capas:
 ### Backend
 
 - FastAPI
-- SQLite por defecto
-- PostgreSQL en despliegue
+- PostgreSQL como ruta principal en local y despliegue
+- SQLite solo como fallback explicito de compatibilidad
 - Alembic al arranque
 - workers/schedulers para enrichment, imports y reportes
 
@@ -107,9 +107,25 @@ Backend:
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.lock
+docker compose -f docker-compose.dev.yml up -d postgres
+alembic upgrade head
 uvicorn backend.main:app --reload --port 8000
 ```
+
+Si Docker vive solo en WSL Ubuntu, levanta PostgreSQL desde el repo montado en WSL, por ejemplo:
+
+```bash
+cd /mnt/d/universal-knowledge-intelligence-platform
+docker compose -f docker-compose.dev.yml up -d postgres
+```
+
+Las migraciones ya no corren al importar `backend.main`; el upgrade de schema es un paso explicito de arranque.
+
+Checks operativos utiles:
+
+- `GET /health` expone estado del servicio, estado de DB, `request_id`, formato de log y duracion del probe.
+- `LOG_FORMAT=json` produce logs estructurados; `LOG_FORMAT=text` conserva los mismos campos en texto.
 
 Frontend:
 
@@ -140,6 +156,15 @@ Del backend:
 Del frontend:
 
 - `NEXT_PUBLIC_API_URL`
+
+## 7.1 Dependencias reproducibles
+
+Para backend:
+
+- `requirements.txt` define la intencion humana de dependencias
+- `requirements.lock` es la referencia reproducible de instalacion
+
+Usa `requirements.lock` para entornos repetibles, CI y despliegues.
 
 ## 8. Que tocar segun el tipo de cambio
 

@@ -11,10 +11,10 @@
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![DuckDB](https://img.shields.io/badge/DuckDB-OLAP-FFF000?style=for-the-badge&logo=duckdb&logoColor=black)](https://duckdb.org/)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20DB-ff6b35?style=for-the-badge)](https://www.trychroma.com/)
-[![Tests](https://img.shields.io/badge/Tests-1330%20passing-brightgreen?style=for-the-badge)](backend/tests/)
+[![Tests](https://img.shields.io/badge/Backend%20Tests-1300%2B-brightgreen?style=for-the-badge)](backend/tests/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge)](LICENSE)
 
-A domain-agnostic intelligence platform that ingests raw data, harmonizes it, enriches it against global knowledge bases, runs OLAP analytics and stochastic simulations, builds entity relationship graphs, and lets you query everything through an agentic RAG-powered AI assistant — with custom dashboards, scheduled reports, Slack/Teams alerts, and a public API ecosystem.
+A domain-agnostic intelligence platform that ingests raw data, harmonizes it, enriches it against global knowledge bases, runs OLAP analytics and stochastic simulations, builds entity relationship graphs, and lets you query everything through a RAG-powered AI assistant — with dashboards, scheduled reports, alerts, and a documented API surface.
 
 [Features](#features) · [Quick Start](#quick-start) · [Architecture](#architecture) · [API](#api-overview) · [Roadmap](#roadmap) · [Strategic Vision](docs/EVOLUTION_STRATEGY.md)
 
@@ -24,7 +24,7 @@ A domain-agnostic intelligence platform that ingests raw data, harmonizes it, en
 
 ## Why UKIP?
 
-Most data platforms force you to choose: clean your data **or** analyze it. UKIP does both in a single pipeline. It started as a catalog deduplication tool and evolved into a full research intelligence engine across **101 development sprints**.
+Most data platforms force you to choose: clean your data **or** analyze it. UKIP does both in a single pipeline. It started as a catalog deduplication tool and evolved into a broader knowledge intelligence platform across **100+ development sprints**.
 
 **What it does:**
 
@@ -39,8 +39,34 @@ Most data platforms force you to choose: clean your data **or** analyze it. UKIP
 9. **Integrate** programmatically through long-lived **API Keys** with scope control (`read`/`write`/`admin`) — zero friction for developer ecosystems.
 10. **Collaborate** through threaded comments with emoji reactions and resolve workflows, full RBAC (4 roles), role-aware UI, and outbound webhooks.
 11. **Observe** every action through a real-time audit log, notification center, and HTTP-level audit middleware.
-12. **Scale** with multi-tenant **Organizations** — users belong to orgs, roles scoped per org, plan tiers (free/pro/enterprise).
+12. **Organize access** with **Organizations** and scoped memberships — a foundation for multi-tenant SaaS, with full tenant-level data isolation still in progress.
 13. **Present** data instantly with the **Sales Deck** generator — live HTML narrative printable to PDF for prospects and stakeholders.
+
+## Current Status
+
+UKIP is currently best understood as an **advanced product prototype / pre-commercial platform**, not yet a hardened commercial SaaS.
+
+### Implemented and usable today
+
+- multi-format ingestion, preview and mapping flows
+- data quality tooling, authority resolution and enrichment pipelines
+- OLAP, analytics, dashboards and report generation
+- API auth with JWT and API keys
+- broad functional coverage for research and knowledge workflows
+
+### Partially implemented or still being hardened
+
+- PostgreSQL is now the default development and deployment path; SQLite remains an explicit compatibility fallback for simple local scenarios
+- Organizations and membership exist, but full tenant data isolation is still a roadmap item
+- background jobs currently run in-process and are candidates for externalization
+- observability exists in parts, but production telemetry and health instrumentation are still being strengthened
+
+### Not yet treated as commercially complete
+
+- billing and plan enforcement
+- enterprise-grade tenant isolation
+- full compliance readiness
+- production-grade background job orchestration
 
 ### Design Philosophy
 
@@ -48,11 +74,13 @@ One rule: **Justified Complexity** ([details](docs/ARCHITECTURE.md)).
 
 - Monorepo (FastAPI + Next.js). No microservices until proven necessary.
 - If a dictionary solves it, we use a dictionary.
-- Accessible for beginners, robust for production data tasks.
+- Accessible for beginners, robust for serious data workflows, with additional hardening still underway for commercial deployment.
 
 ---
 
 ## Features
+
+The list below is a capability inventory. Some areas are fully implemented, while others represent strong foundations that are still being hardened for production SaaS use.
 
 ### Data Operations
 - **Entity Catalog** — Browse, search, inline-edit, and delete records across any domain. Universal schema (`primary_label`, `secondary_label`, `canonical_id`, `entity_type`, `domain`). Dynamic pagination, FTS5 full-text search.
@@ -124,10 +152,10 @@ One rule: **Justified Complexity** ([details](docs/ARCHITECTURE.md)).
 - **Emoji Reactions** — 7 reaction types (👍 ❤️ 🚀 👀 ✅ 😄 🎉) per annotation with per-user toggle. Reaction bar with live counts displayed inline.
 - **Resolve Workflow** — Mark annotation threads as resolved/unresolved (editor+). Resolved badge on thread header, stats endpoint with `total_threads`, `resolved`, `unresolved`, and `total_reactions`.
 - **Comments Tab** — Integrated into the entity detail page with live count badge.
-- **Multi-tenant Organizations** — Users belong to orgs with plan tiers (free/pro/enterprise), scoped membership roles (owner/admin/member), and organization switching.
+- **Organizations foundation** — Users can belong to organizations with membership roles and active-org switching. Full tenant-level data isolation across platform resources is still in progress.
 
 ### Full-Text Search
-- **SQLite FTS5 index** covering entities, authority records, and annotations.
+- **FTS-backed search path** covering entities, authority records, and annotations, with SQLite FTS5 compatibility and PostgreSQL-first runtime guidance.
 - **Global search bar** in the header with debounced live dropdown (6 results) and keyboard navigation.
 - **Search page** (`/search`) with type filter pills, ranked result cards, and pagination.
 
@@ -192,7 +220,7 @@ Four-phase cascading enrichment worker:
 | Layer | Technology |
 |-------|------------|
 | **API** | Python 3.10+, FastAPI, SQLAlchemy ORM |
-| **Database** | SQLite + FTS5 (OLTP), DuckDB (OLAP cubes), ChromaDB (vectors) |
+| **Database** | PostgreSQL (default local + deployment path), SQLite + FTS5 (explicit compatibility fallback), DuckDB (OLAP cubes), ChromaDB (vectors) |
 | **Matching** | thefuzz + python-Levenshtein |
 | **Enrichment** | openalex-py, scholarly, httpx, Scopus API |
 | **Analytics** | numpy, scipy, DuckDB SQL (CUBE/ROLLUP/GROUPING SETS) |
@@ -200,7 +228,7 @@ Four-phase cascading enrichment worker:
 | **AI/RAG** | openai, anthropic, ChromaDB, sentence-transformers, function calling |
 | **Export** | openpyxl (Excel), WeasyPrint (PDF), python-pptx (PowerPoint) |
 | **Notifications** | smtplib + TLS STARTTLS (email), urllib (Slack/Teams/Discord webhooks) |
-| **Migrations** | Alembic (revision-based schema migrations, render_as_batch for SQLite) |
+| **Migrations** | Alembic (revision-based schema migrations, including SQLite compatibility via render_as_batch) |
 | **Frontend** | Next.js 16, React 19, TypeScript 5, Tailwind CSS 4, Recharts |
 
 ---
@@ -220,6 +248,8 @@ cd universal-knowledge-intelligence-platform
 
 ### 2. Backend
 
+Local development and deployment now share the same default database path: PostgreSQL. SQLite remains available only as an explicit fallback for constrained local scenarios.
+
 ```bash
 python -m venv .venv
 
@@ -228,11 +258,23 @@ python -m venv .venv
 # macOS / Linux
 source .venv/bin/activate
 
-pip install -r requirements.txt
+pip install -r requirements.lock
+docker compose -f docker-compose.dev.yml up -d postgres
+alembic upgrade head
 uvicorn backend.main:app --reload
 ```
 
 API at `http://localhost:8000` — Swagger UI at `http://localhost:8000/docs`
+
+If you need the legacy fallback path for a very simple local run, set `UKIP_DB_MODE=sqlite` and optionally `SQLITE_DATABASE_URL`.
+
+If Docker is available only inside WSL Ubuntu, run the PostgreSQL command from the repo mounted in WSL, for example `cd /mnt/d/universal-knowledge-intelligence-platform && docker compose -f docker-compose.dev.yml up -d postgres`.
+
+Schema upgrades are now an explicit startup step. Importing `backend.main` no longer runs migrations implicitly.
+
+Operational checks:
+- `GET /health` returns service status, database status, request id, log format, and probe duration.
+- `LOG_FORMAT=json` enables structured JSON logs; `LOG_FORMAT=text` keeps the same fields in key=value form.
 
 ### 3. Frontend
 
@@ -257,7 +299,7 @@ Open `http://localhost:3004`
 
 ```bash
 python -m pytest backend/tests/ -x -q
-# 1330 tests, all passing
+# backend test count varies by branch; use CI as the source of truth for current pass status
 ```
 
 ---
@@ -266,7 +308,7 @@ python -m pytest backend/tests/ -x -q
 
 ```mermaid
 graph TD
-    A[Excel / CSV / BibTeX / RIS / JSON-LD] -->|Import Wizard + AI Mapping| B[(SQLite + FTS5)]
+    A[Excel / CSV / BibTeX / RIS / JSON-LD] -->|Import Wizard + AI Mapping| B[(Operational DB: PostgreSQL-first runtime)]
     B --> C{Disambiguation}
     C -->|Fuzzy Match| D[Authority Resolution]
     D -->|Wikidata, VIAF, ORCID, DBpedia, OpenAlex| E[Review Queue]
@@ -636,7 +678,8 @@ ukip/
 │   ├── ARCHITECTURE.md
 │   ├── EVOLUTION_STRATEGY.md
 │   └── SCIENTOMETRICS.md
-└── requirements.txt
+├── requirements.txt          # human-maintained dependency intent
+└── requirements.lock         # reproducible backend lockfile
 ```
 
 </details>
