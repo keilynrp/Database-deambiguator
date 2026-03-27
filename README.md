@@ -60,6 +60,7 @@ UKIP is currently best understood as an **advanced product prototype / pre-comme
 - Organizations and membership exist, but full tenant data isolation is still a roadmap item
 - background jobs currently run in-process and are candidates for externalization
 - observability exists in parts, but production telemetry and health instrumentation are still being strengthened
+- Sentry telemetry now has a conservative baseline, but it remains fully disabled unless `SENTRY_ENABLED=1` is set explicitly
 
 ### Not yet treated as commercially complete
 
@@ -275,6 +276,7 @@ Schema upgrades are now an explicit startup step. Importing `backend.main` no lo
 Operational checks:
 - `GET /health` returns service status, database status, request id, log format, and probe duration.
 - `LOG_FORMAT=json` enables structured JSON logs; `LOG_FORMAT=text` keeps the same fields in key=value form.
+- Sentry stays off by default. Enable it only with `SENTRY_ENABLED=1` plus `SENTRY_DSN`; tracing remains off unless `SENTRY_ENABLE_TRACING=1`.
 
 ### 3. Frontend
 

@@ -24,7 +24,7 @@ Cada fila debe poder seguir este hilo:
 | Aislamiento real por tenant | EPIC-012 | US-043 | SPRINT-TBD | modelos con `org_id`, filtros por tenant, `docs/product/epics/EPIC-012-tenant-isolation-and-access-control.md` | Multi-tenancy real y control enterprise | Planned |
 | Credibilidad comercial y tecnica | EPIC-013 | US-046, US-047 | SPRINT-104 | `README.md`, onboarding, docs operativas, `docs/product/epics/EPIC-013-commercial-readiness-and-credibility.md` | Discurso alineado con producto real y salida a mercado mas creible | Planned |
 | Frontend mantenible | EPIC-014 | US-049 | SPRINT-TBD | `EntityTable.tsx`, `Sidebar.tsx`, `RAGChatInterface.tsx`, `docs/product/epics/EPIC-014-frontend-decomposition-and-maintainability.md` | Menor complejidad de UI y mejor velocidad de iteracion | Planned |
-| Observabilidad y operacion | EPIC-015 | US-051, US-052 | SPRINT-104 | logging, health checks, Sentry, `docs/product/epics/EPIC-015-observability-and-operations.md` | Mejor visibilidad operativa y readiness de producto serio | Planned |
+| Observabilidad y operacion | EPIC-015 | US-051, US-052 | SPRINT-104 | `backend/logging_utils.py`, `backend/telemetry.py`, `backend/routers/analytics.py`, `docs/product/epics/EPIC-015-observability-and-operations.md` | Mejor visibilidad operativa y readiness de producto serio | In progress |
 
 ## Regla de mantenimiento
 

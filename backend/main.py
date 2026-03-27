@@ -20,6 +20,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from backend import database, enrichment_worker, models
 from backend.logging_utils import RequestLoggingMiddleware, configure_logging
+from backend.telemetry import initialize_telemetry
 from backend.routers.limiter import limiter
 
 # ── Domain routers ────────────────────────────────────────────────────────────
@@ -104,6 +105,8 @@ _BUILTIN_TEMPLATES = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    initialize_telemetry(logger)
+
     # ── Startup env-var guard ────────────────────────────────────────────────
     # Required vars that must be set in production
     _required_vars = [
@@ -242,19 +245,6 @@ _OPENAPI_TAGS = [
     {"name": "sso",            "description": "OAuth2 / SAML single-sign-on flows."},
     {"name": "exports",        "description": "One-click PDF and Excel exports."},
 ]
-
-try:
-    import sentry_sdk
-    _sentry_dsn = os.environ.get("SENTRY_DSN")
-    if _sentry_dsn:
-        sentry_sdk.init(
-            dsn=_sentry_dsn,
-            traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.2")),
-            environment=os.environ.get("ENVIRONMENT", "development"),
-        )
-        logger.info("Sentry SDK initialized for FastAPI telemetry")
-except ImportError:
-    logger.debug("sentry-sdk not installed — telemetry disabled")
 
 app = FastAPI(
     title="UKIP — Universal Knowledge Intelligence Platform",

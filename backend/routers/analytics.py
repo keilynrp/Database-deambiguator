@@ -27,6 +27,7 @@ from backend.analyzers.correlation import CorrelationAnalyzer
 from backend.analyzers.roi_calculator import ROIParams, simulate as _roi_simulate
 from backend.analyzers.topic_modeling import TopicAnalyzer
 from backend.logging_utils import current_log_format
+from backend.telemetry import telemetry_status
 from backend.services.analytics_service import AnalyticsService
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
@@ -364,5 +365,6 @@ def health_check(request: Request, db: Session = Depends(get_db)):
         "database": db_status,
         "request_id": getattr(request.state, "request_id", None),
         "log_format": current_log_format(),
+        "telemetry": telemetry_status(),
         "duration_ms": round((time.perf_counter() - started) * 1000, 2),
     }

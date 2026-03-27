@@ -13,6 +13,9 @@ def test_health_includes_operational_fields(client):
     assert body["database"] == "ok"
     assert body["log_format"] in ("json", "text")
     assert body["request_id"]
+    assert body["telemetry"]["provider"] in ("none", "sentry")
+    assert body["telemetry"]["active"] is False
+    assert body["telemetry"]["tracing"] is False
     assert isinstance(body["duration_ms"], (int, float))
 
 

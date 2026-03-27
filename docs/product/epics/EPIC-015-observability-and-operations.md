@@ -55,8 +55,8 @@ Excluye:
 
 | ID | Story | Estado |
 |---|---|---|
-| US-051 | Health checks y structured logging | Planned |
-| US-052 | Baseline de Sentry y telemetria operativa | Planned |
+| US-051 | Health checks y structured logging | Done |
+| US-052 | Baseline de Sentry y telemetria operativa | Done |
 | US-053 | Verificaciones operativas y alertas base | Planned |
 
 ## 10. Sprint allocation

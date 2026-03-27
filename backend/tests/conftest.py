@@ -23,6 +23,7 @@ os.environ.setdefault("ENCRYPTION_KEY", "vRHc0zVcTXbRfUBZEsKNal2lMCfINwDh90EXE8v
 os.environ.setdefault("DATABASE_URL", TEST_DATABASE_URL)
 os.environ.setdefault("UKIP_DB_MODE", "sqlite")
 os.environ.setdefault("UKIP_SKIP_STARTUP_SIDE_EFFECTS", "1")
+os.environ.setdefault("SENTRY_ENABLED", "0")
 
 
 from sqlalchemy import text  # noqa: E402

@@ -126,6 +126,8 @@ Checks operativos utiles:
 
 - `GET /health` expone estado del servicio, estado de DB, `request_id`, formato de log y duracion del probe.
 - `LOG_FORMAT=json` produce logs estructurados; `LOG_FORMAT=text` conserva los mismos campos en texto.
+- `GET /health` tambien expone si telemetry esta activa, si Sentry esta configurado y si tracing esta habilitado.
+- Sentry esta apagado por defecto. Solo se activa con `SENTRY_ENABLED=1` y `SENTRY_DSN`; el tracing sigue apagado hasta `SENTRY_ENABLE_TRACING=1`.
 
 Frontend:
 
@@ -152,6 +154,9 @@ Del backend:
 - `ADMIN_PASSWORD`
 - `ALLOWED_ORIGINS`
 - `SESSION_SECRET_KEY`
+- `SENTRY_ENABLED`
+- `SENTRY_DSN`
+- `SENTRY_ENABLE_TRACING`
 
 Del frontend:
 

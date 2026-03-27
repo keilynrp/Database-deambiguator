@@ -25,7 +25,7 @@ Este sprint prioriza lo que mas duele entre el discurso actual y la realidad tec
 | US-041 | Story | Ciclo seguro de migraciones y arranque | EPIC-011 | Team | Done | P1 |
 | US-046 | Story | Alinear README y claims con la implementacion real | EPIC-013 | Team | Done | P0 |
 | US-051 | Story | Health checks y structured logging | EPIC-015 | Team | Done | P1 |
-| US-052 | Story | Baseline de Sentry y telemetria operativa | EPIC-015 | Team | Planned | P2 |
+| US-052 | Story | Baseline de Sentry y telemetria operativa | EPIC-015 | Team | Done | P2 |
 | US-047 | Story | Definir MVP comercial y onboarding real | EPIC-013 | Team | Planned | P2 |
 
 ## 4. Sprint narrative
@@ -64,6 +64,7 @@ Si este sprint sale bien, UKIP no solo sera mas solido tecnicamente: tambien ser
 - [ ] migraciones ya no corren al importar el modulo principal
 - [ ] README distingue claramente realidad actual vs plan
 - [ ] health/logging permiten diagnostico basico
+- [x] existe baseline opcional de telemetry con activacion explicita y defaults conservadores
 - [ ] docs y backlog quedan alineados
 
 ## 9. Exit criteria
