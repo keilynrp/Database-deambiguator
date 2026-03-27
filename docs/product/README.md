@@ -6,6 +6,7 @@ Este directorio contiene el sistema operativo de producto y delivery de UKIP.
 
 - `docs/DOCUMENTATION_GOVERNANCE.md`: reglas de autoridad y uso de la documentacion.
 - `PROGRAM_BACKLOG.md`: mapa maestro de epicas y lineas de producto.
+- `COMMERCIAL_MVP.md`: foco comercial inicial y recorrido real de onboarding.
 - `TRACEABILITY_MATRIX.md`: relacion entre vision, epicas, historias, sprints y evidencia.
 - `STORY_MAP.md`: vista funcional resumida del backlog refinado.
 - `epics/`: epicas activas del programa.

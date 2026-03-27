@@ -11,9 +11,9 @@ Como equipo de producto, quiero definir un MVP comercial y un onboarding real pa
 
 ## 3. Acceptance criteria
 
-- [ ] existe definicion explicita del vertical inicial o foco comercial
-- [ ] existe recorrido de onboarding real mas alla de demo mode
-- [ ] las prioridades tecnicas se conectan a ese MVP
+- [x] existe definicion explicita del vertical inicial o foco comercial
+- [x] existe recorrido de onboarding real mas alla de demo mode
+- [x] las prioridades tecnicas se conectan a ese MVP
 
 ## 4. Functional notes
 
@@ -27,13 +27,14 @@ Como equipo de producto, quiero definir un MVP comercial y un onboarding real pa
 
 ## 6. Definition of done
 
-- [ ] implementado
-- [ ] probado
-- [ ] documentado
-- [ ] trazabilidad actualizada
+- [x] implementado
+- [x] probado
+- [x] documentado
+- [x] trazabilidad actualizada
 
 ## 7. Evidence
 
-- Documento MVP:
-- Flujo onboarding:
-- Riesgos:
+- Documento MVP: `docs/product/COMMERCIAL_MVP.md`
+- Flujo onboarding: `backend/routers/onboarding.py`, `frontend/app/components/OnboardingChecklist.tsx`, `frontend/app/components/WelcomeModal.tsx`
+- Tests: `backend/tests/test_sprint95_onboarding.py`, `frontend/__tests__/OnboardingChecklist.test.tsx`
+- Riesgos: mantener la promesa comercial enfocada en research intelligence y no volver a narrativa demasiado generalista antes de cerrar `US-048`

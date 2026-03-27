@@ -69,6 +69,16 @@ UKIP is currently best understood as an **advanced product prototype / pre-comme
 - full compliance readiness
 - production-grade background job orchestration
 
+## Initial Commercial MVP
+
+The initial go-to-market wedge is `research intelligence` for teams that need to consolidate and operationalize publication portfolios.
+
+- primary users: research offices, library analytics teams, and innovation or R&D strategy groups
+- first dataset: CSV, Excel, BibTeX, or RIS with publications, authors, and affiliations
+- first-value path: import portfolio data, enrich and harmonize metadata, review analytics, then automate a recurring report or workflow
+
+See `docs/product/COMMERCIAL_MVP.md` for the fuller operating definition.
+
 ### Design Philosophy
 
 One rule: **Justified Complexity** ([details](docs/ARCHITECTURE.md)).

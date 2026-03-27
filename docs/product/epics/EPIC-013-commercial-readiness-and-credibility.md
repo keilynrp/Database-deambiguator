@@ -55,8 +55,8 @@ Excluye:
 
 | ID | Story | Estado |
 |---|---|---|
-| US-046 | Alinear README y claims con la implementacion real | Planned |
-| US-047 | Definir MVP comercial y onboarding real | Planned |
+| US-046 | Alinear README y claims con la implementacion real | Done |
+| US-047 | Definir MVP comercial y onboarding real | Done |
 | US-048 | Registrar gaps de compliance y readiness enterprise | Planned |
 
 ## 10. Sprint allocation
@@ -70,3 +70,7 @@ Excluye:
 - Valoracion tecnica senior 2026-03-24
 - `README.md`
 - docs estrategicas y de onboarding
+- `docs/product/COMMERCIAL_MVP.md`
+- `backend/routers/onboarding.py`
+- `frontend/app/components/OnboardingChecklist.tsx`
+- `frontend/app/components/WelcomeModal.tsx`
