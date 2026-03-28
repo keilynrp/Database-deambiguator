@@ -26,6 +26,7 @@ from backend import models
 from backend.analyzers.correlation import CorrelationAnalyzer
 from backend.analyzers.roi_calculator import ROIParams, simulate as _roi_simulate
 from backend.analyzers.topic_modeling import TopicAnalyzer
+from backend.enterprise_readiness import get_enterprise_readiness_report
 from backend.logging_utils import current_log_format
 from backend.ops_checks import dispatch_operational_alert_if_needed, run_operational_checks
 from backend.telemetry import telemetry_status
@@ -394,3 +395,11 @@ def run_operational_checks_now(
         else {"attempted": False, "event": "ops.check_failed", "reason": "notify_disabled"}
     )
     return report
+
+
+@router.get("/ops/enterprise-readiness", tags=["analytics"])
+def enterprise_readiness(
+    _: models.User = Depends(require_role("super_admin", "admin")),
+):
+    """Internal baseline of enterprise readiness and compliance gaps."""
+    return get_enterprise_readiness_report()

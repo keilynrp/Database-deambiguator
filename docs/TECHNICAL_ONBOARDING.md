@@ -127,6 +127,7 @@ Checks operativos utiles:
 - `GET /health` expone estado del servicio, estado de DB, `request_id`, formato de log y duracion del probe.
 - `GET /ops/checks` expone checklist repetible de DB, schedulers y readiness de alertado operativo.
 - `POST /ops/checks/run?notify=true` corre el mismo checklist y dispara `ops.check_failed` si encuentra estado degradado o critico.
+- `GET /ops/enterprise-readiness` expone el registro interno priorizado de gaps de compliance y readiness enterprise.
 - `LOG_FORMAT=json` produce logs estructurados; `LOG_FORMAT=text` conserva los mismos campos en texto.
 - `GET /health` tambien expone si telemetry esta activa, si Sentry esta configurado y si tracing esta habilitado.
 - Sentry esta apagado por defecto. Solo se activa con `SENTRY_ENABLED=1` y `SENTRY_DSN`; el tracing sigue apagado hasta `SENTRY_ENABLE_TRACING=1`.

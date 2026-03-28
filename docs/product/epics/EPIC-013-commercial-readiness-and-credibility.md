@@ -36,6 +36,7 @@ Excluye:
 
 - claims principales alineados con el codigo
 - existe definicion de MVP comercial concreto
+- existe registro priorizado de gaps de enterprise readiness
 - se reduce el riesgo de sobreventa tecnica
 
 ## 7. Technical impact
@@ -57,7 +58,7 @@ Excluye:
 |---|---|---|
 | US-046 | Alinear README y claims con la implementacion real | Done |
 | US-047 | Definir MVP comercial y onboarding real | Done |
-| US-048 | Registrar gaps de compliance y readiness enterprise | Planned |
+| US-048 | Registrar gaps de compliance y readiness enterprise | Done |
 
 ## 10. Sprint allocation
 
@@ -71,6 +72,9 @@ Excluye:
 - `README.md`
 - docs estrategicas y de onboarding
 - `docs/product/COMMERCIAL_MVP.md`
+- `docs/product/COMPLIANCE_GAP_REGISTER.md`
+- `backend/enterprise_readiness.py`
+- `GET /ops/enterprise-readiness`
 - `backend/routers/onboarding.py`
 - `frontend/app/components/OnboardingChecklist.tsx`
 - `frontend/app/components/WelcomeModal.tsx`

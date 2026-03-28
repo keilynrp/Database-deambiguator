@@ -7,13 +7,13 @@ Como equipo directivo y tecnico, quiero un registro claro de gaps de compliance 
 ## 2. Context
 
 - Epic: `EPIC-013`
-- Sprint objetivo: `SPRINT-TBD`
+- Sprint objetivo: `SPRINT-104`
 
 ## 3. Acceptance criteria
 
-- [ ] existe lista priorizada de gaps de compliance y enterprise readiness
-- [ ] cada gap tiene impacto y recomendacion
-- [ ] sirve de base para roadmap comercial posterior
+- [x] existe lista priorizada de gaps de compliance y enterprise readiness
+- [x] cada gap tiene impacto y recomendacion
+- [x] sirve de base para roadmap comercial posterior
 
 ## 4. Functional notes
 
@@ -27,13 +27,14 @@ Como equipo directivo y tecnico, quiero un registro claro de gaps de compliance 
 
 ## 6. Definition of done
 
-- [ ] implementado
-- [ ] probado
-- [ ] documentado
-- [ ] trazabilidad actualizada
+- [x] implementado
+- [x] probado
+- [x] documentado
+- [x] trazabilidad actualizada
 
 ## 7. Evidence
 
-- Registro:
-- Riesgos:
-- Prioridades:
+- Registro: `docs/product/COMPLIANCE_GAP_REGISTER.md`
+- Endpoint: `GET /ops/enterprise-readiness`
+- Riesgos: no confundir baseline de gaps con cumplimiento real ya implementado
+- Prioridades: tenant isolation, lifecycle controls y secret rotation como bloque P0

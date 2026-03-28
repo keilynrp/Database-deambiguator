@@ -68,6 +68,7 @@ UKIP is currently best understood as an **advanced product prototype / pre-comme
 - enterprise-grade tenant isolation
 - full compliance readiness
 - production-grade background job orchestration
+- a formal privacy, retention, and enterprise controls pack
 
 ## Initial Commercial MVP
 
@@ -78,6 +79,7 @@ The initial go-to-market wedge is `research intelligence` for teams that need to
 - first-value path: import portfolio data, enrich and harmonize metadata, review analytics, then automate a recurring report or workflow
 
 See `docs/product/COMMERCIAL_MVP.md` for the fuller operating definition.
+See `docs/product/COMPLIANCE_GAP_REGISTER.md` for the current enterprise readiness baseline and explicit gaps.
 
 ### Design Philosophy
 

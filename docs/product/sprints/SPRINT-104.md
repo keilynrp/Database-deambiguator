@@ -28,6 +28,7 @@ Este sprint prioriza lo que mas duele entre el discurso actual y la realidad tec
 | US-052 | Story | Baseline de Sentry y telemetria operativa | EPIC-015 | Team | Done | P2 |
 | US-053 | Story | Verificaciones operativas y alertas base | EPIC-015 | Team | Done | P2 |
 | US-047 | Story | Definir MVP comercial y onboarding real | EPIC-013 | Team | Done | P2 |
+| US-048 | Story | Registrar gaps de compliance y readiness enterprise | EPIC-013 | Team | Done | P2 |
 
 ## 4. Sprint narrative
 
