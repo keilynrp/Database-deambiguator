@@ -30,6 +30,7 @@ from backend.enterprise_readiness import get_enterprise_readiness_report
 from backend.logging_utils import current_log_format
 from backend.ops_checks import dispatch_operational_alert_if_needed, run_operational_checks
 from backend.telemetry import telemetry_status
+from backend.tenant_scoping import get_tenant_scoping_report
 from backend.services.analytics_service import AnalyticsService
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
@@ -403,3 +404,11 @@ def enterprise_readiness(
 ):
     """Internal baseline of enterprise readiness and compliance gaps."""
     return get_enterprise_readiness_report()
+
+
+@router.get("/ops/tenant-model", tags=["analytics"])
+def tenant_model(
+    _: models.User = Depends(require_role("super_admin", "admin")),
+):
+    """Internal target model and migration waves for tenant isolation."""
+    return get_tenant_scoping_report()

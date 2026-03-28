@@ -55,7 +55,7 @@ Excluye:
 
 | ID | Story | Estado |
 |---|---|---|
-| US-043 | Scoping de tenant en modelo de datos | Planned |
+| US-043 | Scoping de tenant en modelo de datos | Done |
 | US-044 | Enforcements de tenant en queries y acceso | Planned |
 | US-045 | Limites y quotas por tenant o plan | Planned |
 
@@ -63,10 +63,13 @@ Excluye:
 
 | Sprint | Objetivo |
 |---|---|
-| SPRINT-TBD | Iniciar tenant isolation real despues del hardening base |
+| SPRINT-105 | Iniciar tenant isolation real despues del hardening base |
 
 ## 11. Evidence
 
 - Valoracion tecnica senior 2026-03-24
 - `backend/models.py`
 - auth y routers de recursos compartidos
+- `backend/tenant_scoping.py`
+- `GET /ops/tenant-model`
+- `docs/product/TENANT_SCOPING_MODEL.md`

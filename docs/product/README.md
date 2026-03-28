@@ -8,6 +8,7 @@ Este directorio contiene el sistema operativo de producto y delivery de UKIP.
 - `PROGRAM_BACKLOG.md`: mapa maestro de epicas y lineas de producto.
 - `COMMERCIAL_MVP.md`: foco comercial inicial y recorrido real de onboarding.
 - `COMPLIANCE_GAP_REGISTER.md`: baseline de gaps enterprise y de compliance.
+- `TENANT_SCOPING_MODEL.md`: modelo objetivo y olas de migracion para tenant isolation.
 - `TRACEABILITY_MATRIX.md`: relacion entre vision, epicas, historias, sprints y evidencia.
 - `STORY_MAP.md`: vista funcional resumida del backlog refinado.
 - `epics/`: epicas activas del programa.
@@ -33,6 +34,7 @@ Este directorio contiene el sistema operativo de producto y delivery de UKIP.
 - sprint activo base en `docs/product/sprints/SPRINT-102.md`
 - siguiente sprint operativo en `docs/product/sprints/SPRINT-103.md`
 - siguiente sprint de hardening en `docs/product/sprints/SPRINT-104.md`
+- siguiente sprint de tenant isolation en `docs/product/sprints/SPRINT-105.md`
 
 ## Regla de oro
 

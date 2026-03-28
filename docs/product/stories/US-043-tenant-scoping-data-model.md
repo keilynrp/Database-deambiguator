@@ -7,13 +7,13 @@ Como arquitecto del producto, quiero identificar e introducir scoping de tenant 
 ## 2. Context
 
 - Epic: `EPIC-012`
-- Sprint objetivo: `SPRINT-TBD`
+- Sprint objetivo: `SPRINT-105`
 
 ## 3. Acceptance criteria
 
-- [ ] existe mapa de recursos que requieren `org_id` o equivalente
-- [ ] se define orden incremental de migracion de tablas
-- [ ] el modelo objetivo de tenant isolation queda claro
+- [x] existe mapa de recursos que requieren `org_id` o equivalente
+- [x] se define orden incremental de migracion de tablas
+- [x] el modelo objetivo de tenant isolation queda claro
 
 ## 4. Functional notes
 
@@ -26,13 +26,13 @@ Como arquitecto del producto, quiero identificar e introducir scoping de tenant 
 
 ## 6. Definition of done
 
-- [ ] implementado
-- [ ] probado
-- [ ] documentado
-- [ ] trazabilidad actualizada
+- [x] implementado
+- [x] probado
+- [x] documentado
+- [x] trazabilidad actualizada
 
 ## 7. Evidence
 
-- Modelo objetivo:
-- Riesgos:
-- Plan:
+- Modelo objetivo: `docs/product/TENANT_SCOPING_MODEL.md`
+- Riesgos: no aplicar enforcement antes de cerrar la secuencia de migracion por olas
+- Plan: `backend/tenant_scoping.py`, `GET /ops/tenant-model`, `backend/tests/test_sprint105_tenant_model.py`

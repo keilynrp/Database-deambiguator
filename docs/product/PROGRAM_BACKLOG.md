@@ -33,7 +33,7 @@ Fuentes estrategicas relacionadas:
 | EPIC-009 | Automation and Delivery | Automatizar imports, reportes, alertas y workflows | In progress | `scheduled_imports.py`, `scheduled_reports.py`, `alert_channels.py`, `workflows.py` |
 | EPIC-010 | Platform, Security and Collaboration | Fortalecer auth, RBAC, auditoria, organizaciones y colaboracion | In progress | `auth_users.py`, `api_keys.py`, `audit_log.py`, `organizations.py`, `annotations.py`, `notifications.py` |
 | EPIC-011 | Hardening and Runtime Reliability | Endurecer runtime, dependencias, DB path y lifecycle tecnico base | Planned | `requirements.txt`, `backend/database.py`, `backend/main.py`, Docker/config de despliegue |
-| EPIC-012 | Tenant Isolation and Access Control | Llevar multi-tenancy y control de acceso a aislamiento real de datos | Planned | modelos con `org_id`, filtros por tenant, RBAC/ABAC, quotas |
+| EPIC-012 | Tenant Isolation and Access Control | Llevar multi-tenancy y control de acceso a aislamiento real de datos | In progress | modelos con `org_id`, filtros por tenant, RBAC/ABAC, quotas |
 | EPIC-013 | Commercial Readiness and Credibility | Alinear claims, onboarding y readiness comercial con la realidad del producto | Done | `README.md`, docs comerciales, onboarding, compliance baseline |
 | EPIC-014 | Frontend Decomposition and Maintainability | Reducir componentes monoliticos y mejorar capacidad de evolucion del frontend | Planned | `EntityTable.tsx`, `Sidebar.tsx`, `RAGChatInterface.tsx`, `DisambiguationTool.tsx` |
 | EPIC-015 | Observability and Operations | Construir salud operativa, logging y telemetria minima de producto serio | Done | health endpoints, logging, Sentry/telemetry, checks operativos |
