@@ -24,6 +24,12 @@ from sqlalchemy.orm import Session
 from backend import models
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
+from backend.tenant_access import (
+    get_scoped_record,
+    persisted_org_id,
+    resolve_request_org_id,
+    scope_query_to_org,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +89,7 @@ def _serialize(cfg: models.WebScraperConfig) -> dict[str, Any]:
         field_map = {}
     return {
         "id": cfg.id,
+        "org_id": cfg.org_id,
         "name": cfg.name,
         "url_template": cfg.url_template,
         "selector_type": cfg.selector_type,
@@ -104,9 +111,11 @@ def _serialize(cfg: models.WebScraperConfig) -> dict[str, Any]:
 def create_scraper(
     payload: ScraperCreate,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
+    org_id = persisted_org_id(resolve_request_org_id(db, current_user))
     cfg = models.WebScraperConfig(
+        org_id=org_id,
         name=payload.name,
         url_template=payload.url_template,
         selector_type=payload.selector_type,
@@ -127,9 +136,10 @@ def list_scrapers(
     limit: int = Query(50, ge=1, le=200),
     active_only: bool = Query(False),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
-    q = db.query(models.WebScraperConfig)
+    org_id = resolve_request_org_id(db, current_user)
+    q = scope_query_to_org(db.query(models.WebScraperConfig), models.WebScraperConfig, org_id)
     if active_only:
         q = q.filter(models.WebScraperConfig.is_active == True)  # noqa: E712
     items = q.offset(skip).limit(limit).all()
@@ -140,9 +150,10 @@ def list_scrapers(
 def get_scraper(
     scraper_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
-    cfg = db.get(models.WebScraperConfig, scraper_id)
+    org_id = resolve_request_org_id(db, current_user)
+    cfg = get_scoped_record(db, models.WebScraperConfig, scraper_id, org_id)
     if not cfg:
         raise HTTPException(status_code=404, detail="Scraper config not found")
     return _serialize(cfg)
@@ -153,9 +164,10 @@ def update_scraper(
     payload: ScraperUpdate,
     scraper_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    cfg = db.get(models.WebScraperConfig, scraper_id)
+    org_id = resolve_request_org_id(db, current_user)
+    cfg = get_scoped_record(db, models.WebScraperConfig, scraper_id, org_id)
     if not cfg:
         raise HTTPException(status_code=404, detail="Scraper config not found")
     data = payload.model_dump(exclude_unset=True)
@@ -172,9 +184,10 @@ def update_scraper(
 def delete_scraper(
     scraper_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    cfg = db.get(models.WebScraperConfig, scraper_id)
+    org_id = resolve_request_org_id(db, current_user)
+    cfg = get_scoped_record(db, models.WebScraperConfig, scraper_id, org_id)
     if not cfg:
         raise HTTPException(status_code=404, detail="Scraper config not found")
     db.delete(cfg)
@@ -189,13 +202,14 @@ def test_scraper(
     payload: ScraperTestRequest,
     scraper_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
     """
     Run the scraper against a single label and return the scraped fields.
     Does NOT write anything to the database.
     """
-    cfg = db.get(models.WebScraperConfig, scraper_id)
+    org_id = resolve_request_org_id(db, current_user)
+    cfg = get_scoped_record(db, models.WebScraperConfig, scraper_id, org_id)
     if not cfg:
         raise HTTPException(status_code=404, detail="Scraper config not found")
 
@@ -216,13 +230,14 @@ def run_scraper(
     scraper_id: int = Path(..., ge=1),
     limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
     """
     Synchronously run the scraper against up to *limit* entities whose
     enrichment_status is 'none' or 'failed'. Updates entities in-place.
     """
-    cfg = db.get(models.WebScraperConfig, scraper_id)
+    org_id = resolve_request_org_id(db, current_user)
+    cfg = get_scoped_record(db, models.WebScraperConfig, scraper_id, org_id)
     if not cfg:
         raise HTTPException(status_code=404, detail="Scraper config not found")
     if not cfg.is_active:
@@ -239,7 +254,7 @@ def run_scraper(
     )
 
     entities = (
-        db.query(models.RawEntity)
+        scope_query_to_org(db.query(models.RawEntity), models.RawEntity, cfg.org_id)
         .filter(models.RawEntity.enrichment_status.in_(["none", "failed"]))
         .limit(limit)
         .all()

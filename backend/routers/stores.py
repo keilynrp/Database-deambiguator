@@ -28,10 +28,20 @@ from backend.database import get_db
 from backend.encryption import encrypt
 from backend.routers.deps import _get_store_adapter
 from backend.routers.limiter import limiter
+from backend.tenant_access import (
+    get_scoped_record,
+    persisted_org_id,
+    resolve_request_org_id,
+    scope_query_to_org,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["stores"])
+
+
+def _get_scoped_store(db: Session, store_id: int, org_id: int | None) -> models.StoreConnection | None:
+    return get_scoped_record(db, models.StoreConnection, store_id, org_id)
 
 
 @router.get("/stores")
@@ -39,10 +49,11 @@ def get_all_stores(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
+    org_id = resolve_request_org_id(db, current_user)
     stores = (
-        db.query(models.StoreConnection)
+        scope_query_to_org(db.query(models.StoreConnection), models.StoreConnection, org_id)
         .order_by(models.StoreConnection.id.desc())
         .offset(skip)
         .limit(limit)
@@ -69,11 +80,10 @@ def get_all_stores(
 def get_store(
     store_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    store = db.query(models.StoreConnection).filter(
-        models.StoreConnection.id == store_id
-    ).first()
+    org_id = resolve_request_org_id(db, current_user)
+    store = _get_scoped_store(db, store_id, org_id)
     if not store:
         raise HTTPException(status_code=404, detail="Store connection not found")
     return {
@@ -97,9 +107,11 @@ def get_store(
 def create_store(
     payload: schemas.StoreConnectionCreate,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
+    org_id = persisted_org_id(resolve_request_org_id(db, current_user))
     store = models.StoreConnection(
+        org_id=org_id,
         name=payload.name.strip(),
         platform=payload.platform,
         base_url=payload.base_url.rstrip("/"),
@@ -128,11 +140,10 @@ def update_store(
     store_id: int = Path(..., ge=1),
     payload: schemas.StoreConnectionUpdate = ...,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    store = db.query(models.StoreConnection).filter(
-        models.StoreConnection.id == store_id
-    ).first()
+    org_id = resolve_request_org_id(db, current_user)
+    store = _get_scoped_store(db, store_id, org_id)
     if not store:
         raise HTTPException(status_code=404, detail="Store connection not found")
 
@@ -158,14 +169,16 @@ def update_store(
 def delete_store(
     store_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    store = db.query(models.StoreConnection).filter(
-        models.StoreConnection.id == store_id
-    ).first()
+    org_id = resolve_request_org_id(db, current_user)
+    store = _get_scoped_store(db, store_id, org_id)
     if not store:
         raise HTTPException(status_code=404, detail="Store connection not found")
 
+    db.query(models.SyncQueueItem).filter(
+        models.SyncQueueItem.store_id == store_id
+    ).delete()
     db.query(models.StoreSyncMapping).filter(
         models.StoreSyncMapping.store_id == store_id
     ).delete()
@@ -182,11 +195,10 @@ def delete_store(
 def toggle_store(
     store_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    store = db.query(models.StoreConnection).filter(
-        models.StoreConnection.id == store_id
-    ).first()
+    org_id = resolve_request_org_id(db, current_user)
+    store = _get_scoped_store(db, store_id, org_id)
     if not store:
         raise HTTPException(status_code=404, detail="Store connection not found")
     store.is_active = not store.is_active
@@ -200,19 +212,26 @@ def toggle_store(
 @router.get("/stores/stats/summary")
 def get_stores_summary(
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    total_stores  = db.query(func.count(models.StoreConnection.id)).scalar() or 0
+    org_id = resolve_request_org_id(db, current_user)
+    store_query = scope_query_to_org(db.query(models.StoreConnection), models.StoreConnection, org_id)
+    total_stores = store_query.count()
     active_stores = (
-        db.query(func.count(models.StoreConnection.id))
+        scope_query_to_org(db.query(models.StoreConnection), models.StoreConnection, org_id)
         .filter(models.StoreConnection.is_active == True)
-        .scalar() or 0
+        .count()
     )
-    total_mappings = db.query(func.count(models.StoreSyncMapping.id)).scalar() or 0
-    platform_counts = db.query(
+    store_ids = [store.id for store in store_query.all()]
+    total_mappings = (
+        db.query(func.count(models.StoreSyncMapping.id))
+        .filter(models.StoreSyncMapping.store_id.in_(store_ids))
+        .scalar() or 0
+    ) if store_ids else 0
+    platform_counts = scope_query_to_org(db.query(
         models.StoreConnection.platform,
         func.count(models.StoreConnection.id),
-    ).group_by(models.StoreConnection.platform).all()
+    ), models.StoreConnection, org_id).group_by(models.StoreConnection.platform).all()
 
     return {
         "total_stores":   total_stores,
@@ -230,11 +249,10 @@ def test_store_connection(
     request: Request,
     store_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    store = db.query(models.StoreConnection).filter(
-        models.StoreConnection.id == store_id
-    ).first()
+    org_id = resolve_request_org_id(db, current_user)
+    store = _get_scoped_store(db, store_id, org_id)
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
     try:
@@ -259,12 +277,11 @@ def pull_entities_from_store(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
     """Pull entities from remote store and create queue items for human review."""
-    store = db.query(models.StoreConnection).filter(
-        models.StoreConnection.id == store_id
-    ).first()
+    org_id = resolve_request_org_id(db, current_user)
+    store = _get_scoped_store(db, store_id, org_id)
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
     if not store.is_active:
@@ -399,8 +416,12 @@ def get_store_mappings(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
+    org_id = resolve_request_org_id(db, current_user)
+    store = _get_scoped_store(db, store_id, org_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="Store connection not found")
     total = (
         db.query(func.count(models.StoreSyncMapping.id))
         .filter(models.StoreSyncMapping.store_id == store_id)
@@ -442,8 +463,12 @@ def get_store_queue(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
+    org_id = resolve_request_org_id(db, current_user)
+    store = _get_scoped_store(db, store_id, org_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="Store connection not found")
     query = db.query(models.SyncQueueItem).filter(
         models.SyncQueueItem.store_id == store_id
     )
@@ -482,20 +507,23 @@ def get_store_queue(
 def approve_queue_item(
     item_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    now = datetime.now(timezone.utc)
-    rows = db.query(models.SyncQueueItem).filter(
-        models.SyncQueueItem.id     == item_id,
-        models.SyncQueueItem.status == "pending",
-    ).update({"status": "approved", "resolved_at": now})
-    if rows == 0:
-        item = db.query(models.SyncQueueItem).filter(
-            models.SyncQueueItem.id == item_id
-        ).first()
-        if not item:
-            raise HTTPException(status_code=404, detail="Queue item not found")
+    org_id = resolve_request_org_id(db, current_user)
+    item = db.query(models.SyncQueueItem).filter(
+        models.SyncQueueItem.id == item_id
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Queue item not found")
+    store = _get_scoped_store(db, item.store_id, org_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="Queue item not found")
+    if item.status != "pending":
         raise HTTPException(status_code=409, detail=f"Item is already {item.status}")
+
+    now = datetime.now(timezone.utc)
+    item.status = "approved"
+    item.resolved_at = now
     db.commit()
     return {"message": "Item approved", "id": item_id, "status": "approved"}
 
@@ -504,20 +532,23 @@ def approve_queue_item(
 def reject_queue_item(
     item_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    now = datetime.now(timezone.utc)
-    rows = db.query(models.SyncQueueItem).filter(
-        models.SyncQueueItem.id     == item_id,
-        models.SyncQueueItem.status == "pending",
-    ).update({"status": "rejected", "resolved_at": now})
-    if rows == 0:
-        item = db.query(models.SyncQueueItem).filter(
-            models.SyncQueueItem.id == item_id
-        ).first()
-        if not item:
-            raise HTTPException(status_code=404, detail="Queue item not found")
+    org_id = resolve_request_org_id(db, current_user)
+    item = db.query(models.SyncQueueItem).filter(
+        models.SyncQueueItem.id == item_id
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Queue item not found")
+    store = _get_scoped_store(db, item.store_id, org_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="Queue item not found")
+    if item.status != "pending":
         raise HTTPException(status_code=409, detail=f"Item is already {item.status}")
+
+    now = datetime.now(timezone.utc)
+    item.status = "rejected"
+    item.resolved_at = now
     db.commit()
     return {"message": "Item rejected", "id": item_id, "status": "rejected"}
 
@@ -526,9 +557,13 @@ def reject_queue_item(
 def bulk_approve_queue(
     store_id: int = Query(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
     """Approve all pending queue items for a store."""
+    org_id = resolve_request_org_id(db, current_user)
+    store = _get_scoped_store(db, store_id, org_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="Store connection not found")
     updated = db.query(models.SyncQueueItem).filter(
         models.SyncQueueItem.store_id == store_id,
         models.SyncQueueItem.status   == "pending",
@@ -541,9 +576,13 @@ def bulk_approve_queue(
 def bulk_reject_queue(
     store_id: int = Query(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
     """Reject all pending queue items for a store."""
+    org_id = resolve_request_org_id(db, current_user)
+    store = _get_scoped_store(db, store_id, org_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="Store connection not found")
     updated = db.query(models.SyncQueueItem).filter(
         models.SyncQueueItem.store_id == store_id,
         models.SyncQueueItem.status   == "pending",
@@ -558,8 +597,12 @@ def get_store_logs(
     skip: int = 0,
     limit: int = 20,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
+    org_id = resolve_request_org_id(db, current_user)
+    store = _get_scoped_store(db, store_id, org_id)
+    if not store:
+        raise HTTPException(status_code=404, detail="Store connection not found")
     logs = (
         db.query(models.SyncLog)
         .filter(models.SyncLog.store_id == store_id)

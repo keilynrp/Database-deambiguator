@@ -11,7 +11,7 @@ from backend.adapters.enrichment.scholar import ScholarAdapter
 from backend.adapters.enrichment.scopus import ScopusAdapter
 from backend.adapters.enrichment.wos import WebOfScienceAdapter
 from backend.circuit_breaker import CircuitBreaker, CircuitOpenError
-from backend.tenant_access import scope_query_to_org
+from backend.tenant_access import LEGACY_GLOBAL_ORG_ID, scope_query_to_org
 
 logger = logging.getLogger(__name__)
 
@@ -210,8 +210,16 @@ def enrich_with_web_scrapers(db: Session, entity: models.RawEntity) -> bool:
     if not entity.primary_label:
         return False
 
+    scope_org_id = getattr(entity, "org_id", None)
+    if scope_org_id is None:
+        scope_org_id = LEGACY_GLOBAL_ORG_ID
+
     configs = (
-        db.query(models.WebScraperConfig)
+        scope_query_to_org(
+            db.query(models.WebScraperConfig),
+            models.WebScraperConfig,
+            scope_org_id,
+        )
         .filter(models.WebScraperConfig.is_active == True)  # noqa: E712
         .all()
     )

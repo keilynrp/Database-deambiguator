@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from backend import models
 from backend.analyzers.topic_modeling import TopicAnalyzer
+from backend.tenant_access import scope_query_to_org
 
 logger = logging.getLogger(__name__)
 
@@ -57,28 +58,43 @@ class EnterpriseExcelExporter:
     _ENTITY_CAP = 5_000
     _CONCEPT_CAP = 50
 
-    def build(self, db: Session, domain_id: str, sections: List[str]) -> bytes:
+    def _entities_query(self, db: Session, domain_id: str, org_id: int | None):
+        query = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+        if domain_id:
+            query = query.filter(models.RawEntity.domain == domain_id)
+        return query
+
+    def _harmonization_query(self, db: Session, org_id: int | None):
+        return scope_query_to_org(db.query(models.HarmonizationLog), models.HarmonizationLog, org_id)
+
+    def build(
+        self,
+        db: Session,
+        domain_id: str,
+        sections: List[str],
+        org_id: int | None = None,
+    ) -> bytes:
         wb = openpyxl.Workbook()
 
         # ── Sheet 1: Summary KPIs ──────────────────────────────────────────────
         ws_summary = wb.active
         assert ws_summary is not None
         ws_summary.title = "Summary"
-        self._write_summary(ws_summary, db, domain_id)
+        self._write_summary(ws_summary, db, domain_id, org_id)
 
         # ── Sheet 2: Entities ──────────────────────────────────────────────────
         ws_entities = wb.create_sheet("Entities")
-        self._write_entities(ws_entities, db)
+        self._write_entities(ws_entities, db, domain_id, org_id)
 
         # ── Sheet 3: Concepts ─────────────────────────────────────────────────
         if "topic_clusters" in sections:
             ws_concepts = wb.create_sheet("Concepts")
-            self._write_concepts(ws_concepts, db, domain_id)
+            self._write_concepts(ws_concepts, db, domain_id, org_id)
 
         # ── Sheet 4: Harmonization Log ────────────────────────────────────────
         if "harmonization_log" in sections:
             ws_harm = wb.create_sheet("Harmonization")
-            self._write_harmonization(ws_harm, db)
+            self._write_harmonization(ws_harm, db, org_id)
 
         buf = BytesIO()
         wb.save(buf)
@@ -86,10 +102,11 @@ class EnterpriseExcelExporter:
 
     # ── Private sheet writers ──────────────────────────────────────────────────
 
-    def _write_summary(self, ws, db: Session, domain_id: str) -> None:
-        total = db.query(models.RawEntity).count()
+    def _write_summary(self, ws, db: Session, domain_id: str, org_id: int | None) -> None:
+        query = self._entities_query(db, domain_id, org_id)
+        total = query.count()
         enriched = (
-            db.query(models.RawEntity)
+            query
             .filter(models.RawEntity.enrichment_status == "completed")
             .count()
         )
@@ -97,7 +114,7 @@ class EnterpriseExcelExporter:
 
         from sqlalchemy import func
         avg_row = (
-            db.query(func.avg(models.RawEntity.enrichment_citation_count))
+            query.with_entities(func.avg(models.RawEntity.enrichment_citation_count))
             .filter(models.RawEntity.enrichment_status == "completed")
             .scalar()
         )
@@ -120,7 +137,7 @@ class EnterpriseExcelExporter:
 
         _autofit(ws)
 
-    def _write_entities(self, ws, db: Session) -> None:
+    def _write_entities(self, ws, db: Session, domain_id: str, org_id: int | None) -> None:
         headers = [
             "ID", "Primary Label", "Secondary Label", "Canonical ID", "Entity Type",
             "Enrichment Status", "Citation Count", "Source",
@@ -129,7 +146,7 @@ class EnterpriseExcelExporter:
         ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}1"
 
         rows = (
-            db.query(models.RawEntity)
+            self._entities_query(db, domain_id, org_id)
             .order_by(models.RawEntity.id)
             .limit(self._ENTITY_CAP)
             .all()
@@ -146,12 +163,22 @@ class EnterpriseExcelExporter:
 
         _autofit(ws)
 
-    def _write_concepts(self, ws, db: Session, domain_id: str) -> None:  # db kept for consistency
+    def _write_concepts(
+        self,
+        ws,
+        db: Session,
+        domain_id: str,
+        org_id: int | None,
+    ) -> None:  # db kept for consistency
         headers = ["Rank", "Concept", "Count", "Percentage (%)"]
         _style_header_row(ws, headers)
 
         try:
-            result = TopicAnalyzer().top_topics(domain_id=domain_id, top_n=self._CONCEPT_CAP)
+            result = TopicAnalyzer().top_topics(
+                domain_id=domain_id,
+                top_n=self._CONCEPT_CAP,
+                org_id=org_id,
+            )
             topics = result.get("topics", [])
         except Exception:
             logger.warning("TopicAnalyzer failed in excel_exporter", exc_info=True)
@@ -165,12 +192,12 @@ class EnterpriseExcelExporter:
 
         _autofit(ws)
 
-    def _write_harmonization(self, ws, db: Session) -> None:
+    def _write_harmonization(self, ws, db: Session, org_id: int | None) -> None:
         headers = ["ID", "Step ID", "Step Name", "Records Updated", "Fields Modified", "Executed At", "Reverted"]
         _style_header_row(ws, headers)
 
         rows = (
-            db.query(models.HarmonizationLog)
+            self._harmonization_query(db, org_id)
             .order_by(models.HarmonizationLog.id.desc())
             .limit(200)
             .all()

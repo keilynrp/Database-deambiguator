@@ -8,12 +8,13 @@ import json
 from datetime import datetime, timezone
 from typing import List
 
-from sqlalchemy import func, text
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend import models
 from backend.analyzers.topic_modeling import TopicAnalyzer
 from backend.schema_registry import registry
+from backend.tenant_access import scope_query_to_org
 
 # ── CSS (inline, print-friendly) ─────────────────────────────────────────────
 
@@ -64,12 +65,28 @@ footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e5e7eb;
 
 # ── Section builders ──────────────────────────────────────────────────────────
 
-def _section_entity_stats(db: Session) -> str:
-    total = db.query(func.count(models.RawEntity.id)).scalar() or 0
-    by_status = db.query(models.RawEntity.validation_status, func.count(models.RawEntity.id))\
-        .group_by(models.RawEntity.validation_status).all()
-    by_enrich = db.query(models.RawEntity.enrichment_status, func.count(models.RawEntity.id))\
-        .group_by(models.RawEntity.enrichment_status).all()
+def _entities_query(db: Session, domain_id: str, org_id: int | None):
+    query = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+    if domain_id:
+        query = query.filter(models.RawEntity.domain == domain_id)
+    return query
+
+
+def _harmonization_query(db: Session, org_id: int | None):
+    return scope_query_to_org(db.query(models.HarmonizationLog), models.HarmonizationLog, org_id)
+
+
+def _section_entity_stats(db: Session, domain_id: str, org_id: int | None) -> str:
+    query = _entities_query(db, domain_id, org_id)
+    total = query.with_entities(func.count(models.RawEntity.id)).scalar() or 0
+    by_status = query.with_entities(
+        models.RawEntity.validation_status,
+        func.count(models.RawEntity.id),
+    ).group_by(models.RawEntity.validation_status).all()
+    by_enrich = query.with_entities(
+        models.RawEntity.enrichment_status,
+        func.count(models.RawEntity.id),
+    ).group_by(models.RawEntity.enrichment_status).all()
 
     status_map = {r[0]: r[1] for r in by_status}
     enrich_map = {r[0]: r[1] for r in by_enrich}
@@ -109,16 +126,22 @@ def _section_entity_stats(db: Session) -> str:
 </section>"""
 
 
-def _section_enrichment_coverage(db: Session) -> str:
-    total = db.query(func.count(models.RawEntity.id)).scalar() or 0
-    completed = db.query(func.count(models.RawEntity.id))\
+def _section_enrichment_coverage(db: Session, domain_id: str, org_id: int | None) -> str:
+    query = _entities_query(db, domain_id, org_id)
+    total = query.with_entities(func.count(models.RawEntity.id)).scalar() or 0
+    completed = query.with_entities(func.count(models.RawEntity.id))\
         .filter(models.RawEntity.enrichment_status == "completed").scalar() or 0
-    avg_cit = db.query(func.avg(models.RawEntity.enrichment_citation_count))\
+    avg_cit = query.with_entities(func.avg(models.RawEntity.enrichment_citation_count))\
         .filter(models.RawEntity.enrichment_status == "completed").scalar() or 0
-    top = db.query(models.RawEntity.primary_label, models.RawEntity.enrichment_citation_count,
-                   models.RawEntity.enrichment_source)\
-        .filter(models.RawEntity.enrichment_status == "completed")\
-        .order_by(models.RawEntity.enrichment_citation_count.desc()).limit(8).all()
+    top = query.with_entities(
+        models.RawEntity.primary_label,
+        models.RawEntity.enrichment_citation_count,
+        models.RawEntity.enrichment_source,
+    ).filter(
+        models.RawEntity.enrichment_status == "completed"
+    ).order_by(
+        models.RawEntity.enrichment_citation_count.desc()
+    ).limit(8).all()
 
     pct = round(completed / total * 100) if total else 0
     rows = "".join(f"""
@@ -139,8 +162,11 @@ def _section_enrichment_coverage(db: Session) -> str:
 </section>"""
 
 
-def _section_top_brands(db: Session) -> str:
-    rows_q = db.query(models.RawEntity.secondary_label, func.count(models.RawEntity.id).label("n"))\
+def _section_top_brands(db: Session, domain_id: str, org_id: int | None) -> str:
+    rows_q = _entities_query(db, domain_id, org_id).with_entities(
+        models.RawEntity.secondary_label,
+        func.count(models.RawEntity.id).label("n"),
+    )\
         .filter(models.RawEntity.secondary_label.isnot(None))\
         .group_by(models.RawEntity.secondary_label)\
         .order_by(func.count(models.RawEntity.id).desc()).limit(15).all()
@@ -161,10 +187,11 @@ def _section_top_brands(db: Session) -> str:
 </section>"""
 
 
-def _section_topic_clusters(db: Session) -> str:
+def _section_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> str:
     analyzer = TopicAnalyzer()
     try:
-        topics = analyzer.top_topics(db, limit=15)
+        result = analyzer.top_topics(domain_id=domain_id, top_n=15, org_id=org_id)
+        topics = result.get("topics", [])
     except Exception:
         topics = []
 
@@ -192,8 +219,8 @@ def _section_topic_clusters(db: Session) -> str:
 </section>"""
 
 
-def _section_harmonization_log(db: Session) -> str:
-    logs = db.query(models.HarmonizationLog)\
+def _section_harmonization_log(db: Session, domain_id: str, org_id: int | None) -> str:
+    logs = _harmonization_query(db, org_id)\
         .order_by(models.HarmonizationLog.executed_at.desc()).limit(10).all()
 
     if not logs:
@@ -238,7 +265,13 @@ SECTION_LABELS = {
 }
 
 
-def build(db: Session, domain_id: str, sections: List[str], title: str | None = None) -> str:
+def build(
+    db: Session,
+    domain_id: str,
+    sections: List[str],
+    title: str | None = None,
+    org_id: int | None = None,
+) -> str:
     """Return a complete, self-contained HTML report string."""
     domain_name = domain_id
     try:
@@ -268,7 +301,7 @@ def build(db: Session, domain_id: str, sections: List[str], title: str | None = 
         builder = SECTION_BUILDERS.get(sec)
         if builder:
             try:
-                body_sections.append(builder(db))
+                body_sections.append(builder(db, domain_id, org_id))
             except Exception as exc:
                 body_sections.append(f'<section><h2>{SECTION_LABELS.get(sec, sec)}</h2>'
                                      f'<p style="color:#ef4444">Error building section: {exc}</p></section>')

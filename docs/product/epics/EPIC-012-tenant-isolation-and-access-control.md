@@ -57,6 +57,7 @@ Excluye:
 |---|---|---|
 | US-043 | Scoping de tenant en modelo de datos | Done |
 | US-044 | Enforcements de tenant en queries y acceso | Done |
+| US-054 | Scoping tenant en runtime operativo y jobs derivados | Done |
 | US-045 | Limites y quotas por tenant o plan | Planned |
 
 ## 10. Sprint allocation
@@ -75,3 +76,15 @@ Excluye:
 - `GET /ops/tenant-model`
 - `docs/product/TENANT_SCOPING_MODEL.md`
 - `docs/product/stories/US-044-tenant-query-enforcement.md`
+- `alembic/versions/f0a1b2c3d4e5_tenant_scope_operational_resources.py`
+- `backend/routers/stores.py`
+- `backend/routers/scheduled_imports.py`
+- `backend/routers/scheduled_reports.py`
+- `backend/routers/scrapers.py`
+- `backend/report_builder.py`
+- `backend/exporters/excel_exporter.py`
+- `backend/exporters/pptx_exporter.py`
+- `backend/enrichment_worker.py`
+- `backend/workflow_engine.py`
+- `backend/tests/test_sprint105_tenant_async_runtime.py`
+- `docs/product/stories/US-054-tenant-operational-runtime-scoping.md`

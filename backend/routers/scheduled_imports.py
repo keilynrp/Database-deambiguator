@@ -22,10 +22,24 @@ from backend import models, database
 from backend.auth import require_role
 from backend.database import get_db
 from backend.routers.deps import _get_store_adapter
+from backend.tenant_access import (
+    get_scoped_record,
+    persisted_org_id,
+    resolve_request_org_id,
+    scope_query_to_org,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _get_scoped_store(db: Session, store_id: int, org_id: int | None) -> models.StoreConnection | None:
+    return get_scoped_record(db, models.StoreConnection, store_id, org_id)
+
+
+def _get_scoped_schedule(db: Session, schedule_id: int, org_id: int | None) -> models.ScheduledImport | None:
+    return get_scoped_record(db, models.ScheduledImport, schedule_id, org_id)
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -47,6 +61,7 @@ class ScheduledImportUpdate(BaseModel):
 def _serialize(s: models.ScheduledImport) -> dict:
     return {
         "id": s.id,
+        "org_id": s.org_id,
         "store_id": s.store_id,
         "name": s.name,
         "interval_minutes": s.interval_minutes,
@@ -67,15 +82,18 @@ def _serialize(s: models.ScheduledImport) -> dict:
 def create_scheduled_import(
     payload: ScheduledImportCreate,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
+    org_id = resolve_request_org_id(db, current_user)
+    stored_org_id = persisted_org_id(org_id)
     # Verify store exists
-    store = db.get(models.StoreConnection, payload.store_id)
+    store = _get_scoped_store(db, payload.store_id, org_id)
     if not store:
         raise HTTPException(status_code=404, detail="Store connection not found")
 
     now = datetime.now(timezone.utc)
     schedule = models.ScheduledImport(
+        org_id=stored_org_id,
         store_id=payload.store_id,
         name=payload.name.strip(),
         interval_minutes=payload.interval_minutes,
@@ -92,16 +110,25 @@ def create_scheduled_import(
 @router.get("/scheduled-imports", tags=["scheduled-imports"])
 def list_scheduled_imports(
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    items = db.query(models.ScheduledImport).order_by(
+    org_id = resolve_request_org_id(db, current_user)
+    items = scope_query_to_org(
+        db.query(models.ScheduledImport),
+        models.ScheduledImport,
+        org_id,
+    ).order_by(
         models.ScheduledImport.id.desc()
     ).all()
     # Enrich with store name
     store_ids = {s.store_id for s in items}
     stores = {
         s.id: s.name
-        for s in db.query(models.StoreConnection).filter(
+        for s in scope_query_to_org(
+            db.query(models.StoreConnection),
+            models.StoreConnection,
+            org_id,
+        ).filter(
             models.StoreConnection.id.in_(store_ids)
         ).all()
     } if store_ids else {}
@@ -116,19 +143,36 @@ def list_scheduled_imports(
 @router.get("/scheduled-imports/stats", tags=["scheduled-imports"])
 def scheduled_imports_stats(
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    total = db.query(models.ScheduledImport).count()
-    active = db.query(models.ScheduledImport).filter(
+    org_id = resolve_request_org_id(db, current_user)
+    total = scope_query_to_org(
+        db.query(models.ScheduledImport),
+        models.ScheduledImport,
+        org_id,
+    ).count()
+    active = scope_query_to_org(
+        db.query(models.ScheduledImport),
+        models.ScheduledImport,
+        org_id,
+    ).filter(
         models.ScheduledImport.is_active == True  # noqa: E712
     ).count()
     total_runs = sum(
         s.total_runs or 0
-        for s in db.query(models.ScheduledImport).all()
+        for s in scope_query_to_org(
+            db.query(models.ScheduledImport),
+            models.ScheduledImport,
+            org_id,
+        ).all()
     )
     total_entities = sum(
         s.total_entities_imported or 0
-        for s in db.query(models.ScheduledImport).all()
+        for s in scope_query_to_org(
+            db.query(models.ScheduledImport),
+            models.ScheduledImport,
+            org_id,
+        ).all()
     )
     return {
         "total": total,
@@ -143,9 +187,10 @@ def scheduled_imports_stats(
 def get_scheduled_import(
     schedule_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    s = db.get(models.ScheduledImport, schedule_id)
+    org_id = resolve_request_org_id(db, current_user)
+    s = _get_scoped_schedule(db, schedule_id, org_id)
     if not s:
         raise HTTPException(status_code=404, detail="Schedule not found")
     return _serialize(s)
@@ -156,9 +201,10 @@ def update_scheduled_import(
     schedule_id: int = Path(..., ge=1),
     payload: ScheduledImportUpdate = ...,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    s = db.get(models.ScheduledImport, schedule_id)
+    org_id = resolve_request_org_id(db, current_user)
+    s = _get_scoped_schedule(db, schedule_id, org_id)
     if not s:
         raise HTTPException(status_code=404, detail="Schedule not found")
     if payload.name is not None:
@@ -181,9 +227,10 @@ def update_scheduled_import(
 def delete_scheduled_import(
     schedule_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    s = db.get(models.ScheduledImport, schedule_id)
+    org_id = resolve_request_org_id(db, current_user)
+    s = _get_scoped_schedule(db, schedule_id, org_id)
     if not s:
         raise HTTPException(status_code=404, detail="Schedule not found")
     db.delete(s)
@@ -195,10 +242,11 @@ def delete_scheduled_import(
 def trigger_scheduled_import(
     schedule_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
     """Manually trigger a scheduled import right now."""
-    s = db.get(models.ScheduledImport, schedule_id)
+    org_id = resolve_request_org_id(db, current_user)
+    s = _get_scoped_schedule(db, schedule_id, org_id)
     if not s:
         raise HTTPException(status_code=404, detail="Schedule not found")
     result = _execute_import(s, db)
@@ -221,6 +269,12 @@ def _execute_import(schedule: models.ScheduledImport, db: Session) -> dict:
         schedule.next_run_at = now + timedelta(minutes=schedule.interval_minutes)
         db.commit()
         return {"success": False, "error": "Store not found or inactive"}
+    if getattr(store, "org_id", None) != getattr(schedule, "org_id", None):
+        schedule.last_status = "error"
+        schedule.last_result = json.dumps({"error": "Store tenant scope mismatch"})
+        schedule.next_run_at = now + timedelta(minutes=schedule.interval_minutes)
+        db.commit()
+        return {"success": False, "error": "Store tenant scope mismatch"}
 
     try:
         adapter = _get_store_adapter(store)

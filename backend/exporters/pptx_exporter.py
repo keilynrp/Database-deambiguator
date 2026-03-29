@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from backend import models
 from backend.analyzers.topic_modeling import TopicAnalyzer
+from backend.tenant_access import scope_query_to_org
 
 try:
     from pptx import Presentation
@@ -70,6 +71,7 @@ def generate_pptx(
     sections: List[str],
     title: Optional[str],
     branding: dict,
+    org_id: int | None = None,
 ) -> bytes:
     """
     Build a branded 16:9 PPTX.
@@ -89,6 +91,10 @@ def generate_pptx(
     prs.slide_height = Inches(7.5)
     W = prs.slide_width
     H = prs.slide_height
+
+    entities_query = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+    if domain_id:
+        entities_query = entities_query.filter(models.RawEntity.domain == domain_id)
 
     # ── Slide 1: Cover ────────────────────────────────────────────────────────
     slide = _add_slide(prs)
@@ -116,11 +122,15 @@ def generate_pptx(
 
     # ── Slide 2: Entity Statistics ────────────────────────────────────────────
     if "entity_stats" in sections:
-        total = db.query(func.count(models.RawEntity.id)).scalar() or 0
-        by_status = db.query(models.RawEntity.validation_status, func.count(models.RawEntity.id))\
-            .group_by(models.RawEntity.validation_status).all()
-        by_enrich = db.query(models.RawEntity.enrichment_status, func.count(models.RawEntity.id))\
-            .group_by(models.RawEntity.enrichment_status).all()
+        total = entities_query.with_entities(func.count(models.RawEntity.id)).scalar() or 0
+        by_status = entities_query.with_entities(
+            models.RawEntity.validation_status,
+            func.count(models.RawEntity.id),
+        ).group_by(models.RawEntity.validation_status).all()
+        by_enrich = entities_query.with_entities(
+            models.RawEntity.enrichment_status,
+            func.count(models.RawEntity.id),
+        ).group_by(models.RawEntity.enrichment_status).all()
         enrich_map = {r[0]: r[1] for r in by_enrich}
         enriched = enrich_map.get("done", 0) + enrich_map.get("completed", 0)
         enrich_pct = round(enriched / total * 100) if total else 0
@@ -156,12 +166,15 @@ def generate_pptx(
 
     # ── Slide 3: Enrichment Coverage ──────────────────────────────────────────
     if "enrichment_coverage" in sections:
-        total = db.query(func.count(models.RawEntity.id)).scalar() or 0
-        done = db.query(func.count(models.RawEntity.id))\
+        total = entities_query.with_entities(func.count(models.RawEntity.id)).scalar() or 0
+        done = entities_query.with_entities(func.count(models.RawEntity.id))\
             .filter(models.RawEntity.enrichment_status.in_(["done", "completed"])).scalar() or 0
-        avg_cit = db.query(func.avg(models.RawEntity.enrichment_citation_count))\
+        avg_cit = entities_query.with_entities(func.avg(models.RawEntity.enrichment_citation_count))\
             .filter(models.RawEntity.enrichment_status.in_(["done", "completed"])).scalar() or 0
-        top_entities = db.query(models.RawEntity.primary_label, models.RawEntity.enrichment_citation_count)\
+        top_entities = entities_query.with_entities(
+            models.RawEntity.primary_label,
+            models.RawEntity.enrichment_citation_count,
+        )\
             .filter(models.RawEntity.enrichment_status.in_(["done", "completed"]))\
             .order_by(models.RawEntity.enrichment_citation_count.desc()).limit(8).all()
         pct = round(done / total * 100) if total else 0
@@ -182,7 +195,10 @@ def generate_pptx(
 
     # ── Slide 4: Top Brands ───────────────────────────────────────────────────
     if "top_brands" in sections:
-        rows_q = db.query(models.RawEntity.secondary_label, func.count(models.RawEntity.id).label("n"))\
+        rows_q = entities_query.with_entities(
+            models.RawEntity.secondary_label,
+            func.count(models.RawEntity.id).label("n"),
+        )\
             .filter(models.RawEntity.secondary_label.isnot(None))\
             .group_by(models.RawEntity.secondary_label)\
             .order_by(func.count(models.RawEntity.id).desc()).limit(10).all()
@@ -201,7 +217,7 @@ def generate_pptx(
     # ── Slide 5: Topic Clusters ───────────────────────────────────────────────
     if "topic_clusters" in sections:
         try:
-            result = TopicAnalyzer().top_topics(domain_id, top_n=20)
+            result = TopicAnalyzer().top_topics(domain_id, top_n=20, org_id=org_id)
             topics = result.get("topics", [])
         except Exception:
             topics = []

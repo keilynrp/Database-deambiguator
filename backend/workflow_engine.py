@@ -35,7 +35,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from backend import models
-from backend.tenant_access import scope_query_to_org
+from backend.tenant_access import LEGACY_GLOBAL_ORG_ID, scope_query_to_org
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +250,10 @@ def fire_trigger(trigger_type: str, entity: models.RawEntity, db: Session) -> li
         models.Workflow.trigger_type == trigger_type,
         models.Workflow.is_active == True,  # noqa: E712
     )
-    workflows = scope_query_to_org(workflows, models.Workflow, getattr(entity, "org_id", None)).all()
+    scope_org_id = getattr(entity, "org_id", None)
+    if scope_org_id is None:
+        scope_org_id = LEGACY_GLOBAL_ORG_ID
+    workflows = scope_query_to_org(workflows, models.Workflow, scope_org_id).all()
 
     runs: list[models.WorkflowRun] = []
     for wf in workflows:

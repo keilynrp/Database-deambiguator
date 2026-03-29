@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 WAVE_ORDER = {1: 0, 2: 1, 3: 2, 4: 3}
-TENANT_MODEL_UPDATED_AT = "2026-03-27"
+TENANT_MODEL_UPDATED_AT = "2026-03-28"
 
 TENANT_SCOPED_RESOURCES = [
     {
@@ -69,6 +69,15 @@ TENANT_SCOPED_RESOURCES = [
         "touchpoints": ["backend/models.py", "backend/routers/workflows.py", "backend/workflow_engine.py"],
     },
     {
+        "resource": "store_connections",
+        "model": "StoreConnection",
+        "current_scope": "global",
+        "target_scope": "org_id required",
+        "migration_wave": 2,
+        "why": "External commerce connections are tenant-owned operational resources and cannot be shared implicitly across organizations.",
+        "touchpoints": ["backend/models.py", "backend/routers/stores.py"],
+    },
+    {
         "resource": "scheduled_reports",
         "model": "ScheduledReport",
         "current_scope": "global",
@@ -85,6 +94,15 @@ TENANT_SCOPED_RESOURCES = [
         "migration_wave": 2,
         "why": "Inbound sync jobs are tenant-owned operational state and need isolated queues and status.",
         "touchpoints": ["backend/models.py", "backend/routers/scheduled_imports.py"],
+    },
+    {
+        "resource": "web_scraper_configs",
+        "model": "WebScraperConfig",
+        "current_scope": "global",
+        "target_scope": "org_id required",
+        "migration_wave": 2,
+        "why": "Fallback enrichment adapters shape tenant data and must not leak config or execution across organizations.",
+        "touchpoints": ["backend/models.py", "backend/routers/scrapers.py", "backend/enrichment_worker.py"],
     },
     {
         "resource": "alert_channels",

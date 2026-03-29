@@ -21,6 +21,12 @@ from sqlalchemy.orm import Session
 from backend import database, models
 from backend.auth import require_role
 from backend.database import get_db
+from backend.tenant_access import (
+    get_scoped_record,
+    persisted_org_id,
+    resolve_request_org_id,
+    scope_query_to_org,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +63,7 @@ class ScheduledReportUpdate(BaseModel):
 def _serialize(r: models.ScheduledReport) -> dict:
     return {
         "id":                r.id,
+        "org_id":            r.org_id,
         "name":              r.name,
         "domain_id":         r.domain_id,
         "format":            r.format,
@@ -80,10 +87,12 @@ def _serialize(r: models.ScheduledReport) -> dict:
 def create_scheduled_report(
     payload: ScheduledReportCreate,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
+    org_id = persisted_org_id(resolve_request_org_id(db, current_user))
     now = datetime.now(timezone.utc)
     r = models.ScheduledReport(
+        org_id=org_id,
         name=payload.name.strip(),
         domain_id=payload.domain_id,
         format=payload.format,
@@ -106,9 +115,14 @@ def create_scheduled_report(
 @router.get("/scheduled-reports", tags=["scheduled-reports"])
 def list_scheduled_reports(
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    items = db.query(models.ScheduledReport).order_by(
+    org_id = resolve_request_org_id(db, current_user)
+    items = scope_query_to_org(
+        db.query(models.ScheduledReport),
+        models.ScheduledReport,
+        org_id,
+    ).order_by(
         models.ScheduledReport.id.desc()
     ).all()
     return [_serialize(r) for r in items]
@@ -118,9 +132,10 @@ def list_scheduled_reports(
 def get_scheduled_report(
     report_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    r = db.get(models.ScheduledReport, report_id)
+    org_id = resolve_request_org_id(db, current_user)
+    r = get_scoped_record(db, models.ScheduledReport, report_id, org_id)
     if not r:
         raise HTTPException(status_code=404, detail="Scheduled report not found")
     return _serialize(r)
@@ -131,9 +146,10 @@ def update_scheduled_report(
     report_id: int = Path(..., ge=1),
     payload: ScheduledReportUpdate = ...,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    r = db.get(models.ScheduledReport, report_id)
+    org_id = resolve_request_org_id(db, current_user)
+    r = get_scoped_record(db, models.ScheduledReport, report_id, org_id)
     if not r:
         raise HTTPException(status_code=404, detail="Scheduled report not found")
     if payload.name is not None:
@@ -165,9 +181,10 @@ def update_scheduled_report(
 def delete_scheduled_report(
     report_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    r = db.get(models.ScheduledReport, report_id)
+    org_id = resolve_request_org_id(db, current_user)
+    r = get_scoped_record(db, models.ScheduledReport, report_id, org_id)
     if not r:
         raise HTTPException(status_code=404, detail="Scheduled report not found")
     db.delete(r)
@@ -179,10 +196,11 @@ def delete_scheduled_report(
 def trigger_scheduled_report(
     report_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
     """Manually trigger a scheduled report right now."""
-    r = db.get(models.ScheduledReport, report_id)
+    org_id = resolve_request_org_id(db, current_user)
+    r = get_scoped_record(db, models.ScheduledReport, report_id, org_id)
     if not r:
         raise HTTPException(status_code=404, detail="Scheduled report not found")
     result = _execute_report(r, db)
@@ -204,6 +222,7 @@ def _execute_report(schedule: models.ScheduledReport, db: Session) -> dict:
     recipients = json.loads(schedule.recipient_emails) if schedule.recipient_emails else []
     fmt = schedule.format or "pdf"
     report_title = schedule.report_title or schedule.name
+    org_id = getattr(schedule, "org_id", None)
 
     try:
         # ── 1. Generate report bytes ────────────────────────────────────────
@@ -218,7 +237,12 @@ def _execute_report(schedule: models.ScheduledReport, db: Session) -> dict:
         sections = [s for s in sections if s in _rb.SECTION_BUILDERS]
 
         if fmt == "excel":
-            report_bytes = EnterpriseExcelExporter().build(db, domain_id, sections)
+            report_bytes = EnterpriseExcelExporter().build(
+                db,
+                domain_id,
+                sections,
+                org_id=org_id,
+            )
             attachment_filename = (
                 f"ukip_report_{domain_id}_{now.strftime('%Y%m%d_%H%M%S')}.xlsx"
             )
@@ -233,14 +257,14 @@ def _execute_report(schedule: models.ScheduledReport, db: Session) -> dict:
                     "PDF reports require weasyprint. "
                     "Install it with: pip install weasyprint"
                 )
-            html = _rb.build(db, domain_id, sections, report_title)
+            html = _rb.build(db, domain_id, sections, report_title, org_id=org_id)
             report_bytes = _WPHTML(string=html).write_pdf()
             attachment_filename = (
                 f"ukip_report_{domain_id}_{now.strftime('%Y%m%d_%H%M%S')}.pdf"
             )
             attachment_mimetype = "application/pdf"
         else:  # html
-            html = _rb.build(db, domain_id, sections, report_title)
+            html = _rb.build(db, domain_id, sections, report_title, org_id=org_id)
             report_bytes = html.encode("utf-8")
             attachment_filename = (
                 f"ukip_report_{domain_id}_{now.strftime('%Y%m%d_%H%M%S')}.html"

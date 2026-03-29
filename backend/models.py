@@ -93,6 +93,7 @@ class StoreConnection(Base):
     __tablename__ = "store_connections"
 
     id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     name = Column(String, index=True)                    # Human-friendly label, e.g. "Mi Tienda WooCommerce"
     platform = Column(String, index=True)                # woocommerce | shopify | bsale | custom
     base_url = Column(String)                            # e.g. https://mitienda.com
@@ -413,6 +414,7 @@ class ScheduledImport(Base):
     __tablename__ = "scheduled_imports"
 
     id              = Column(Integer, primary_key=True, index=True)
+    org_id          = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     store_id        = Column(Integer, index=True, nullable=False)  # FK store_connections.id
     name            = Column(String, nullable=False)               # human label
     interval_minutes = Column(Integer, nullable=False, default=60) # run every N minutes
@@ -501,6 +503,7 @@ class ScheduledReport(Base):
     __tablename__ = "scheduled_reports"
 
     id               = Column(Integer, primary_key=True, index=True)
+    org_id           = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     name             = Column(String(200), nullable=False)
     domain_id        = Column(String(64), default="default")
     format           = Column(String(10), default="pdf")     # pdf | excel | html
@@ -565,6 +568,7 @@ class WebScraperConfig(Base):
     __tablename__ = "web_scraper_configs"
 
     id              = Column(Integer, primary_key=True, index=True)
+    org_id          = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     name            = Column(String(200), nullable=False)
     url_template    = Column(Text, nullable=False)         # e.g. https://site.com/search?q={primary_label}
     selector_type   = Column(String(10), default="css")   # css | xpath

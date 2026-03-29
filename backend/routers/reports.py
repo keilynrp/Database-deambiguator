@@ -20,6 +20,7 @@ from backend.auth import get_current_user, require_role
 from backend.database import get_db
 from backend.exporters.excel_exporter import EnterpriseExcelExporter
 from backend.exporters.pptx_exporter import generate_pptx as _generate_pptx
+from backend.tenant_access import resolve_request_org_id
 
 logger = logging.getLogger(__name__)
 
@@ -49,16 +50,23 @@ class _ReportRequest(BaseModel):
 def generate_report(
     payload: _ReportRequest,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Generate a self-contained HTML report and return it as a downloadable file."""
+    org_id = resolve_request_org_id(db, current_user)
     invalid = [s for s in payload.sections if s not in _report_builder.SECTION_BUILDERS]
     if invalid:
         raise HTTPException(
             status_code=422,
             detail=f"Unknown sections: {invalid}. Valid: {_ALL_REPORT_SECTIONS}",
         )
-    html = _report_builder.build(db, payload.domain_id, payload.sections, payload.title)
+    html = _report_builder.build(
+        db,
+        payload.domain_id,
+        payload.sections,
+        payload.title,
+        org_id=org_id,
+    )
     filename = (
         f"ukip_report_{payload.domain_id}_"
         f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.html"
@@ -82,16 +90,23 @@ def list_report_sections(_: models.User = Depends(get_current_user)):
 def export_pdf(
     payload: _ReportRequest,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Generate a professional PDF report via WeasyPrint."""
+    org_id = resolve_request_org_id(db, current_user)
     invalid = [s for s in payload.sections if s not in _report_builder.SECTION_BUILDERS]
     if invalid:
         raise HTTPException(
             status_code=422,
             detail=f"Unknown sections: {invalid}. Valid: {_ALL_REPORT_SECTIONS}",
         )
-    html = _report_builder.build(db, payload.domain_id, payload.sections, payload.title)
+    html = _report_builder.build(
+        db,
+        payload.domain_id,
+        payload.sections,
+        payload.title,
+        org_id=org_id,
+    )
     pdf_bytes = _make_pdf(html)
     filename = (
         f"ukip_report_{payload.domain_id}_"
@@ -108,10 +123,16 @@ def export_pdf(
 def export_excel(
     payload: _ReportRequest,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Generate a branded multi-sheet Excel workbook."""
-    xlsx_bytes = EnterpriseExcelExporter().build(db, payload.domain_id, payload.sections)
+    org_id = resolve_request_org_id(db, current_user)
+    xlsx_bytes = EnterpriseExcelExporter().build(
+        db,
+        payload.domain_id,
+        payload.sections,
+        org_id=org_id,
+    )
     filename = (
         f"ukip_export_{payload.domain_id}_"
         f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.xlsx"
@@ -127,9 +148,10 @@ def export_excel(
 def export_pptx(
     payload: _ReportRequest,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Generate a branded PowerPoint presentation (python-pptx)."""
+    org_id = resolve_request_org_id(db, current_user)
     invalid = [s for s in payload.sections if s not in _report_builder.SECTION_BUILDERS]
     if invalid:
         raise HTTPException(
@@ -152,6 +174,7 @@ def export_pptx(
             sections=payload.sections,
             title=payload.title,
             branding=branding_dict,
+            org_id=org_id,
         )
     except ImportError as exc:
         raise HTTPException(
