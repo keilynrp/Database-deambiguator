@@ -31,6 +31,7 @@ from backend.logging_utils import current_log_format
 from backend.ops_checks import dispatch_operational_alert_if_needed, run_operational_checks
 from backend.telemetry import telemetry_status
 from backend.tenant_scoping import get_tenant_scoping_report
+from backend.tenant_access import resolve_request_org_id, scope_query_to_org, scope_tag
 from backend.services.analytics_service import AnalyticsService
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
@@ -138,15 +139,17 @@ def run_roi_simulation(
 def analyzer_topics(
     domain_id: str,
     top_n: int = Query(default=30, ge=1, le=100),
-    _: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Top concepts by frequency across enriched entities in a domain."""
-    _key = f"topics_{domain_id}_{top_n}"
+    org_id = resolve_request_org_id(db, current_user)
+    _key = f"topics_{domain_id}_{scope_tag(org_id)}_{top_n}"
     cached = _analytics_cache.get(_key)
     if cached is not None:
         return cached
     try:
-        result = _topic_analyzer.top_topics(domain_id, top_n=top_n)
+        result = _topic_analyzer.top_topics(domain_id, top_n=top_n, org_id=org_id)
         _analytics_cache.set(_key, result)
         return result
     except ValueError as e:
@@ -160,15 +163,17 @@ def analyzer_topics(
 def analyzer_cooccurrence(
     domain_id: str,
     top_n: int = Query(default=20, ge=1, le=100),
-    _: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Concept co-occurrence pairs with PMI score."""
-    _key = f"cooccurrence_{domain_id}_{top_n}"
+    org_id = resolve_request_org_id(db, current_user)
+    _key = f"cooccurrence_{domain_id}_{scope_tag(org_id)}_{top_n}"
     cached = _analytics_cache.get(_key)
     if cached is not None:
         return cached
     try:
-        result = _topic_analyzer.cooccurrence(domain_id, top_n=top_n)
+        result = _topic_analyzer.cooccurrence(domain_id, top_n=top_n, org_id=org_id)
         _analytics_cache.set(_key, result)
         return result
     except ValueError as e:
@@ -182,15 +187,17 @@ def analyzer_cooccurrence(
 def analyzer_clusters(
     domain_id: str,
     n_clusters: int = Query(default=6, ge=2, le=20),
-    _: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Greedy concept clusters seeded by top concepts."""
-    _key = f"clusters_{domain_id}_{n_clusters}"
+    org_id = resolve_request_org_id(db, current_user)
+    _key = f"clusters_{domain_id}_{scope_tag(org_id)}_{n_clusters}"
     cached = _analytics_cache.get(_key)
     if cached is not None:
         return cached
     try:
-        result = _topic_analyzer.topic_clusters(domain_id, n_clusters=n_clusters)
+        result = _topic_analyzer.topic_clusters(domain_id, n_clusters=n_clusters, org_id=org_id)
         _analytics_cache.set(_key, result)
         return result
     except ValueError as e:
@@ -204,15 +211,17 @@ def analyzer_clusters(
 def analyzer_correlation(
     domain_id: str,
     top_n: int = Query(default=20, ge=1, le=50),
-    _: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Cramér's V pairwise field correlations for categorical columns in a domain."""
-    _key = f"correlation_{domain_id}_{top_n}"
+    org_id = resolve_request_org_id(db, current_user)
+    _key = f"correlation_{domain_id}_{scope_tag(org_id)}_{top_n}"
     cached = _analytics_cache.get(_key)
     if cached is not None:
         return cached
     try:
-        result = _correlation_analyzer.top_correlations(domain_id, top_n=top_n)
+        result = _correlation_analyzer.top_correlations(domain_id, top_n=top_n, org_id=org_id)
         _analytics_cache.set(_key, result)
         return result
     except ValueError as e:
@@ -226,14 +235,22 @@ def analyzer_correlation(
 def dashboard_summary(
     domain_id: str = Query(default="default", min_length=1, max_length=64),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Aggregated KPIs + timeline + heatmap + concepts for the Executive Dashboard."""
-    _key = f"dashboard_{domain_id}"
+    org_id = resolve_request_org_id(db, current_user)
+    _key = f"dashboard_{domain_id}_{scope_tag(org_id)}"
     cached = _dashboard_cache.get(_key)
     if cached is not None:
         return cached
-    result = AnalyticsService.get_domain_snapshot(db, _topic_analyzer, domain_id, top_n_concepts=30, top_n_entities=10)
+    result = AnalyticsService.get_domain_snapshot(
+        db,
+        _topic_analyzer,
+        domain_id,
+        org_id=org_id,
+        top_n_concepts=30,
+        top_n_entities=10,
+    )
     _dashboard_cache.set(_key, result)
     return result
 
@@ -245,7 +262,7 @@ def dashboard_compare(
         description="Comma-separated list of domain IDs to compare (2–4 domains)",
     ),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """
     Side-by-side KPI comparison for 2–4 domains.
@@ -258,9 +275,12 @@ def dashboard_compare(
     if len(domain_ids) > 4:
         domain_ids = domain_ids[:4]
 
+    org_id = resolve_request_org_id(db, current_user)
     return {
         "domains": [
-            AnalyticsService.get_domain_snapshot(db, _topic_analyzer, did, top_n_concepts=10, top_n_entities=5)
+            AnalyticsService.get_domain_snapshot(
+                db, _topic_analyzer, did, org_id=org_id, top_n_concepts=10, top_n_entities=5
+            )
             for did in domain_ids
         ]
     }
@@ -284,28 +304,37 @@ def invalidate_analytics_for_domain(domain_id: str) -> None:
     Call this from ingest/entity routers after mutations to keep analytics fresh.
     Invalidates only entries matching the affected domain.
     """
-    _analytics_cache.invalidate(f"topics_{domain_id}")
-    _analytics_cache.invalidate(f"cooccurrence_{domain_id}")
-    _analytics_cache.invalidate(f"clusters_{domain_id}")
-    _analytics_cache.invalidate(f"correlation_{domain_id}")
+    _analytics_cache.invalidate(f"topics_{domain_id}_")
+    _analytics_cache.invalidate(f"cooccurrence_{domain_id}_")
+    _analytics_cache.invalidate(f"clusters_{domain_id}_")
+    _analytics_cache.invalidate(f"correlation_{domain_id}_")
     _dashboard_cache.invalidate(f"dashboard_{domain_id}")
 
 
 # ── Global stats and lookup endpoints ────────────────────────────────────────
 
 @router.get("/stats")
-def get_stats(db: Session = Depends(get_db), _: models.User = Depends(get_current_user)):
-    return AnalyticsService.get_stats(db)
+def get_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    org_id = resolve_request_org_id(db, current_user)
+    return AnalyticsService.get_stats(db, org_id=org_id)
 
 
 @router.get("/brands")
 def get_all_brands(
     limit: int = Query(default=200, ge=1, le=1000),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
+    org_id = resolve_request_org_id(db, current_user)
     brands = (
-        db.query(models.RawEntity.secondary_label, func.count(models.RawEntity.id).label("count"))
+        scope_query_to_org(
+            db.query(models.RawEntity.secondary_label, func.count(models.RawEntity.id).label("count")),
+            models.RawEntity,
+            org_id,
+        )
         .filter(models.RawEntity.secondary_label != None)
         .group_by(models.RawEntity.secondary_label)
         .order_by(func.count(models.RawEntity.id).desc())
@@ -319,10 +348,15 @@ def get_all_brands(
 def get_all_entity_types(
     limit: int = Query(default=200, ge=1, le=1000),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
+    org_id = resolve_request_org_id(db, current_user)
     types = (
-        db.query(models.RawEntity.entity_type, func.count(models.RawEntity.id).label("count"))
+        scope_query_to_org(
+            db.query(models.RawEntity.entity_type, func.count(models.RawEntity.id).label("count")),
+            models.RawEntity,
+            org_id,
+        )
         .filter(models.RawEntity.entity_type != None)
         .group_by(models.RawEntity.entity_type)
         .order_by(func.count(models.RawEntity.id).desc())
@@ -336,10 +370,15 @@ def get_all_entity_types(
 def get_all_classifications(
     limit: int = Query(default=200, ge=1, le=1000),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
+    org_id = resolve_request_org_id(db, current_user)
     classes = (
-        db.query(models.RawEntity.entity_type, func.count(models.RawEntity.id).label("count"))
+        scope_query_to_org(
+            db.query(models.RawEntity.entity_type, func.count(models.RawEntity.id).label("count")),
+            models.RawEntity,
+            org_id,
+        )
         .filter(models.RawEntity.entity_type != None)
         .group_by(models.RawEntity.entity_type)
         .order_by(func.count(models.RawEntity.id).desc())

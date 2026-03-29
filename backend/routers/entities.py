@@ -33,6 +33,7 @@ from backend import entity_linker as _entity_linker
 from backend.routers.deps import _audit, _dispatch_webhook
 from backend.routers.limiter import limiter
 from backend.services.entity_service import EntityService
+from backend.tenant_access import get_scoped_record, resolve_request_org_id, scope_query_to_org
 
 router = APIRouter(tags=["entities"])
 
@@ -43,14 +44,15 @@ router = APIRouter(tags=["entities"])
 def get_entity_facets(
     fields: str = Query(default="entity_type,domain,validation_status,enrichment_status,source"),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """
     Returns value counts for the requested facet fields.
     Response: { field: [{value, count}, ...], ... }
     Unknown fields are silently ignored.
     """
-    return EntityService.get_facets(db, fields)
+    org_id = resolve_request_org_id(db, current_user)
+    return EntityService.get_facets(db, fields, org_id=org_id)
 
 
 @router.get("/entities", response_model=List[schemas.Entity])
@@ -68,8 +70,9 @@ def get_entities(
     ft_enrichment_status: Optional[str] = Query(default=None),
     ft_source:            Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
+    org_id = resolve_request_org_id(db, current_user)
     total, entities = EntityService.get_list(
         db=db,
         skip=skip,
@@ -83,6 +86,7 @@ def get_entities(
         ft_validation_status=ft_validation_status,
         ft_enrichment_status=ft_enrichment_status,
         ft_source=ft_source,
+        org_id=org_id,
     )
     response.headers["X-Total-Count"] = str(total)
     return entities
@@ -95,13 +99,14 @@ def get_entities_grouped(
     limit: int = Query(default=100, ge=1, le=500),
     search: str = None,
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """
     Group entities by primary_label and show all variants for each entity.
     Similar to OpenRefine's clustering/faceting feature.
     """
-    total_groups, results = EntityService.get_grouped(db, skip, limit, search)
+    org_id = resolve_request_org_id(db, current_user)
+    total_groups, results = EntityService.get_grouped(db, skip, limit, search, org_id=org_id)
     response.headers["X-Total-Count"] = str(total_groups)
     return results
 
@@ -128,12 +133,13 @@ class _LinkDismissRequest(BaseModel):
 def link_find(
     payload: _LinkFindRequest,
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
+    org_id = resolve_request_org_id(db, current_user)
     dismissed_rows = db.query(models.LinkDismissal).all()
     dismissed_pairs = {(d.entity_a_id, d.entity_b_id) for d in dismissed_rows}
     candidates = _entity_linker.find_candidates(
-        db, payload.threshold, payload.limit, dismissed_pairs
+        db, payload.threshold, payload.limit, dismissed_pairs, org_id=org_id
     )
     return {
         "candidates": [
@@ -157,13 +163,14 @@ def link_merge(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
+    org_id = resolve_request_org_id(db, current_user)
     if payload.primary_id in payload.secondary_ids:
         raise HTTPException(
             status_code=400, detail="primary_id cannot also appear in secondary_ids"
         )
     try:
         merged = _entity_linker.merge_entities(
-            db, payload.primary_id, payload.secondary_ids, payload.strategy
+            db, payload.primary_id, payload.secondary_ids, payload.strategy, org_id=org_id
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
@@ -202,8 +209,13 @@ def link_merge(
 def link_dismiss(
     payload: _LinkDismissRequest,
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
+    org_id = resolve_request_org_id(db, current_user)
+    if not get_scoped_record(db, models.RawEntity, payload.entity_a_id, org_id):
+        raise HTTPException(status_code=404, detail="Entity not found")
+    if not get_scoped_record(db, models.RawEntity, payload.entity_b_id, org_id):
+        raise HTTPException(status_code=404, detail="Entity not found")
     a_id = min(payload.entity_a_id, payload.entity_b_id)
     b_id = max(payload.entity_a_id, payload.entity_b_id)
     exists = db.query(models.LinkDismissal).filter(
@@ -222,9 +234,10 @@ def link_dismiss(
 def get_entity(
     entity_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
-    entity = db.query(models.RawEntity).filter(models.RawEntity.id == entity_id).first()
+    org_id = resolve_request_org_id(db, current_user)
+    entity = get_scoped_record(db, models.RawEntity, entity_id, org_id)
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
     return entity
@@ -237,7 +250,8 @@ def update_entity(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
-    entity = db.query(models.RawEntity).filter(models.RawEntity.id == entity_id).first()
+    org_id = resolve_request_org_id(db, current_user)
+    entity = get_scoped_record(db, models.RawEntity, entity_id, org_id)
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
 
@@ -268,10 +282,11 @@ def delete_entities_bulk(
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Delete a specific list of entities by id."""
+    org_id = resolve_request_org_id(db, current_user)
     if not payload.ids:
         raise HTTPException(status_code=422, detail="ids list is empty")
     deleted = (
-        db.query(models.RawEntity)
+        scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
         .filter(models.RawEntity.id.in_(payload.ids))
         .delete(synchronize_session=False)
     )
@@ -297,6 +312,7 @@ def update_entities_bulk(
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Batch field updates for a list of entities."""
+    org_id = resolve_request_org_id(db, current_user)
     if not payload.ids or not payload.updates:
         raise HTTPException(status_code=422, detail="ids and updates are required")
     # Whitelist updatable fields from EntityBase
@@ -308,7 +324,7 @@ def update_entities_bulk(
             detail=f"Invalid fields: {', '.join(bad_fields)}. Allowed: {', '.join(sorted(allowed_fields))}",
         )
     updated = (
-        db.query(models.RawEntity)
+        scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
         .filter(models.RawEntity.id.in_(payload.ids))
         .update(payload.updates, synchronize_session=False)
     )
@@ -335,15 +351,29 @@ def update_entities_bulk(
 def purge_all_entities(
     include_rules: bool = Query(False),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
-    entity_count = db.query(func.count(models.RawEntity.id)).scalar() or 0
-    db.query(models.RawEntity).delete()
+    org_id = resolve_request_org_id(db, current_user)
+    entity_count = (
+        scope_query_to_org(db.query(func.count(models.RawEntity.id)), models.RawEntity, org_id)
+        .scalar()
+        or 0
+    )
+    scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id).delete()
 
     rules_count = 0
     if include_rules:
-        rules_count = db.query(func.count(models.NormalizationRule.id)).scalar() or 0
-        db.query(models.NormalizationRule).delete()
+        rules_count = (
+            scope_query_to_org(
+                db.query(func.count(models.NormalizationRule.id)),
+                models.NormalizationRule,
+                org_id,
+            ).scalar()
+            or 0
+        )
+        scope_query_to_org(
+            db.query(models.NormalizationRule), models.NormalizationRule, org_id
+        ).delete()
 
     db.commit()
     return {
@@ -359,7 +389,8 @@ def delete_entity(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
-    entity = db.query(models.RawEntity).filter(models.RawEntity.id == entity_id).first()
+    org_id = resolve_request_org_id(db, current_user)
+    entity = get_scoped_record(db, models.RawEntity, entity_id, org_id)
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
     db.delete(entity)
@@ -382,10 +413,11 @@ def enrich_single_entity(
     request: Request,
     entity_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Enriches a single row manually (e.g. from a UI click)."""
-    entity = db.query(models.RawEntity).filter(models.RawEntity.id == entity_id).first()
+    org_id = resolve_request_org_id(db, current_user)
+    entity = get_scoped_record(db, models.RawEntity, entity_id, org_id)
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
     enriched = enrichment_worker.enrich_single_record(db, entity)
@@ -399,10 +431,11 @@ def enrich_bulk_queue(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Queues missing records for background enrichment."""
-    count = enrichment_worker.trigger_enrichment_bulk(db, skip=skip, limit=limit)
+    org_id = resolve_request_org_id(db, current_user)
+    count = enrichment_worker.trigger_enrichment_bulk(db, skip=skip, limit=limit, org_id=org_id)
     return {"message": "Bulk queue triggered", "queued_records": count}
 
 
@@ -410,11 +443,12 @@ def enrich_bulk_queue(
 def enrich_bulk_by_ids(
     payload: _BulkIdsPayload,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Queue a specific list of entities for background enrichment."""
+    org_id = resolve_request_org_id(db, current_user)
     updated = (
-        db.query(models.RawEntity)
+        scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
         .filter(models.RawEntity.id.in_(payload.ids))
         .update({"enrichment_status": "pending"}, synchronize_session=False)
     )
@@ -425,13 +459,22 @@ def enrich_bulk_by_ids(
 @router.get("/enrich/stats")
 def get_enrichment_stats(
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Returns enrichment statistics for the predictive analytics dashboard."""
-    total = db.query(func.count(models.RawEntity.id)).scalar() or 0
+    org_id = resolve_request_org_id(db, current_user)
+    total = (
+        scope_query_to_org(db.query(func.count(models.RawEntity.id)), models.RawEntity, org_id)
+        .scalar()
+        or 0
+    )
 
     status_rows = (
-        db.query(models.RawEntity.enrichment_status, func.count(models.RawEntity.id))
+        scope_query_to_org(
+            db.query(models.RawEntity.enrichment_status, func.count(models.RawEntity.id)),
+            models.RawEntity,
+            org_id,
+        )
         .group_by(models.RawEntity.enrichment_status)
         .all()
     )
@@ -443,7 +486,7 @@ def get_enrichment_stats(
     none_count     = status_breakdown.get("none", 0)
 
     enriched_entities = (
-        db.query(models.RawEntity.enrichment_concepts)
+        scope_query_to_org(db.query(models.RawEntity.enrichment_concepts), models.RawEntity, org_id)
         .filter(
             models.RawEntity.enrichment_concepts != None,
             models.RawEntity.enrichment_concepts != "",
@@ -462,7 +505,9 @@ def get_enrichment_stats(
     top_concepts = sorted(concept_freq.items(), key=lambda x: x[1], reverse=True)[:20]
 
     citation_rows = (
-        db.query(models.RawEntity.enrichment_citation_count)
+        scope_query_to_org(
+            db.query(models.RawEntity.enrichment_citation_count), models.RawEntity, org_id
+        )
         .filter(
             models.RawEntity.enrichment_status == "completed",
             models.RawEntity.enrichment_citation_count != None,
@@ -510,13 +555,14 @@ def get_enrichment_stats(
 def get_montecarlo_prediction(
     entity_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """
     Phase 4: Performs a stochastic Monte Carlo simulation on the future citation trajectory
     of a single enriched entity.
     """
-    entity = db.query(models.RawEntity).filter(models.RawEntity.id == entity_id).first()
+    org_id = resolve_request_org_id(db, current_user)
+    entity = get_scoped_record(db, models.RawEntity, entity_id, org_id)
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
     if entity.enrichment_status != "completed":

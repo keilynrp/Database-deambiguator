@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from sqlalchemy.orm import Session
 from backend import models
+from backend.tenant_access import scope_query_to_org
 
 
 EdgeList = list[tuple[int, int, str, float]]  # (source_id, target_id, relation_type, weight)
@@ -24,13 +25,17 @@ EdgeList = list[tuple[int, int, str, float]]  # (source_id, target_id, relation_
 
 # ── Data fetching ─────────────────────────────────────────────────────────────
 
-def fetch_edges(db: Session) -> EdgeList:
+def fetch_edges(db: Session, org_id: int | None = None) -> EdgeList:
     """Load all edges from DB as a flat list of (src, dst, rel_type, weight)."""
-    rows = db.query(
-        models.EntityRelationship.source_id,
-        models.EntityRelationship.target_id,
-        models.EntityRelationship.relation_type,
-        models.EntityRelationship.weight,
+    rows = scope_query_to_org(
+        db.query(
+            models.EntityRelationship.source_id,
+            models.EntityRelationship.target_id,
+            models.EntityRelationship.relation_type,
+            models.EntityRelationship.weight,
+        ),
+        models.EntityRelationship,
+        org_id,
     ).all()
     return [(r[0], r[1], r[2], r[3]) for r in rows]
 

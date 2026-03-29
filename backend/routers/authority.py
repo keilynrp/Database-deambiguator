@@ -29,6 +29,13 @@ from backend.authority.resolver import resolve_all as _authority_resolve_all
 from backend.database import get_db
 from backend.routers.deps import _audit, _build_disambig_groups, _serialize_authority_record
 from backend.routers.limiter import limiter
+from backend.tenant_access import (
+    add_org_sql_filter,
+    get_scoped_record,
+    persisted_org_id,
+    resolve_request_org_id,
+    scope_query_to_org,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +52,14 @@ def resolve_authority(
     request: Request,
     payload: schemas.AuthorityResolveRequest,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """
     Query all authority sources in parallel for a given value and persist
     the candidates with status='pending'. Returns the persisted records.
     """
+    org_id = resolve_request_org_id(db, current_user)
+    record_org_id = persisted_org_id(org_id)
     ctx = _AuthorityContext(
         affiliation=payload.context_affiliation,
         orcid_hint=payload.context_orcid_hint,
@@ -62,6 +71,7 @@ def resolve_authority(
     records = []
     for c in candidates:
         rec = models.AuthorityRecord(
+            org_id=record_org_id,
             field_name=payload.field_name,
             original_value=payload.value,
             authority_source=c.authority_source,
@@ -91,11 +101,13 @@ def resolve_authority(
 def resolve_authority_batch(
     payload: schemas.BatchResolveRequest,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """
     Resolve all distinct values of a field against external authority sources.
     """
+    org_id = resolve_request_org_id(db, current_user)
+    record_org_id = persisted_org_id(org_id)
     field = payload.field_name
     entity_type = payload.entity_type.value
 
@@ -106,19 +118,25 @@ def resolve_authority_batch(
     if field not in _entity_cols:
         raise HTTPException(status_code=422, detail=f"Field '{field}' not found in entity table")
 
-    rows = db.execute(
-        text(
-            f'SELECT DISTINCT "{field}" FROM raw_entities '
-            f'WHERE "{field}" IS NOT NULL AND "{field}" != \'\''
-        )
-    ).fetchall()
+    query_text = (
+        f'SELECT DISTINCT "{field}" FROM raw_entities '
+        f'WHERE "{field}" IS NOT NULL AND "{field}" != \'\''
+    )
+    params: dict[str, object] = {}
+    where_clauses: list[str] = []
+    add_org_sql_filter(where_clauses, params, org_id)
+    if where_clauses:
+        query_text += " AND " + " AND ".join(where_clauses)
+    rows = db.execute(text(query_text), params).fetchall()
     all_values = [row[0] for row in rows if row[0]]
 
     already_existed = 0
     if payload.skip_existing and all_values:
         existing_values = {
             r.original_value
-            for r in db.query(models.AuthorityRecord.original_value).filter(
+            for r in scope_query_to_org(
+                db.query(models.AuthorityRecord.original_value), models.AuthorityRecord, org_id
+            ).filter(
                 models.AuthorityRecord.field_name == field,
                 models.AuthorityRecord.status.in_(["pending", "confirmed"]),
             ).all()
@@ -137,6 +155,7 @@ def resolve_authority_batch(
         candidates = _authority_resolve_all(value, entity_type, ctx)
         for c in candidates:
             rec = models.AuthorityRecord(
+                org_id=record_org_id,
                 field_name=field,
                 original_value=value,
                 authority_source=c.authority_source,
@@ -173,14 +192,19 @@ def resolve_authority_batch(
 @router.get("/authority/queue/summary", tags=["authority"])
 def authority_queue_summary(
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Aggregated queue stats by field."""
-    rows = db.query(
-        models.AuthorityRecord.field_name,
-        models.AuthorityRecord.status,
-        func.count(models.AuthorityRecord.id),
-        func.avg(models.AuthorityRecord.confidence),
+    org_id = resolve_request_org_id(db, current_user)
+    rows = scope_query_to_org(
+        db.query(
+            models.AuthorityRecord.field_name,
+            models.AuthorityRecord.status,
+            func.count(models.AuthorityRecord.id),
+            func.avg(models.AuthorityRecord.confidence),
+        ),
+        models.AuthorityRecord,
+        org_id,
     ).group_by(
         models.AuthorityRecord.field_name,
         models.AuthorityRecord.status,
@@ -201,9 +225,13 @@ def authority_queue_summary(
         if status in totals:
             totals[status] += count
 
-    avg_rows = db.query(
-        models.AuthorityRecord.field_name,
-        func.avg(models.AuthorityRecord.confidence),
+    avg_rows = scope_query_to_org(
+        db.query(
+            models.AuthorityRecord.field_name,
+            func.avg(models.AuthorityRecord.confidence),
+        ),
+        models.AuthorityRecord,
+        org_id,
     ).group_by(models.AuthorityRecord.field_name).all()
     for field_name, avg_conf in avg_rows:
         if field_name in field_map:
@@ -223,17 +251,16 @@ def authority_queue_summary(
 def bulk_confirm_authority_records(
     payload: schemas.BulkActionRequest,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Confirm multiple authority records in one request."""
+    org_id = resolve_request_org_id(db, current_user)
     confirmed = 0
     rules_created = 0
     now = datetime.now(timezone.utc).isoformat()
 
     for record_id in payload.ids:
-        rec = db.query(models.AuthorityRecord).filter(
-            models.AuthorityRecord.id == record_id
-        ).first()
+        rec = get_scoped_record(db, models.AuthorityRecord, record_id, org_id)
         if rec is None or rec.status == "confirmed":
             continue
         rec.status = "confirmed"
@@ -241,12 +268,15 @@ def bulk_confirm_authority_records(
         confirmed += 1
 
         if payload.also_create_rules:
-            existing = db.query(models.NormalizationRule).filter(
+            existing = scope_query_to_org(
+                db.query(models.NormalizationRule), models.NormalizationRule, org_id
+            ).filter(
                 models.NormalizationRule.field_name == rec.field_name,
                 models.NormalizationRule.original_value == rec.original_value,
             ).first()
             if not existing:
                 db.add(models.NormalizationRule(
+                    org_id=rec.org_id,
                     field_name=rec.field_name,
                     original_value=rec.original_value,
                     normalized_value=rec.canonical_label,
@@ -262,14 +292,13 @@ def bulk_confirm_authority_records(
 def bulk_reject_authority_records(
     payload: schemas.BulkActionRequest,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Reject multiple authority records in one request."""
+    org_id = resolve_request_org_id(db, current_user)
     rejected = 0
     for record_id in payload.ids:
-        rec = db.query(models.AuthorityRecord).filter(
-            models.AuthorityRecord.id == record_id
-        ).first()
+        rec = get_scoped_record(db, models.AuthorityRecord, record_id, org_id)
         if rec is None or rec.status == "rejected":
             continue
         rec.status = "rejected"
@@ -286,10 +315,11 @@ def list_authority_records(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """List persisted authority candidates with optional filtering."""
-    q = db.query(models.AuthorityRecord)
+    org_id = resolve_request_org_id(db, current_user)
+    q = scope_query_to_org(db.query(models.AuthorityRecord), models.AuthorityRecord, org_id)
     if field_name:
         q = q.filter(models.AuthorityRecord.field_name == field_name)
     if status:
@@ -311,7 +341,8 @@ def confirm_authority_record(
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Confirm a candidate as the authoritative form."""
-    rec = db.get(models.AuthorityRecord, record_id)
+    org_id = resolve_request_org_id(db, current_user)
+    rec = get_scoped_record(db, models.AuthorityRecord, record_id, org_id)
     if rec is None:
         raise HTTPException(status_code=404, detail="AuthorityRecord not found")
 
@@ -320,12 +351,15 @@ def confirm_authority_record(
 
     rule_created = False
     if payload.also_create_rule:
-        existing = db.query(models.NormalizationRule).filter(
+        existing = scope_query_to_org(
+            db.query(models.NormalizationRule), models.NormalizationRule, org_id
+        ).filter(
             models.NormalizationRule.field_name == rec.field_name,
             models.NormalizationRule.original_value == rec.original_value,
         ).first()
         if not existing:
             db.add(models.NormalizationRule(
+                org_id=rec.org_id,
                 field_name=rec.field_name,
                 original_value=rec.original_value,
                 normalized_value=rec.canonical_label,
@@ -352,7 +386,8 @@ def reject_authority_record(
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Mark a candidate as rejected."""
-    rec = db.get(models.AuthorityRecord, record_id)
+    org_id = resolve_request_org_id(db, current_user)
+    rec = get_scoped_record(db, models.AuthorityRecord, record_id, org_id)
     if rec is None:
         raise HTTPException(status_code=404, detail="AuthorityRecord not found")
     rec.status = "rejected"
@@ -371,10 +406,11 @@ def reject_authority_record(
 def delete_authority_record(
     record_id: int = Path(ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Permanently delete an authority candidate record."""
-    rec = db.get(models.AuthorityRecord, record_id)
+    org_id = resolve_request_org_id(db, current_user)
+    rec = get_scoped_record(db, models.AuthorityRecord, record_id, org_id)
     if rec is None:
         raise HTTPException(status_code=404, detail="AuthorityRecord not found")
     db.delete(rec)
@@ -385,14 +421,23 @@ def delete_authority_record(
 @router.get("/authority/metrics", tags=["authority"])
 def authority_metrics(
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Operational and quality KPIs for the Authority Resolution Layer."""
-    total = db.query(func.count(models.AuthorityRecord.id)).scalar() or 0
+    org_id = resolve_request_org_id(db, current_user)
+    total = (
+        scope_query_to_org(db.query(func.count(models.AuthorityRecord.id)), models.AuthorityRecord, org_id)
+        .scalar()
+        or 0
+    )
 
     by_status: dict = {}
     for row in (
-        db.query(models.AuthorityRecord.status, func.count(models.AuthorityRecord.id))
+        scope_query_to_org(
+            db.query(models.AuthorityRecord.status, func.count(models.AuthorityRecord.id)),
+            models.AuthorityRecord,
+            org_id,
+        )
         .group_by(models.AuthorityRecord.status)
         .all()
     ):
@@ -400,7 +445,11 @@ def authority_metrics(
 
     by_resolution: dict = {}
     for row in (
-        db.query(models.AuthorityRecord.resolution_status, func.count(models.AuthorityRecord.id))
+        scope_query_to_org(
+            db.query(models.AuthorityRecord.resolution_status, func.count(models.AuthorityRecord.id)),
+            models.AuthorityRecord,
+            org_id,
+        )
         .group_by(models.AuthorityRecord.resolution_status)
         .all()
     ):
@@ -409,13 +458,21 @@ def authority_metrics(
 
     by_source: dict = {}
     for row in (
-        db.query(models.AuthorityRecord.authority_source, func.count(models.AuthorityRecord.id))
+        scope_query_to_org(
+            db.query(models.AuthorityRecord.authority_source, func.count(models.AuthorityRecord.id)),
+            models.AuthorityRecord,
+            org_id,
+        )
         .group_by(models.AuthorityRecord.authority_source)
         .all()
     ):
         by_source[row[0]] = row[1]
 
-    avg_conf  = db.query(func.avg(models.AuthorityRecord.confidence)).scalar() or 0.0
+    avg_conf = (
+        scope_query_to_org(db.query(func.avg(models.AuthorityRecord.confidence)), models.AuthorityRecord, org_id)
+        .scalar()
+        or 0.0
+    )
     confirmed = by_status.get("confirmed", 0)
     rejected  = by_status.get("rejected", 0)
 
@@ -437,14 +494,17 @@ def get_authority_view(
     field: str,
     threshold: int = Query(default=80, ge=0, le=100),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
+    org_id = resolve_request_org_id(db, current_user)
     try:
-        groups = _build_disambig_groups(field, threshold, db)
+        groups = _build_disambig_groups(field, threshold, db, org_id=org_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    rules = db.query(models.NormalizationRule).filter(
+    rules = scope_query_to_org(
+        db.query(models.NormalizationRule), models.NormalizationRule, org_id
+    ).filter(
         models.NormalizationRule.field_name == field
     ).all()
     rules_by_original = {r.original_value: r.normalized_value for r in rules}
@@ -461,7 +521,9 @@ def get_authority_view(
         annotated.append({**g, "has_rules": has_rules, "resolved_to": resolved_to})
 
     total_rules = (
-        db.query(func.count(models.NormalizationRule.id))
+        scope_query_to_org(
+            db.query(func.count(models.NormalizationRule.id)), models.NormalizationRule, org_id
+        )
         .filter(models.NormalizationRule.field_name == field)
         .scalar() or 0
     )

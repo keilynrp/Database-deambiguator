@@ -68,10 +68,20 @@ with test_engine.connect() as _fts_conn:
 from backend.database import get_db  # noqa: E402
 app.dependency_overrides[get_db] = override_get_db
 
-# Override the session factory used by AuditMiddleware so it writes to the
-# same in-memory DB that tests read from via override_get_db.
+# Rebind module-level engine/session factories that were captured at import
+# time so analytics helpers and background threads use the shared test DB.
+database.engine = test_engine
+database.SessionLocal = TestingSessionLocal
+
+# Override modules that imported engine/SessionLocal directly.
 import backend.audit as _audit_module  # noqa: E402
+import backend.analyzers.correlation as _correlation_module  # noqa: E402
+import backend.analyzers.topic_modeling as _topic_modeling_module  # noqa: E402
+import backend.olap as _olap_module  # noqa: E402
 _audit_module.SessionLocal = TestingSessionLocal
+_correlation_module.engine = test_engine
+_topic_modeling_module.engine = test_engine
+_olap_module.engine = test_engine
 
 # Seed the super_admin in the in-memory test DB so the login fixture works.
 # Startup side effects are disabled in tests, so seeding must happen explicitly.

@@ -16,6 +16,7 @@ import pandas as pd
 
 from backend.database import engine
 from backend.schema_registry import registry
+from backend.tenant_access import add_org_sql_filter
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ def _parse_concepts(raw: str | None) -> list[str]:
     return [c.strip() for c in raw.split(_SEP) if c.strip()]
 
 
-def _load_concepts_df(domain_id: str) -> pd.DataFrame:
+def _load_concepts_df(domain_id: str, org_id: int | None = None) -> pd.DataFrame:
     """
     Load rows that have enrichment_concepts for the given domain.
     Returns a DataFrame with columns: id, enrichment_concepts, and domain
@@ -40,11 +41,21 @@ def _load_concepts_df(domain_id: str) -> pd.DataFrame:
     if domain is None:
         raise ValueError(f"Domain '{domain_id}' not found")
 
+    where_clauses = ["enrichment_concepts IS NOT NULL", "enrichment_concepts != ''"]
+    params: dict[str, object] = {}
+    if domain_id != "all":
+        if domain_id == "default":
+            where_clauses.append("(domain = :domain_id OR domain IS NULL)")
+        else:
+            where_clauses.append("domain = :domain_id")
+        params["domain_id"] = domain_id
+    add_org_sql_filter(where_clauses, params, org_id)
+
     with engine.connect() as conn:
         df = pd.read_sql(
-            "SELECT id, enrichment_concepts FROM raw_entities "
-            "WHERE enrichment_concepts IS NOT NULL AND enrichment_concepts != ''",
+            f"SELECT id, enrichment_concepts FROM raw_entities WHERE {' AND '.join(where_clauses)}",
             conn,
+            params=params,
         )
     return df
 
@@ -54,7 +65,7 @@ class TopicAnalyzer:
 
     # ── Top topics ──────────────────────────────────────────────────────────
 
-    def top_topics(self, domain_id: str, top_n: int = 30) -> dict[str, Any]:
+    def top_topics(self, domain_id: str, top_n: int = 30, org_id: int | None = None) -> dict[str, Any]:
         """
         Return concept frequencies across all enriched entities.
 
@@ -65,7 +76,7 @@ class TopicAnalyzer:
               "topics": [{"concept": str, "count": int, "pct": float}, ...]
             }
         """
-        df = _load_concepts_df(domain_id)
+        df = _load_concepts_df(domain_id, org_id=org_id)
         total_enriched = len(df)
 
         counter: Counter = Counter()
@@ -89,7 +100,7 @@ class TopicAnalyzer:
 
     # ── Co-occurrence ────────────────────────────────────────────────────────
 
-    def cooccurrence(self, domain_id: str, top_n: int = 20) -> dict[str, Any]:
+    def cooccurrence(self, domain_id: str, top_n: int = 20, org_id: int | None = None) -> dict[str, Any]:
         """
         Return concept pairs that most frequently co-occur in the same entity.
 
@@ -100,7 +111,7 @@ class TopicAnalyzer:
               "pairs": [{"concept_a": str, "concept_b": str, "count": int, "pmi": float}, ...]
             }
         """
-        df = _load_concepts_df(domain_id)
+        df = _load_concepts_df(domain_id, org_id=org_id)
         total_enriched = len(df)
 
         pair_counter: Counter = Counter()
@@ -146,7 +157,12 @@ class TopicAnalyzer:
 
     # ── Topic clusters ───────────────────────────────────────────────────────
 
-    def topic_clusters(self, domain_id: str, n_clusters: int = 6) -> dict[str, Any]:
+    def topic_clusters(
+        self,
+        domain_id: str,
+        n_clusters: int = 6,
+        org_id: int | None = None,
+    ) -> dict[str, Any]:
         """
         Group concepts into clusters using greedy PMI-based single-linkage.
 
@@ -166,7 +182,7 @@ class TopicAnalyzer:
               ]
             }
         """
-        df = _load_concepts_df(domain_id)
+        df = _load_concepts_df(domain_id, org_id=org_id)
 
         pair_counter: Counter = Counter()
         concept_counter: Counter = Counter()

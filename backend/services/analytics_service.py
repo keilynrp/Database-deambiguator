@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend import models
 from backend.analyzers.topic_modeling import TopicAnalyzer
+from backend.tenant_access import scope_query_to_org
 
 
 class AnalyticsService:
@@ -24,12 +25,13 @@ class AnalyticsService:
         db: Session,
         topic_analyzer: TopicAnalyzer,
         domain_id: str,
+        org_id: int | None = None,
         top_n_concepts: int = 10,
         top_n_entities: int = 5
     ) -> dict:
         """Reusable per-domain KPI snapshot — used by dashboard/summary and compare."""
         def _q():
-            q = db.query(models.RawEntity)
+            q = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
             if domain_id and domain_id != "all":
                 if domain_id == "default":
                     q = q.filter(
@@ -71,7 +73,7 @@ class AnalyticsService:
         # Top concepts via TopicAnalyzer
         top_concepts = []
         try:
-            result = topic_analyzer.top_topics(domain_id, top_n=top_n_concepts)
+            result = topic_analyzer.top_topics(domain_id, top_n=top_n_concepts, org_id=org_id)
             top_concepts = result.get("topics", [])
         except Exception:
             pass
@@ -150,35 +152,55 @@ class AnalyticsService:
         }
 
     @staticmethod
-    def get_stats(db: Session) -> dict:
-        total_entities = db.query(func.count(models.RawEntity.id)).scalar() or 0
+    def get_stats(db: Session, org_id: int | None = None) -> dict:
+        total_entities = (
+            scope_query_to_org(db.query(func.count(models.RawEntity.id)), models.RawEntity, org_id)
+            .scalar()
+            or 0
+        )
 
         unique_secondary_labels = (
-            db.query(func.count(func.distinct(models.RawEntity.secondary_label)))
+            scope_query_to_org(
+                db.query(func.count(func.distinct(models.RawEntity.secondary_label))),
+                models.RawEntity,
+                org_id,
+            )
             .filter(models.RawEntity.secondary_label != None)
             .scalar() or 0
         )
         unique_entity_types = (
-            db.query(func.count(func.distinct(models.RawEntity.entity_type)))
+            scope_query_to_org(
+                db.query(func.count(func.distinct(models.RawEntity.entity_type))),
+                models.RawEntity,
+                org_id,
+            )
             .filter(models.RawEntity.entity_type != None)
             .scalar() or 0
         )
 
         validation_rows = (
-            db.query(models.RawEntity.validation_status, func.count(models.RawEntity.id))
+            scope_query_to_org(
+                db.query(models.RawEntity.validation_status, func.count(models.RawEntity.id)),
+                models.RawEntity,
+                org_id,
+            )
             .group_by(models.RawEntity.validation_status)
             .all()
         )
         validation_status = {row[0] or "pending": row[1] for row in validation_rows}
 
         with_canonical_id = (
-            db.query(func.count(models.RawEntity.id))
+            scope_query_to_org(db.query(func.count(models.RawEntity.id)), models.RawEntity, org_id)
             .filter(models.RawEntity.canonical_id != None, models.RawEntity.canonical_id != "")
             .scalar() or 0
         )
 
         top_secondary_labels = (
-            db.query(models.RawEntity.secondary_label, func.count(models.RawEntity.id).label("count"))
+            scope_query_to_org(
+                db.query(models.RawEntity.secondary_label, func.count(models.RawEntity.id).label("count")),
+                models.RawEntity,
+                org_id,
+            )
             .filter(models.RawEntity.secondary_label != None)
             .group_by(models.RawEntity.secondary_label)
             .order_by(func.count(models.RawEntity.id).desc())
@@ -186,7 +208,11 @@ class AnalyticsService:
             .all()
         )
         type_distribution = (
-            db.query(models.RawEntity.entity_type, func.count(models.RawEntity.id).label("count"))
+            scope_query_to_org(
+                db.query(models.RawEntity.entity_type, func.count(models.RawEntity.id).label("count")),
+                models.RawEntity,
+                org_id,
+            )
             .filter(models.RawEntity.entity_type != None)
             .group_by(models.RawEntity.entity_type)
             .order_by(func.count(models.RawEntity.id).desc())
@@ -194,7 +220,11 @@ class AnalyticsService:
             .all()
         )
         domain_distribution = (
-            db.query(models.RawEntity.domain, func.count(models.RawEntity.id).label("count"))
+            scope_query_to_org(
+                db.query(models.RawEntity.domain, func.count(models.RawEntity.id).label("count")),
+                models.RawEntity,
+                org_id,
+            )
             .filter(models.RawEntity.domain != None)
             .group_by(models.RawEntity.domain)
             .order_by(func.count(models.RawEntity.id).desc())
@@ -202,7 +232,7 @@ class AnalyticsService:
         )
 
         quality_rows = (
-            db.query(models.RawEntity.quality_score)
+            scope_query_to_org(db.query(models.RawEntity.quality_score), models.RawEntity, org_id)
             .filter(models.RawEntity.quality_score != None)
             .all()
         )
@@ -212,7 +242,12 @@ class AnalyticsService:
             "high":     sum(1 for v in quality_values if v >= 0.7),
             "medium":   sum(1 for v in quality_values if 0.3 <= v < 0.7),
             "low":      sum(1 for v in quality_values if v < 0.3),
-            "unscored": db.query(func.count(models.RawEntity.id)).filter(models.RawEntity.quality_score == None).scalar() or 0,
+            "unscored": (
+                scope_query_to_org(db.query(func.count(models.RawEntity.id)), models.RawEntity, org_id)
+                .filter(models.RawEntity.quality_score == None)
+                .scalar()
+                or 0
+            ),
         }
 
         return {

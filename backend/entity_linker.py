@@ -19,6 +19,7 @@ import numpy as np
 from sqlalchemy.orm import Session
 
 from . import models
+from .tenant_access import scope_query_to_org
 
 # ── Tokenizer ─────────────────────────────────────────────────────────────────
 
@@ -98,12 +99,17 @@ def find_candidates(
     threshold: float = 0.82,
     limit: int = 500,
     dismissed_pairs: set[tuple[int, int]] | None = None,
+    org_id: int | None = None,
 ) -> list[LinkCandidate]:
     """
     Scan up to `limit` entities, return pairs whose cosine similarity ≥ threshold.
     Already-dismissed pairs are excluded.
     """
-    entities = db.query(models.RawEntity).limit(limit).all()
+    entities = (
+        scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+        .limit(limit)
+        .all()
+    )
     if len(entities) < 2:
         return []
 
@@ -156,6 +162,7 @@ def merge_entities(
     primary_id: int,
     secondary_ids: list[int],
     strategy: str = "keep_non_empty",
+    org_id: int | None = None,
 ) -> models.RawEntity:
     """
     Merge secondary entities into primary according to `strategy`, then delete them.
@@ -165,13 +172,19 @@ def merge_entities(
       keep_non_empty  — if primary field is null/empty, take from secondary (default)
       keep_longest    — keep whichever string value is longer
     """
-    primary = db.query(models.RawEntity).filter(models.RawEntity.id == primary_id).first()
+    primary = (
+        scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+        .filter(models.RawEntity.id == primary_id)
+        .first()
+    )
     if not primary:
         raise ValueError(f"Primary entity {primary_id} not found")
 
-    secondaries = db.query(models.RawEntity).filter(
-        models.RawEntity.id.in_(secondary_ids)
-    ).all()
+    secondaries = (
+        scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+        .filter(models.RawEntity.id.in_(secondary_ids))
+        .all()
+    )
 
     if not secondaries:
         raise ValueError("No secondary entities found")

@@ -8,6 +8,7 @@ class UniversalEntity(Base):
     __tablename__ = "raw_entities"
 
     id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
 
     # Universal fields
     domain = Column(String, default="default", index=True)
@@ -44,6 +45,7 @@ class EntityRelationship(Base):
     __tablename__ = "entity_relationships"
 
     id          = Column(Integer, primary_key=True, index=True)
+    org_id      = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     source_id   = Column(Integer, ForeignKey("raw_entities.id"), index=True)
     target_id   = Column(Integer, ForeignKey("raw_entities.id"), index=True)
     relation_type = Column(String, index=True)  # cites | authored-by | belongs-to | related-to
@@ -55,6 +57,7 @@ class NormalizationRule(Base):
     __tablename__ = "normalization_rules"
     
     id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     field_name = Column(String, index=True) # e.g., "brand_lower"
     original_value = Column(String, index=True) # e.g., "mikrosoft"
     normalized_value = Column(String) # e.g., "Microsoft"
@@ -65,6 +68,7 @@ class HarmonizationLog(Base):
     __tablename__ = "harmonization_logs"
 
     id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     step_id = Column(String, index=True)
     step_name = Column(String)
     records_updated = Column(Integer)
@@ -203,6 +207,7 @@ class AuthorityRecord(Base):
     __tablename__ = "authority_records"
 
     id               = Column(Integer, primary_key=True, index=True)
+    org_id           = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     field_name       = Column(String, index=True)         # e.g. "brand_capitalized"
     original_value   = Column(String, index=True)         # local value that was queried
     authority_source = Column(String, index=True)         # wikidata | viaf | orcid | dbpedia | openalex
@@ -586,6 +591,7 @@ class Workflow(Base):
     __tablename__ = "workflows"
 
     id           = Column(Integer, primary_key=True, index=True)
+    org_id       = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     name         = Column(String(200), nullable=False)
     description  = Column(Text, nullable=True)
     is_active    = Column(Boolean, default=True, index=True)
@@ -607,6 +613,7 @@ class WorkflowRun(Base):
     __tablename__ = "workflow_runs"
 
     id           = Column(Integer, primary_key=True, index=True)
+    org_id       = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     workflow_id  = Column(Integer, ForeignKey("workflows.id"), nullable=False, index=True)
     status       = Column(String(20), nullable=False, default="running")  # running|success|error|skipped
     trigger_data = Column(Text, default="{}")   # JSON — entity id / event data

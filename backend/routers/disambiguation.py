@@ -20,6 +20,13 @@ from sqlalchemy.orm import Session
 from backend import models, schemas
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
+from backend.tenant_access import (
+    get_scoped_record,
+    org_scope_filter,
+    persisted_org_id,
+    resolve_request_org_id,
+    scope_query_to_org,
+)
 from backend.llm_agent import resolve_canonical_name
 from backend.routers.deps import _build_disambig_groups
 from backend.routers.limiter import limiter
@@ -86,9 +93,10 @@ def get_rules(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
-    query = db.query(models.NormalizationRule)
+    org_id = resolve_request_org_id(db, current_user)
+    query = scope_query_to_org(db.query(models.NormalizationRule), models.NormalizationRule, org_id)
     if field_name:
         query = query.filter(models.NormalizationRule.field_name == field_name)
     return query.order_by(models.NormalizationRule.id.desc()).offset(skip).limit(limit).all()
@@ -98,12 +106,16 @@ def get_rules(
 def create_rules_bulk(
     payload: schemas.BulkRuleCreate,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
+    org_id = resolve_request_org_id(db, current_user)
+    rule_org_id = persisted_org_id(org_id)
     for var in payload.variations:
         if var == payload.canonical_value:
             continue
-        existing = db.query(models.NormalizationRule).filter(
+        existing = scope_query_to_org(
+            db.query(models.NormalizationRule), models.NormalizationRule, org_id
+        ).filter(
             models.NormalizationRule.field_name == payload.field_name,
             models.NormalizationRule.original_value == var,
         ).first()
@@ -111,6 +123,7 @@ def create_rules_bulk(
             existing.normalized_value = payload.canonical_value
         else:
             db.add(models.NormalizationRule(
+                org_id=rule_org_id,
                 field_name=payload.field_name,
                 original_value=var,
                 normalized_value=payload.canonical_value,
@@ -126,11 +139,10 @@ def create_rules_bulk(
 def delete_rule(
     rule_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
-    rule = db.query(models.NormalizationRule).filter(
-        models.NormalizationRule.id == rule_id
-    ).first()
+    org_id = resolve_request_org_id(db, current_user)
+    rule = get_scoped_record(db, models.NormalizationRule, rule_id, org_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
     db.delete(rule)
@@ -142,9 +154,10 @@ def delete_rule(
 def apply_rules(
     field_name: str = None,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
-    query = db.query(models.NormalizationRule)
+    org_id = resolve_request_org_id(db, current_user)
+    query = scope_query_to_org(db.query(models.NormalizationRule), models.NormalizationRule, org_id)
     if field_name:
         query = query.filter(models.NormalizationRule.field_name == field_name)
     rules = query.all()
@@ -154,7 +167,11 @@ def apply_rules(
         if hasattr(models.RawEntity, rule.field_name):
             column = getattr(models.RawEntity, rule.field_name)
             if rule.is_regex:
-                entities = db.query(models.RawEntity).filter(column != None).all()
+                entities = (
+                    scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+                    .filter(column != None)
+                    .all()
+                )
                 for p in entities:
                     original = getattr(p, rule.field_name)
                     if original:
@@ -166,16 +183,22 @@ def apply_rules(
                         except re.error:
                             pass
             else:
+                filters = [column == rule.original_value]
+                org_filter = org_scope_filter(models.RawEntity.org_id, org_id)
+                if org_filter is not None:
+                    filters.append(org_filter)
                 result = db.execute(
                     update(models.RawEntity)
-                    .where(column == rule.original_value)
+                    .where(*filters)
                     .values({rule.field_name: rule.normalized_value})
                 )
                 total_updated += result.rowcount
         else:
-            entities = db.query(models.RawEntity).filter(
-                models.RawEntity.normalized_json != None
-            ).all()
+            entities = (
+                scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+                .filter(models.RawEntity.normalized_json != None)
+                .all()
+            )
             for entity in entities:
                 try:
                     data = json.loads(entity.normalized_json or "{}")

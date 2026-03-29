@@ -5,6 +5,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from backend import models
+from backend.tenant_access import scope_query_to_org
 
 
 class EntityService:
@@ -22,7 +23,7 @@ class EntityService:
     }
 
     @classmethod
-    def get_facets(cls, db: Session, fields_raw: str) -> dict:
+    def get_facets(cls, db: Session, fields_raw: str, org_id: int | None = None) -> dict:
         requested = [f.strip() for f in fields_raw.split(",") if f.strip()]
         result = {}
         for field in requested:
@@ -30,7 +31,11 @@ class EntityService:
             if col is None:
                 continue
             rows = (
-                db.query(col, func.count(models.RawEntity.id).label("cnt"))
+                scope_query_to_org(
+                    db.query(col, func.count(models.RawEntity.id).label("cnt")),
+                    models.RawEntity,
+                    org_id,
+                )
                 .filter(col != None, col != "")
                 .group_by(col)
                 .order_by(func.count(models.RawEntity.id).desc())
@@ -53,8 +58,9 @@ class EntityService:
         ft_validation_status: Optional[str],
         ft_enrichment_status: Optional[str],
         ft_source: Optional[str],
+        org_id: int | None = None,
     ) -> tuple[int, list[models.RawEntity]]:
-        query = db.query(models.RawEntity)
+        query = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
         
         if search:
             search_filter = f"%{search}%"
@@ -95,22 +101,34 @@ class EntityService:
         return total, entities
 
     @staticmethod
-    def get_grouped(db: Session, skip: int, limit: int, search: Optional[str]) -> tuple[int, list[dict]]:
+    def get_grouped(
+        db: Session,
+        skip: int,
+        limit: int,
+        search: Optional[str],
+        org_id: int | None = None,
+    ) -> tuple[int, list[dict]]:
         variant_counts = (
-            db.query(
-                models.RawEntity.primary_label,
-                func.count(models.RawEntity.id).label("variant_count"),
+            scope_query_to_org(
+                db.query(
+                    models.RawEntity.primary_label,
+                    func.count(models.RawEntity.id).label("variant_count"),
+                ),
+                models.RawEntity,
+                org_id,
             )
             .filter(models.RawEntity.primary_label != None)
             .group_by(models.RawEntity.primary_label)
             .subquery()
         )
 
-        query = (
-            db.query(models.RawEntity.primary_label, variant_counts.c.variant_count)
-            .join(variant_counts, models.RawEntity.primary_label == variant_counts.c.primary_label)
-            .group_by(models.RawEntity.primary_label, variant_counts.c.variant_count)
-        )
+        query = scope_query_to_org(
+            db.query(models.RawEntity.primary_label, variant_counts.c.variant_count),
+            models.RawEntity,
+            org_id,
+        ).join(
+            variant_counts, models.RawEntity.primary_label == variant_counts.c.primary_label
+        ).group_by(models.RawEntity.primary_label, variant_counts.c.variant_count)
 
         if search:
             search_filter = f"%{search}%"
@@ -126,7 +144,7 @@ class EntityService:
             return total_groups, []
 
         all_variants = (
-            db.query(models.RawEntity)
+            scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
             .filter(models.RawEntity.primary_label.in_(entity_names))
             .all()
         )

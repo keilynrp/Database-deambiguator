@@ -25,6 +25,12 @@ from sqlalchemy.orm import Session
 from backend import models
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
+from backend.tenant_access import (
+    get_scoped_record,
+    persisted_org_id,
+    resolve_request_org_id,
+    scope_query_to_org,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +89,7 @@ def _serialize(wf: models.Workflow) -> dict:
         "trigger_config": json.loads(wf.trigger_config or "{}"),
         "conditions": json.loads(wf.conditions or "[]"),
         "actions": json.loads(wf.actions or "[]"),
+        "org_id": wf.org_id,
         "created_by": wf.created_by,
         "created_at": wf.created_at.isoformat() if wf.created_at else None,
         "last_run_at": wf.last_run_at.isoformat() if wf.last_run_at else None,
@@ -94,6 +101,7 @@ def _serialize(wf: models.Workflow) -> dict:
 def _serialize_run(run: models.WorkflowRun) -> dict:
     return {
         "id": run.id,
+        "org_id": run.org_id,
         "workflow_id": run.workflow_id,
         "status": run.status,
         "trigger_data": json.loads(run.trigger_data or "{}"),
@@ -112,7 +120,10 @@ def create_workflow(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
+    org_id = resolve_request_org_id(db, current_user)
+    workflow_org_id = persisted_org_id(org_id)
     wf = models.Workflow(
+        org_id=workflow_org_id,
         name=payload.name,
         description=payload.description,
         is_active=payload.is_active,
@@ -134,9 +145,10 @@ def list_workflows(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
-    q = db.query(models.Workflow)
+    org_id = resolve_request_org_id(db, current_user)
+    q = scope_query_to_org(db.query(models.Workflow), models.Workflow, org_id)
     if is_active is not None:
         q = q.filter(models.Workflow.is_active == is_active)
     total = q.count()
@@ -148,9 +160,10 @@ def list_workflows(
 def get_run(
     run_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
-    run = db.query(models.WorkflowRun).filter(models.WorkflowRun.id == run_id).first()
+    org_id = resolve_request_org_id(db, current_user)
+    run = get_scoped_record(db, models.WorkflowRun, run_id, org_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
     return _serialize_run(run)
@@ -160,9 +173,10 @@ def get_run(
 def get_workflow(
     workflow_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
-    wf = db.query(models.Workflow).filter(models.Workflow.id == workflow_id).first()
+    org_id = resolve_request_org_id(db, current_user)
+    wf = get_scoped_record(db, models.Workflow, workflow_id, org_id)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return _serialize(wf)
@@ -173,9 +187,10 @@ def update_workflow(
     payload: WorkflowUpdate,
     workflow_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    wf = db.query(models.Workflow).filter(models.Workflow.id == workflow_id).first()
+    org_id = resolve_request_org_id(db, current_user)
+    wf = get_scoped_record(db, models.Workflow, workflow_id, org_id)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
@@ -203,9 +218,10 @@ def update_workflow(
 def delete_workflow(
     workflow_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
-    wf = db.query(models.Workflow).filter(models.Workflow.id == workflow_id).first()
+    org_id = resolve_request_org_id(db, current_user)
+    wf = get_scoped_record(db, models.Workflow, workflow_id, org_id)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     db.delete(wf)
@@ -220,14 +236,15 @@ def manual_run(
     payload: ManualRunRequest,
     workflow_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin")),
+    current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
     """Manually trigger a workflow against a specific entity."""
-    wf = db.query(models.Workflow).filter(models.Workflow.id == workflow_id).first()
+    org_id = resolve_request_org_id(db, current_user)
+    wf = get_scoped_record(db, models.Workflow, workflow_id, org_id)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
-    entity = db.query(models.RawEntity).filter(models.RawEntity.id == payload.entity_id).first()
+    entity = get_scoped_record(db, models.RawEntity, payload.entity_id, org_id)
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
 
@@ -242,13 +259,17 @@ def list_runs(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
-    wf = db.query(models.Workflow).filter(models.Workflow.id == workflow_id).first()
+    org_id = resolve_request_org_id(db, current_user)
+    wf = get_scoped_record(db, models.Workflow, workflow_id, org_id)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
-    q = db.query(models.WorkflowRun).filter(models.WorkflowRun.workflow_id == workflow_id)
+    q = (
+        scope_query_to_org(db.query(models.WorkflowRun), models.WorkflowRun, org_id)
+        .filter(models.WorkflowRun.workflow_id == workflow_id)
+    )
     total = q.count()
     runs = q.order_by(models.WorkflowRun.started_at.desc()).offset(skip).limit(limit).all()
     return {"total": total, "items": [_serialize_run(r) for r in runs]}

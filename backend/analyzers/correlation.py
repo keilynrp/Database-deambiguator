@@ -12,6 +12,7 @@ import pandas as pd
 
 from backend.database import engine
 from backend.schema_registry import registry
+from backend.tenant_access import add_org_sql_filter
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,10 @@ class CorrelationAnalyzer:
     """Compute pairwise Cramér's V between categorical fields."""
 
     def top_correlations(
-        self, domain_id: str, top_n: int = 20
+        self,
+        domain_id: str,
+        top_n: int = 20,
+        org_id: int | None = None,
     ) -> dict[str, Any]:
         """
         Compute Cramér's V for all valid field pairs in the domain.
@@ -106,10 +110,20 @@ class CorrelationAnalyzer:
 
         with engine.connect() as conn:
             cols_sql = ", ".join(f'"{f}"' for f in candidate_fields)
-            df = pd.read_sql(
-                f"SELECT {cols_sql} FROM raw_entities",  # noqa: S608
-                conn,
-            )
+            where_clauses: list[str] = []
+            params: dict[str, object] = {}
+            if domain_id != "all":
+                if domain_id == "default":
+                    where_clauses.append("(domain = :domain_id OR domain IS NULL)")
+                else:
+                    where_clauses.append("domain = :domain_id")
+                params["domain_id"] = domain_id
+            add_org_sql_filter(where_clauses, params, org_id)
+
+            sql = f"SELECT {cols_sql} FROM raw_entities"  # noqa: S608
+            if where_clauses:
+                sql += " WHERE " + " AND ".join(where_clauses)
+            df = pd.read_sql(sql, conn, params=params)
 
         n_entities = len(df)
 

@@ -22,6 +22,12 @@ from backend.auth import get_current_user, require_role
 from backend.database import get_db
 from backend.routers.deps import _audit, _dispatch_webhook
 from backend.routers.limiter import limiter
+from backend.tenant_access import (
+    get_scoped_record,
+    persisted_org_id,
+    resolve_request_org_id,
+    scope_query_to_org,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +73,8 @@ _PREVIEW_ROW_CAP = 10_000  # Max rows examined during preview to avoid OOM
 
 # ── Step functions ────────────────────────────────────────────────────────────
 
-def _step_normalize_labels(db: Session, preview_only: bool):
-    entities = db.query(models.RawEntity).filter(
+def _step_normalize_labels(db: Session, preview_only: bool, org_id: int | None = None):
+    entities = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id).filter(
         or_(
             models.RawEntity.primary_label != None,
             models.RawEntity.secondary_label != None,
@@ -95,8 +101,8 @@ def _step_normalize_labels(db: Session, preview_only: bool):
     return changes
 
 
-def _step_normalize_canonical_ids(db: Session, preview_only: bool):
-    entities = db.query(models.RawEntity).filter(
+def _step_normalize_canonical_ids(db: Session, preview_only: bool, org_id: int | None = None):
+    entities = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id).filter(
         models.RawEntity.canonical_id != None
     ).all()
     changes = []
@@ -119,8 +125,8 @@ def _step_normalize_canonical_ids(db: Session, preview_only: bool):
     return changes
 
 
-def _step_normalize_entity_types(db: Session, preview_only: bool):
-    entities = db.query(models.RawEntity).filter(
+def _step_normalize_entity_types(db: Session, preview_only: bool, org_id: int | None = None):
+    entities = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id).filter(
         models.RawEntity.entity_type != None
     ).all()
     changes = []
@@ -143,8 +149,8 @@ def _step_normalize_entity_types(db: Session, preview_only: bool):
     return changes
 
 
-def _step_set_default_validation(db: Session, preview_only: bool):
-    entities = db.query(models.RawEntity).filter(
+def _step_set_default_validation(db: Session, preview_only: bool, org_id: int | None = None):
+    entities = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id).filter(
         or_(
             models.RawEntity.validation_status == None,
             models.RawEntity.validation_status == "",
@@ -178,13 +184,18 @@ STEP_FUNCTIONS = {
 @router.get("/harmonization/steps")
 def get_harmonization_steps(
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
-    total_entities = db.query(func.count(models.RawEntity.id)).scalar() or 0
+    org_id = resolve_request_org_id(db, current_user)
+    total_entities = (
+        scope_query_to_org(db.query(func.count(models.RawEntity.id)), models.RawEntity, org_id)
+        .scalar()
+        or 0
+    )
     steps_with_status = []
     for step in HARMONIZATION_STEPS:
         last_log = (
-            db.query(models.HarmonizationLog)
+            scope_query_to_org(db.query(models.HarmonizationLog), models.HarmonizationLog, org_id)
             .filter(models.HarmonizationLog.step_id == step["step_id"])
             .order_by(models.HarmonizationLog.id.desc())
             .first()
@@ -202,12 +213,13 @@ def get_harmonization_steps(
 def preview_harmonization_step(
     step_id: str,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
+    org_id = resolve_request_org_id(db, current_user)
     if step_id not in STEP_FUNCTIONS:
         raise HTTPException(status_code=400, detail=f"Unknown step: {step_id}")
     step_def = next(s for s in HARMONIZATION_STEPS if s["step_id"] == step_id)
-    changes = STEP_FUNCTIONS[step_id](db, preview_only=True)
+    changes = STEP_FUNCTIONS[step_id](db, preview_only=True, org_id=org_id)
     return {
         "step_id":       step_id,
         "step_name":     step_def["name"],
@@ -224,13 +236,16 @@ def apply_harmonization_step(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
+    org_id = resolve_request_org_id(db, current_user)
+    log_org_id = persisted_org_id(org_id)
     if step_id not in STEP_FUNCTIONS:
         raise HTTPException(status_code=400, detail=f"Unknown step: {step_id}")
     step_def = next(s for s in HARMONIZATION_STEPS if s["step_id"] == step_id)
-    changes = STEP_FUNCTIONS[step_id](db, preview_only=False)
+    changes = STEP_FUNCTIONS[step_id](db, preview_only=False, org_id=org_id)
 
     fields_modified = list({c["field"] for c in changes})
     log_entry = models.HarmonizationLog(
+        org_id=log_org_id,
         step_id=step_id,
         step_name=step_def["name"],
         records_updated=len(changes),
@@ -280,15 +295,18 @@ def apply_harmonization_step(
 def apply_all_harmonization_steps(
     request: Request,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
+    org_id = resolve_request_org_id(db, current_user)
+    log_org_id = persisted_org_id(org_id)
     results = []
     for step in HARMONIZATION_STEPS:
         step_id = step["step_id"]
-        changes = STEP_FUNCTIONS[step_id](db, preview_only=False)
+        changes = STEP_FUNCTIONS[step_id](db, preview_only=False, org_id=org_id)
         fields_modified = list({c["field"] for c in changes})
 
         log_entry = models.HarmonizationLog(
+            org_id=log_org_id,
             step_id=step_id,
             step_name=step["name"],
             records_updated=len(changes),
@@ -323,10 +341,11 @@ def apply_all_harmonization_steps(
 @router.get("/harmonization/logs")
 def get_harmonization_logs(
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
+    org_id = resolve_request_org_id(db, current_user)
     logs = (
-        db.query(models.HarmonizationLog)
+        scope_query_to_org(db.query(models.HarmonizationLog), models.HarmonizationLog, org_id)
         .order_by(models.HarmonizationLog.id.desc())
         .limit(50)
         .all()
@@ -349,11 +368,10 @@ def get_harmonization_logs(
 def undo_harmonization(
     log_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
-    log_entry = db.query(models.HarmonizationLog).filter(
-        models.HarmonizationLog.id == log_id
-    ).first()
+    org_id = resolve_request_org_id(db, current_user)
+    log_entry = get_scoped_record(db, models.HarmonizationLog, log_id, org_id)
     if not log_entry:
         raise HTTPException(status_code=404, detail="Log entry not found")
     if log_entry.reverted:
@@ -371,7 +389,7 @@ def undo_harmonization(
 
     restored = 0
     for cr in change_records:
-        entity = db.query(models.RawEntity).filter(models.RawEntity.id == cr.record_id).first()
+        entity = get_scoped_record(db, models.RawEntity, cr.record_id, org_id)
         if entity:
             setattr(entity, cr.field, cr.old_value)
             restored += 1
@@ -391,11 +409,10 @@ def undo_harmonization(
 def redo_harmonization(
     log_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
-    log_entry = db.query(models.HarmonizationLog).filter(
-        models.HarmonizationLog.id == log_id
-    ).first()
+    org_id = resolve_request_org_id(db, current_user)
+    log_entry = get_scoped_record(db, models.HarmonizationLog, log_id, org_id)
     if not log_entry:
         raise HTTPException(status_code=404, detail="Log entry not found")
     if not log_entry.reverted:
@@ -409,7 +426,7 @@ def redo_harmonization(
 
     reapplied = 0
     for cr in change_records:
-        entity = db.query(models.RawEntity).filter(models.RawEntity.id == cr.record_id).first()
+        entity = get_scoped_record(db, models.RawEntity, cr.record_id, org_id)
         if entity:
             setattr(entity, cr.field, cr.new_value)
             reapplied += 1

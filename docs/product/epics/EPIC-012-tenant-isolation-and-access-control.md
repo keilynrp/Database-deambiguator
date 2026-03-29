@@ -56,7 +56,7 @@ Excluye:
 | ID | Story | Estado |
 |---|---|---|
 | US-043 | Scoping de tenant en modelo de datos | Done |
-| US-044 | Enforcements de tenant en queries y acceso | Planned |
+| US-044 | Enforcements de tenant en queries y acceso | Done |
 | US-045 | Limites y quotas por tenant o plan | Planned |
 
 ## 10. Sprint allocation
@@ -71,5 +71,7 @@ Excluye:
 - `backend/models.py`
 - auth y routers de recursos compartidos
 - `backend/tenant_scoping.py`
+- `backend/tenant_access.py`
 - `GET /ops/tenant-model`
 - `docs/product/TENANT_SCOPING_MODEL.md`
+- `docs/product/stories/US-044-tenant-query-enforcement.md`

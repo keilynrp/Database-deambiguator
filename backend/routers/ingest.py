@@ -34,6 +34,7 @@ from backend.parsers.ris_parser import parse_ris
 from backend.parsers.science_mapper import science_record_to_entity
 from backend.routers.column_maps import COLUMN_MAPPING, EXPORT_COLUMN_MAPPING
 from backend.routers.deps import _audit, _dispatch_webhook, _get_active_integration
+from backend.tenant_access import persisted_org_id, resolve_request_org_id, scope_query_to_org
 
 logger = logging.getLogger(__name__)
 
@@ -381,6 +382,8 @@ async def upload_file(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
+    org_id = resolve_request_org_id(db, current_user)
+    stored_org_id = persisted_org_id(org_id)
     filename = file.filename.lower()
     allowed_extensions = (
         ".xlsx", ".csv", ".json", ".xml", ".parquet",
@@ -423,6 +426,7 @@ async def upload_file(
         for r in science_records:
             entity_data = science_record_to_entity(r)
             entity_data["domain"] = effective_domain
+            entity_data["org_id"] = stored_org_id
             objects.append(models.RawEntity(**entity_data))
 
         fmt = "bibtex" if filename.endswith(".bib") else "ris"
@@ -493,7 +497,7 @@ async def upload_file(
         if not isinstance(row, dict):
             continue
 
-        row_data: dict = {"domain": domain}
+        row_data: dict = {"domain": domain, "org_id": stored_org_id}
         unmatched_data: dict = {}
 
         for k, val in row.items():
@@ -598,9 +602,10 @@ def export_entities(
     search: str = None,
     limit: int = Query(default=5000, ge=1, le=50000),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
-    query = db.query(models.RawEntity)
+    org_id = resolve_request_org_id(db, current_user)
+    query = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
 
     if search:
         search_filter = f"%{search}%"

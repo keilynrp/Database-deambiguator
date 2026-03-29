@@ -11,6 +11,7 @@ from backend.adapters.enrichment.scholar import ScholarAdapter
 from backend.adapters.enrichment.scopus import ScopusAdapter
 from backend.adapters.enrichment.wos import WebOfScienceAdapter
 from backend.circuit_breaker import CircuitBreaker, CircuitOpenError
+from backend.tenant_access import scope_query_to_org
 
 logger = logging.getLogger(__name__)
 
@@ -239,13 +240,18 @@ def enrich_with_web_scrapers(db: Session, entity: models.RawEntity) -> bool:
     return False
 
 
-def trigger_enrichment_bulk(db: Session, skip: int = 0, limit: int = 100) -> int:
+def trigger_enrichment_bulk(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    org_id: int | None = None,
+) -> int:
     """
     Marks a batch of 'none' or 'failed' entities as 'pending' so the background
     worker picks them up. Does NOT re-queue records already 'processing' or 'completed'.
     """
     entities = (
-        db.query(models.RawEntity)
+        scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
         .filter(models.RawEntity.enrichment_status.in_(["none", "failed"]))
         .offset(skip)
         .limit(limit)

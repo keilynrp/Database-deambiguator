@@ -21,14 +21,15 @@ from sqlalchemy.orm import Session
 from backend import graph_analytics, models, schemas
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
+from backend.tenant_access import get_scoped_record, resolve_request_org_id, scope_query_to_org
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["relationships"])
 
 
-def _get_entity_or_404(entity_id: int, db: Session) -> models.RawEntity:
-    entity = db.get(models.RawEntity, entity_id)
+def _get_entity_or_404(entity_id: int, db: Session, org_id: int | None) -> models.RawEntity:
+    entity = get_scoped_record(db, models.RawEntity, entity_id, org_id)
     if not entity:
         raise HTTPException(status_code=404, detail=f"Entity {entity_id} not found")
     return entity
@@ -37,10 +38,11 @@ def _get_entity_or_404(entity_id: int, db: Session) -> models.RawEntity:
 @router.get("/graph/stats")
 def get_graph_stats(
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Sprint 73 — Global graph statistics: nodes, edges, components, top PageRank."""
-    edges = graph_analytics.fetch_edges(db)
+    org_id = resolve_request_org_id(db, current_user)
+    edges = graph_analytics.fetch_edges(db, org_id=org_id)
 
     if not edges:
         return {
@@ -71,7 +73,9 @@ def get_graph_stats(
     top_ids = {nid for nid, _ in top_pr + top_degree}
     label_map = {
         e.id: e.primary_label
-        for e in db.query(models.RawEntity).filter(models.RawEntity.id.in_(top_ids)).all()
+        for e in scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+        .filter(models.RawEntity.id.in_(top_ids))
+        .all()
     }
 
     return {
@@ -95,18 +99,19 @@ def get_shortest_path(
     from_id: int = Query(..., ge=1),
     to_id:   int = Query(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Sprint 73 — BFS shortest path between two entities (directed)."""
+    org_id = resolve_request_org_id(db, current_user)
     if from_id == to_id:
         raise HTTPException(status_code=400, detail="from_id and to_id must be different")
 
     # Verify both entities exist
     for eid in (from_id, to_id):
-        if not db.query(models.RawEntity).filter(models.RawEntity.id == eid).first():
+        if not get_scoped_record(db, models.RawEntity, eid, org_id):
             raise HTTPException(status_code=404, detail=f"Entity {eid} not found")
 
-    edges = graph_analytics.fetch_edges(db)
+    edges = graph_analytics.fetch_edges(db, org_id=org_id)
     result = graph_analytics.shortest_path(from_id, to_id, edges)
 
     if result is None:
@@ -116,7 +121,9 @@ def get_shortest_path(
     path_ids = result["path"]
     label_map = {
         e.id: e.primary_label
-        for e in db.query(models.RawEntity).filter(models.RawEntity.id.in_(path_ids)).all()
+        for e in scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+        .filter(models.RawEntity.id.in_(path_ids))
+        .all()
     }
     steps = [
         {"entity_id": pid, "primary_label": label_map.get(pid)}
@@ -136,10 +143,11 @@ def get_shortest_path(
 @router.get("/graph/components")
 def get_graph_components(
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """Sprint 73 — List all weakly connected components with sizes and member IDs."""
-    edges = graph_analytics.fetch_edges(db)
+    org_id = resolve_request_org_id(db, current_user)
+    edges = graph_analytics.fetch_edges(db, org_id=org_id)
 
     if not edges:
         return {"total_components": 0, "components": []}
@@ -172,17 +180,18 @@ def get_graph_components(
 def get_entity_graph_metrics(
     entity_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """
     Sprint 73 — Return graph analytics metrics for a single entity:
     degree centrality, PageRank score, connected component info.
     """
-    entity = db.query(models.RawEntity).filter(models.RawEntity.id == entity_id).first()
+    org_id = resolve_request_org_id(db, current_user)
+    entity = get_scoped_record(db, models.RawEntity, entity_id, org_id)
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
 
-    edges = graph_analytics.fetch_edges(db)
+    edges = graph_analytics.fetch_edges(db, org_id=org_id)
 
     # Degree
     degree = graph_analytics.degree_centrality(entity_id, edges)
@@ -221,14 +230,15 @@ def get_entity_graph(
     entity_id: int = Path(..., ge=1),
     depth: int = Query(default=1, ge=1, le=2),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """
     Return a subgraph centered on entity_id.
     depth=1 → direct neighbors only.
     depth=2 → neighbors + their neighbors (capped at 50 nodes total).
     """
-    _get_entity_or_404(entity_id, db)
+    org_id = resolve_request_org_id(db, current_user)
+    _get_entity_or_404(entity_id, db, org_id)
 
     visited_ids = set()
     queue = deque([(entity_id, 0)])
@@ -246,7 +256,7 @@ def get_entity_graph(
 
         # Edges where this node is source or target
         rels = (
-            db.query(models.EntityRelationship)
+            scope_query_to_org(db.query(models.EntityRelationship), models.EntityRelationship, org_id)
             .filter(
                 (models.EntityRelationship.source_id == current_id)
                 | (models.EntityRelationship.target_id == current_id)
@@ -274,7 +284,11 @@ def get_entity_graph(
     ]
 
     # Fetch node data
-    entities = db.query(models.RawEntity).filter(models.RawEntity.id.in_(visited_ids)).all()
+    entities = (
+        scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+        .filter(models.RawEntity.id.in_(visited_ids))
+        .all()
+    )
     entity_map = {e.id: e for e in entities}
 
     nodes = [
@@ -311,12 +325,13 @@ def get_entity_graph(
 def list_relationships(
     entity_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
 ):
     """List all relationships where this entity is source or target."""
-    _get_entity_or_404(entity_id, db)
+    org_id = resolve_request_org_id(db, current_user)
+    _get_entity_or_404(entity_id, db, org_id)
     return (
-        db.query(models.EntityRelationship)
+        scope_query_to_org(db.query(models.EntityRelationship), models.EntityRelationship, org_id)
         .filter(
             (models.EntityRelationship.source_id == entity_id)
             | (models.EntityRelationship.target_id == entity_id)
@@ -331,18 +346,19 @@ def create_relationship(
     payload: schemas.EntityRelationshipCreate,
     entity_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Create a directed relationship from entity_id → target_id."""
-    _get_entity_or_404(entity_id, db)
-    _get_entity_or_404(payload.target_id, db)
+    org_id = resolve_request_org_id(db, current_user)
+    source = _get_entity_or_404(entity_id, db, org_id)
+    _get_entity_or_404(payload.target_id, db, org_id)
 
     if entity_id == payload.target_id:
         raise HTTPException(status_code=400, detail="Self-referential relationships are not allowed.")
 
     # Prevent duplicate directed edge of same type
     existing = (
-        db.query(models.EntityRelationship)
+        scope_query_to_org(db.query(models.EntityRelationship), models.EntityRelationship, org_id)
         .filter(
             models.EntityRelationship.source_id == entity_id,
             models.EntityRelationship.target_id == payload.target_id,
@@ -354,6 +370,7 @@ def create_relationship(
         raise HTTPException(status_code=409, detail="This relationship already exists.")
 
     rel = models.EntityRelationship(
+        org_id=source.org_id,
         source_id=entity_id,
         target_id=payload.target_id,
         relation_type=payload.relation_type,
@@ -370,10 +387,11 @@ def create_relationship(
 def delete_relationship(
     rel_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Delete a relationship by ID."""
-    rel = db.get(models.EntityRelationship, rel_id)
+    org_id = resolve_request_org_id(db, current_user)
+    rel = get_scoped_record(db, models.EntityRelationship, rel_id, org_id)
     if not rel:
         raise HTTPException(status_code=404, detail="Relationship not found")
     db.delete(rel)
