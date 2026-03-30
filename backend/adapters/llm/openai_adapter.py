@@ -5,7 +5,6 @@ Sprint 69C: Agentic tool loop via OpenAI function calling.
 """
 import json
 import logging
-import openai
 from typing import Any, Callable, Dict, List
 from .base import BaseLLMAdapter
 
@@ -15,6 +14,12 @@ logger = logging.getLogger(__name__)
 class OpenAIAdapter(BaseLLMAdapter):
 
     def __init__(self, api_key: str, model_name: str = "gpt-4o-mini"):
+        try:
+            import openai
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "OpenAI SDK is not installed. Install the 'openai' package to use OpenAIAdapter."
+            ) from exc
         self._client = openai.OpenAI(api_key=api_key)
         self._model_name = model_name
         self._embedding_model = "text-embedding-3-small"

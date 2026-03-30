@@ -4,14 +4,25 @@ import os
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 from backend.schema_registry import DomainSchema
-from openai import OpenAI
+
+try:
+    from openai import OpenAI
+except ModuleNotFoundError:  # pragma: no cover - exercised through fallback behavior
+    OpenAI = None
 
 logger = logging.getLogger(__name__)
 
-# Try to get the client initialized
-client = None
-if os.environ.get("OPENAI_API_KEY"):
-    client = OpenAI()
+
+def _create_client(api_key: Optional[str] = None):
+    resolved_api_key = api_key or os.environ.get("OPENAI_API_KEY")
+    if not resolved_api_key or OpenAI is None:
+        return None
+    if api_key:
+        return OpenAI(api_key=api_key)
+    return OpenAI()
+
+
+client = _create_client()
 
 def _generate_system_prompt(domain: DomainSchema) -> str:
     """Generate a domain-aware prompt for the LLM based on the target schema."""
@@ -50,7 +61,7 @@ def disambiguate_entity(raw_record: Dict[str, Any], domain: DomainSchema, api_ke
     Accepts raw un-normalized properties and attempts to harmonize them using the Domain Schema.
     """
     # Prefer explicitly passed API key (from frontend settings/header), fallback to env vars.
-    active_client = OpenAI(api_key=api_key) if api_key else client
+    active_client = _create_client(api_key) if api_key else client
     
     # Fallback simulation logic if no API key is present
     if not active_client:
@@ -100,7 +111,7 @@ def resolve_canonical_name(field_name: str, variations: List[str], api_key: str 
     Given an entity attribute name and a list of lexical variations, uses the LLM to elect the single best
     canonical string (e.g., standardizing 'nike inc', 'NIKE', 'nkie' to 'Nike').
     """
-    active_client = OpenAI(api_key=api_key) if api_key else client
+    active_client = _create_client(api_key) if api_key else client
     
     if not active_client:
         # Fallback to just taking the shortest capitalized one, or just the first if no API key

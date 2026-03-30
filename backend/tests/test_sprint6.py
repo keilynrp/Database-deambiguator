@@ -4,6 +4,8 @@ Sprint 6 regression tests:
 - Store schema: invalid platform/sync_direction → 422
 - Rate-limit enforced on /auth/token (429 after exceeding 5/min)
 """
+import os
+
 import pytest
 
 
@@ -110,7 +112,7 @@ def test_auth_token_rate_limit_enforced(client):
     for _ in range(10):
         r = client.post(
             "/auth/token",
-            data={"username": "testadmin", "password": "testpassword"},
+            data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]},
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
         statuses.append(r.status_code)

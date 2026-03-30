@@ -109,7 +109,7 @@ def auth_token(client):
     """Obtain a valid JWT token for the super_admin test account."""
     response = client.post(
         "/auth/token",
-        data={"username": "testadmin", "password": "testpassword"},
+        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]},
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     assert response.status_code == 200, f"Auth failed: {response.text}"

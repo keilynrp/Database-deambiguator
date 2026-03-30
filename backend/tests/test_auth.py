@@ -45,7 +45,7 @@ def test_create_access_token_custom_expiry():
 
 def test_authenticate_user_correct_credentials(session_factory):
     with session_factory() as db:
-        assert authenticate_user(db, "testadmin", "testpassword") is not None
+        assert authenticate_user(db, os.environ["ADMIN_USERNAME"], os.environ["ADMIN_PASSWORD"]) is not None
 
 
 def test_authenticate_user_wrong_password(session_factory):
@@ -55,7 +55,7 @@ def test_authenticate_user_wrong_password(session_factory):
 
 def test_authenticate_user_wrong_username(session_factory):
     with session_factory() as db:
-        assert authenticate_user(db, "notauser", "testpassword") is None
+        assert authenticate_user(db, "notauser", os.environ["ADMIN_PASSWORD"]) is None
 
 
 def test_authenticate_user_empty_credentials(session_factory):
@@ -68,7 +68,7 @@ def test_authenticate_user_empty_credentials(session_factory):
 def test_login_success(client):
     response = client.post(
         "/auth/token",
-        data={"username": "testadmin", "password": "testpassword"},
+        data={"username": os.environ["ADMIN_USERNAME"], "password": os.environ["ADMIN_PASSWORD"]},
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     assert response.status_code == 200
@@ -89,7 +89,7 @@ def test_login_wrong_password(client):
 def test_login_wrong_username(client):
     response = client.post(
         "/auth/token",
-        data={"username": "nobody", "password": "testpassword"},
+        data={"username": "nobody", "password": os.environ["ADMIN_PASSWORD"]},
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     assert response.status_code == 401

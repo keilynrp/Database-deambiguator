@@ -5,6 +5,8 @@ Sprint 14 regression tests:
 - POST /users/me/password endpoint (14C)
 - /health remains public
 """
+import os
+
 import pytest
 from datetime import datetime, timedelta, timezone
 
@@ -189,7 +191,7 @@ def test_successful_login_resets_failed_attempts(auth_headers, db_session, sessi
 def test_change_password_without_auth_returns_401(client):
     resp = client.post(
         "/users/me/password",
-        json={"current_password": "testpassword", "new_password": "NewSecure1!"},
+        json={"current_password": os.environ["ADMIN_PASSWORD"], "new_password": "NewSecure1!"},
     )
     assert resp.status_code == 401
 
@@ -206,7 +208,7 @@ def test_change_password_wrong_current_returns_400(client, auth_headers):
 def test_change_password_too_short_new_returns_422(client, auth_headers):
     resp = client.post(
         "/users/me/password",
-        json={"current_password": "testpassword", "new_password": "short"},
+        json={"current_password": os.environ["ADMIN_PASSWORD"], "new_password": "short"},
         headers=auth_headers,
     )
     assert resp.status_code == 422
@@ -214,7 +216,7 @@ def test_change_password_too_short_new_returns_422(client, auth_headers):
 
 def test_change_password_success_returns_200(client, auth_headers):
     """Change and restore testadmin password so other tests are not affected."""
-    original = "testpassword"
+    original = os.environ["ADMIN_PASSWORD"]
     new_pw = "NewSecurePass1!"
 
     # Change
