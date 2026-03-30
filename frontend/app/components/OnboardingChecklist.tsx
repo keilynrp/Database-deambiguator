@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "../../lib/api";
+import { useLanguage } from "../contexts/LanguageContext";
 
 interface OnboardingStep {
   key: string;
@@ -82,7 +83,7 @@ function StepIcon({ icon, completed }: { icon: string; completed: boolean }) {
 
   if (completed) {
     return (
-      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400">
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4.5 12.75l6 6 9-13.5" />
         </svg>
@@ -91,13 +92,14 @@ function StepIcon({ icon, completed }: { icon: string; completed: boolean }) {
   }
 
   return (
-    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-400">
       {iconMap[icon] || iconMap.chart}
     </div>
   );
 }
 
 export default function OnboardingChecklist({ token }: { token: string | null }) {
+  const { t } = useLanguage();
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [dismissed, setDismissed] = useState(() => {
@@ -132,29 +134,29 @@ export default function OnboardingChecklist({ token }: { token: string | null })
   if (dismissed || !status || status.all_done) return null;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-900/50 dark:bg-slate-900">
       <div
         className="flex cursor-pointer select-none items-center justify-between px-5 py-4"
         onClick={() => setCollapsed((current) => !current)}
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-600">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
             {status.completed}/{status.total}
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-900">Getting started</p>
-            <p className="text-xs text-slate-400">{status.percent}% complete</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('onboarding.getting_started')}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">{status.percent}% {t('onboarding.complete')}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 sm:block">
+          <div className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700 sm:block">
             <div
               className="h-full rounded-full bg-violet-500 transition-all"
               style={{ width: `${status.percent}%` }}
             />
           </div>
           <svg
-            className={`h-4 w-4 text-slate-400 transition-transform ${collapsed ? "" : "rotate-180"}`}
+            className={`h-4 w-4 text-slate-400 dark:text-slate-500 transition-transform ${collapsed ? "" : "rotate-180"}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -165,43 +167,43 @@ export default function OnboardingChecklist({ token }: { token: string | null })
       </div>
 
       {!collapsed && (
-        <div className="border-t border-slate-100">
-          <div className="grid gap-4 bg-slate-50/80 px-5 py-5 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-600">
-                Initial commercial focus
+        <div className="border-t border-slate-100 dark:border-slate-800">
+          <div className="grid gap-4 bg-slate-50/80 px-5 py-5 dark:bg-slate-800/50 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-800">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-600 dark:text-sky-400">
+                {t('onboarding.commercial_focus')}
               </p>
-              <h3 className="mt-2 text-base font-semibold text-slate-900">
+              <h3 className="mt-2 text-base font-semibold text-slate-900 dark:text-slate-100">
                 {status.commercial_mvp.label}
               </h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
                 {status.commercial_mvp.summary}
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Ideal customer
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {t('onboarding.ideal_customer')}
                   </p>
-                  <p className="mt-1 text-sm text-slate-700">{status.commercial_mvp.ideal_customer}</p>
+                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{status.commercial_mvp.ideal_customer}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    First dataset
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {t('onboarding.first_dataset')}
                   </p>
-                  <p className="mt-1 text-sm text-slate-700">{status.commercial_mvp.initial_dataset}</p>
+                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{status.commercial_mvp.initial_dataset}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Time to first value
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {t('onboarding.time_to_value')}
                   </p>
-                  <p className="mt-1 text-sm text-slate-700">{status.commercial_mvp.time_to_first_value}</p>
+                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{status.commercial_mvp.time_to_first_value}</p>
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {status.commercial_mvp.primary_outcomes.map((outcome) => (
                   <span
                     key={outcome}
-                    className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600"
+                    className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300"
                   >
                     {outcome}
                   </span>
@@ -211,21 +213,21 @@ export default function OnboardingChecklist({ token }: { token: string | null })
 
             <div className="space-y-3">
               {status.next_recommended_step && (
-                <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-600">
-                    Recommended next
+                <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-4 dark:border-violet-900/50 dark:bg-violet-950/40">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-600 dark:text-violet-400">
+                    {t('onboarding.recommended_next')}
                   </p>
-                  <h3 className="mt-2 text-sm font-semibold text-slate-900">
+                  <h3 className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
                     {status.next_recommended_step.label}
                   </h3>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     {status.next_recommended_step.reason}
                   </p>
                   <Link
                     href={status.next_recommended_step.href}
                     className="mt-3 inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700"
                   >
-                    Go now
+                    {t('onboarding.go_now')}
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 4.5l6 7.5-6 7.5M19.5 12h-15" />
                     </svg>
@@ -233,21 +235,21 @@ export default function OnboardingChecklist({ token }: { token: string | null })
                 </div>
               )}
 
-              <div className="rounded-xl border border-slate-200 bg-white px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-600">
-                  Fast path
+              <div className="rounded-xl border border-slate-200 bg-white px-4 py-4 dark:border-slate-700 dark:bg-slate-800">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-600 dark:text-emerald-400">
+                  {t('onboarding.fast_path')}
                 </p>
                 <div className="mt-3 space-y-3">
                   {status.journey.map((step, index) => (
                     <div key={step.key} className="flex items-start gap-3">
-                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
                         {index + 1}
                       </div>
                       <div>
-                        <Link href={step.href} className="text-sm font-medium text-slate-800 hover:text-emerald-700">
+                        <Link href={step.href} className="text-sm font-medium text-slate-800 hover:text-emerald-700 dark:text-slate-200 dark:hover:text-emerald-400">
                           {step.label}
                         </Link>
-                        <p className="mt-0.5 text-xs leading-5 text-slate-500">{step.description}</p>
+                        <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">{step.description}</p>
                       </div>
                     </div>
                   ))}
@@ -256,31 +258,31 @@ export default function OnboardingChecklist({ token }: { token: string | null })
             </div>
           </div>
 
-          <div className="divide-y divide-slate-50 border-t border-slate-100">
+          <div className="divide-y divide-slate-50 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
             {status.steps.map((step) => {
               const isRecommended = status.next_recommended_step?.key === step.key;
               return (
                 <Link
                   key={step.key}
                   href={step.href}
-                  className={`flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50 ${step.completed ? "opacity-60" : ""}`}
+                  className={`flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60 ${step.completed ? "opacity-60" : ""}`}
                 >
                   <StepIcon icon={step.icon} completed={step.completed} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className={`text-sm font-medium ${step.completed ? "text-slate-400 line-through" : "text-slate-800"}`}>
+                      <p className={`text-sm font-medium ${step.completed ? "text-slate-400 line-through dark:text-slate-500" : "text-slate-800 dark:text-slate-200"}`}>
                         {step.label}
                       </p>
                       {isRecommended && !step.completed && (
-                        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
-                          Recommended now
+                        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-400">
+                          {t('onboarding.recommended_badge')}
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs leading-5 text-slate-400">{step.description}</p>
+                    <p className="mt-0.5 text-xs leading-5 text-slate-400 dark:text-slate-500">{step.description}</p>
                   </div>
                   {!step.completed && (
-                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                     </svg>
                   )}
@@ -294,9 +296,9 @@ export default function OnboardingChecklist({ token }: { token: string | null })
                   event.preventDefault();
                   dismiss();
                 }}
-                className="text-xs text-slate-400 hover:text-slate-600"
+                className="text-xs text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
               >
-                Dismiss checklist
+                {t('onboarding.dismiss')}
               </button>
             </div>
           </div>

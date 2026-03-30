@@ -7,9 +7,18 @@ vi.mock("../lib/api", () => ({
 }));
 
 import OnboardingChecklist from "../app/components/OnboardingChecklist";
+import { LanguageProvider } from "../app/contexts/LanguageContext";
 import { apiFetch } from "../lib/api";
 
 const mockApiFetch = apiFetch as ReturnType<typeof vi.fn>;
+
+function renderChecklist() {
+  return render(
+    <LanguageProvider>
+      <OnboardingChecklist token="token" />
+    </LanguageProvider>
+  );
+}
 
 function successResponse(data: unknown) {
   return {
@@ -79,6 +88,7 @@ const BASE_STATUS = {
 
 beforeEach(() => {
   localStorage.clear();
+  localStorage.setItem("app_lang", "en");
   mockApiFetch.mockReset();
 });
 
@@ -86,7 +96,7 @@ describe("OnboardingChecklist", () => {
   it("renders the commercial MVP context and recommended next step", async () => {
     mockApiFetch.mockResolvedValue(successResponse(BASE_STATUS));
 
-    render(<OnboardingChecklist token="token" />);
+    renderChecklist();
 
     await waitFor(() => {
       expect(screen.getByText("Research Intelligence")).toBeInTheDocument();
@@ -109,7 +119,7 @@ describe("OnboardingChecklist", () => {
       })
     );
 
-    const { container } = render(<OnboardingChecklist token="token" />);
+    const { container } = renderChecklist();
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledTimes(1);

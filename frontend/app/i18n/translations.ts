@@ -891,6 +891,19 @@ export const translations = {
         'page.authority.rejecting': 'Rejecting...',
         'page.authority.no_records': 'No records found',
         'page.authority.search_placeholder': 'Search authority records...',
+
+        // ── Onboarding checklist ──────────────────────────────────────────────
+        'onboarding.getting_started': 'Getting started',
+        'onboarding.complete': 'complete',
+        'onboarding.commercial_focus': 'Initial commercial focus',
+        'onboarding.ideal_customer': 'Ideal customer',
+        'onboarding.first_dataset': 'First dataset',
+        'onboarding.time_to_value': 'Time to first value',
+        'onboarding.recommended_next': 'Recommended next',
+        'onboarding.go_now': 'Go now',
+        'onboarding.fast_path': 'Fast path',
+        'onboarding.recommended_badge': 'Recommended now',
+        'onboarding.dismiss': 'Dismiss checklist',
     },
     es: {
         // Sidebar sections
@@ -1782,5 +1795,18 @@ export const translations = {
         'page.authority.rejecting': 'Rechazando...',
         'page.authority.no_records': 'No se encontraron registros',
         'page.authority.search_placeholder': 'Buscar registros de autoridad...',
+
+        // ── Lista de inicio (onboarding) ──────────────────────────────────────
+        'onboarding.getting_started': 'Primeros pasos',
+        'onboarding.complete': 'completado',
+        'onboarding.commercial_focus': 'Enfoque comercial inicial',
+        'onboarding.ideal_customer': 'Cliente ideal',
+        'onboarding.first_dataset': 'Primer conjunto de datos',
+        'onboarding.time_to_value': 'Tiempo al primer valor',
+        'onboarding.recommended_next': 'Siguiente recomendado',
+        'onboarding.go_now': 'Ir ahora',
+        'onboarding.fast_path': 'Ruta rápida',
+        'onboarding.recommended_badge': 'Recomendado ahora',
+        'onboarding.dismiss': 'Descartar lista',
     }
 };
