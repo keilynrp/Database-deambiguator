@@ -188,10 +188,23 @@ _TABLES_TO_CLEAN = [
     "webhook_deliveries",
     "webhooks",
     "scheduled_imports",
+    "scheduled_reports",
+    "web_scraper_configs",
+    "workflow_runs",
+    "workflows",
+    "organization_members",
+    "organizations",
     "entity_relationships",
     # Note: "users" is intentionally excluded — the super_admin/editor/viewer
     # test accounts must persist across the entire test session.
 ]
+
+
+def _reset_test_state(db):
+    for table in _TABLES_TO_CLEAN:
+        db.execute(text(f"DELETE FROM {table}"))
+    db.execute(text("UPDATE users SET org_id = NULL"))
+    db.commit()
 
 
 @pytest.fixture()
@@ -207,9 +220,7 @@ def db_session():
     # ── Pre-test cleanup ──────────────────────────────────────────────
     pre = TestingSessionLocal()
     try:
-        for table in _TABLES_TO_CLEAN:
-            pre.execute(text(f"DELETE FROM {table}"))
-        pre.commit()
+        _reset_test_state(pre)
     finally:
         pre.close()
 
@@ -221,8 +232,6 @@ def db_session():
         # ── Post-test cleanup ─────────────────────────────────────────
         cleanup_db = TestingSessionLocal()
         try:
-            for table in _TABLES_TO_CLEAN:
-                cleanup_db.execute(text(f"DELETE FROM {table}"))
-            cleanup_db.commit()
+            _reset_test_state(cleanup_db)
         finally:
             cleanup_db.close()

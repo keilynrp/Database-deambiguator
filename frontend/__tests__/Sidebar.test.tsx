@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import React from "react";
-// Since Sidebar could rely on multiple contexts similarly, we provide standard mocks
 import Sidebar from "../app/components/Sidebar";
+import { LanguageProvider } from "../app/contexts/LanguageContext";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
@@ -23,20 +23,30 @@ vi.mock("../app/components/SidebarProvider", () => ({
   useSidebar: () => ({ isMobileOpen: true, setMobileOpen: vi.fn() }),
 }));
 
+function renderSidebar() {
+  return render(
+    <LanguageProvider>
+      <Sidebar />
+    </LanguageProvider>
+  );
+}
+
 describe("Sidebar Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    localStorage.setItem("app_lang", "en");
   });
 
-  it("renders the branding platform name correctly", () => {
-    render(<Sidebar />);
-    expect(screen.getByText("UKIP Default Platform")).toBeInTheDocument();
+  it("renders the branding platform name correctly", async () => {
+    renderSidebar();
+    expect(await screen.findByText("UKIP Default Platform")).toBeInTheDocument();
   });
 
-  it("renders main navigation links properly", () => {
-    render(<Sidebar />);
-    expect(screen.getByText(/Master Data Hub/i)).toBeInTheDocument();
-    expect(screen.getByText(/Data Harmonization/i)).toBeInTheDocument();
-    expect(screen.getByText(/Semantic RAG/i)).toBeInTheDocument();
+  it("renders main navigation links properly", async () => {
+    renderSidebar();
+    expect(await screen.findByText(/Knowledge Explorer/i)).toBeInTheDocument();
+    expect(screen.getByText(/Harmonization/i)).toBeInTheDocument();
+    expect(screen.getByText(/Semantic AI/i)).toBeInTheDocument();
   });
 });
