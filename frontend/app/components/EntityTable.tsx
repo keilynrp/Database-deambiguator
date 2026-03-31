@@ -283,13 +283,13 @@ export default function EntityTable() {
     const inputClass = "h-8 w-full rounded border border-gray-200 bg-white px-2 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
 
     return (
-        <div className="flex gap-4 items-start">
+        <div className="grid gap-5 items-start lg:grid-cols-[16rem_minmax(0,1fr)]">
             <FacetPanel
                 activeFacets={activeFacets}
                 onFacetChange={handleFacetChange}
                 refreshKey={facetRefreshKey}
             />
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0">
         <div className="space-y-6">
             {/* Active facet pills */}
             {Object.entries(activeFacets).some(([, v]) => v) && (

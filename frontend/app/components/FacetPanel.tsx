@@ -52,7 +52,7 @@ export default function FacetPanel({ activeFacets, onFacetChange, refreshKey }: 
   const activeCount = Object.values(activeFacets).filter(Boolean).length;
 
   return (
-    <aside className="w-56 flex-shrink-0 flex flex-col gap-2">
+    <aside className="flex flex-col gap-2">
       {/* Header */}
       <div className="flex items-center justify-between px-1 mb-1">
         <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
