@@ -12,6 +12,8 @@ thefuzz
 python-Levenshtein
 rdflib
 pyarrow
+duckdb
+cssselect
 pytest
 pytest-asyncio
 httpx<0.28.0
