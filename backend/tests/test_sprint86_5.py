@@ -18,13 +18,12 @@ import pytest
 # Project root (two levels up from this file)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PYTHON = sys.executable
-ALEMBIC = str(PROJECT_ROOT / ".venv" / "Scripts" / "alembic")
 
 
 def _alembic(*args: str) -> subprocess.CompletedProcess:
     """Run an alembic CLI command in the project root."""
     return subprocess.run(
-        [ALEMBIC, *args],
+        [PYTHON, "-m", "alembic", *args],
         cwd=str(PROJECT_ROOT),
         capture_output=True,
         text=True,
