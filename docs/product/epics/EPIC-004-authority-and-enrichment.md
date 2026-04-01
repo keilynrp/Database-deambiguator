@@ -60,7 +60,7 @@ Excluye:
 | US-024 | Revision y confirmacion de candidatos de autoridad | Planned |
 | US-025 | Orquestacion de enrichment individual y masivo | Planned |
 | US-026 | Gestion de fuentes de scraping para enrichment | Planned |
-| US-055 | Author Resolution Engine MVP | Proposed |
+| US-055 | Author Resolution Engine MVP | Done |
 
 ## 10. Sprint allocation
 
@@ -73,3 +73,4 @@ Excluye:
 - Codigo: `backend/routers/authority.py`, `backend/enrichment_worker.py`, `backend/routers/scrapers.py`
 - Docs: `README.md`, `docs/reference/HISTORICAL_REFERENCE_INDEX.md`
 - Blueprint recomendado: `docs/product/AUTHOR_RESOLUTION_ENGINE_MVP.md`
+- Implementacion MVP: `backend/authority/author_resolution.py`, `POST /authority/authors/resolve`, `GET /authority/authors/review-queue`

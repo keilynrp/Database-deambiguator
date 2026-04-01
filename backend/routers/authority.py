@@ -350,6 +350,86 @@ def authority_queue_summary(
     }
 
 
+@router.get("/authority/authors/review-queue", tags=["authority"])
+def author_review_queue(
+    status: Optional[str] = Query("pending", pattern="^(pending|confirmed|rejected)$"),
+    review_required: Optional[bool] = Query(True),
+    route: Optional[str] = Query(None, pattern="^(fast_path|hybrid_path|llm_path|manual_review)$"),
+    nil_only: bool = Query(False),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Author-only operational queue.
+
+    This is intentionally scoped to records created by the adaptive author
+    pipeline (identified by a non-null `resolution_route`). It gives the
+    frontend a stable review surface without disturbing the legacy authority
+    endpoints used for generic entity reconciliation.
+    """
+    org_id = resolve_request_org_id(db, current_user)
+    base_q = scope_query_to_org(db.query(models.AuthorityRecord), models.AuthorityRecord, org_id).filter(
+        models.AuthorityRecord.resolution_route.is_not(None)
+    )
+
+    summary_by_route = {
+        row[0]: row[1]
+        for row in base_q.with_entities(
+            models.AuthorityRecord.resolution_route,
+            func.count(models.AuthorityRecord.id),
+        ).group_by(
+            models.AuthorityRecord.resolution_route
+        ).all()
+        if row[0]
+    }
+    summary_by_status = {
+        row[0]: row[1]
+        for row in base_q.with_entities(
+            models.AuthorityRecord.status,
+            func.count(models.AuthorityRecord.id),
+        ).group_by(
+            models.AuthorityRecord.status
+        ).all()
+        if row[0]
+    }
+    summary = {
+        "total_records": base_q.count(),
+        "pending_review": base_q.filter(
+            models.AuthorityRecord.status == "pending",
+            models.AuthorityRecord.review_required == True,  # noqa: E712
+        ).count(),
+        "nil_cases": base_q.filter(models.AuthorityRecord.nil_reason.is_not(None)).count(),
+        "by_route": summary_by_route,
+        "by_status": summary_by_status,
+    }
+
+    q = base_q
+    if status:
+        q = q.filter(models.AuthorityRecord.status == status)
+    if review_required is not None:
+        q = q.filter(models.AuthorityRecord.review_required == review_required)
+    if route:
+        q = q.filter(models.AuthorityRecord.resolution_route == route)
+    if nil_only:
+        q = q.filter(models.AuthorityRecord.nil_reason.is_not(None))
+
+    total = q.count()
+    records = q.order_by(
+        models.AuthorityRecord.review_required.desc(),
+        models.AuthorityRecord.complexity_score.desc(),
+        models.AuthorityRecord.confidence.desc(),
+        models.AuthorityRecord.id.desc(),
+    ).offset(skip).limit(limit).all()
+
+    return {
+        "total": total,
+        "records": [_serialize_authority_record(r) for r in records],
+        "summary": summary,
+    }
+
+
 @router.post("/authority/records/bulk-confirm", tags=["authority"])
 def bulk_confirm_authority_records(
     payload: schemas.BulkActionRequest,
