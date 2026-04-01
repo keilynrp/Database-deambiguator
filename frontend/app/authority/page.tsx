@@ -103,12 +103,14 @@ const SOURCE_COLORS: Record<string, string> = {
 // ═════════════════════════════════════════════════════════════════════════════
 
 function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null }) {
+    const { toast } = useToast();
     const [summary, setSummary] = useState<QueueSummary | null>(null);
     const [authorSummary, setAuthorSummary] = useState<AuthorQueueSummary | null>(null);
     const [records, setRecords] = useState<AuthorityRecord[]>([]);
     const [loadingRecords, setLoadingRecords] = useState(false);
     const [selected, setSelected] = useState<Set<number>>(new Set());
     const [acting, setActing] = useState(false);
+    const [rowActionId, setRowActionId] = useState<number | null>(null);
     const [queueMode, setQueueMode] = useState<"generic" | "authors">("generic");
     const [statusFilter, setStatusFilter] = useState("pending");
     const [fieldFilter, setFieldFilter] = useState("");
@@ -250,6 +252,35 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
             setResolveResult("Network error");
         } finally {
             setResolving(false);
+        }
+    }
+
+    async function reviewRecord(rec: AuthorityRecord, action: "confirm" | "reject") {
+        setRowActionId(rec.id);
+        try {
+            const res = await apiFetch(`/authority/records/${rec.id}/${action}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: action === "confirm"
+                    ? JSON.stringify({ also_create_rule: !rec.nil_reason })
+                    : undefined,
+            });
+            if (!res.ok) {
+                toast(`Failed to ${action} record`, "error");
+                return;
+            }
+            toast(
+                action === "confirm"
+                    ? (rec.nil_reason ? "NIL case accepted" : "Author candidate confirmed")
+                    : "Author candidate rejected",
+                "success"
+            );
+            await fetchSummary();
+            await fetchRecords();
+        } catch {
+            toast(`Failed to ${action} record`, "error");
+        } finally {
+            setRowActionId(null);
         }
     }
 
@@ -534,7 +565,7 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                     <th className="px-4 py-2">Confidence</th>
                                     <th className="px-4 py-2">{queueMode === "authors" ? "Route" : "Field"}</th>
                                     <th className="px-4 py-2">Status</th>
-                                    <th className="px-4 py-2 w-10"></th>
+                                    <th className="px-4 py-2">{queueMode === "authors" ? "Actions" : ""}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
@@ -622,15 +653,35 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                             </div>
                                         </td>
                                         <td className="px-4 py-2.5">
-                                            <button
-                                                onClick={() => setExpandedId(expandedId === rec.id ? null : rec.id)}
-                                                className={`rounded p-1 transition-colors ${expandedId === rec.id ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"}`}
-                                                title="Toggle comments"
-                                            >
-                                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                                </svg>
-                                            </button>
+                                            <div className="flex items-center justify-end gap-2">
+                                                {queueMode === "authors" && statusFilter === "pending" && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => reviewRecord(rec, "confirm")}
+                                                            disabled={rowActionId === rec.id}
+                                                            className="inline-flex h-7 items-center rounded-md bg-green-600 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                                                        >
+                                                            {rowActionId === rec.id ? "Saving..." : rec.nil_reason ? "Accept NIL" : "Confirm"}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => reviewRecord(rec, "reject")}
+                                                            disabled={rowActionId === rec.id}
+                                                            className="inline-flex h-7 items-center rounded-md bg-red-600 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                                                        >
+                                                            Reject
+                                                        </button>
+                                                    </>
+                                                )}
+                                                <button
+                                                    onClick={() => setExpandedId(expandedId === rec.id ? null : rec.id)}
+                                                    className={`rounded p-1 transition-colors ${expandedId === rec.id ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"}`}
+                                                    title="Toggle comments"
+                                                >
+                                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                                    </svg>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     {expandedId === rec.id && (
