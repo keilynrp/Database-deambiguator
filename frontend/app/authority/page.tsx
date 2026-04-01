@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Fragment } from "react";
 import { PageHeader, TabNav, Badge, useToast } from "../components/ui";
-import { useDomain } from "../contexts/DomainContext";
+import { useDomain, type DomainAttribute, type DomainSchema } from "../contexts/DomainContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { apiFetch } from "@/lib/api";
 import AnnotationThread from "../components/AnnotationThread";
@@ -65,6 +65,27 @@ interface AuthorityRecord {
     created_at: string;
     confirmed_at: string | null;
     resolution_status: string;
+    score_breakdown?: Record<string, number> | null;
+    evidence?: string[] | null;
+    merged_sources?: string[] | null;
+    resolution_route?: string | null;
+    complexity_score?: number | null;
+    review_required?: boolean;
+    nil_reason?: string | null;
+}
+
+interface AuthorQueueSummary {
+    total_records: number;
+    pending_review: number;
+    nil_cases: number;
+    by_route: Record<string, number>;
+    by_status: Record<string, number>;
+}
+
+interface AuthorQueueResponse {
+    total: number;
+    records: AuthorityRecord[];
+    summary: AuthorQueueSummary;
 }
 
 // ── Source badge colors ─────────────────────────────────────────────────────
@@ -81,15 +102,19 @@ const SOURCE_COLORS: Record<string, string> = {
 // Review Queue Tab
 // ═════════════════════════════════════════════════════════════════════════════
 
-function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
+function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null }) {
     const [summary, setSummary] = useState<QueueSummary | null>(null);
+    const [authorSummary, setAuthorSummary] = useState<AuthorQueueSummary | null>(null);
     const [records, setRecords] = useState<AuthorityRecord[]>([]);
-    const [loading, setLoading] = useState(false);
     const [loadingRecords, setLoadingRecords] = useState(false);
     const [selected, setSelected] = useState<Set<number>>(new Set());
     const [acting, setActing] = useState(false);
+    const [queueMode, setQueueMode] = useState<"generic" | "authors">("generic");
     const [statusFilter, setStatusFilter] = useState("pending");
     const [fieldFilter, setFieldFilter] = useState("");
+    const [authorRouteFilter, setAuthorRouteFilter] = useState("");
+    const [authorReviewFilter, setAuthorReviewFilter] = useState("required");
+    const [authorNilOnly, setAuthorNilOnly] = useState(false);
     const [batchField, setBatchField] = useState("");
     const [batchEntityType, setBatchEntityType] = useState("general");
     const [batchLimit, setBatchLimit] = useState(20);
@@ -100,38 +125,62 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
     // Auto-select first string field for batch resolve
     useEffect(() => {
         if (activeDomain && !batchField) {
-            const firstStr = activeDomain.attributes.find((a: any) => a.type === "string");
+            const firstStr = activeDomain.attributes.find((a: DomainAttribute) => a.type === "string");
             if (firstStr) setBatchField(firstStr.name);
         }
     }, [activeDomain, batchField]);
 
     const fetchSummary = useCallback(async () => {
-        setLoading(true);
         try {
-            const res = await apiFetch("/authority/queue/summary");
-            if (res.ok) setSummary(await res.json());
-        } catch (e) {
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+            if (queueMode === "authors") {
+                const res = await apiFetch("/authority/authors/review-queue");
+                if (res.ok) {
+                    const payload: AuthorQueueResponse = await res.json();
+                    setAuthorSummary(payload.summary);
+                    setSummary(null);
+                }
+            } else {
+                const res = await apiFetch("/authority/queue/summary");
+                if (res.ok) {
+                    setSummary(await res.json());
+                    setAuthorSummary(null);
+                }
+            }
+        } catch {}
+    }, [queueMode]);
 
     const fetchRecords = useCallback(async () => {
         setLoadingRecords(true);
         try {
-            const params = new URLSearchParams({ status: statusFilter });
-            if (fieldFilter) params.set("field_name", fieldFilter);
-            const res = await apiFetch(`/authority/records?${params}&limit=100`);
-            if (res.ok) {
-                const data = await res.json();
-                setRecords(data);
-                setSelected(new Set());
+            if (queueMode === "authors") {
+                const params = new URLSearchParams({ status: statusFilter, limit: "100" });
+                if (authorRouteFilter) params.set("route", authorRouteFilter);
+                if (authorReviewFilter === "required") params.set("review_required", "true");
+                if (authorReviewFilter === "not_required") params.set("review_required", "false");
+                if (authorNilOnly) params.set("nil_only", "true");
+
+                const res = await apiFetch(`/authority/authors/review-queue?${params.toString()}`);
+                if (res.ok) {
+                    const data: AuthorQueueResponse = await res.json();
+                    setRecords(data.records ?? []);
+                    setAuthorSummary(data.summary);
+                    setSelected(new Set());
+                }
+            } else {
+                const params = new URLSearchParams({ status: statusFilter, limit: "100" });
+                if (fieldFilter) params.set("field_name", fieldFilter);
+                const res = await apiFetch(`/authority/records?${params.toString()}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setRecords(data.records ?? []);
+                    setSelected(new Set());
+                }
             }
-        } catch (e) {
+        } catch {
         } finally {
             setLoadingRecords(false);
         }
-    }, [statusFilter, fieldFilter]);
+    }, [statusFilter, fieldFilter, queueMode, authorRouteFilter, authorReviewFilter, authorNilOnly]);
 
     useEffect(() => { fetchSummary(); }, [fetchSummary]);
     useEffect(() => { fetchRecords(); }, [fetchRecords]);
@@ -165,7 +214,7 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                 await fetchSummary();
                 await fetchRecords();
             }
-        } catch (e) {
+        } catch {
         } finally {
             setActing(false);
         }
@@ -197,7 +246,7 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                 const err = await res.json().catch(() => ({}));
                 setResolveResult(`Error: ${err.detail || res.statusText}`);
             }
-        } catch (e) {
+        } catch {
             setResolveResult("Network error");
         } finally {
             setResolving(false);
@@ -206,8 +255,31 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
 
     return (
         <div className="space-y-6">
+            <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <button
+                    onClick={() => setQueueMode("generic")}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                        queueMode === "generic"
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                    }`}
+                >
+                    Generic Queue
+                </button>
+                <button
+                    onClick={() => setQueueMode("authors")}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                        queueMode === "authors"
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                    }`}
+                >
+                    Author Queue
+                </button>
+            </div>
+
             {/* Summary cards */}
-            {summary && (
+            {queueMode === "generic" && summary && (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <p className="text-sm text-gray-500 dark:text-gray-400">Pending Review</p>
@@ -224,8 +296,25 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                 </div>
             )}
 
+            {queueMode === "authors" && authorSummary && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Author Records</p>
+                        <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{authorSummary.total_records}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Needs Review</p>
+                        <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{authorSummary.pending_review}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">NIL Cases</p>
+                        <p className="mt-1 text-2xl font-bold text-rose-600 dark:text-rose-400">{authorSummary.nil_cases}</p>
+                    </div>
+                </div>
+            )}
+
             {/* Per-field breakdown */}
-            {summary && summary.by_field.length > 0 && (
+            {queueMode === "generic" && summary && summary.by_field.length > 0 && (
                 <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
                     <div className="border-b border-gray-200 px-5 py-3 dark:border-gray-800">
                         <h3 className="text-sm font-medium text-gray-900 dark:text-white">By Field</h3>
@@ -246,7 +335,24 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                 </div>
             )}
 
+            {queueMode === "authors" && authorSummary && Object.keys(authorSummary.by_route).length > 0 && (
+                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <div className="border-b border-gray-200 px-5 py-3 dark:border-gray-800">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">By Route</h3>
+                    </div>
+                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {Object.entries(authorSummary.by_route).map(([routeKey, count]) => (
+                            <div key={routeKey} className="flex items-center justify-between px-5 py-3">
+                                <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{routeKey}</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">{count} records</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Batch resolve panel */}
+            {queueMode === "generic" && (
             <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <h3 className="mb-3 text-sm font-medium text-gray-900 dark:text-white">Batch Resolve</h3>
                 <div className="flex flex-wrap items-end gap-4">
@@ -259,8 +365,8 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                         >
                             {activeDomain ? (
                                 activeDomain.attributes
-                                    .filter((a: any) => a.type === "string")
-                                    .map((attr: any) => (
+                                    .filter((a: DomainAttribute) => a.type === "string")
+                                    .map((attr: DomainAttribute) => (
                                         <option key={attr.name} value={attr.name}>{attr.label}</option>
                                     ))
                             ) : (
@@ -313,6 +419,7 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                     </p>
                 )}
             </div>
+            )}
 
             {/* Records filter + bulk actions */}
             <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -327,17 +434,50 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                             <option value="confirmed">Confirmed</option>
                             <option value="rejected">Rejected</option>
                         </select>
-                        {/* status labels intentionally kept in English as DB values */}
-                        <select
-                            value={fieldFilter}
-                            onChange={e => setFieldFilter(e.target.value)}
-                            className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-                        >
-                            <option value="">All fields</option>
-                            {summary?.by_field.map(f => (
-                                <option key={f.field_name} value={f.field_name}>{f.field_name}</option>
-                            ))}
-                        </select>
+                        {queueMode === "generic" ? (
+                            <select
+                                value={fieldFilter}
+                                onChange={e => setFieldFilter(e.target.value)}
+                                className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                            >
+                                <option value="">All fields</option>
+                                {summary?.by_field.map(f => (
+                                    <option key={f.field_name} value={f.field_name}>{f.field_name}</option>
+                                ))}
+                            </select>
+                        ) : (
+                            <>
+                                <select
+                                    value={authorRouteFilter}
+                                    onChange={e => setAuthorRouteFilter(e.target.value)}
+                                    className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                                >
+                                    <option value="">All routes</option>
+                                    <option value="fast_path">fast_path</option>
+                                    <option value="hybrid_path">hybrid_path</option>
+                                    <option value="llm_path">llm_path</option>
+                                    <option value="manual_review">manual_review</option>
+                                </select>
+                                <select
+                                    value={authorReviewFilter}
+                                    onChange={e => setAuthorReviewFilter(e.target.value)}
+                                    className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                                >
+                                    <option value="required">Needs review</option>
+                                    <option value="all">All review states</option>
+                                    <option value="not_required">No review needed</option>
+                                </select>
+                                <label className="inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                    <input
+                                        type="checkbox"
+                                        checked={authorNilOnly}
+                                        onChange={e => setAuthorNilOnly(e.target.checked)}
+                                        className="rounded border-gray-300"
+                                    />
+                                    NIL only
+                                </label>
+                            </>
+                        )}
                     </div>
                     {statusFilter === "pending" && (
                         <div className="flex items-center gap-2">
@@ -389,10 +529,10 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                                         </th>
                                     )}
                                     <th className="px-4 py-2">Original Value</th>
-                                    <th className="px-4 py-2">Canonical Label</th>
+                                    <th className="px-4 py-2">{queueMode === "authors" ? "Candidate" : "Canonical Label"}</th>
                                     <th className="px-4 py-2">Source</th>
                                     <th className="px-4 py-2">Confidence</th>
-                                    <th className="px-4 py-2">Field</th>
+                                    <th className="px-4 py-2">{queueMode === "authors" ? "Route" : "Field"}</th>
                                     <th className="px-4 py-2">Status</th>
                                     <th className="px-4 py-2 w-10"></th>
                                 </tr>
@@ -417,6 +557,9 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                                         <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">
                                             <div className="flex items-center gap-2">
                                                 {rec.canonical_label}
+                                                {queueMode === "authors" && rec.nil_reason && (
+                                                    <Badge variant="error">NIL</Badge>
+                                                )}
                                                 {rec.uri && (
                                                     <a
                                                         href={rec.uri}
@@ -436,6 +579,11 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                                                     {rec.description}
                                                 </p>
                                             )}
+                                            {queueMode === "authors" && rec.nil_reason && (
+                                                <p className="mt-0.5 text-xs text-rose-500 dark:text-rose-400">
+                                                    {rec.nil_reason}
+                                                </p>
+                                            )}
                                         </td>
                                         <td className="px-4 py-2.5">
                                             <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${SOURCE_COLORS[rec.authority_source] || "bg-gray-100 text-gray-600"}`}>
@@ -453,11 +601,25 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
                                                 <span className="text-xs text-gray-500">{(rec.confidence * 100).toFixed(0)}%</span>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{rec.field_name}</td>
+                                        <td className="px-4 py-2.5 font-mono text-xs text-gray-500">
+                                            {queueMode === "authors" ? (
+                                                <div className="space-y-1">
+                                                    <div>{rec.resolution_route || "legacy"}</div>
+                                                    <div className="text-[11px] text-gray-400">
+                                                        complexity {typeof rec.complexity_score === "number" ? rec.complexity_score.toFixed(2) : "--"}
+                                                    </div>
+                                                </div>
+                                            ) : rec.field_name}
+                                        </td>
                                         <td className="px-4 py-2.5">
-                                            <Badge variant={rec.status === "confirmed" ? "success" : rec.status === "rejected" ? "error" : "warning"}>
-                                                {rec.status}
-                                            </Badge>
+                                            <div className="flex flex-col items-start gap-1">
+                                                <Badge variant={rec.status === "confirmed" ? "success" : rec.status === "rejected" ? "error" : "warning"}>
+                                                    {rec.status}
+                                                </Badge>
+                                                {queueMode === "authors" && rec.review_required && (
+                                                    <span className="text-[11px] text-amber-600 dark:text-amber-400">needs review</span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-4 py-2.5">
                                             <button
@@ -493,13 +655,13 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: any }) {
 // Disambiguation Tab (existing)
 // ═════════════════════════════════════════════════════════════════════════════
 
-function DisambiguationTab({ activeDomain }: { activeDomain: any }) {
+function DisambiguationTab({ activeDomain }: { activeDomain: DomainSchema | null }) {
     const { toast } = useToast();
     const [field, setField] = useState("");
 
     useEffect(() => {
         if (activeDomain && !field) {
-            const firstStr = activeDomain.attributes.find((a: any) => a.type === "string");
+            const firstStr = activeDomain.attributes.find((a: DomainAttribute) => a.type === "string");
             if (firstStr) setField(firstStr.name);
         }
     }, [activeDomain, field]);
@@ -532,7 +694,7 @@ function DisambiguationTab({ activeDomain }: { activeDomain: any }) {
                 states[idx] = { canonical: g.resolved_to || g.main, excluded: new Set<string>(), saved: g.has_rules };
             });
             setGroupStates(states);
-        } catch (error) {
+        } catch {
             toast("Error fetching authority data", "error");
         } finally {
             setLoading(false);
@@ -565,7 +727,7 @@ function DisambiguationTab({ activeDomain }: { activeDomain: any }) {
             });
             if (!res.ok) throw new Error("Failed to save rules");
             setGroupStates(prev => ({ ...prev, [idx]: { ...prev[idx], saved: true } }));
-        } catch (error) {
+        } catch {
             toast("Error saving rules", "error");
         } finally {
             setSavingGroup(null);
@@ -579,7 +741,7 @@ function DisambiguationTab({ activeDomain }: { activeDomain: any }) {
             const res = await apiFetch(`/rules/apply?field_name=${field}`, { method: "POST" });
             if (!res.ok) throw new Error("Failed to apply rules");
             setApplyResult(await res.json());
-        } catch (error) {
+        } catch {
             toast("Error applying rules", "error");
         } finally {
             setApplying(false);
@@ -604,8 +766,8 @@ function DisambiguationTab({ activeDomain }: { activeDomain: any }) {
                         >
                             {activeDomain ? (
                                 activeDomain.attributes
-                                    .filter((a: any) => a.type === "string")
-                                    .map((attr: any) => (
+                                    .filter((a: DomainAttribute) => a.type === "string")
+                                    .map((attr: DomainAttribute) => (
                                         <option key={attr.name} value={attr.name}>{attr.label}</option>
                                     ))
                             ) : (
