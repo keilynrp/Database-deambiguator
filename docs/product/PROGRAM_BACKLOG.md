@@ -38,6 +38,12 @@ Fuentes estrategicas relacionadas:
 | EPIC-014 | Frontend Decomposition and Maintainability | Reducir componentes monoliticos y mejorar capacidad de evolucion del frontend | Planned | `EntityTable.tsx`, `Sidebar.tsx`, `RAGChatInterface.tsx`, `DisambiguationTool.tsx` |
 | EPIC-015 | Observability and Operations | Construir salud operativa, logging y telemetria minima de producto serio | Done | health endpoints, logging, Sentry/telemetry, checks operativos |
 
+## Prioridades recomendadas de corto plazo
+
+- cerrar `US-045` para terminar el baseline comercial multi-tenant con quotas por plan
+- abrir `US-055` como evolucion del authority layer hacia `author resolution` explicable y comercializable
+- posponer infraestructura nueva de vector/graph store hasta validar demanda y volumen
+
 ## Epicas futuras sugeridas
 
 | ID | Epic | Objetivo | Estado |
