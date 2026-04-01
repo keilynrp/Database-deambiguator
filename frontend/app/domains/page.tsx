@@ -2,21 +2,13 @@
 
 import { useState } from "react";
 import { PageHeader, Badge } from "../components/ui";
-import { useDomain, DomainSchema, DomainAttribute } from "../contexts/DomainContext";
+import { useDomain, DomainAttribute } from "../contexts/DomainContext";
 import { useAuth } from "../contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useLanguage } from "../contexts/LanguageContext";
 
 const BUILTIN_IDS = new Set(["default", "science", "healthcare"]);
-
-const TYPE_COLORS: Record<string, string> = {
-  string:  "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  integer: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  float:   "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  boolean: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  array:   "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
-};
 
 const ICON_OPTIONS = ["Database", "Microscope", "Heart", "Building", "BookOpen", "Globe", "Briefcase", "FlaskConical"];
 
@@ -163,9 +155,18 @@ export default function DomainsPage() {
         {/* Domain list */}
         <div className="flex flex-col gap-3 overflow-y-auto">
           {domains.map(d => (
-            <button
+            <div
               key={d.id}
               onClick={() => setSelectedId(d.id)}
+              onKeyDown={e => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelectedId(d.id);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-pressed={selectedId === d.id}
               className={`w-full text-left rounded-xl border p-4 transition-all ${
                 selectedId === d.id
                   ? "border-blue-500 bg-blue-50 dark:bg-blue-900/10 ring-1 ring-blue-500"
@@ -213,7 +214,7 @@ export default function DomainsPage() {
                   </button>
                 )}
               </div>
-            </button>
+            </div>
           ))}
         </div>
 
