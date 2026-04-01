@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from backend import database, models
 from backend.auth import require_role
 from backend.database import get_db
+from backend.tenant_quotas import assert_org_quota_available
 from backend.tenant_access import (
     get_scoped_record,
     persisted_org_id,
@@ -90,6 +91,7 @@ def create_scheduled_report(
     current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
     org_id = persisted_org_id(resolve_request_org_id(db, current_user))
+    assert_org_quota_available(db, org_id, "scheduled_reports", current_user=current_user)
     now = datetime.now(timezone.utc)
     r = models.ScheduledReport(
         org_id=org_id,

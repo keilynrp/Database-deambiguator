@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from backend import models
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
+from backend.tenant_quotas import assert_org_quota_available
 from backend.tenant_access import (
     get_scoped_record,
     persisted_org_id,
@@ -122,6 +123,7 @@ def create_workflow(
 ):
     org_id = resolve_request_org_id(db, current_user)
     workflow_org_id = persisted_org_id(org_id)
+    assert_org_quota_available(db, workflow_org_id, "workflows", current_user=current_user)
     wf = models.Workflow(
         org_id=workflow_org_id,
         name=payload.name,

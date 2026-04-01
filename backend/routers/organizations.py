@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from backend import models
 from backend.auth import get_current_user
 from backend.database import get_db
+from backend.tenant_quotas import assert_org_quota_available, build_org_quota_snapshot
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["organizations"])
@@ -192,6 +193,17 @@ def get_organization(
     return _serialize_org(org, member_count=count)
 
 
+@router.get("/organizations/{org_id}/quotas", tags=["organizations"])
+def get_organization_quotas(
+    org_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    org = _get_org_or_404(org_id, db)
+    _require_membership(org_id, current_user, db)
+    return build_org_quota_snapshot(db, org, current_user=current_user)
+
+
 # ── PUT /organizations/{id} ────────────────────────────────────────────────────
 
 @router.put("/organizations/{org_id}", tags=["organizations"])
@@ -269,6 +281,7 @@ def invite_member(
         raise HTTPException(status_code=404, detail="User not found")
     if _get_membership(org_id, target.id, db):
         raise HTTPException(status_code=409, detail="User is already a member")
+    assert_org_quota_available(db, org_id, "members", current_user=current_user)
     m = models.OrganizationMember(org_id=org_id, user_id=target.id, role=payload.role)
     db.add(m)
     db.commit()

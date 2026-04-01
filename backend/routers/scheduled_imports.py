@@ -22,6 +22,7 @@ from backend import models, database
 from backend.auth import require_role
 from backend.database import get_db
 from backend.routers.deps import _get_store_adapter
+from backend.tenant_quotas import assert_org_quota_available
 from backend.tenant_access import (
     get_scoped_record,
     persisted_org_id,
@@ -86,6 +87,7 @@ def create_scheduled_import(
 ):
     org_id = resolve_request_org_id(db, current_user)
     stored_org_id = persisted_org_id(org_id)
+    assert_org_quota_available(db, stored_org_id, "scheduled_imports", current_user=current_user)
     # Verify store exists
     store = _get_scoped_store(db, payload.store_id, org_id)
     if not store:

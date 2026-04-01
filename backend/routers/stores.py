@@ -28,6 +28,7 @@ from backend.database import get_db
 from backend.encryption import encrypt
 from backend.routers.deps import _get_store_adapter
 from backend.routers.limiter import limiter
+from backend.tenant_quotas import assert_org_quota_available
 from backend.tenant_access import (
     get_scoped_record,
     persisted_org_id,
@@ -110,6 +111,7 @@ def create_store(
     current_user: models.User = Depends(require_role("super_admin", "admin")),
 ):
     org_id = persisted_org_id(resolve_request_org_id(db, current_user))
+    assert_org_quota_available(db, org_id, "stores", current_user=current_user)
     store = models.StoreConnection(
         org_id=org_id,
         name=payload.name.strip(),
