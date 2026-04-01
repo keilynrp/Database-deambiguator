@@ -226,6 +226,11 @@ class AuthorityRecord(Base):
     score_breakdown   = Column(Text, nullable=True)   # JSON: {identifiers, name, affiliation, coauthorship, topic}
     evidence          = Column(Text, nullable=True)   # JSON array of signal strings
     merged_sources    = Column(Text, nullable=True)   # JSON array of "source:id" refs merged into this record
+    # Sprint 106 - author resolution engine baseline
+    resolution_route  = Column(String, nullable=True, index=True)  # fast_path | hybrid_path | llm_path | manual_review
+    complexity_score  = Column(Float, nullable=True, index=True)   # 0.0-1.0 complexity heuristic
+    review_required   = Column(Boolean, default=False, index=True)
+    nil_reason        = Column(String, nullable=True)
 
 
 class Webhook(Base):

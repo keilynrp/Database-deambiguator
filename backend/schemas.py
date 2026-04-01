@@ -247,8 +247,21 @@ class AuthorityRecordResponse(BaseModel):
     score_breakdown:   Optional[dict]         = None
     evidence:          Optional[List[str]]    = None
     merged_sources:    Optional[List[str]]    = None
+    resolution_route:  Optional[str]          = None
+    complexity_score:  Optional[float]        = None
+    review_required:   bool                   = False
+    nil_reason:        Optional[str]          = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AuthorResolveRequest(BaseModel):
+    field_name: str = Field(default="author_name", min_length=1, max_length=64)
+    value: str = Field(min_length=1, max_length=500)
+    context_affiliation: Optional[str] = Field(None, max_length=500)
+    context_orcid_hint: Optional[str] = Field(None, max_length=25)
+    context_doi: Optional[str] = Field(None, max_length=200)
+    context_year: Optional[int] = Field(None, ge=1000, le=2100)
 
 
 class AuthorityConfirmRequest(BaseModel):

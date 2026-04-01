@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from backend import database, models, schemas
 from backend.auth import get_current_user, require_role
+from backend.authority.author_resolution import summarize_author_resolution
 from backend.authority.base import ResolveContext as _AuthorityContext
 from backend.authority.resolver import resolve_all as _authority_resolve_all
 from backend.database import get_db
@@ -95,6 +96,108 @@ def resolve_authority(
         db.refresh(rec)
 
     return [_serialize_authority_record(r) for r in records]
+
+
+@router.post("/authority/authors/resolve", status_code=201, tags=["authority"])
+@limiter.limit("60/minute")
+def resolve_author_profile(
+    request: Request,
+    payload: schemas.AuthorResolveRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
+):
+    """
+    Author-only adaptive resolution baseline.
+
+    Reuses the existing authority resolver/scoring pipeline, then adds a
+    deterministic routing heuristic that classifies the case as fast/hybrid/LLM
+    or manual review. The response keeps all persisted records for auditability.
+    """
+    org_id = resolve_request_org_id(db, current_user)
+    record_org_id = persisted_org_id(org_id)
+    ctx = _AuthorityContext(
+        affiliation=payload.context_affiliation,
+        orcid_hint=payload.context_orcid_hint,
+        doi=payload.context_doi,
+        year=payload.context_year,
+    )
+    candidates = _authority_resolve_all(payload.value, "person", ctx)
+    summary = summarize_author_resolution(candidates, ctx)
+
+    records: list[models.AuthorityRecord] = []
+    if candidates:
+        for c in candidates:
+            rec = models.AuthorityRecord(
+                org_id=record_org_id,
+                field_name=payload.field_name,
+                original_value=payload.value,
+                authority_source=c.authority_source,
+                authority_id=c.authority_id,
+                canonical_label=c.canonical_label,
+                aliases=json.dumps(c.aliases),
+                description=c.description,
+                confidence=c.confidence,
+                uri=c.uri,
+                status="pending",
+                resolution_status=c.resolution_status,
+                score_breakdown=json.dumps(c.score_breakdown),
+                evidence=json.dumps(c.evidence),
+                merged_sources=json.dumps(c.merged_sources),
+                resolution_route=summary.resolution_route,
+                complexity_score=summary.complexity_score,
+                review_required=summary.review_required,
+                nil_reason=summary.nil_reason,
+            )
+            db.add(rec)
+            records.append(rec)
+    else:
+        nil_record = models.AuthorityRecord(
+            org_id=record_org_id,
+            field_name=payload.field_name,
+            original_value=payload.value,
+            authority_source="internal_nil",
+            authority_id="NIL",
+            canonical_label=payload.value,
+            aliases="[]",
+            description="No external authority candidates were returned for this author query.",
+            confidence=0.0,
+            uri=None,
+            status="pending",
+            resolution_status="unresolved",
+            score_breakdown="{}",
+            evidence=json.dumps([f"nil_reason:{summary.nil_reason or 'no_candidates'}"]),
+            merged_sources="[]",
+            resolution_route=summary.resolution_route,
+            complexity_score=summary.complexity_score,
+            review_required=summary.review_required,
+            nil_reason=summary.nil_reason or "no_candidates",
+        )
+        db.add(nil_record)
+        records.append(nil_record)
+
+    db.commit()
+    for rec in records:
+        db.refresh(rec)
+
+    serialized = [_serialize_authority_record(r) for r in records]
+    winning = serialized[0] if serialized else None
+    runner_up = serialized[1] if len(serialized) > 1 else None
+
+    return {
+        "query": {
+            "field_name": payload.field_name,
+            "value": payload.value,
+            "entity_type": "person",
+        },
+        "resolution_route": summary.resolution_route,
+        "complexity_score": summary.complexity_score,
+        "review_required": summary.review_required,
+        "nil_reason": summary.nil_reason,
+        "records_created": len(serialized),
+        "winning_record": winning,
+        "runner_up_record": runner_up,
+        "records": serialized,
+    }
 
 
 @router.post("/authority/resolve/batch", status_code=201, tags=["authority"])

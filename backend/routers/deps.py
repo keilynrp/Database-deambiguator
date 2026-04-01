@@ -315,4 +315,8 @@ def _serialize_authority_record(r: models.AuthorityRecord) -> dict:
         "score_breakdown":   json.loads(r.score_breakdown or "{}"),
         "evidence":          json.loads(r.evidence or "[]"),
         "merged_sources":    json.loads(r.merged_sources or "[]"),
+        "resolution_route":  r.resolution_route,
+        "complexity_score":  r.complexity_score,
+        "review_required":   bool(r.review_required),
+        "nil_reason":        r.nil_reason,
     }
