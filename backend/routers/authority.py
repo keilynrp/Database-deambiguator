@@ -494,6 +494,43 @@ def author_resolution_metrics(
     }
 
 
+@router.get("/authority/authors/review-queue/{record_id}/compare", tags=["authority"])
+def author_review_compare(
+    record_id: int = Path(ge=1),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Compare an author-engine record against sibling candidates from the same
+    original query value. This supports lightweight reviewer workflows without
+    introducing a heavier dedicated compare model.
+    """
+    org_id = resolve_request_org_id(db, current_user)
+    subject = get_scoped_record(db, models.AuthorityRecord, record_id, org_id)
+    if subject is None or subject.resolution_route is None:
+        raise HTTPException(status_code=404, detail="Author review record not found")
+
+    siblings = scope_query_to_org(
+        db.query(models.AuthorityRecord),
+        models.AuthorityRecord,
+        org_id,
+    ).filter(
+        models.AuthorityRecord.resolution_route.is_not(None),
+        models.AuthorityRecord.field_name == subject.field_name,
+        models.AuthorityRecord.original_value == subject.original_value,
+        models.AuthorityRecord.id != subject.id,
+    ).order_by(
+        models.AuthorityRecord.confidence.desc(),
+        models.AuthorityRecord.id.desc(),
+    ).limit(5).all()
+
+    return {
+        "subject": _serialize_authority_record(subject),
+        "peers": [_serialize_authority_record(r) for r in siblings],
+        "peer_count": len(siblings),
+    }
+
+
 @router.post("/authority/records/bulk-confirm", tags=["authority"])
 def bulk_confirm_authority_records(
     payload: schemas.BulkActionRequest,

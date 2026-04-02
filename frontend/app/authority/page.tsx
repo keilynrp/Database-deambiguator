@@ -102,6 +102,12 @@ interface AuthorMetrics {
     by_status: Record<string, number>;
 }
 
+interface AuthorCompareResponse {
+    subject: AuthorityRecord;
+    peers: AuthorityRecord[];
+    peer_count: number;
+}
+
 // ── Source badge colors ─────────────────────────────────────────────────────
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -138,6 +144,8 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
     const [resolving, setResolving] = useState(false);
     const [resolveResult, setResolveResult] = useState<string | null>(null);
     const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [compareMap, setCompareMap] = useState<Record<number, AuthorCompareResponse>>({});
+    const [loadingCompareId, setLoadingCompareId] = useState<number | null>(null);
 
     // Auto-select first string field for batch resolve
     useEffect(() => {
@@ -303,6 +311,26 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
             toast(`Failed to ${action} record`, "error");
         } finally {
             setRowActionId(null);
+        }
+    }
+
+    async function toggleExpanded(rec: AuthorityRecord) {
+        const nextExpanded = expandedId === rec.id ? null : rec.id;
+        setExpandedId(nextExpanded);
+        if (queueMode !== "authors" || nextExpanded === null || compareMap[rec.id]) {
+            return;
+        }
+
+        setLoadingCompareId(rec.id);
+        try {
+            const res = await apiFetch(`/authority/authors/review-queue/${rec.id}/compare`);
+            if (res.ok) {
+                const payload: AuthorCompareResponse = await res.json();
+                setCompareMap(prev => ({ ...prev, [rec.id]: payload }));
+            }
+        } catch {
+        } finally {
+            setLoadingCompareId(current => (current === rec.id ? null : current));
         }
     }
 
@@ -736,7 +764,7 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                                     </>
                                                 )}
                                                 <button
-                                                    onClick={() => setExpandedId(expandedId === rec.id ? null : rec.id)}
+                                                    onClick={() => toggleExpanded(rec)}
                                                     className={`rounded p-1 transition-colors ${expandedId === rec.id ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"}`}
                                                     title="Toggle comments"
                                                 >
@@ -752,7 +780,61 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                             <td colSpan={statusFilter === "pending" ? 8 : 7} className="px-6 py-4 bg-gray-50 dark:bg-gray-800/30 border-t border-gray-100 dark:border-gray-800">
                                                 <div className="space-y-4">
                                                     {queueMode === "authors" && (
-                                                        <div className="grid gap-4 lg:grid-cols-3">
+                                                        <div className="space-y-4">
+                                                            {loadingCompareId === rec.id ? (
+                                                                <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-400">
+                                                                    Loading candidate comparison...
+                                                                </div>
+                                                            ) : compareMap[rec.id]?.peer_count ? (
+                                                                <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/60">
+                                                                    <div className="mb-3 flex items-center justify-between gap-3">
+                                                                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                                            Winner vs Runner-Up
+                                                                        </p>
+                                                                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                                                                            {compareMap[rec.id].peer_count} alternate candidates
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="space-y-3">
+                                                                        {compareMap[rec.id].peers.map(peer => (
+                                                                            <div
+                                                                                key={peer.id}
+                                                                                className="flex flex-col gap-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between"
+                                                                            >
+                                                                                <div className="space-y-1">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <span className="font-medium text-gray-900 dark:text-white">{peer.canonical_label}</span>
+                                                                                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${SOURCE_COLORS[peer.authority_source] || "bg-gray-100 text-gray-600"}`}>
+                                                                                            {peer.authority_source}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                                                        {peer.authority_id} · {peer.resolution_status}
+                                                                                    </p>
+                                                                                </div>
+                                                                                <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 dark:text-gray-400">
+                                                                                    <div>
+                                                                                        <p className="uppercase tracking-wide">Confidence</p>
+                                                                                        <p className="mt-1 font-mono text-gray-900 dark:text-white">{(peer.confidence * 100).toFixed(0)}%</p>
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <p className="uppercase tracking-wide">Delta</p>
+                                                                                        <p className="mt-1 font-mono text-gray-900 dark:text-white">
+                                                                                            {((rec.confidence - peer.confidence) * 100).toFixed(0)} pts
+                                                                                        </p>
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <p className="uppercase tracking-wide">Route</p>
+                                                                                        <p className="mt-1 font-mono text-gray-900 dark:text-white">{peer.resolution_route || "legacy"}</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            ) : null}
+
+                                                            <div className="grid gap-4 lg:grid-cols-3">
                                                             <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/60">
                                                                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                                                     Resolution Decision
@@ -859,6 +941,7 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                                                 </div>
                                                             </div>
                                                         </div>
+                                                    </div>
                                                     )}
 
                                                     <AnnotationThread authorityId={rec.id} />
