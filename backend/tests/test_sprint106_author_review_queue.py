@@ -132,3 +132,4 @@ class TestAuthorReviewQueue:
         assert payload["total"] == 1
         assert payload["records"][0]["nil_reason"] == "no_candidates"
         assert payload["summary"]["nil_cases"] == 1
+        assert payload["summary"]["by_nil_reason"]["no_candidates"] == 1

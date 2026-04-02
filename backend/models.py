@@ -231,6 +231,7 @@ class AuthorityRecord(Base):
     complexity_score  = Column(Float, nullable=True, index=True)   # 0.0-1.0 complexity heuristic
     review_required   = Column(Boolean, default=False, index=True)
     nil_reason        = Column(String, nullable=True)
+    nil_score         = Column(Float, nullable=True, index=True)
 
 
 class Webhook(Base):

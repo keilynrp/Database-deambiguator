@@ -72,12 +72,14 @@ interface AuthorityRecord {
     complexity_score?: number | null;
     review_required?: boolean;
     nil_reason?: string | null;
+    nil_score?: number | null;
 }
 
 interface AuthorQueueSummary {
     total_records: number;
     pending_review: number;
     nil_cases: number;
+    by_nil_reason?: Record<string, number>;
     by_route: Record<string, number>;
     by_status: Record<string, number>;
 }
@@ -94,10 +96,12 @@ interface AuthorMetrics {
     nil_cases: number;
     avg_confidence: number;
     avg_complexity: number;
+    avg_nil_score: number;
     review_rate: number;
     nil_rate: number;
     confirm_rate: number;
     reject_rate: number;
+    by_nil_reason: Record<string, number>;
     by_route: Record<string, number>;
     by_status: Record<string, number>;
 }
@@ -414,6 +418,12 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                             </p>
                         </div>
                         <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg NIL score</p>
+                            <p className="mt-1 text-lg font-semibold text-rose-600 dark:text-rose-400">
+                                {(authorMetrics.avg_nil_score * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                        <div>
                             <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Review rate</p>
                             <p className="mt-1 text-lg font-semibold text-amber-600 dark:text-amber-400">
                                 {(authorMetrics.review_rate * 100).toFixed(0)}%
@@ -431,6 +441,22 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                 {(authorMetrics.nil_rate * 100).toFixed(0)}%
                             </p>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {queueMode === "authors" && authorMetrics && Object.keys(authorMetrics.by_nil_reason).length > 0 && (
+                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <div className="border-b border-gray-200 px-5 py-3 dark:border-gray-800">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">NIL Reasons</h3>
+                    </div>
+                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {Object.entries(authorMetrics.by_nil_reason).map(([reason, count]) => (
+                            <div key={reason} className="flex items-center justify-between px-5 py-3">
+                                <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{reason}</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">{count} records</span>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
@@ -730,6 +756,9 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                                     <div className="text-[11px] text-gray-400">
                                                         complexity {typeof rec.complexity_score === "number" ? rec.complexity_score.toFixed(2) : "--"}
                                                     </div>
+                                                    <div className="text-[11px] text-rose-500 dark:text-rose-400">
+                                                        nil {typeof rec.nil_score === "number" ? `${(rec.nil_score * 100).toFixed(0)}%` : "--"}
+                                                    </div>
                                                 </div>
                                             ) : rec.field_name}
                                         </td>
@@ -851,6 +880,12 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                                                         </dd>
                                                                     </div>
                                                                     <div className="flex items-center justify-between gap-3">
+                                                                        <dt className="text-gray-500 dark:text-gray-400">NIL score</dt>
+                                                                        <dd className="text-rose-600 dark:text-rose-400">
+                                                                            {typeof rec.nil_score === "number" ? `${(rec.nil_score * 100).toFixed(0)}%` : "--"}
+                                                                        </dd>
+                                                                    </div>
+                                                                    <div className="flex items-center justify-between gap-3">
                                                                         <dt className="text-gray-500 dark:text-gray-400">Authority ID</dt>
                                                                         <dd className="font-mono text-gray-900 dark:text-white">{rec.authority_id}</dd>
                                                                     </div>
@@ -858,6 +893,12 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                                                         <dt className="text-gray-500 dark:text-gray-400">Resolution</dt>
                                                                         <dd className="text-gray-900 dark:text-white">{rec.resolution_status}</dd>
                                                                     </div>
+                                                                    {rec.nil_reason && (
+                                                                        <div className="flex items-center justify-between gap-3">
+                                                                            <dt className="text-gray-500 dark:text-gray-400">NIL reason</dt>
+                                                                            <dd className="font-mono text-rose-600 dark:text-rose-400">{rec.nil_reason}</dd>
+                                                                        </div>
+                                                                    )}
                                                                 </dl>
                                                             </div>
 

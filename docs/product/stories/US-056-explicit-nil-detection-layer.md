@@ -11,15 +11,15 @@ Como analista de research intelligence, quiero que el sistema detecte de forma e
 
 ## 3. Acceptance criteria
 
-- [ ] existe un modulo explicito de deteccion `NIL` separado del routing general
-- [ ] cada decision `NIL` expone `nil_score` o criterio equivalente mas `nil_reason`
-- [ ] el sistema diferencia al menos entre:
+- [x] existe un modulo explicito de deteccion `NIL` separado del routing general
+- [x] cada decision `NIL` expone `nil_score` o criterio equivalente mas `nil_reason`
+- [x] el sistema diferencia al menos entre:
   - falta de candidatos
   - cobertura insuficiente
   - ambiguedad no resoluble
   - evidencia conflictiva
-- [ ] la deteccion `NIL` queda trazable en metricas operativas
-- [ ] el baseline inicial no introduce infraestructura nueva obligatoria
+- [x] la deteccion `NIL` queda trazable en metricas operativas
+- [x] el baseline inicial no introduce infraestructura nueva obligatoria
 
 ## 4. Functional notes
 
@@ -39,12 +39,30 @@ Como analista de research intelligence, quiero que el sistema detecte de forma e
 
 ## 6. Definition of done
 
-- [ ] implementado
-- [ ] probado
-- [ ] documentado
-- [ ] trazabilidad actualizada
+- [x] implementado
+- [x] probado
+- [x] documentado
+- [x] trazabilidad actualizada
 
-## 7. Notes for prioritization
+## 7. Evidence
+
+- Detector explicito: `backend/authority/nil_detection.py`
+- Integracion de routing: `backend/authority/author_resolution.py`
+- Persistencia: `AuthorityRecord.nil_score` en `backend/models.py`
+- API:
+  - `POST /authority/authors/resolve`
+  - `GET /authority/authors/review-queue`
+  - `GET /authority/authors/metrics`
+- UI: `frontend/app/authority/page.tsx`
+- Migracion: `alembic/versions/b1c2d3e4f5a6_sprint_106_nil_detection_layer.py`
+- Tests:
+  - `backend/tests/test_sprint106_nil_detection.py`
+  - `backend/tests/test_sprint106_author_resolution_engine.py`
+  - `backend/tests/test_sprint106_author_review_queue.py`
+  - `backend/tests/test_sprint106_author_metrics.py`
+  - `backend/tests/test_sprint86_5.py`
+
+## 8. Notes for prioritization
 
 - es la pieza del paper mas alineada con el estado actual de UKIP
 - agrega valor operativo inmediato sin exigir vertical biomedica ni datasets externos

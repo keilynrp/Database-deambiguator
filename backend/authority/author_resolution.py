@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from backend.authority.base import AuthorityCandidate, ResolveContext
+from backend.authority.nil_detection import detect_author_nil
 
 
 @dataclass
@@ -11,6 +12,7 @@ class AuthorResolutionSummary:
     resolution_route: str
     complexity_score: float
     review_required: bool
+    nil_score: float = 0.0
     nil_reason: Optional[str] = None
 
 
@@ -32,16 +34,19 @@ def summarize_author_resolution(
     - manual_review / NIL for missing or weak evidence
     """
     if not candidates:
+        nil_detection = detect_author_nil(candidates)
         return AuthorResolutionSummary(
             resolution_route="manual_review",
             complexity_score=1.0,
             review_required=True,
-            nil_reason="no_candidates",
+            nil_score=nil_detection.nil_score,
+            nil_reason=nil_detection.nil_reason,
         )
 
     top = candidates[0]
     runner_up = candidates[1] if len(candidates) > 1 else None
     gap = round(top.confidence - (runner_up.confidence if runner_up else 0.0), 3)
+    nil_detection = detect_author_nil(candidates)
 
     complexity = 0.55
     if context.orcid_hint:
@@ -70,13 +75,26 @@ def summarize_author_resolution(
     if len(candidates) >= 5:
         complexity += 0.10
 
+    if nil_detection.detected:
+        complexity += 0.10
+
     complexity = round(_clamp(complexity), 3)
+
+    if nil_detection.detected:
+        return AuthorResolutionSummary(
+            resolution_route="manual_review",
+            complexity_score=complexity,
+            review_required=True,
+            nil_score=nil_detection.nil_score,
+            nil_reason=nil_detection.nil_reason,
+        )
 
     if top.confidence >= 0.92 and top.resolution_status == "exact_match" and gap >= 0.12:
         return AuthorResolutionSummary(
             resolution_route="fast_path",
             complexity_score=complexity,
             review_required=False,
+            nil_score=nil_detection.nil_score,
         )
 
     if top.confidence >= 0.78 and gap >= 0.10 and top.resolution_status in {"exact_match", "probable_match"}:
@@ -84,6 +102,7 @@ def summarize_author_resolution(
             resolution_route="hybrid_path",
             complexity_score=complexity,
             review_required=False,
+            nil_score=nil_detection.nil_score,
         )
 
     if top.confidence >= 0.55 and top.resolution_status in {"probable_match", "ambiguous"}:
@@ -91,11 +110,12 @@ def summarize_author_resolution(
             resolution_route="llm_path",
             complexity_score=complexity,
             review_required=True,
+            nil_score=nil_detection.nil_score,
         )
 
     return AuthorResolutionSummary(
         resolution_route="manual_review",
         complexity_score=complexity,
         review_required=True,
-        nil_reason="low_confidence",
+        nil_score=nil_detection.nil_score,
     )

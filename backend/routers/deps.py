@@ -319,4 +319,5 @@ def _serialize_authority_record(r: models.AuthorityRecord) -> dict:
         "complexity_score":  r.complexity_score,
         "review_required":   bool(r.review_required),
         "nil_reason":        r.nil_reason,
+        "nil_score":         r.nil_score,
     }

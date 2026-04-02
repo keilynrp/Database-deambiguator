@@ -147,6 +147,7 @@ def resolve_author_profile(
                 complexity_score=summary.complexity_score,
                 review_required=summary.review_required,
                 nil_reason=summary.nil_reason,
+                nil_score=summary.nil_score,
             )
             db.add(rec)
             records.append(rec)
@@ -171,6 +172,7 @@ def resolve_author_profile(
             complexity_score=summary.complexity_score,
             review_required=summary.review_required,
             nil_reason=summary.nil_reason or "no_candidates",
+            nil_score=summary.nil_score,
         )
         db.add(nil_record)
         records.append(nil_record)
@@ -193,6 +195,7 @@ def resolve_author_profile(
         "complexity_score": summary.complexity_score,
         "review_required": summary.review_required,
         "nil_reason": summary.nil_reason,
+        "nil_score": summary.nil_score,
         "records_created": len(serialized),
         "winning_record": winning,
         "runner_up_record": runner_up,
@@ -401,6 +404,18 @@ def author_review_queue(
             models.AuthorityRecord.review_required == True,  # noqa: E712
         ).count(),
         "nil_cases": base_q.filter(models.AuthorityRecord.nil_reason.is_not(None)).count(),
+        "by_nil_reason": {
+            row[0]: row[1]
+            for row in base_q.with_entities(
+                models.AuthorityRecord.nil_reason,
+                func.count(models.AuthorityRecord.id),
+            ).filter(
+                models.AuthorityRecord.nil_reason.is_not(None)
+            ).group_by(
+                models.AuthorityRecord.nil_reason
+            ).all()
+            if row[0]
+        },
         "by_route": summary_by_route,
         "by_status": summary_by_status,
     }
@@ -473,9 +488,22 @@ def author_resolution_metrics(
         ).all()
         if row[0]
     }
+    by_nil_reason = {
+        row[0]: row[1]
+        for row in base_q.with_entities(
+            models.AuthorityRecord.nil_reason,
+            func.count(models.AuthorityRecord.id),
+        ).filter(
+            models.AuthorityRecord.nil_reason.is_not(None)
+        ).group_by(
+            models.AuthorityRecord.nil_reason
+        ).all()
+        if row[0]
+    }
 
     avg_confidence = base_q.with_entities(func.avg(models.AuthorityRecord.confidence)).scalar() or 0.0
     avg_complexity = base_q.with_entities(func.avg(models.AuthorityRecord.complexity_score)).scalar() or 0.0
+    avg_nil_score = base_q.with_entities(func.avg(models.AuthorityRecord.nil_score)).scalar() or 0.0
     confirmed = by_status.get("confirmed", 0)
     rejected = by_status.get("rejected", 0)
 
@@ -485,10 +513,12 @@ def author_resolution_metrics(
         "nil_cases": nil_cases,
         "avg_confidence": round(float(avg_confidence), 3),
         "avg_complexity": round(float(avg_complexity), 3),
+        "avg_nil_score": round(float(avg_nil_score), 3),
         "review_rate": round(pending_review / total, 3) if total > 0 else 0.0,
         "nil_rate": round(nil_cases / total, 3) if total > 0 else 0.0,
         "confirm_rate": round(confirmed / total, 3) if total > 0 else 0.0,
         "reject_rate": round(rejected / total, 3) if total > 0 else 0.0,
+        "by_nil_reason": by_nil_reason,
         "by_route": by_route,
         "by_status": by_status,
     }

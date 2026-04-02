@@ -61,7 +61,7 @@ Excluye:
 | US-025 | Orquestacion de enrichment individual y masivo | Planned |
 | US-026 | Gestion de fuentes de scraping para enrichment | Planned |
 | US-055 | Author Resolution Engine MVP | Done |
-| US-056 | Explicit NIL Detection Layer | Planned |
+| US-056 | Explicit NIL Detection Layer | Done |
 | US-057 | Hierarchical Fallback for Concept Linking | Planned |
 | US-058 | UKIP NIL Benchmark and Evaluation Pack | Planned |
 | US-059 | LLM Query Reformulation for Hard NIL Cases | Proposed |
@@ -79,6 +79,7 @@ Excluye:
 - Docs: `README.md`, `docs/reference/HISTORICAL_REFERENCE_INDEX.md`
 - Blueprint recomendado: `docs/product/AUTHOR_RESOLUTION_ENGINE_MVP.md`
 - Implementacion MVP: `backend/authority/author_resolution.py`, `POST /authority/authors/resolve`, `GET /authority/authors/review-queue`, `GET /authority/authors/metrics`, `GET /authority/authors/review-queue/{record_id}/compare`
+- Deteccion explicita NIL: `backend/authority/nil_detection.py`, `AuthorityRecord.nil_score`, `alembic/versions/b1c2d3e4f5a6_sprint_106_nil_detection_layer.py`
 - UI operativa: `frontend/app/authority/page.tsx`
-- Tests MVP: `backend/tests/test_sprint106_author_resolution_engine.py`, `backend/tests/test_sprint106_author_review_queue.py`, `backend/tests/test_sprint106_author_metrics.py`, `backend/tests/test_sprint106_author_compare.py`
-- Siguiente roadmap: `US-056`, `US-057`, `US-058`, `US-059`
+- Tests MVP: `backend/tests/test_sprint106_author_resolution_engine.py`, `backend/tests/test_sprint106_author_review_queue.py`, `backend/tests/test_sprint106_author_metrics.py`, `backend/tests/test_sprint106_author_compare.py`, `backend/tests/test_sprint106_nil_detection.py`
+- Siguiente roadmap: `US-057`, `US-058`, `US-059`

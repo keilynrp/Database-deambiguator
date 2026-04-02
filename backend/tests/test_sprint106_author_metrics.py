@@ -113,6 +113,7 @@ class TestAuthorResolutionMetrics:
         assert payload["total_records"] == 6
         assert payload["pending_review"] == 2
         assert payload["nil_cases"] == 1
+        assert payload["by_nil_reason"]["no_candidates"] == 1
         assert payload["by_route"]["fast_path"] == 1
         assert payload["by_route"]["hybrid_path"] == 2
         assert payload["by_route"]["llm_path"] == 2
@@ -122,6 +123,7 @@ class TestAuthorResolutionMetrics:
         assert payload["by_status"]["pending"] == 4
         assert payload["avg_confidence"] > 0
         assert payload["avg_complexity"] > 0
+        assert payload["avg_nil_score"] > 0
         assert payload["review_rate"] == 0.333
         assert payload["nil_rate"] == 0.167
         assert payload["confirm_rate"] == 0.167

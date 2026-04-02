@@ -251,6 +251,7 @@ class AuthorityRecordResponse(BaseModel):
     complexity_score:  Optional[float]        = None
     review_required:   bool                   = False
     nil_reason:        Optional[str]          = None
+    nil_score:         Optional[float]        = None
 
     model_config = ConfigDict(from_attributes=True)
 

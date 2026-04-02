@@ -40,7 +40,6 @@ Fuentes estrategicas relacionadas:
 
 ## Prioridades recomendadas de corto plazo
 
-- cerrar `US-056` para hacer explicita la deteccion `NIL`
 - preparar `US-058` como benchmark propio de NIL linking y regresion de calidad
 - evaluar `US-057` solo donde exista jerarquia de conceptos realmente util
 - cerrar historias pendientes de `EPIC-004` que eleven calidad de authority review y enrichment fallback

@@ -59,13 +59,16 @@ class TestAuthorResolutionEngine:
         assert payload["resolution_route"] == "fast_path"
         assert payload["review_required"] is False
         assert payload["nil_reason"] is None
+        assert payload["nil_score"] < 0.5
         assert payload["complexity_score"] < 0.5
         assert payload["winning_record"]["resolution_route"] == "fast_path"
+        assert payload["winning_record"]["nil_score"] < 0.5
 
         record = db_session.query(models.AuthorityRecord).one()
         assert record.resolution_route == "fast_path"
         assert record.review_required is False
         assert record.nil_reason is None
+        assert (record.nil_score or 0.0) < 0.5
 
     def test_hybrid_path_returns_runner_up_for_comparison(self, client, editor_headers, db_session):
         candidates = [
@@ -79,6 +82,7 @@ class TestAuthorResolutionEngine:
         payload = resp.json()
         assert payload["resolution_route"] == "hybrid_path"
         assert payload["review_required"] is False
+        assert payload["nil_score"] < 0.8
         assert payload["runner_up_record"] is not None
         assert payload["records_created"] == 2
 
@@ -99,10 +103,12 @@ class TestAuthorResolutionEngine:
         assert payload["resolution_route"] == "llm_path"
         assert payload["review_required"] is True
         assert payload["nil_reason"] is None
+        assert payload["nil_score"] < 0.8
 
         rows = db_session.query(models.AuthorityRecord).all()
         assert len(rows) == 2
         assert all(row.review_required is True for row in rows)
+        assert all((row.nil_score or 0.0) < 0.8 for row in rows)
 
     def test_no_candidates_persists_nil_record(self, client, editor_headers, db_session):
         with patch(_PATCH, return_value=[]):
@@ -113,6 +119,7 @@ class TestAuthorResolutionEngine:
         assert payload["resolution_route"] == "manual_review"
         assert payload["review_required"] is True
         assert payload["nil_reason"] == "no_candidates"
+        assert payload["nil_score"] == 1.0
         assert payload["records_created"] == 1
         assert payload["winning_record"]["authority_source"] == "internal_nil"
 
@@ -120,3 +127,4 @@ class TestAuthorResolutionEngine:
         assert record.authority_source == "internal_nil"
         assert record.nil_reason == "no_candidates"
         assert record.resolution_route == "manual_review"
+        assert record.nil_score == 1.0
