@@ -88,6 +88,20 @@ interface AuthorQueueResponse {
     summary: AuthorQueueSummary;
 }
 
+interface AuthorMetrics {
+    total_records: number;
+    pending_review: number;
+    nil_cases: number;
+    avg_confidence: number;
+    avg_complexity: number;
+    review_rate: number;
+    nil_rate: number;
+    confirm_rate: number;
+    reject_rate: number;
+    by_route: Record<string, number>;
+    by_status: Record<string, number>;
+}
+
 // ── Source badge colors ─────────────────────────────────────────────────────
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -106,6 +120,7 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
     const { toast } = useToast();
     const [summary, setSummary] = useState<QueueSummary | null>(null);
     const [authorSummary, setAuthorSummary] = useState<AuthorQueueSummary | null>(null);
+    const [authorMetrics, setAuthorMetrics] = useState<AuthorMetrics | null>(null);
     const [records, setRecords] = useState<AuthorityRecord[]>([]);
     const [loadingRecords, setLoadingRecords] = useState(false);
     const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -135,17 +150,24 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
     const fetchSummary = useCallback(async () => {
         try {
             if (queueMode === "authors") {
-                const res = await apiFetch("/authority/authors/review-queue");
-                if (res.ok) {
-                    const payload: AuthorQueueResponse = await res.json();
+                const [queueRes, metricsRes] = await Promise.all([
+                    apiFetch("/authority/authors/review-queue"),
+                    apiFetch("/authority/authors/metrics"),
+                ]);
+                if (queueRes.ok) {
+                    const payload: AuthorQueueResponse = await queueRes.json();
                     setAuthorSummary(payload.summary);
                     setSummary(null);
+                }
+                if (metricsRes.ok) {
+                    setAuthorMetrics(await metricsRes.json());
                 }
             } else {
                 const res = await apiFetch("/authority/queue/summary");
                 if (res.ok) {
                     setSummary(await res.json());
                     setAuthorSummary(null);
+                    setAuthorMetrics(null);
                 }
             }
         } catch {}
@@ -340,6 +362,47 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                     <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <p className="text-sm text-gray-500 dark:text-gray-400">NIL Cases</p>
                         <p className="mt-1 text-2xl font-bold text-rose-600 dark:text-rose-400">{authorSummary.nil_cases}</p>
+                    </div>
+                </div>
+            )}
+
+            {queueMode === "authors" && authorMetrics && (
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">Engine Metrics</h3>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">author-only runtime</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg confidence</p>
+                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                                {(authorMetrics.avg_confidence * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg complexity</p>
+                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                                {authorMetrics.avg_complexity.toFixed(2)}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Review rate</p>
+                            <p className="mt-1 text-lg font-semibold text-amber-600 dark:text-amber-400">
+                                {(authorMetrics.review_rate * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Confirm rate</p>
+                            <p className="mt-1 text-lg font-semibold text-green-600 dark:text-green-400">
+                                {(authorMetrics.confirm_rate * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">NIL rate</p>
+                            <p className="mt-1 text-lg font-semibold text-rose-600 dark:text-rose-400">
+                                {(authorMetrics.nil_rate * 100).toFixed(0)}%
+                            </p>
+                        </div>
                     </div>
                 </div>
             )}

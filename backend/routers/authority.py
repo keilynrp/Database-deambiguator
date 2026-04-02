@@ -430,6 +430,70 @@ def author_review_queue(
     }
 
 
+@router.get("/authority/authors/metrics", tags=["authority"])
+def author_resolution_metrics(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    Operational metrics for the adaptive author resolution engine only.
+
+    This intentionally excludes legacy/generic authority rows by requiring
+    `resolution_route` to be present.
+    """
+    org_id = resolve_request_org_id(db, current_user)
+    base_q = scope_query_to_org(db.query(models.AuthorityRecord), models.AuthorityRecord, org_id).filter(
+        models.AuthorityRecord.resolution_route.is_not(None)
+    )
+
+    total = base_q.count()
+    pending_review = base_q.filter(
+        models.AuthorityRecord.status == "pending",
+        models.AuthorityRecord.review_required == True,  # noqa: E712
+    ).count()
+    nil_cases = base_q.filter(models.AuthorityRecord.nil_reason.is_not(None)).count()
+
+    by_route = {
+        row[0]: row[1]
+        for row in base_q.with_entities(
+            models.AuthorityRecord.resolution_route,
+            func.count(models.AuthorityRecord.id),
+        ).group_by(
+            models.AuthorityRecord.resolution_route
+        ).all()
+        if row[0]
+    }
+    by_status = {
+        row[0]: row[1]
+        for row in base_q.with_entities(
+            models.AuthorityRecord.status,
+            func.count(models.AuthorityRecord.id),
+        ).group_by(
+            models.AuthorityRecord.status
+        ).all()
+        if row[0]
+    }
+
+    avg_confidence = base_q.with_entities(func.avg(models.AuthorityRecord.confidence)).scalar() or 0.0
+    avg_complexity = base_q.with_entities(func.avg(models.AuthorityRecord.complexity_score)).scalar() or 0.0
+    confirmed = by_status.get("confirmed", 0)
+    rejected = by_status.get("rejected", 0)
+
+    return {
+        "total_records": total,
+        "pending_review": pending_review,
+        "nil_cases": nil_cases,
+        "avg_confidence": round(float(avg_confidence), 3),
+        "avg_complexity": round(float(avg_complexity), 3),
+        "review_rate": round(pending_review / total, 3) if total > 0 else 0.0,
+        "nil_rate": round(nil_cases / total, 3) if total > 0 else 0.0,
+        "confirm_rate": round(confirmed / total, 3) if total > 0 else 0.0,
+        "reject_rate": round(rejected / total, 3) if total > 0 else 0.0,
+        "by_route": by_route,
+        "by_status": by_status,
+    }
+
+
 @router.post("/authority/records/bulk-confirm", tags=["authority"])
 def bulk_confirm_authority_records(
     payload: schemas.BulkActionRequest,
