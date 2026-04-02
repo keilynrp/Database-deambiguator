@@ -7,7 +7,7 @@ Como analista o equipo de research intelligence, quiero resolver identidades de 
 ## 2. Context
 
 - Epic: `EPIC-004`
-- Sprint objetivo: `SPRINT-106`
+- Entrega: post-`SPRINT-105`, publicada incrementalmente sobre `main`
 
 ## 3. Acceptance criteria
 
@@ -47,7 +47,16 @@ Como analista o equipo de research intelligence, quiero resolver identidades de 
 - Base tecnica actual: `backend/authority/resolver.py`, `backend/authority/scoring.py`, `backend/routers/authority.py`
 - Endpoint principal: `POST /authority/authors/resolve`
 - Cola operativa: `GET /authority/authors/review-queue`
+- Metricas operativas: `GET /authority/authors/metrics`
+- Comparador de candidatos: `GET /authority/authors/review-queue/{record_id}/compare`
+- UI operativa: `frontend/app/authority/page.tsx`
 - Persistencia: `AuthorityRecord.resolution_route`, `complexity_score`, `review_required`, `nil_reason`
 - Migracion: `alembic/versions/a2b3c4d5e6f7_sprint_106_author_resolution_engine.py`
-- Tests: `backend/tests/test_sprint106_author_resolution_engine.py`, `backend/tests/test_sprint106_author_review_queue.py`
+- Tests: `backend/tests/test_sprint106_author_resolution_engine.py`, `backend/tests/test_sprint106_author_review_queue.py`, `backend/tests/test_sprint106_author_metrics.py`, `backend/tests/test_sprint106_author_compare.py`
+- Cobertura funcional actual:
+  - resolucion adaptativa author-only
+  - review queue con acciones `confirm`, `reject` y `Accept NIL`
+  - evidencia visible (`score_breakdown`, `evidence`, `merged_sources`, `aliases`)
+  - comparacion `winner vs runner-up`
+  - metricas de volumen, review load y `NIL`
 - Riesgo clave: evitar crear un subsistema paralelo o introducir `pgvector` / GraphDB antes de validar demanda

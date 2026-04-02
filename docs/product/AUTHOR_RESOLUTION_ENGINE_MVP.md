@@ -309,6 +309,21 @@ Orden recomendado:
 4. agregar review UI
 5. medir precision y cobertura antes de ampliar infraestructura
 
+## 16.1 Recommended next stories after US-055
+
+- `US-056`
+  - deteccion explicita de `NIL`
+  - separa falta de cobertura de ambiguedad y de low-confidence
+- `US-058`
+  - benchmark y protocolo de evaluacion propio para UKIP
+  - evita depender de datasets externos poco alineados con el wedge actual
+- `US-057`
+  - fallback jerarquico a conceptos mas generales
+  - recomendable primero para conceptos y taxonomias, no para autores
+- `US-059`
+  - reformulacion de consultas con LLM como experimento opt-in
+  - nunca como dependencia principal del runtime
+
 ## 17. Conclusion
 
 El enfoque del PRD es viable y estrategicamente valioso para UKIP, siempre que se implemente como una extension del authority layer actual y no como una plataforma nueva.
