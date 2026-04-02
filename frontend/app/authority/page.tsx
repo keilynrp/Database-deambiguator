@@ -687,7 +687,119 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                     {expandedId === rec.id && (
                                         <tr>
                                             <td colSpan={statusFilter === "pending" ? 8 : 7} className="px-6 py-4 bg-gray-50 dark:bg-gray-800/30 border-t border-gray-100 dark:border-gray-800">
-                                                <AnnotationThread authorityId={rec.id} />
+                                                <div className="space-y-4">
+                                                    {queueMode === "authors" && (
+                                                        <div className="grid gap-4 lg:grid-cols-3">
+                                                            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/60">
+                                                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                                    Resolution Decision
+                                                                </p>
+                                                                <dl className="mt-3 space-y-2 text-sm">
+                                                                    <div className="flex items-center justify-between gap-3">
+                                                                        <dt className="text-gray-500 dark:text-gray-400">Route</dt>
+                                                                        <dd className="font-mono text-gray-900 dark:text-white">{rec.resolution_route || "legacy"}</dd>
+                                                                    </div>
+                                                                    <div className="flex items-center justify-between gap-3">
+                                                                        <dt className="text-gray-500 dark:text-gray-400">Complexity</dt>
+                                                                        <dd className="text-gray-900 dark:text-white">
+                                                                            {typeof rec.complexity_score === "number" ? rec.complexity_score.toFixed(2) : "--"}
+                                                                        </dd>
+                                                                    </div>
+                                                                    <div className="flex items-center justify-between gap-3">
+                                                                        <dt className="text-gray-500 dark:text-gray-400">Authority ID</dt>
+                                                                        <dd className="font-mono text-gray-900 dark:text-white">{rec.authority_id}</dd>
+                                                                    </div>
+                                                                    <div className="flex items-center justify-between gap-3">
+                                                                        <dt className="text-gray-500 dark:text-gray-400">Resolution</dt>
+                                                                        <dd className="text-gray-900 dark:text-white">{rec.resolution_status}</dd>
+                                                                    </div>
+                                                                </dl>
+                                                            </div>
+
+                                                            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/60">
+                                                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                                    Score Breakdown
+                                                                </p>
+                                                                <div className="mt-3 space-y-2">
+                                                                    {rec.score_breakdown && Object.keys(rec.score_breakdown).length > 0 ? (
+                                                                        Object.entries(rec.score_breakdown).map(([key, value]) => (
+                                                                            <div key={key} className="flex items-center justify-between gap-3 text-sm">
+                                                                                <span className="text-gray-500 dark:text-gray-400">{key.replaceAll("_", " ")}</span>
+                                                                                <span className="font-mono text-gray-900 dark:text-white">
+                                                                                    {typeof value === "number" ? value.toFixed(2) : String(value)}
+                                                                                </span>
+                                                                            </div>
+                                                                        ))
+                                                                    ) : (
+                                                                        <p className="text-sm text-gray-400 dark:text-gray-500">No structured score breakdown.</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/60">
+                                                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                                    Evidence
+                                                                </p>
+                                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                                    {rec.evidence && rec.evidence.length > 0 ? (
+                                                                        rec.evidence.map(item => (
+                                                                            <span
+                                                                                key={item}
+                                                                                className="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300"
+                                                                            >
+                                                                                {item}
+                                                                            </span>
+                                                                        ))
+                                                                    ) : (
+                                                                        <p className="text-sm text-gray-400 dark:text-gray-500">No evidence captured.</p>
+                                                                    )}
+                                                                </div>
+                                                                <div className="mt-4 space-y-3">
+                                                                    <div>
+                                                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                                            Merged Sources
+                                                                        </p>
+                                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                                            {rec.merged_sources && rec.merged_sources.length > 0 ? (
+                                                                                rec.merged_sources.map(source => (
+                                                                                    <span
+                                                                                        key={source}
+                                                                                        className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                                                                                    >
+                                                                                        {source}
+                                                                                    </span>
+                                                                                ))
+                                                                            ) : (
+                                                                                <span className="text-xs text-gray-400 dark:text-gray-500">None</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                                            Aliases
+                                                                        </p>
+                                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                                            {rec.aliases && rec.aliases.length > 0 ? (
+                                                                                rec.aliases.map(alias => (
+                                                                                    <span
+                                                                                        key={alias}
+                                                                                        className="inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                                                                                    >
+                                                                                        {alias}
+                                                                                    </span>
+                                                                                ))
+                                                                            ) : (
+                                                                                <span className="text-xs text-gray-400 dark:text-gray-500">None</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <AnnotationThread authorityId={rec.id} />
+                                                </div>
                                             </td>
                                         </tr>
                                     )}
