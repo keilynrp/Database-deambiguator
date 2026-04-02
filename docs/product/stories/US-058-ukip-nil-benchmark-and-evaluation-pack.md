@@ -11,15 +11,15 @@ Como equipo de producto e ingenieria, quiero un benchmark propio de `NIL entity 
 
 ## 3. Acceptance criteria
 
-- [ ] existe un dataset o pack de evaluacion reproducible alineado con el wedge actual de UKIP
-- [ ] el pack incluye casos `in-KB`, ambiguos, `NIL` reales y `artificial NIL` generados de forma controlada
-- [ ] se miden al menos:
+- [x] existe un dataset o pack de evaluacion reproducible alineado con el wedge actual de UKIP
+- [x] el pack incluye casos `in-KB`, ambiguos, `NIL` reales y `artificial NIL` generados de forma controlada
+- [x] se miden al menos:
   - NIL detection precision/recall
   - exact linking quality
   - fallback parcial a conceptos mas generales
   - review load esperado
-- [ ] la evaluacion corre offline sin dependencia de servicios de produccion
-- [ ] el benchmark no depende de `MedPath` para ser util en UKIP
+- [x] la evaluacion corre offline sin dependencia de servicios de produccion
+- [x] el benchmark no depende de `MedPath` para ser util en UKIP
 
 ## 4. Functional notes
 
@@ -37,10 +37,18 @@ Como equipo de producto e ingenieria, quiero un benchmark propio de `NIL entity 
 
 ## 6. Definition of done
 
-- [ ] implementado
-- [ ] probado
-- [ ] documentado
-- [ ] trazabilidad actualizada
+- [x] implementado
+- [x] probado
+- [x] documentado
+- [x] trazabilidad actualizada
+
+## 8. Evidence
+
+- dataset: `backend/tests/fixtures/author_nil_benchmark.json`
+- runner: `backend/authority/benchmark.py`
+- script: `scripts/evaluate_author_nil_benchmark.py`
+- tests: `backend/tests/test_sprint106_nil_benchmark.py`
+- protocol: `docs/product/AUTHORITY_NIL_BENCHMARK_PROTOCOL.md`
 
 ## 7. Notes for prioritization
 

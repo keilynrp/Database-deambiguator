@@ -1,0 +1,428 @@
+{
+  "dataset_name": "ukip_author_nil_benchmark_v1",
+  "version": 1,
+  "description": "Offline author-only benchmark for UKIP NIL detection and author resolution regression checks.",
+  "cases": [
+    {
+      "id": "exact_orcid_fast_path",
+      "category": "in_kb",
+      "value": "Gabriel Garcia Marquez",
+      "context": {
+        "affiliation": "Universidad Nacional de Colombia",
+        "orcid_hint": "0000-0001-0000-0001"
+      },
+      "expected": {
+        "nil_detected": false,
+        "nil_reason": null,
+        "review_required": false,
+        "resolution_route": "fast_path",
+        "winner_authority_id": "0000-0001-0000-0001"
+      },
+      "candidates": [
+        {
+          "authority_source": "orcid",
+          "authority_id": "0000-0001-0000-0001",
+          "canonical_label": "Gabriel Garcia Marquez",
+          "aliases": [
+            "G. Garcia Marquez"
+          ],
+          "description": "Author profile",
+          "confidence": 0.97,
+          "uri": "https://example.org/orcid/0000-0001-0000-0001",
+          "score_breakdown": {
+            "identifiers": 1.0,
+            "name": 0.97,
+            "affiliation": 0.2,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "orcid_exact_match"
+          ],
+          "resolution_status": "exact_match",
+          "merged_sources": []
+        }
+      ]
+    },
+    {
+      "id": "probable_hybrid_path",
+      "category": "in_kb",
+      "value": "Gabriel Garcia Marquez",
+      "context": {
+        "affiliation": "Universidad Nacional de Colombia"
+      },
+      "expected": {
+        "nil_detected": false,
+        "nil_reason": null,
+        "review_required": false,
+        "resolution_route": "hybrid_path",
+        "winner_authority_id": "A1"
+      },
+      "candidates": [
+        {
+          "authority_source": "openalex",
+          "authority_id": "A1",
+          "canonical_label": "Gabriel Garcia Marquez",
+          "aliases": [
+            "Gabo"
+          ],
+          "description": "OpenAlex profile",
+          "confidence": 0.84,
+          "uri": "https://example.org/openalex/A1",
+          "score_breakdown": {
+            "identifiers": 0.7,
+            "name": 0.84,
+            "affiliation": 0.2,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "openalex_probable_match"
+          ],
+          "resolution_status": "probable_match",
+          "merged_sources": []
+        },
+        {
+          "authority_source": "wikidata",
+          "authority_id": "Q1",
+          "canonical_label": "Gabriel G. Marquez",
+          "aliases": [],
+          "description": "Wikidata profile",
+          "confidence": 0.62,
+          "uri": "https://example.org/wikidata/Q1",
+          "score_breakdown": {
+            "identifiers": 0.45,
+            "name": 0.62,
+            "affiliation": 0.15,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "wikidata_runner_up"
+          ],
+          "resolution_status": "ambiguous",
+          "merged_sources": []
+        }
+      ]
+    },
+    {
+      "id": "viable_ambiguous_llm_path",
+      "category": "ambiguous",
+      "value": "Viable Ambiguous Author",
+      "context": {
+        "affiliation": "Universidad Nacional de Colombia"
+      },
+      "expected": {
+        "nil_detected": false,
+        "nil_reason": null,
+        "review_required": true,
+        "resolution_route": "llm_path",
+        "winner_authority_id": "A2"
+      },
+      "candidates": [
+        {
+          "authority_source": "openalex",
+          "authority_id": "A2",
+          "canonical_label": "Viable Ambiguous Author",
+          "aliases": [],
+          "description": "OpenAlex profile",
+          "confidence": 0.68,
+          "uri": "https://example.org/openalex/A2",
+          "score_breakdown": {
+            "identifiers": 0.7,
+            "name": 0.68,
+            "affiliation": 0.2,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "ambiguous_but_viable"
+          ],
+          "resolution_status": "ambiguous",
+          "merged_sources": []
+        },
+        {
+          "authority_source": "wikidata",
+          "authority_id": "Q2",
+          "canonical_label": "Viable Runner Up",
+          "aliases": [],
+          "description": "Wikidata profile",
+          "confidence": 0.65,
+          "uri": "https://example.org/wikidata/Q2",
+          "score_breakdown": {
+            "identifiers": 0.55,
+            "name": 0.65,
+            "affiliation": 0.18,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "credible_runner_up"
+          ],
+          "resolution_status": "probable_match",
+          "merged_sources": []
+        }
+      ]
+    },
+    {
+      "id": "real_nil_no_candidates",
+      "category": "real_nil",
+      "value": "Unknown Author",
+      "context": {
+        "affiliation": "Universidad Nacional de Colombia"
+      },
+      "expected": {
+        "nil_detected": true,
+        "nil_reason": "no_candidates",
+        "review_required": true,
+        "resolution_route": "manual_review",
+        "winner_authority_id": null
+      },
+      "candidates": []
+    },
+    {
+      "id": "real_nil_insufficient_coverage",
+      "category": "real_nil",
+      "value": "Unknownish Author",
+      "context": {
+        "affiliation": "Universidad Nacional de Colombia"
+      },
+      "expected": {
+        "nil_detected": true,
+        "nil_reason": "insufficient_coverage",
+        "review_required": true,
+        "resolution_route": "manual_review",
+        "winner_authority_id": null
+      },
+      "candidates": [
+        {
+          "authority_source": "openalex",
+          "authority_id": "A3",
+          "canonical_label": "Candidate Author",
+          "aliases": [],
+          "description": "Sparse profile",
+          "confidence": 0.39,
+          "uri": "https://example.org/openalex/A3",
+          "score_breakdown": {
+            "identifiers": 0.15,
+            "name": 0.39,
+            "affiliation": 0.05,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "low_coverage"
+          ],
+          "resolution_status": "unresolved",
+          "merged_sources": []
+        }
+      ]
+    },
+    {
+      "id": "real_nil_conflicting_evidence",
+      "category": "real_nil",
+      "value": "Conflict Author",
+      "context": {
+        "affiliation": "Universidad Nacional de Colombia"
+      },
+      "expected": {
+        "nil_detected": true,
+        "nil_reason": "conflicting_evidence",
+        "review_required": true,
+        "resolution_route": "manual_review",
+        "winner_authority_id": null
+      },
+      "candidates": [
+        {
+          "authority_source": "openalex",
+          "authority_id": "A4",
+          "canonical_label": "Conflict Author",
+          "aliases": [],
+          "description": "Conflicting profile",
+          "confidence": 0.61,
+          "uri": "https://example.org/openalex/A4",
+          "score_breakdown": {
+            "identifiers": 0.7,
+            "name": 0.61,
+            "affiliation": 0.2,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "source_conflict"
+          ],
+          "resolution_status": "ambiguous",
+          "merged_sources": [
+            "openalex:A4",
+            "wikidata:Q4"
+          ]
+        },
+        {
+          "authority_source": "wikidata",
+          "authority_id": "Q4",
+          "canonical_label": "Conflict Author",
+          "aliases": [],
+          "description": "Conflicting Wikidata profile",
+          "confidence": 0.6,
+          "uri": "https://example.org/wikidata/Q4",
+          "score_breakdown": {
+            "identifiers": 0.65,
+            "name": 0.6,
+            "affiliation": 0.18,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "conflicting_runner_up"
+          ],
+          "resolution_status": "ambiguous",
+          "merged_sources": []
+        }
+      ]
+    },
+    {
+      "id": "real_nil_unresolved_ambiguity",
+      "category": "real_nil",
+      "value": "Nearly Matching Author",
+      "context": {
+        "affiliation": "Universidad Nacional de Colombia"
+      },
+      "expected": {
+        "nil_detected": true,
+        "nil_reason": "unresolved_ambiguity",
+        "review_required": true,
+        "resolution_route": "manual_review",
+        "winner_authority_id": null
+      },
+      "candidates": [
+        {
+          "authority_source": "openalex",
+          "authority_id": "A5",
+          "canonical_label": "Nearly Matching Author",
+          "aliases": [],
+          "description": "Close ambiguous profile",
+          "confidence": 0.6,
+          "uri": "https://example.org/openalex/A5",
+          "score_breakdown": {
+            "identifiers": 0.7,
+            "name": 0.6,
+            "affiliation": 0.2,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "very_close_match"
+          ],
+          "resolution_status": "ambiguous",
+          "merged_sources": []
+        },
+        {
+          "authority_source": "wikidata",
+          "authority_id": "Q5",
+          "canonical_label": "Nearly Matching Author Variant",
+          "aliases": [],
+          "description": "Runner up profile",
+          "confidence": 0.59,
+          "uri": "https://example.org/wikidata/Q5",
+          "score_breakdown": {
+            "identifiers": 0.68,
+            "name": 0.59,
+            "affiliation": 0.18,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "runner_up_close"
+          ],
+          "resolution_status": "probable_match",
+          "merged_sources": []
+        }
+      ]
+    },
+    {
+      "id": "artificial_nil_with_ancestor",
+      "category": "artificial_nil",
+      "value": "Removed Subspecialty Author",
+      "context": {
+        "affiliation": "Universidad Nacional de Colombia"
+      },
+      "expected": {
+        "nil_detected": true,
+        "nil_reason": "insufficient_coverage",
+        "review_required": true,
+        "resolution_route": "manual_review",
+        "winner_authority_id": null,
+        "ancestor_label": "Latin American novelist",
+        "partial_fallback_available": true
+      },
+      "fallback_candidates": [
+        "Latin American novelist",
+        "Colombian writer"
+      ],
+      "candidates": [
+        {
+          "authority_source": "openalex",
+          "authority_id": "A6",
+          "canonical_label": "Removed Subspecialty Author",
+          "aliases": [],
+          "description": "Weak profile after removing fine-grained entity",
+          "confidence": 0.44,
+          "uri": "https://example.org/openalex/A6",
+          "score_breakdown": {
+            "identifiers": 0.18,
+            "name": 0.44,
+            "affiliation": 0.05,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "synthetic_artificial_nil"
+          ],
+          "resolution_status": "unresolved",
+          "merged_sources": []
+        }
+      ]
+    },
+    {
+      "id": "artificial_nil_without_ancestor",
+      "category": "artificial_nil",
+      "value": "Removed Narrow Institution Entity",
+      "context": {
+        "affiliation": "Universidad Nacional de Colombia"
+      },
+      "expected": {
+        "nil_detected": true,
+        "nil_reason": "insufficient_coverage",
+        "review_required": true,
+        "resolution_route": "manual_review",
+        "winner_authority_id": null,
+        "ancestor_label": "Research institution",
+        "partial_fallback_available": false
+      },
+      "fallback_candidates": [],
+      "candidates": [
+        {
+          "authority_source": "openalex",
+          "authority_id": "A7",
+          "canonical_label": "Removed Narrow Institution Entity",
+          "aliases": [],
+          "description": "Weak profile without useful ancestor fallback",
+          "confidence": 0.41,
+          "uri": "https://example.org/openalex/A7",
+          "score_breakdown": {
+            "identifiers": 0.12,
+            "name": 0.41,
+            "affiliation": 0.04,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "synthetic_artificial_nil"
+          ],
+          "resolution_status": "unresolved",
+          "merged_sources": []
+        }
+      ]
+    }
+  ]
+}
