@@ -233,6 +233,10 @@ class AuthorityRecord(Base):
     nil_reason        = Column(String, nullable=True)
     nil_score         = Column(Float, nullable=True, index=True)
     hierarchy_distance = Column(Integer, nullable=True)
+    reformulation_applied = Column(Boolean, default=False, index=True)
+    reformulation_gain = Column(Integer, nullable=True)
+    reformulation_cost_estimate = Column(Float, nullable=True)
+    reformulation_trace = Column(Text, nullable=True)
 
 
 class Webhook(Base):

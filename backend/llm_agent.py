@@ -106,6 +106,95 @@ class CanonicalResolution(BaseModel):
     canonical_value: str
     reasoning: str
 
+class QueryReformulationResult(BaseModel):
+    variants: List[str] = Field(default_factory=list)
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+
+def generate_query_reformulations(
+    value: str,
+    *,
+    context: Optional[Dict[str, Any]] = None,
+    max_variants: int = 3,
+    api_key: str | None = None,
+    model_name: str = "gpt-4o-mini",
+) -> QueryReformulationResult:
+    """
+    Generate alternative search queries for difficult retrieval cases.
+
+    This helper is intentionally safe:
+    - returns [] when the OpenAI SDK or API key is unavailable
+    - never raises to callers
+    - keeps output bounded and deduplicated
+    """
+    active_client = _create_client(api_key) if api_key else client
+    if not active_client:
+        logger.info("LLM query reformulation skipped: OpenAI client unavailable")
+        return QueryReformulationResult()
+
+    context = context or {}
+    prompt = {
+        "value": value,
+        "context": {
+            "affiliation": context.get("affiliation"),
+            "orcid_hint": context.get("orcid_hint"),
+            "doi": context.get("doi"),
+            "year": context.get("year"),
+        },
+        "instructions": [
+            "Generate a few alternative search queries for academic author lookup.",
+            "Preserve determinism and avoid inventing identifiers.",
+            "Prefer lexical rewrites, affiliation-aware variants, and reordered name formats.",
+            "Return only JSON with a top-level 'variants' array.",
+        ],
+        "max_variants": max_variants,
+    }
+
+    try:
+        response = active_client.chat.completions.create(
+            model=model_name,
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You generate safe search query reformulations for UKIP authority resolution. "
+                        "Never fabricate facts. Return compact JSON only."
+                    ),
+                },
+                {"role": "user", "content": json.dumps(prompt, ensure_ascii=True)},
+            ],
+            temperature=0.2,
+            max_tokens=220,
+        )
+        data = json.loads(response.choices[0].message.content or "{}")
+        variants: list[str] = []
+        for item in data.get("variants", []):
+            if not isinstance(item, str):
+                continue
+            cleaned = " ".join(item.strip().split())
+            if cleaned and cleaned.lower() != value.strip().lower() and cleaned not in variants:
+                variants.append(cleaned)
+            if len(variants) >= max_variants:
+                break
+
+        usage = getattr(response, "usage", None)
+        prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+        completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+        return QueryReformulationResult(
+            variants=variants,
+            provider="openai",
+            model=model_name,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
+    except Exception as e:
+        logger.warning("LLM query reformulation error: %s", e)
+        return QueryReformulationResult()
+
 def resolve_canonical_name(field_name: str, variations: List[str], api_key: str = None) -> CanonicalResolution:
     """
     Given an entity attribute name and a list of lexical variations, uses the LLM to elect the single best

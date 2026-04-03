@@ -321,4 +321,8 @@ def _serialize_authority_record(r: models.AuthorityRecord) -> dict:
         "nil_reason":        r.nil_reason,
         "nil_score":         r.nil_score,
         "hierarchy_distance": r.hierarchy_distance,
+        "reformulation_applied": bool(r.reformulation_applied),
+        "reformulation_gain": r.reformulation_gain,
+        "reformulation_cost_estimate": r.reformulation_cost_estimate,
+        "reformulation_trace": json.loads(r.reformulation_trace or "{}"),
     }

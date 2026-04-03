@@ -11,11 +11,11 @@ Como equipo de authority resolution, quiero usar reformulacion de consultas con 
 
 ## 3. Acceptance criteria
 
-- [ ] existe un experimento controlado de query reformulation para casos con retrieval vacio o debil
-- [ ] el uso de LLM queda bajo feature flag y apagado por defecto
-- [ ] se registran consultas alternativas, ganancia de retrieval y costo operativo
-- [ ] el sistema no rompe si el proveedor LLM no esta configurado o falla
-- [ ] las variantes generadas no sustituyen la evidencia deterministicamente explicable ya existente
+- [x] existe un experimento controlado de query reformulation para casos con retrieval vacio o debil
+- [x] el uso de LLM queda bajo feature flag y apagado por defecto
+- [x] se registran consultas alternativas, ganancia de retrieval y costo operativo
+- [x] el sistema no rompe si el proveedor LLM no esta configurado o falla
+- [x] las variantes generadas no sustituyen la evidencia deterministicamente explicable ya existente
 
 ## 4. Functional notes
 
@@ -33,10 +33,19 @@ Como equipo de authority resolution, quiero usar reformulacion de consultas con 
 
 ## 6. Definition of done
 
-- [ ] implementado
-- [ ] probado
-- [ ] documentado
-- [ ] trazabilidad actualizada
+- [x] implementado
+- [x] probado
+- [x] documentado
+- [x] trazabilidad actualizada
+
+## 8. Evidence
+
+- helper opt-in: `backend/authority/query_reformulation.py`
+- safe LLM wrapper: `backend/llm_agent.py`
+- persistence: `AuthorityRecord.reformulation_*`, `alembic/versions/d3e4f5a6b7c8_sprint_106_llm_query_reformulation.py`
+- metrics/UI: `backend/routers/authority.py`, `frontend/app/authority/page.tsx`
+- tests: `backend/tests/test_sprint106_query_reformulation.py`, `backend/tests/test_ci_optional_openai.py`
+- flags: `.env.example`
 
 ## 7. Notes for prioritization
 

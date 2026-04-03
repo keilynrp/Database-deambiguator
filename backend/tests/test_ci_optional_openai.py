@@ -51,3 +51,16 @@ def test_openai_adapter_imports_without_sdk_until_init(monkeypatch):
 
     with pytest.raises(RuntimeError, match="OpenAI SDK is not installed"):
         OpenAIAdapter(api_key="test-key")
+
+
+def test_query_reformulation_falls_back_without_openai_sdk(monkeypatch):
+    from backend import llm_agent
+
+    monkeypatch.setattr(llm_agent, "OpenAI", None)
+    monkeypatch.setattr(llm_agent, "client", None)
+
+    result = llm_agent.generate_query_reformulations("Gabriel Garcia Marquez")
+
+    assert result.variants == []
+    assert result.provider is None
+    assert result.model is None

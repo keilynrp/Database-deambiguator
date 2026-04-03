@@ -253,6 +253,10 @@ class AuthorityRecordResponse(BaseModel):
     nil_reason:        Optional[str]          = None
     nil_score:         Optional[float]        = None
     hierarchy_distance: Optional[int]         = None
+    reformulation_applied: bool               = False
+    reformulation_gain: Optional[int]         = None
+    reformulation_cost_estimate: Optional[float] = None
+    reformulation_trace: Optional[dict]       = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -27,6 +27,7 @@ from backend.auth import get_current_user, require_role
 from backend.authority.author_resolution import summarize_author_resolution
 from backend.authority.base import ResolveContext as _AuthorityContext
 from backend.authority.hierarchical_fallback import apply_hierarchical_fallback
+from backend.authority.query_reformulation import run_author_query_reformulation
 from backend.authority.resolver import resolve_all as _authority_resolve_all
 from backend.database import get_db
 from backend.routers.deps import _audit, _build_disambig_groups, _serialize_authority_record
@@ -126,10 +127,17 @@ def resolve_author_profile(
     )
     candidates = _authority_resolve_all(payload.value, "person", ctx)
     summary = summarize_author_resolution(candidates, ctx)
+    candidates, summary, reformulation_trace = run_author_query_reformulation(
+        value=payload.value,
+        context=ctx,
+        base_candidates=candidates,
+        base_summary=summary,
+        resolver_fn=_authority_resolve_all,
+    )
 
     records: list[models.AuthorityRecord] = []
     if candidates:
-        for c in candidates:
+        for idx, c in enumerate(candidates):
             rec = models.AuthorityRecord(
                 org_id=record_org_id,
                 field_name=payload.field_name,
@@ -151,6 +159,10 @@ def resolve_author_profile(
                 review_required=summary.review_required,
                 nil_reason=summary.nil_reason,
                 nil_score=summary.nil_score,
+                reformulation_applied=reformulation_trace.applied if idx == 0 else False,
+                reformulation_gain=reformulation_trace.retrieval_gain if idx == 0 else None,
+                reformulation_cost_estimate=reformulation_trace.estimated_cost_usd if idx == 0 else None,
+                reformulation_trace=reformulation_trace.to_json() if reformulation_trace.attempted and idx == 0 else None,
             )
             db.add(rec)
             records.append(rec)
@@ -176,6 +188,10 @@ def resolve_author_profile(
             review_required=summary.review_required,
             nil_reason=summary.nil_reason or "no_candidates",
             nil_score=summary.nil_score,
+            reformulation_applied=reformulation_trace.applied,
+            reformulation_gain=reformulation_trace.retrieval_gain,
+            reformulation_cost_estimate=reformulation_trace.estimated_cost_usd,
+            reformulation_trace=reformulation_trace.to_json() if reformulation_trace.attempted else None,
         )
         db.add(nil_record)
         records.append(nil_record)
@@ -199,6 +215,7 @@ def resolve_author_profile(
         "review_required": summary.review_required,
         "nil_reason": summary.nil_reason,
         "nil_score": summary.nil_score,
+        "reformulation": json.loads(reformulation_trace.to_json()) if reformulation_trace.attempted else None,
         "records_created": len(serialized),
         "winning_record": winning,
         "runner_up_record": runner_up,
@@ -509,6 +526,20 @@ def author_resolution_metrics(
     avg_confidence = base_q.with_entities(func.avg(models.AuthorityRecord.confidence)).scalar() or 0.0
     avg_complexity = base_q.with_entities(func.avg(models.AuthorityRecord.complexity_score)).scalar() or 0.0
     avg_nil_score = base_q.with_entities(func.avg(models.AuthorityRecord.nil_score)).scalar() or 0.0
+    reformulation_attempts = base_q.filter(models.AuthorityRecord.reformulation_trace.is_not(None)).count()
+    reformulation_applied = base_q.filter(models.AuthorityRecord.reformulation_applied == True).count()  # noqa: E712
+    avg_reformulation_gain = (
+        base_q.filter(models.AuthorityRecord.reformulation_trace.is_not(None))
+        .with_entities(func.avg(models.AuthorityRecord.reformulation_gain))
+        .scalar()
+        or 0.0
+    )
+    total_reformulation_cost = (
+        base_q.filter(models.AuthorityRecord.reformulation_trace.is_not(None))
+        .with_entities(func.sum(models.AuthorityRecord.reformulation_cost_estimate))
+        .scalar()
+        or 0.0
+    )
     confirmed = by_status.get("confirmed", 0)
     rejected = by_status.get("rejected", 0)
 
@@ -519,6 +550,11 @@ def author_resolution_metrics(
         "avg_confidence": round(float(avg_confidence), 3),
         "avg_complexity": round(float(avg_complexity), 3),
         "avg_nil_score": round(float(avg_nil_score), 3),
+        "reformulation_attempts": reformulation_attempts,
+        "reformulation_applied": reformulation_applied,
+        "avg_reformulation_gain": round(float(avg_reformulation_gain), 3),
+        "reformulation_apply_rate": round(reformulation_applied / reformulation_attempts, 3) if reformulation_attempts > 0 else 0.0,
+        "total_reformulation_cost": round(float(total_reformulation_cost), 6),
         "review_rate": round(pending_review / total, 3) if total > 0 else 0.0,
         "nil_rate": round(nil_cases / total, 3) if total > 0 else 0.0,
         "confirm_rate": round(confirmed / total, 3) if total > 0 else 0.0,

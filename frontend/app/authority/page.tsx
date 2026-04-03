@@ -74,6 +74,24 @@ interface AuthorityRecord {
     nil_reason?: string | null;
     nil_score?: number | null;
     hierarchy_distance?: number | null;
+    reformulation_applied?: boolean;
+    reformulation_gain?: number | null;
+    reformulation_cost_estimate?: number | null;
+    reformulation_trace?: {
+        enabled?: boolean;
+        attempted?: boolean;
+        applied?: boolean;
+        provider?: string | null;
+        model?: string | null;
+        generated_queries?: string[];
+        selected_query?: string | null;
+        retrieval_gain?: number;
+        candidate_count_before?: number;
+        candidate_count_after?: number;
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        estimated_cost_usd?: number;
+    } | null;
 }
 
 interface AuthorQueueSummary {
@@ -102,6 +120,11 @@ interface AuthorMetrics {
     nil_rate: number;
     confirm_rate: number;
     reject_rate: number;
+    reformulation_attempts: number;
+    reformulation_applied: number;
+    avg_reformulation_gain: number;
+    reformulation_apply_rate: number;
+    total_reformulation_cost: number;
     by_nil_reason: Record<string, number>;
     by_route: Record<string, number>;
     by_status: Record<string, number>;
@@ -405,7 +428,7 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                         <h3 className="text-sm font-medium text-gray-900 dark:text-white">Engine Metrics</h3>
                         <span className="text-xs text-gray-400 dark:text-gray-500">author-only runtime</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-5 xl:grid-cols-10">
                         <div>
                             <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg confidence</p>
                             <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
@@ -440,6 +463,36 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                             <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">NIL rate</p>
                             <p className="mt-1 text-lg font-semibold text-rose-600 dark:text-rose-400">
                                 {(authorMetrics.nil_rate * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Reformulations</p>
+                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                                {authorMetrics.reformulation_attempts}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Applied</p>
+                            <p className="mt-1 text-lg font-semibold text-blue-600 dark:text-blue-400">
+                                {authorMetrics.reformulation_applied}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Apply rate</p>
+                            <p className="mt-1 text-lg font-semibold text-blue-600 dark:text-blue-400">
+                                {(authorMetrics.reformulation_apply_rate * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg gain</p>
+                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                                {authorMetrics.avg_reformulation_gain.toFixed(2)}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Est. cost</p>
+                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                                ${authorMetrics.total_reformulation_cost.toFixed(4)}
                             </p>
                         </div>
                     </div>
@@ -913,6 +966,20 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                                                             <dd className="font-mono text-rose-600 dark:text-rose-400">{rec.nil_reason}</dd>
                                                                         </div>
                                                                     )}
+                                                                    {rec.reformulation_trace?.attempted && (
+                                                                        <>
+                                                                            <div className="flex items-center justify-between gap-3">
+                                                                                <dt className="text-gray-500 dark:text-gray-400">Reformulation</dt>
+                                                                                <dd className="text-blue-600 dark:text-blue-400">
+                                                                                    {rec.reformulation_trace.applied ? "applied" : "attempted"}
+                                                                                </dd>
+                                                                            </div>
+                                                                            <div className="flex items-center justify-between gap-3">
+                                                                                <dt className="text-gray-500 dark:text-gray-400">Retrieval gain</dt>
+                                                                                <dd className="text-gray-900 dark:text-white">{rec.reformulation_gain ?? 0}</dd>
+                                                                            </div>
+                                                                        </>
+                                                                    )}
                                                                 </dl>
                                                             </div>
 
@@ -993,6 +1060,32 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                                                             )}
                                                                         </div>
                                                                     </div>
+                                                                    {rec.reformulation_trace?.attempted && (
+                                                                        <div>
+                                                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                                                Reformulation Trace
+                                                                            </p>
+                                                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                                                {rec.reformulation_trace.generated_queries && rec.reformulation_trace.generated_queries.length > 0 ? (
+                                                                                    rec.reformulation_trace.generated_queries.map(query => (
+                                                                                        <span
+                                                                                            key={query}
+                                                                                            className="inline-flex rounded-full bg-sky-50 px-2 py-1 text-xs text-sky-700 dark:bg-sky-500/10 dark:text-sky-300"
+                                                                                        >
+                                                                                            {query}
+                                                                                        </span>
+                                                                                    ))
+                                                                                ) : (
+                                                                                    <span className="text-xs text-gray-400 dark:text-gray-500">No alternate queries kept</span>
+                                                                                )}
+                                                                            </div>
+                                                                            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                                                                {rec.reformulation_trace.provider || "provider-unavailable"}
+                                                                                {rec.reformulation_trace.model ? ` · ${rec.reformulation_trace.model}` : ""}
+                                                                                {typeof rec.reformulation_cost_estimate === "number" ? ` · est. $${rec.reformulation_cost_estimate.toFixed(4)}` : ""}
+                                                                            </p>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </div>
