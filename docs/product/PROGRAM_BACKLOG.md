@@ -41,7 +41,7 @@ Fuentes estrategicas relacionadas:
 ## Prioridades recomendadas de corto plazo
 
 - aprovechar `US-058` como guardarrail antes de tocar heuristicas o agregar LLM query reformulation
-- evaluar `US-057` solo donde exista jerarquia de conceptos realmente util
+- extender el fallback jerarquico de `US-057` solo donde exista jerarquia de conceptos realmente util
 - cerrar historias pendientes de `EPIC-004` que eleven calidad de authority review y enrichment fallback
 - posponer infraestructura nueva de vector/graph store hasta validar demanda y volumen
 

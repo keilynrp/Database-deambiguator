@@ -11,11 +11,11 @@ Como analista, quiero que cuando un concepto no exista de forma exacta en una KB
 
 ## 3. Acceptance criteria
 
-- [ ] existe fallback opcional a conceptos ancestro o mas generales donde la KB exponga jerarquia usable
-- [ ] el sistema persiste el tipo de match parcial y la distancia o nivel jerarquico cuando sea posible
-- [ ] la UI diferencia entre `exact_match`, `partial_ancestor_match` y `NIL`
-- [ ] el fallback no se aplica ciegamente a autores; queda acotado a tipos de entidad donde la jerarquia tenga sentido
-- [ ] el sistema mantiene evidencia suficiente para auditoria y revision humana
+- [x] existe fallback opcional a conceptos ancestro o mas generales donde la KB exponga jerarquia usable
+- [x] el sistema persiste el tipo de match parcial y la distancia o nivel jerarquico cuando sea posible
+- [x] la UI diferencia entre `exact_match`, `partial_ancestor_match` y `NIL`
+- [x] el fallback no se aplica ciegamente a autores; queda acotado a tipos de entidad donde la jerarquia tenga sentido
+- [x] el sistema mantiene evidencia suficiente para auditoria y revision humana
 
 ## 4. Functional notes
 
@@ -34,10 +34,18 @@ Como analista, quiero que cuando un concepto no exista de forma exacta en una KB
 
 ## 6. Definition of done
 
-- [ ] implementado
-- [ ] probado
-- [ ] documentado
-- [ ] trazabilidad actualizada
+- [x] implementado
+- [x] probado
+- [x] documentado
+- [x] trazabilidad actualizada
+
+## 8. Evidence
+
+- fallback: `backend/authority/hierarchical_fallback.py`
+- persistence: `AuthorityRecord.hierarchy_distance`, `alembic/versions/c2d3e4f5a6b7_sprint_106_hierarchical_fallback.py`
+- endpoints: `POST /authority/resolve`, `POST /authority/resolve/batch`
+- UI: `frontend/app/authority/page.tsx`
+- tests: `backend/tests/test_sprint106_hierarchical_fallback.py`
 
 ## 7. Notes for prioritization
 

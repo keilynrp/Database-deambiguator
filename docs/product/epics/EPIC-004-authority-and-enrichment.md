@@ -62,7 +62,7 @@ Excluye:
 | US-026 | Gestion de fuentes de scraping para enrichment | Planned |
 | US-055 | Author Resolution Engine MVP | Done |
 | US-056 | Explicit NIL Detection Layer | Done |
-| US-057 | Hierarchical Fallback for Concept Linking | Planned |
+| US-057 | Hierarchical Fallback for Concept Linking | Done |
 | US-058 | UKIP NIL Benchmark and Evaluation Pack | Done |
 | US-059 | LLM Query Reformulation for Hard NIL Cases | Proposed |
 
@@ -83,4 +83,4 @@ Excluye:
 - UI operativa: `frontend/app/authority/page.tsx`
 - Tests MVP: `backend/tests/test_sprint106_author_resolution_engine.py`, `backend/tests/test_sprint106_author_review_queue.py`, `backend/tests/test_sprint106_author_metrics.py`, `backend/tests/test_sprint106_author_compare.py`, `backend/tests/test_sprint106_nil_detection.py`, `backend/tests/test_sprint106_nil_benchmark.py`
 - Benchmark offline: `backend/tests/fixtures/author_nil_benchmark.json`, `backend/authority/benchmark.py`, `scripts/evaluate_author_nil_benchmark.py`, `docs/product/AUTHORITY_NIL_BENCHMARK_PROTOCOL.md`
-- Siguiente roadmap: `US-057`, `US-059`
+- Siguiente roadmap: `US-059`

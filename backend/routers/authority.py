@@ -26,6 +26,7 @@ from backend import database, models, schemas
 from backend.auth import get_current_user, require_role
 from backend.authority.author_resolution import summarize_author_resolution
 from backend.authority.base import ResolveContext as _AuthorityContext
+from backend.authority.hierarchical_fallback import apply_hierarchical_fallback
 from backend.authority.resolver import resolve_all as _authority_resolve_all
 from backend.database import get_db
 from backend.routers.deps import _audit, _build_disambig_groups, _serialize_authority_record
@@ -68,6 +69,7 @@ def resolve_authority(
         year=payload.context_year,
     )
     candidates = _authority_resolve_all(payload.value, payload.entity_type.value, ctx)
+    candidates = apply_hierarchical_fallback(payload.value, payload.entity_type.value, candidates)
 
     records = []
     for c in candidates:
@@ -87,6 +89,7 @@ def resolve_authority(
             score_breakdown=json.dumps(c.score_breakdown),
             evidence=json.dumps(c.evidence),
             merged_sources=json.dumps(c.merged_sources),
+            hierarchy_distance=c.hierarchy_distance,
         )
         db.add(rec)
         records.append(rec)
@@ -259,6 +262,7 @@ def resolve_authority_batch(
 
     for value in to_resolve:
         candidates = _authority_resolve_all(value, entity_type, ctx)
+        candidates = apply_hierarchical_fallback(value, entity_type, candidates)
         for c in candidates:
             rec = models.AuthorityRecord(
                 org_id=record_org_id,
@@ -276,6 +280,7 @@ def resolve_authority_batch(
                 score_breakdown=json.dumps(c.score_breakdown),
                 evidence=json.dumps(c.evidence),
                 merged_sources=json.dumps(c.merged_sources),
+                hierarchy_distance=c.hierarchy_distance,
             )
             db.add(rec)
             new_records.append(rec)

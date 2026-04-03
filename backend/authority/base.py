@@ -36,6 +36,7 @@ class AuthorityCandidate:
     evidence:          List[str]         = dc_field(default_factory=list)
     resolution_status: str               = "unresolved"
     merged_sources:    List[str]         = dc_field(default_factory=list)
+    hierarchy_distance: Optional[int]    = None
 
 
 class BaseAuthorityResolver(ABC):

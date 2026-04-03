@@ -73,6 +73,7 @@ interface AuthorityRecord {
     review_required?: boolean;
     nil_reason?: string | null;
     nil_score?: number | null;
+    hierarchy_distance?: number | null;
 }
 
 interface AuthorQueueSummary {
@@ -705,6 +706,9 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                         <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">
                                             <div className="flex items-center gap-2">
                                                 {rec.canonical_label}
+                                                {rec.resolution_status === "partial_ancestor_match" && (
+                                                    <Badge variant="info">Ancestor Match</Badge>
+                                                )}
                                                 {queueMode === "authors" && rec.nil_reason && (
                                                     <Badge variant="error">NIL</Badge>
                                                 )}
@@ -730,6 +734,11 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                             {queueMode === "authors" && rec.nil_reason && (
                                                 <p className="mt-0.5 text-xs text-rose-500 dark:text-rose-400">
                                                     {rec.nil_reason}
+                                                </p>
+                                            )}
+                                            {queueMode !== "authors" && rec.resolution_status === "partial_ancestor_match" && typeof rec.hierarchy_distance === "number" && (
+                                                <p className="mt-0.5 text-xs text-indigo-600 dark:text-indigo-400">
+                                                    ancestor distance {rec.hierarchy_distance}
                                                 </p>
                                             )}
                                         </td>
@@ -761,6 +770,11 @@ function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null })
                                                     </div>
                                                 </div>
                                             ) : rec.field_name}
+                                            {queueMode !== "authors" && rec.resolution_status === "partial_ancestor_match" && typeof rec.hierarchy_distance === "number" && (
+                                                <div className="mt-1 text-[11px] text-indigo-500 dark:text-indigo-400">
+                                                    ancestor +{rec.hierarchy_distance}
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="px-4 py-2.5">
                                             <div className="flex flex-col items-start gap-1">

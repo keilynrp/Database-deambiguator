@@ -252,6 +252,7 @@ class AuthorityRecordResponse(BaseModel):
     review_required:   bool                   = False
     nil_reason:        Optional[str]          = None
     nil_score:         Optional[float]        = None
+    hierarchy_distance: Optional[int]         = None
 
     model_config = ConfigDict(from_attributes=True)
 
