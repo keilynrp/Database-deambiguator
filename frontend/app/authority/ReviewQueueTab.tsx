@@ -1,11 +1,11 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
-import { Badge, useToast } from "../components/ui";
+import { useCallback, useEffect, useState } from "react";
+import { useToast } from "../components/ui";
 import { apiFetch } from "@/lib/api";
-import AnnotationThread from "../components/AnnotationThread";
 import type { DomainAttribute, DomainSchema } from "../contexts/DomainContext";
-import AuthorReviewExpandedPanel from "./AuthorReviewExpandedPanel";
+import ReviewQueueRecordsTable from "./ReviewQueueRecordsTable";
+import ReviewQueueSummaryPanels from "./ReviewQueueSummaryPanels";
 import {
     type AuthorCompareResponse,
     type AuthorMetrics,
@@ -13,7 +13,6 @@ import {
     type AuthorQueueSummary,
     type AuthorityRecord,
     type QueueSummary,
-    SOURCE_COLORS,
 } from "./reviewQueueTypes";
 
 export default function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null }) {
@@ -253,171 +252,12 @@ export default function ReviewQueueTab({ activeDomain }: { activeDomain: DomainS
                 </button>
             </div>
 
-            {/* Summary cards */}
-            {queueMode === "generic" && summary && (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Pending Review</p>
-                        <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{summary.total_pending}</p>
-                    </div>
-                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Confirmed</p>
-                        <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">{summary.total_confirmed}</p>
-                    </div>
-                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Rejected</p>
-                        <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">{summary.total_rejected}</p>
-                    </div>
-                </div>
-            )}
-
-            {queueMode === "authors" && authorSummary && (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Author Records</p>
-                        <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{authorSummary.total_records}</p>
-                    </div>
-                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Needs Review</p>
-                        <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{authorSummary.pending_review}</p>
-                    </div>
-                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">NIL Cases</p>
-                        <p className="mt-1 text-2xl font-bold text-rose-600 dark:text-rose-400">{authorSummary.nil_cases}</p>
-                    </div>
-                </div>
-            )}
-
-            {queueMode === "authors" && authorMetrics && (
-                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">Engine Metrics</h3>
-                        <span className="text-xs text-gray-400 dark:text-gray-500">author-only runtime</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-5 xl:grid-cols-10">
-                        <div>
-                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg confidence</p>
-                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                                {(authorMetrics.avg_confidence * 100).toFixed(0)}%
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg complexity</p>
-                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                                {authorMetrics.avg_complexity.toFixed(2)}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg NIL score</p>
-                            <p className="mt-1 text-lg font-semibold text-rose-600 dark:text-rose-400">
-                                {(authorMetrics.avg_nil_score * 100).toFixed(0)}%
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Review rate</p>
-                            <p className="mt-1 text-lg font-semibold text-amber-600 dark:text-amber-400">
-                                {(authorMetrics.review_rate * 100).toFixed(0)}%
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Confirm rate</p>
-                            <p className="mt-1 text-lg font-semibold text-green-600 dark:text-green-400">
-                                {(authorMetrics.confirm_rate * 100).toFixed(0)}%
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">NIL rate</p>
-                            <p className="mt-1 text-lg font-semibold text-rose-600 dark:text-rose-400">
-                                {(authorMetrics.nil_rate * 100).toFixed(0)}%
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Reformulations</p>
-                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                                {authorMetrics.reformulation_attempts}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Applied</p>
-                            <p className="mt-1 text-lg font-semibold text-blue-600 dark:text-blue-400">
-                                {authorMetrics.reformulation_applied}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Apply rate</p>
-                            <p className="mt-1 text-lg font-semibold text-blue-600 dark:text-blue-400">
-                                {(authorMetrics.reformulation_apply_rate * 100).toFixed(0)}%
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg gain</p>
-                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                                {authorMetrics.avg_reformulation_gain.toFixed(2)}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Est. cost</p>
-                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                                ${authorMetrics.total_reformulation_cost.toFixed(4)}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {queueMode === "authors" && authorMetrics && Object.keys(authorMetrics.by_nil_reason).length > 0 && (
-                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                    <div className="border-b border-gray-200 px-5 py-3 dark:border-gray-800">
-                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">NIL Reasons</h3>
-                    </div>
-                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                        {Object.entries(authorMetrics.by_nil_reason).map(([reason, count]) => (
-                            <div key={reason} className="flex items-center justify-between px-5 py-3">
-                                <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{reason}</span>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">{count} records</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Per-field breakdown */}
-            {queueMode === "generic" && summary && summary.by_field.length > 0 && (
-                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                    <div className="border-b border-gray-200 px-5 py-3 dark:border-gray-800">
-                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">By Field</h3>
-                    </div>
-                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                        {summary.by_field.map(f => (
-                            <div key={f.field_name} className="flex items-center justify-between px-5 py-3">
-                                <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{f.field_name}</span>
-                                <div className="flex items-center gap-4 text-xs">
-                                    <span className="text-amber-600">{f.pending} pending</span>
-                                    <span className="text-green-600">{f.confirmed} confirmed</span>
-                                    <span className="text-red-600">{f.rejected} rejected</span>
-                                    <span className="text-gray-400">avg {(f.avg_confidence * 100).toFixed(0)}%</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {queueMode === "authors" && authorSummary && Object.keys(authorSummary.by_route).length > 0 && (
-                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                    <div className="border-b border-gray-200 px-5 py-3 dark:border-gray-800">
-                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">By Route</h3>
-                    </div>
-                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                        {Object.entries(authorSummary.by_route).map(([routeKey, count]) => (
-                            <div key={routeKey} className="flex items-center justify-between px-5 py-3">
-                                <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{routeKey}</span>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">{count} records</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+            <ReviewQueueSummaryPanels
+                queueMode={queueMode}
+                summary={summary}
+                authorSummary={authorSummary}
+                authorMetrics={authorMetrics}
+            />
 
             {/* Batch resolve panel */}
             {queueMode === "generic" && (
@@ -567,199 +407,21 @@ export default function ReviewQueueTab({ activeDomain }: { activeDomain: DomainS
                     )}
                 </div>
 
-                {/* Records table */}
-                {loadingRecords ? (
-                    <div className="flex items-center justify-center py-12">
-                        <svg className="h-6 w-6 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                    </div>
-                ) : records.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12">
-                        <p className="text-sm text-gray-400 dark:text-gray-500">
-                            No {statusFilter} records found
-                        </p>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-gray-100 text-left text-xs font-medium text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                                    {statusFilter === "pending" && (
-                                        <th className="px-4 py-2 w-10">
-                                            <input
-                                                type="checkbox"
-                                                checked={selected.size === records.length && records.length > 0}
-                                                onChange={toggleSelectAll}
-                                                className="rounded border-gray-300"
-                                            />
-                                        </th>
-                                    )}
-                                    <th className="px-4 py-2">Original Value</th>
-                                    <th className="px-4 py-2">{queueMode === "authors" ? "Candidate" : "Canonical Label"}</th>
-                                    <th className="px-4 py-2">Source</th>
-                                    <th className="px-4 py-2">Confidence</th>
-                                    <th className="px-4 py-2">{queueMode === "authors" ? "Route" : "Field"}</th>
-                                    <th className="px-4 py-2">Status</th>
-                                    <th className="px-4 py-2">{queueMode === "authors" ? "Actions" : ""}</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                                {records.map(rec => (
-                                    <Fragment key={rec.id}>
-                                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                                        {statusFilter === "pending" && (
-                                            <td className="px-4 py-2.5">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selected.has(rec.id)}
-                                                    onChange={() => toggleSelect(rec.id)}
-                                                    className="rounded border-gray-300"
-                                                />
-                                            </td>
-                                        )}
-                                        <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-white">
-                                            {rec.original_value}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">
-                                            <div className="flex items-center gap-2">
-                                                {rec.canonical_label}
-                                                {rec.resolution_status === "partial_ancestor_match" && (
-                                                    <Badge variant="info">Ancestor Match</Badge>
-                                                )}
-                                                {queueMode === "authors" && rec.nil_reason && (
-                                                    <Badge variant="error">NIL</Badge>
-                                                )}
-                                                {rec.uri && (
-                                                    <a
-                                                        href={rec.uri}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-500 hover:text-blue-600"
-                                                        title="View in authority source"
-                                                    >
-                                                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                                        </svg>
-                                                    </a>
-                                                )}
-                                            </div>
-                                            {rec.description && (
-                                                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500 truncate max-w-xs">
-                                                    {rec.description}
-                                                </p>
-                                            )}
-                                            {queueMode === "authors" && rec.nil_reason && (
-                                                <p className="mt-0.5 text-xs text-rose-500 dark:text-rose-400">
-                                                    {rec.nil_reason}
-                                                </p>
-                                            )}
-                                            {queueMode !== "authors" && rec.resolution_status === "partial_ancestor_match" && typeof rec.hierarchy_distance === "number" && (
-                                                <p className="mt-0.5 text-xs text-indigo-600 dark:text-indigo-400">
-                                                    ancestor distance {rec.hierarchy_distance}
-                                                </p>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-2.5">
-                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${SOURCE_COLORS[rec.authority_source] || "bg-gray-100 text-gray-600"}`}>
-                                                {rec.authority_source}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-2.5">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                                                    <div
-                                                        className={`h-full rounded-full ${rec.confidence >= 0.8 ? "bg-green-500" : rec.confidence >= 0.5 ? "bg-amber-500" : "bg-red-500"}`}
-                                                        style={{ width: `${rec.confidence * 100}%` }}
-                                                    />
-                                                </div>
-                                                <span className="text-xs text-gray-500">{(rec.confidence * 100).toFixed(0)}%</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-2.5 font-mono text-xs text-gray-500">
-                                            {queueMode === "authors" ? (
-                                                <div className="space-y-1">
-                                                    <div>{rec.resolution_route || "legacy"}</div>
-                                                    <div className="text-[11px] text-gray-400">
-                                                        complexity {typeof rec.complexity_score === "number" ? rec.complexity_score.toFixed(2) : "--"}
-                                                    </div>
-                                                    <div className="text-[11px] text-rose-500 dark:text-rose-400">
-                                                        nil {typeof rec.nil_score === "number" ? `${(rec.nil_score * 100).toFixed(0)}%` : "--"}
-                                                    </div>
-                                                </div>
-                                            ) : rec.field_name}
-                                            {queueMode !== "authors" && rec.resolution_status === "partial_ancestor_match" && typeof rec.hierarchy_distance === "number" && (
-                                                <div className="mt-1 text-[11px] text-indigo-500 dark:text-indigo-400">
-                                                    ancestor +{rec.hierarchy_distance}
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-2.5">
-                                            <div className="flex flex-col items-start gap-1">
-                                                <Badge variant={rec.status === "confirmed" ? "success" : rec.status === "rejected" ? "error" : "warning"}>
-                                                    {rec.status}
-                                                </Badge>
-                                                {queueMode === "authors" && rec.review_required && (
-                                                    <span className="text-[11px] text-amber-600 dark:text-amber-400">needs review</span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-2.5">
-                                            <div className="flex items-center justify-end gap-2">
-                                                {queueMode === "authors" && statusFilter === "pending" && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => reviewRecord(rec, "confirm")}
-                                                            disabled={rowActionId === rec.id}
-                                                            className="inline-flex h-7 items-center rounded-md bg-green-600 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
-                                                        >
-                                                            {rowActionId === rec.id ? "Saving..." : rec.nil_reason ? "Accept NIL" : "Confirm"}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => reviewRecord(rec, "reject")}
-                                                            disabled={rowActionId === rec.id}
-                                                            className="inline-flex h-7 items-center rounded-md bg-red-600 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
-                                                        >
-                                                            Reject
-                                                        </button>
-                                                    </>
-                                                )}
-                                                <button
-                                                    onClick={() => toggleExpanded(rec)}
-                                                    className={`rounded p-1 transition-colors ${expandedId === rec.id ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"}`}
-                                                    title="Toggle comments"
-                                                >
-                                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {expandedId === rec.id && (
-                                        <tr>
-                                            <td colSpan={statusFilter === "pending" ? 8 : 7} className="px-6 py-4 bg-gray-50 dark:bg-gray-800/30 border-t border-gray-100 dark:border-gray-800">
-                                                <div className="space-y-4">
-                                                    {queueMode === "authors" && (
-                                                        <AuthorReviewExpandedPanel
-                                                            record={rec}
-                                                            compare={compareMap[rec.id] ?? null}
-                                                            loadingCompare={loadingCompareId === rec.id}
-                                                        />
-                                                    )}
-
-                                                    <AnnotationThread authorityId={rec.id} />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                    </Fragment>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                <ReviewQueueRecordsTable
+                    queueMode={queueMode}
+                    statusFilter={statusFilter}
+                    loadingRecords={loadingRecords}
+                    records={records}
+                    selected={selected}
+                    rowActionId={rowActionId}
+                    expandedId={expandedId}
+                    loadingCompareId={loadingCompareId}
+                    compareMap={compareMap}
+                    onToggleSelectAll={toggleSelectAll}
+                    onToggleSelect={toggleSelect}
+                    onReviewRecord={reviewRecord}
+                    onToggleExpanded={toggleExpanded}
+                />
             </div>
         </div>
     );
