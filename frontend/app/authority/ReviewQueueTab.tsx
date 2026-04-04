@@ -1,0 +1,767 @@
+"use client";
+
+import { Fragment, useCallback, useEffect, useState } from "react";
+import { Badge, useToast } from "../components/ui";
+import { apiFetch } from "@/lib/api";
+import AnnotationThread from "../components/AnnotationThread";
+import type { DomainAttribute, DomainSchema } from "../contexts/DomainContext";
+import AuthorReviewExpandedPanel from "./AuthorReviewExpandedPanel";
+import {
+    type AuthorCompareResponse,
+    type AuthorMetrics,
+    type AuthorQueueResponse,
+    type AuthorQueueSummary,
+    type AuthorityRecord,
+    type QueueSummary,
+    SOURCE_COLORS,
+} from "./reviewQueueTypes";
+
+export default function ReviewQueueTab({ activeDomain }: { activeDomain: DomainSchema | null }) {
+    const { toast } = useToast();
+    const [summary, setSummary] = useState<QueueSummary | null>(null);
+    const [authorSummary, setAuthorSummary] = useState<AuthorQueueSummary | null>(null);
+    const [authorMetrics, setAuthorMetrics] = useState<AuthorMetrics | null>(null);
+    const [records, setRecords] = useState<AuthorityRecord[]>([]);
+    const [loadingRecords, setLoadingRecords] = useState(false);
+    const [selected, setSelected] = useState<Set<number>>(new Set());
+    const [acting, setActing] = useState(false);
+    const [rowActionId, setRowActionId] = useState<number | null>(null);
+    const [queueMode, setQueueMode] = useState<"generic" | "authors">("generic");
+    const [statusFilter, setStatusFilter] = useState("pending");
+    const [fieldFilter, setFieldFilter] = useState("");
+    const [authorRouteFilter, setAuthorRouteFilter] = useState("");
+    const [authorReviewFilter, setAuthorReviewFilter] = useState("required");
+    const [authorNilOnly, setAuthorNilOnly] = useState(false);
+    const [batchField, setBatchField] = useState("");
+    const [batchEntityType, setBatchEntityType] = useState("general");
+    const [batchLimit, setBatchLimit] = useState(20);
+    const [resolving, setResolving] = useState(false);
+    const [resolveResult, setResolveResult] = useState<string | null>(null);
+    const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [compareMap, setCompareMap] = useState<Record<number, AuthorCompareResponse>>({});
+    const [loadingCompareId, setLoadingCompareId] = useState<number | null>(null);
+
+    // Auto-select first string field for batch resolve
+    useEffect(() => {
+        if (activeDomain && !batchField) {
+            const firstStr = activeDomain.attributes.find((a: DomainAttribute) => a.type === "string");
+            if (firstStr) setBatchField(firstStr.name);
+        }
+    }, [activeDomain, batchField]);
+
+    const fetchSummary = useCallback(async () => {
+        try {
+            if (queueMode === "authors") {
+                const [queueRes, metricsRes] = await Promise.all([
+                    apiFetch("/authority/authors/review-queue"),
+                    apiFetch("/authority/authors/metrics"),
+                ]);
+                if (queueRes.ok) {
+                    const payload: AuthorQueueResponse = await queueRes.json();
+                    setAuthorSummary(payload.summary);
+                    setSummary(null);
+                }
+                if (metricsRes.ok) {
+                    setAuthorMetrics(await metricsRes.json());
+                }
+            } else {
+                const res = await apiFetch("/authority/queue/summary");
+                if (res.ok) {
+                    setSummary(await res.json());
+                    setAuthorSummary(null);
+                    setAuthorMetrics(null);
+                }
+            }
+        } catch {}
+    }, [queueMode]);
+
+    const fetchRecords = useCallback(async () => {
+        setLoadingRecords(true);
+        try {
+            if (queueMode === "authors") {
+                const params = new URLSearchParams({ status: statusFilter, limit: "100" });
+                if (authorRouteFilter) params.set("route", authorRouteFilter);
+                if (authorReviewFilter === "required") params.set("review_required", "true");
+                if (authorReviewFilter === "not_required") params.set("review_required", "false");
+                if (authorNilOnly) params.set("nil_only", "true");
+
+                const res = await apiFetch(`/authority/authors/review-queue?${params.toString()}`);
+                if (res.ok) {
+                    const data: AuthorQueueResponse = await res.json();
+                    setRecords(data.records ?? []);
+                    setAuthorSummary(data.summary);
+                    setSelected(new Set());
+                }
+            } else {
+                const params = new URLSearchParams({ status: statusFilter, limit: "100" });
+                if (fieldFilter) params.set("field_name", fieldFilter);
+                const res = await apiFetch(`/authority/records?${params.toString()}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setRecords(data.records ?? []);
+                    setSelected(new Set());
+                }
+            }
+        } catch {
+        } finally {
+            setLoadingRecords(false);
+        }
+    }, [statusFilter, fieldFilter, queueMode, authorRouteFilter, authorReviewFilter, authorNilOnly]);
+
+    useEffect(() => { fetchSummary(); }, [fetchSummary]);
+    useEffect(() => { fetchRecords(); }, [fetchRecords]);
+
+    function toggleSelect(id: number) {
+        setSelected(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    }
+
+    function toggleSelectAll() {
+        if (selected.size === records.length) {
+            setSelected(new Set());
+        } else {
+            setSelected(new Set(records.map(r => r.id)));
+        }
+    }
+
+    async function bulkAction(action: "bulk-confirm" | "bulk-reject") {
+        if (selected.size === 0) return;
+        setActing(true);
+        try {
+            const res = await apiFetch(`/authority/records/${action}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: Array.from(selected), also_create_rules: true }),
+            });
+            if (res.ok) {
+                await fetchSummary();
+                await fetchRecords();
+            }
+        } catch {
+        } finally {
+            setActing(false);
+        }
+    }
+
+    async function batchResolve() {
+        if (!batchField) return;
+        setResolving(true);
+        setResolveResult(null);
+        try {
+            const res = await apiFetch("/authority/resolve/batch", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    field_name: batchField,
+                    entity_type: batchEntityType,
+                    limit: batchLimit,
+                }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setResolveResult(
+                    `Resolved ${data.resolved_count} values, created ${data.records_created} records` +
+                    (data.already_existed_count ? `, ${data.already_existed_count} already existed` : "")
+                );
+                await fetchSummary();
+                await fetchRecords();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                setResolveResult(`Error: ${err.detail || res.statusText}`);
+            }
+        } catch {
+            setResolveResult("Network error");
+        } finally {
+            setResolving(false);
+        }
+    }
+
+    async function reviewRecord(rec: AuthorityRecord, action: "confirm" | "reject") {
+        setRowActionId(rec.id);
+        try {
+            const res = await apiFetch(`/authority/records/${rec.id}/${action}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: action === "confirm"
+                    ? JSON.stringify({ also_create_rule: !rec.nil_reason })
+                    : undefined,
+            });
+            if (!res.ok) {
+                toast(`Failed to ${action} record`, "error");
+                return;
+            }
+            toast(
+                action === "confirm"
+                    ? (rec.nil_reason ? "NIL case accepted" : "Author candidate confirmed")
+                    : "Author candidate rejected",
+                "success"
+            );
+            await fetchSummary();
+            await fetchRecords();
+        } catch {
+            toast(`Failed to ${action} record`, "error");
+        } finally {
+            setRowActionId(null);
+        }
+    }
+
+    async function toggleExpanded(rec: AuthorityRecord) {
+        const nextExpanded = expandedId === rec.id ? null : rec.id;
+        setExpandedId(nextExpanded);
+        if (queueMode !== "authors" || nextExpanded === null || compareMap[rec.id]) {
+            return;
+        }
+
+        setLoadingCompareId(rec.id);
+        try {
+            const res = await apiFetch(`/authority/authors/review-queue/${rec.id}/compare`);
+            if (res.ok) {
+                const payload: AuthorCompareResponse = await res.json();
+                setCompareMap(prev => ({ ...prev, [rec.id]: payload }));
+            }
+        } catch {
+        } finally {
+            setLoadingCompareId(current => (current === rec.id ? null : current));
+        }
+    }
+
+    return (
+        <div className="space-y-6">
+            <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <button
+                    onClick={() => setQueueMode("generic")}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                        queueMode === "generic"
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                    }`}
+                >
+                    Generic Queue
+                </button>
+                <button
+                    onClick={() => setQueueMode("authors")}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                        queueMode === "authors"
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                    }`}
+                >
+                    Author Queue
+                </button>
+            </div>
+
+            {/* Summary cards */}
+            {queueMode === "generic" && summary && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Pending Review</p>
+                        <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{summary.total_pending}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Confirmed</p>
+                        <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">{summary.total_confirmed}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Rejected</p>
+                        <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">{summary.total_rejected}</p>
+                    </div>
+                </div>
+            )}
+
+            {queueMode === "authors" && authorSummary && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Author Records</p>
+                        <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{authorSummary.total_records}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Needs Review</p>
+                        <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{authorSummary.pending_review}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">NIL Cases</p>
+                        <p className="mt-1 text-2xl font-bold text-rose-600 dark:text-rose-400">{authorSummary.nil_cases}</p>
+                    </div>
+                </div>
+            )}
+
+            {queueMode === "authors" && authorMetrics && (
+                <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">Engine Metrics</h3>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">author-only runtime</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-5 xl:grid-cols-10">
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg confidence</p>
+                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                                {(authorMetrics.avg_confidence * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg complexity</p>
+                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                                {authorMetrics.avg_complexity.toFixed(2)}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg NIL score</p>
+                            <p className="mt-1 text-lg font-semibold text-rose-600 dark:text-rose-400">
+                                {(authorMetrics.avg_nil_score * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Review rate</p>
+                            <p className="mt-1 text-lg font-semibold text-amber-600 dark:text-amber-400">
+                                {(authorMetrics.review_rate * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Confirm rate</p>
+                            <p className="mt-1 text-lg font-semibold text-green-600 dark:text-green-400">
+                                {(authorMetrics.confirm_rate * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">NIL rate</p>
+                            <p className="mt-1 text-lg font-semibold text-rose-600 dark:text-rose-400">
+                                {(authorMetrics.nil_rate * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Reformulations</p>
+                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                                {authorMetrics.reformulation_attempts}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Applied</p>
+                            <p className="mt-1 text-lg font-semibold text-blue-600 dark:text-blue-400">
+                                {authorMetrics.reformulation_applied}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Apply rate</p>
+                            <p className="mt-1 text-lg font-semibold text-blue-600 dark:text-blue-400">
+                                {(authorMetrics.reformulation_apply_rate * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Avg gain</p>
+                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                                {authorMetrics.avg_reformulation_gain.toFixed(2)}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Est. cost</p>
+                            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                                ${authorMetrics.total_reformulation_cost.toFixed(4)}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {queueMode === "authors" && authorMetrics && Object.keys(authorMetrics.by_nil_reason).length > 0 && (
+                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <div className="border-b border-gray-200 px-5 py-3 dark:border-gray-800">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">NIL Reasons</h3>
+                    </div>
+                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {Object.entries(authorMetrics.by_nil_reason).map(([reason, count]) => (
+                            <div key={reason} className="flex items-center justify-between px-5 py-3">
+                                <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{reason}</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">{count} records</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Per-field breakdown */}
+            {queueMode === "generic" && summary && summary.by_field.length > 0 && (
+                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <div className="border-b border-gray-200 px-5 py-3 dark:border-gray-800">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">By Field</h3>
+                    </div>
+                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {summary.by_field.map(f => (
+                            <div key={f.field_name} className="flex items-center justify-between px-5 py-3">
+                                <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{f.field_name}</span>
+                                <div className="flex items-center gap-4 text-xs">
+                                    <span className="text-amber-600">{f.pending} pending</span>
+                                    <span className="text-green-600">{f.confirmed} confirmed</span>
+                                    <span className="text-red-600">{f.rejected} rejected</span>
+                                    <span className="text-gray-400">avg {(f.avg_confidence * 100).toFixed(0)}%</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {queueMode === "authors" && authorSummary && Object.keys(authorSummary.by_route).length > 0 && (
+                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <div className="border-b border-gray-200 px-5 py-3 dark:border-gray-800">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">By Route</h3>
+                    </div>
+                    <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {Object.entries(authorSummary.by_route).map(([routeKey, count]) => (
+                            <div key={routeKey} className="flex items-center justify-between px-5 py-3">
+                                <span className="text-sm font-mono text-gray-700 dark:text-gray-300">{routeKey}</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">{count} records</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Batch resolve panel */}
+            {queueMode === "generic" && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <h3 className="mb-3 text-sm font-medium text-gray-900 dark:text-white">Batch Resolve</h3>
+                <div className="flex flex-wrap items-end gap-4">
+                    <div className="min-w-[160px]">
+                        <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Field</label>
+                        <select
+                            value={batchField}
+                            onChange={e => setBatchField(e.target.value)}
+                            className="h-9 w-full rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        >
+                            {activeDomain ? (
+                                activeDomain.attributes
+                                    .filter((a: DomainAttribute) => a.type === "string")
+                                    .map((attr: DomainAttribute) => (
+                                        <option key={attr.name} value={attr.name}>{attr.label}</option>
+                                    ))
+                            ) : (
+                                <option value="">Loading...</option>
+                            )}
+                        </select>
+                    </div>
+                    <div className="min-w-[130px]">
+                        <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Entity Type</label>
+                        <select
+                            value={batchEntityType}
+                            onChange={e => setBatchEntityType(e.target.value)}
+                            className="h-9 w-full rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        >
+                            {["general", "person", "organization", "concept", "institution"].map(et => (
+                                <option key={et} value={et}>{et}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="w-20">
+                        <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Limit</label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={batchLimit}
+                            onChange={e => setBatchLimit(Number(e.target.value))}
+                            className="h-9 w-full rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        />
+                    </div>
+                    <button
+                        onClick={batchResolve}
+                        disabled={resolving || !batchField}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        {resolving ? (
+                            <>
+                                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                Resolving...
+                            </>
+                        ) : "Resolve All"}
+                    </button>
+                </div>
+                {resolveResult && (
+                    <p className={`mt-3 text-sm ${resolveResult.startsWith("Error") ? "text-red-600" : "text-green-600 dark:text-green-400"}`}>
+                        {resolveResult}
+                    </p>
+                )}
+            </div>
+            )}
+
+            {/* Records filter + bulk actions */}
+            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-3 dark:border-gray-800">
+                    <div className="flex items-center gap-3">
+                        <select
+                            value={statusFilter}
+                            onChange={e => setStatusFilter(e.target.value)}
+                            className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                        >
+                            <option value="pending">Pending</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                        {queueMode === "generic" ? (
+                            <select
+                                value={fieldFilter}
+                                onChange={e => setFieldFilter(e.target.value)}
+                                className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                            >
+                                <option value="">All fields</option>
+                                {summary?.by_field.map(f => (
+                                    <option key={f.field_name} value={f.field_name}>{f.field_name}</option>
+                                ))}
+                            </select>
+                        ) : (
+                            <>
+                                <select
+                                    value={authorRouteFilter}
+                                    onChange={e => setAuthorRouteFilter(e.target.value)}
+                                    className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                                >
+                                    <option value="">All routes</option>
+                                    <option value="fast_path">fast_path</option>
+                                    <option value="hybrid_path">hybrid_path</option>
+                                    <option value="llm_path">llm_path</option>
+                                    <option value="manual_review">manual_review</option>
+                                </select>
+                                <select
+                                    value={authorReviewFilter}
+                                    onChange={e => setAuthorReviewFilter(e.target.value)}
+                                    className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                                >
+                                    <option value="required">Needs review</option>
+                                    <option value="all">All review states</option>
+                                    <option value="not_required">No review needed</option>
+                                </select>
+                                <label className="inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                    <input
+                                        type="checkbox"
+                                        checked={authorNilOnly}
+                                        onChange={e => setAuthorNilOnly(e.target.checked)}
+                                        className="rounded border-gray-300"
+                                    />
+                                    NIL only
+                                </label>
+                            </>
+                        )}
+                    </div>
+                    {statusFilter === "pending" && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => bulkAction("bulk-confirm")}
+                                disabled={acting || selected.size === 0}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-green-600 px-3 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                            >
+                                Confirm ({selected.size})
+                            </button>
+                            <button
+                                onClick={() => bulkAction("bulk-reject")}
+                                disabled={acting || selected.size === 0}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                            >
+                                Reject ({selected.size})
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Records table */}
+                {loadingRecords ? (
+                    <div className="flex items-center justify-center py-12">
+                        <svg className="h-6 w-6 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                    </div>
+                ) : records.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                        <p className="text-sm text-gray-400 dark:text-gray-500">
+                            No {statusFilter} records found
+                        </p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-gray-100 text-left text-xs font-medium text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                                    {statusFilter === "pending" && (
+                                        <th className="px-4 py-2 w-10">
+                                            <input
+                                                type="checkbox"
+                                                checked={selected.size === records.length && records.length > 0}
+                                                onChange={toggleSelectAll}
+                                                className="rounded border-gray-300"
+                                            />
+                                        </th>
+                                    )}
+                                    <th className="px-4 py-2">Original Value</th>
+                                    <th className="px-4 py-2">{queueMode === "authors" ? "Candidate" : "Canonical Label"}</th>
+                                    <th className="px-4 py-2">Source</th>
+                                    <th className="px-4 py-2">Confidence</th>
+                                    <th className="px-4 py-2">{queueMode === "authors" ? "Route" : "Field"}</th>
+                                    <th className="px-4 py-2">Status</th>
+                                    <th className="px-4 py-2">{queueMode === "authors" ? "Actions" : ""}</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                                {records.map(rec => (
+                                    <Fragment key={rec.id}>
+                                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                        {statusFilter === "pending" && (
+                                            <td className="px-4 py-2.5">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selected.has(rec.id)}
+                                                    onChange={() => toggleSelect(rec.id)}
+                                                    className="rounded border-gray-300"
+                                                />
+                                            </td>
+                                        )}
+                                        <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-white">
+                                            {rec.original_value}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">
+                                            <div className="flex items-center gap-2">
+                                                {rec.canonical_label}
+                                                {rec.resolution_status === "partial_ancestor_match" && (
+                                                    <Badge variant="info">Ancestor Match</Badge>
+                                                )}
+                                                {queueMode === "authors" && rec.nil_reason && (
+                                                    <Badge variant="error">NIL</Badge>
+                                                )}
+                                                {rec.uri && (
+                                                    <a
+                                                        href={rec.uri}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-500 hover:text-blue-600"
+                                                        title="View in authority source"
+                                                    >
+                                                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                        </svg>
+                                                    </a>
+                                                )}
+                                            </div>
+                                            {rec.description && (
+                                                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500 truncate max-w-xs">
+                                                    {rec.description}
+                                                </p>
+                                            )}
+                                            {queueMode === "authors" && rec.nil_reason && (
+                                                <p className="mt-0.5 text-xs text-rose-500 dark:text-rose-400">
+                                                    {rec.nil_reason}
+                                                </p>
+                                            )}
+                                            {queueMode !== "authors" && rec.resolution_status === "partial_ancestor_match" && typeof rec.hierarchy_distance === "number" && (
+                                                <p className="mt-0.5 text-xs text-indigo-600 dark:text-indigo-400">
+                                                    ancestor distance {rec.hierarchy_distance}
+                                                </p>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${SOURCE_COLORS[rec.authority_source] || "bg-gray-100 text-gray-600"}`}>
+                                                {rec.authority_source}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                                                    <div
+                                                        className={`h-full rounded-full ${rec.confidence >= 0.8 ? "bg-green-500" : rec.confidence >= 0.5 ? "bg-amber-500" : "bg-red-500"}`}
+                                                        style={{ width: `${rec.confidence * 100}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-xs text-gray-500">{(rec.confidence * 100).toFixed(0)}%</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2.5 font-mono text-xs text-gray-500">
+                                            {queueMode === "authors" ? (
+                                                <div className="space-y-1">
+                                                    <div>{rec.resolution_route || "legacy"}</div>
+                                                    <div className="text-[11px] text-gray-400">
+                                                        complexity {typeof rec.complexity_score === "number" ? rec.complexity_score.toFixed(2) : "--"}
+                                                    </div>
+                                                    <div className="text-[11px] text-rose-500 dark:text-rose-400">
+                                                        nil {typeof rec.nil_score === "number" ? `${(rec.nil_score * 100).toFixed(0)}%` : "--"}
+                                                    </div>
+                                                </div>
+                                            ) : rec.field_name}
+                                            {queueMode !== "authors" && rec.resolution_status === "partial_ancestor_match" && typeof rec.hierarchy_distance === "number" && (
+                                                <div className="mt-1 text-[11px] text-indigo-500 dark:text-indigo-400">
+                                                    ancestor +{rec.hierarchy_distance}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            <div className="flex flex-col items-start gap-1">
+                                                <Badge variant={rec.status === "confirmed" ? "success" : rec.status === "rejected" ? "error" : "warning"}>
+                                                    {rec.status}
+                                                </Badge>
+                                                {queueMode === "authors" && rec.review_required && (
+                                                    <span className="text-[11px] text-amber-600 dark:text-amber-400">needs review</span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            <div className="flex items-center justify-end gap-2">
+                                                {queueMode === "authors" && statusFilter === "pending" && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => reviewRecord(rec, "confirm")}
+                                                            disabled={rowActionId === rec.id}
+                                                            className="inline-flex h-7 items-center rounded-md bg-green-600 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                                                        >
+                                                            {rowActionId === rec.id ? "Saving..." : rec.nil_reason ? "Accept NIL" : "Confirm"}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => reviewRecord(rec, "reject")}
+                                                            disabled={rowActionId === rec.id}
+                                                            className="inline-flex h-7 items-center rounded-md bg-red-600 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                                                        >
+                                                            Reject
+                                                        </button>
+                                                    </>
+                                                )}
+                                                <button
+                                                    onClick={() => toggleExpanded(rec)}
+                                                    className={`rounded p-1 transition-colors ${expandedId === rec.id ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"}`}
+                                                    title="Toggle comments"
+                                                >
+                                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {expandedId === rec.id && (
+                                        <tr>
+                                            <td colSpan={statusFilter === "pending" ? 8 : 7} className="px-6 py-4 bg-gray-50 dark:bg-gray-800/30 border-t border-gray-100 dark:border-gray-800">
+                                                <div className="space-y-4">
+                                                    {queueMode === "authors" && (
+                                                        <AuthorReviewExpandedPanel
+                                                            record={rec}
+                                                            compare={compareMap[rec.id] ?? null}
+                                                            loadingCompare={loadingCompareId === rec.id}
+                                                        />
+                                                    )}
+
+                                                    <AnnotationThread authorityId={rec.id} />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    </Fragment>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
