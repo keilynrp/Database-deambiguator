@@ -11,16 +11,17 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("../app/contexts/BrandingContext", () => ({
   useBranding: () => ({
-    branding: { platform_name: "UKIP Default Platform" },
+    branding: { platform_name: "UKIP Default Platform", logo_url: "", accent_color: "#6366f1" },
   }),
 }));
 
-vi.mock("../app/contexts/AuthContext", () => ({
-  useAuth: () => ({ user: { id: "1", role: "admin", username: "admin" } }),
-}));
-
 vi.mock("../app/components/SidebarProvider", () => ({
-  useSidebar: () => ({ isMobileOpen: true, setMobileOpen: vi.fn() }),
+  useSidebar: () => ({
+    collapsed: false,
+    toggle: vi.fn(),
+    mobileOpen: true,
+    closeMobile: vi.fn(),
+  }),
 }));
 
 function renderSidebar() {
