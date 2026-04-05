@@ -147,7 +147,6 @@ export default function Sidebar() {
           {(!collapsed || mobileOpen) ? (
             <div className="rounded-lg bg-gray-50 px-3 py-3 dark:bg-gray-800">
               <p className="text-xs font-semibold text-gray-900 dark:text-white">UKIP</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">v1.0 — Sprint 35</p>
             </div>
           ) : (
             <div className="flex justify-center">
