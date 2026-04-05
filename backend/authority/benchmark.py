@@ -110,18 +110,47 @@ def evaluate_author_nil_benchmark(dataset: dict[str, Any]) -> dict[str, Any]:
 
     review_required_count = sum(1 for item in case_results if item["predicted"]["review_required"])
     route_hits = sum(1 for item in case_results if item["matches"]["resolution_route"])
+    linkable_review_count = sum(
+        1
+        for item in link_cases
+        if item["predicted"]["review_required"]
+    )
+    manual_review_count = sum(
+        1
+        for item in case_results
+        if item["predicted"]["resolution_route"] == "manual_review"
+    )
+    llm_path_count = sum(
+        1
+        for item in case_results
+        if item["predicted"]["resolution_route"] == "llm_path"
+    )
+    nil_reason_hits = sum(
+        1
+        for item in case_results
+        if item["expected"].get("nil_detected")
+        and item["matches"]["nil_reason"]
+    )
 
     predicted_nil_reasons: dict[str, int] = {}
     expected_nil_reasons: dict[str, int] = {}
     category_counts: dict[str, int] = {}
+    predicted_routes: dict[str, int] = {}
+    expected_routes: dict[str, int] = {}
     for item in case_results:
         category_counts[item["category"]] = category_counts.get(item["category"], 0) + 1
         expected_reason = item["expected"].get("nil_reason")
         predicted_reason = item["predicted"].get("nil_reason")
+        expected_route = item["expected"].get("resolution_route")
+        predicted_route = item["predicted"].get("resolution_route")
         if expected_reason:
             expected_nil_reasons[expected_reason] = expected_nil_reasons.get(expected_reason, 0) + 1
         if predicted_reason:
             predicted_nil_reasons[predicted_reason] = predicted_nil_reasons.get(predicted_reason, 0) + 1
+        if expected_route:
+            expected_routes[expected_route] = expected_routes.get(expected_route, 0) + 1
+        if predicted_route:
+            predicted_routes[predicted_route] = predicted_routes.get(predicted_route, 0) + 1
 
     return {
         "dataset_name": dataset.get("dataset_name", "unknown_dataset"),
@@ -139,7 +168,11 @@ def evaluate_author_nil_benchmark(dataset: dict[str, Any]) -> dict[str, Any]:
             "exact_link_accuracy": _safe_rate(exact_link_hits, len(link_cases)),
             "route_accuracy": _safe_rate(route_hits, total_cases),
             "review_load_rate": _safe_rate(review_required_count, total_cases),
+            "linkable_review_rate": _safe_rate(linkable_review_count, len(link_cases)),
+            "manual_review_rate": _safe_rate(manual_review_count, total_cases),
+            "llm_path_rate": _safe_rate(llm_path_count, total_cases),
             "partial_fallback_available_rate": _safe_rate(partial_fallback_hits, len(artificial_nil_cases)),
+            "nil_reason_accuracy": _safe_rate(nil_reason_hits, expected_nil),
             "avg_nil_score_on_predicted_nil": round(
                 sum(item["predicted"]["nil_score"] for item in case_results if item["predicted"]["nil_detected"])
                 / predicted_nil,
@@ -157,6 +190,10 @@ def evaluate_author_nil_benchmark(dataset: dict[str, Any]) -> dict[str, Any]:
         "nil_reasons": {
             "expected": expected_nil_reasons,
             "predicted": predicted_nil_reasons,
+        },
+        "routes": {
+            "expected": expected_routes,
+            "predicted": predicted_routes,
         },
         "case_results": case_results,
     }

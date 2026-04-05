@@ -1,6 +1,6 @@
 {
-  "dataset_name": "ukip_author_nil_benchmark_v1",
-  "version": 1,
+  "dataset_name": "ukip_author_nil_benchmark_v2",
+  "version": 2,
   "description": "Offline author-only benchmark for UKIP NIL detection and author resolution regression checks.",
   "cases": [
     {
@@ -418,6 +418,183 @@
           },
           "evidence": [
             "synthetic_artificial_nil"
+          ],
+          "resolution_status": "unresolved",
+          "merged_sources": []
+        }
+      ]
+    },
+    {
+      "id": "borderline_hybrid_probable_match",
+      "category": "in_kb",
+      "value": "Borderline Hybrid Author",
+      "context": {
+        "affiliation": "Universidad Nacional de Colombia"
+      },
+      "expected": {
+        "nil_detected": false,
+        "nil_reason": null,
+        "review_required": false,
+        "resolution_route": "hybrid_path",
+        "winner_authority_id": "A8"
+      },
+      "candidates": [
+        {
+          "authority_source": "openalex",
+          "authority_id": "A8",
+          "canonical_label": "Borderline Hybrid Author",
+          "aliases": [],
+          "description": "Strong probable profile",
+          "confidence": 0.79,
+          "uri": "https://example.org/openalex/A8",
+          "score_breakdown": {
+            "identifiers": 0.72,
+            "name": 0.79,
+            "affiliation": 0.22,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "borderline_hybrid"
+          ],
+          "resolution_status": "probable_match",
+          "merged_sources": []
+        },
+        {
+          "authority_source": "wikidata",
+          "authority_id": "Q8",
+          "canonical_label": "Borderline Hybrid Runner Up",
+          "aliases": [],
+          "description": "Runner up profile",
+          "confidence": 0.69,
+          "uri": "https://example.org/wikidata/Q8",
+          "score_breakdown": {
+            "identifiers": 0.52,
+            "name": 0.69,
+            "affiliation": 0.17,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "runner_up_profile"
+          ],
+          "resolution_status": "ambiguous",
+          "merged_sources": []
+        }
+      ]
+    },
+    {
+      "id": "borderline_llm_review_case",
+      "category": "ambiguous",
+      "value": "Borderline LLM Author",
+      "context": {
+        "affiliation": "Universidad Nacional de Colombia"
+      },
+      "expected": {
+        "nil_detected": false,
+        "nil_reason": null,
+        "review_required": true,
+        "resolution_route": "llm_path",
+        "winner_authority_id": "A9"
+      },
+      "candidates": [
+        {
+          "authority_source": "openalex",
+          "authority_id": "A9",
+          "canonical_label": "Borderline LLM Author",
+          "aliases": [],
+          "description": "Borderline probable profile",
+          "confidence": 0.56,
+          "uri": "https://example.org/openalex/A9",
+          "score_breakdown": {
+            "identifiers": 0.41,
+            "name": 0.56,
+            "affiliation": 0.16,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "needs_additional_search"
+          ],
+          "resolution_status": "probable_match",
+          "merged_sources": []
+        },
+        {
+          "authority_source": "wikidata",
+          "authority_id": "Q9",
+          "canonical_label": "Borderline Runner Up",
+          "aliases": [],
+          "description": "Close runner up profile",
+          "confidence": 0.52,
+          "uri": "https://example.org/wikidata/Q9",
+          "score_breakdown": {
+            "identifiers": 0.35,
+            "name": 0.52,
+            "affiliation": 0.14,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "close_runner_up"
+          ],
+          "resolution_status": "probable_match",
+          "merged_sources": []
+        }
+      ]
+    },
+    {
+      "id": "weak_exact_match_manual_review",
+      "category": "in_kb",
+      "value": "Weak Exact Match Author",
+      "context": {
+        "affiliation": "Universidad Nacional de Colombia"
+      },
+      "expected": {
+        "nil_detected": false,
+        "nil_reason": null,
+        "review_required": true,
+        "resolution_route": "manual_review",
+        "winner_authority_id": "A10"
+      },
+      "candidates": [
+        {
+          "authority_source": "openalex",
+          "authority_id": "A10",
+          "canonical_label": "Weak Exact Match Author",
+          "aliases": [],
+          "description": "Weak but exact profile",
+          "confidence": 0.58,
+          "uri": "https://example.org/openalex/A10",
+          "score_breakdown": {
+            "identifiers": 0.36,
+            "name": 0.58,
+            "affiliation": 0.1,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "exact_name_but_thin_profile"
+          ],
+          "resolution_status": "exact_match",
+          "merged_sources": []
+        },
+        {
+          "authority_source": "wikidata",
+          "authority_id": "Q10",
+          "canonical_label": "Weak Exact Runner Up",
+          "aliases": [],
+          "description": "Distant runner up profile",
+          "confidence": 0.34,
+          "uri": "https://example.org/wikidata/Q10",
+          "score_breakdown": {
+            "identifiers": 0.22,
+            "name": 0.34,
+            "affiliation": 0.07,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "low_quality_runner_up"
           ],
           "resolution_status": "unresolved",
           "merged_sources": []
