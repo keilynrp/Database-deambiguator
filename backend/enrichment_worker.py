@@ -15,11 +15,15 @@ from backend.tenant_access import LEGACY_GLOBAL_ORG_ID, scope_query_to_org
 
 logger = logging.getLogger(__name__)
 
+
+def _scholar_use_free_proxies() -> bool:
+    return os.environ.get("SCHOLAR_USE_FREE_PROXIES", "").strip().lower() in {"1", "true", "yes", "on"}
+
 # Enrichment adapters — initialized once at module load
 adapter_wos = WebOfScienceAdapter(api_key=os.environ.get("WOS_API_KEY"))
 adapter_scopus = ScopusAdapter(api_key=os.environ.get("SCOPUS_API_KEY"))
 adapter_openalex = OpenAlexAdapter()
-adapter_scholar = ScholarAdapter(use_free_proxies=True)
+adapter_scholar = ScholarAdapter(use_free_proxies=_scholar_use_free_proxies())
 
 # Circuit breakers — trip after 3 consecutive failures; recover after 60 s
 _cb_wos = CircuitBreaker(name="wos", failure_threshold=3, recovery_timeout=60)
