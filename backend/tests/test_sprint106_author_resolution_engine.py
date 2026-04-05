@@ -90,6 +90,25 @@ class TestAuthorResolutionEngine:
         assert len(rows) == 2
         assert all(row.resolution_route == "hybrid_path" for row in rows)
 
+    def test_strong_exact_match_without_orcid_can_use_hybrid_path(self, client, editor_headers, db_session):
+        candidates = [
+            _candidate(authority_source="openalex", authority_id="A8B", confidence=0.88, resolution_status="exact_match"),
+            _candidate(authority_source="wikidata", authority_id="Q8B", canonical_label="Gabriel G. Marquez", confidence=0.76, resolution_status="probable_match"),
+        ]
+        with patch(_PATCH, return_value=candidates):
+            resp = client.post(self._URL, json=self._payload(), headers=editor_headers)
+
+        assert resp.status_code == 201
+        payload = resp.json()
+        assert payload["resolution_route"] == "hybrid_path"
+        assert payload["review_required"] is False
+        assert payload["nil_reason"] is None
+
+        rows = db_session.query(models.AuthorityRecord).order_by(models.AuthorityRecord.id.asc()).all()
+        assert len(rows) == 2
+        assert all(row.resolution_route == "hybrid_path" for row in rows)
+        assert all(row.review_required is False for row in rows)
+
     def test_close_ambiguous_candidates_route_to_llm_path(self, client, editor_headers, db_session):
         candidates = [
             _candidate(authority_source="openalex", authority_id="A1", confidence=0.68, resolution_status="ambiguous"),

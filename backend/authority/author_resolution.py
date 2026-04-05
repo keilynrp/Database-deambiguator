@@ -47,6 +47,8 @@ def summarize_author_resolution(
     runner_up = candidates[1] if len(candidates) > 1 else None
     gap = round(top.confidence - (runner_up.confidence if runner_up else 0.0), 3)
     nil_detection = detect_author_nil(candidates)
+    identifiers = float(top.score_breakdown.get("identifiers", 0.0))
+    affiliation_score = float(top.score_breakdown.get("affiliation", 0.0))
 
     complexity = 0.55
     if context.orcid_hint:
@@ -92,6 +94,21 @@ def summarize_author_resolution(
     if top.confidence >= 0.92 and top.resolution_status == "exact_match" and gap >= 0.12:
         return AuthorResolutionSummary(
             resolution_route="fast_path",
+            complexity_score=complexity,
+            review_required=False,
+            nil_score=nil_detection.nil_score,
+        )
+
+    if (
+        top.resolution_status == "exact_match"
+        and top.confidence >= 0.85
+        and gap >= 0.08
+        and identifiers >= 0.60
+        and nil_detection.nil_score <= 0.15
+        and (context.orcid_hint or affiliation_score >= 0.10)
+    ):
+        return AuthorResolutionSummary(
+            resolution_route="hybrid_path",
             complexity_score=complexity,
             review_required=False,
             nil_score=nil_detection.nil_score,

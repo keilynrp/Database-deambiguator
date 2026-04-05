@@ -1,6 +1,6 @@
 {
-  "dataset_name": "ukip_author_nil_benchmark_v2",
-  "version": 2,
+  "dataset_name": "ukip_author_nil_benchmark_v3",
+  "version": 3,
   "description": "Offline author-only benchmark for UKIP NIL detection and author resolution regression checks.",
   "cases": [
     {
@@ -479,6 +479,65 @@
             "runner_up_profile"
           ],
           "resolution_status": "ambiguous",
+          "merged_sources": []
+        }
+      ]
+    },
+    {
+      "id": "strong_exact_without_orcid_routes_to_hybrid",
+      "category": "in_kb",
+      "value": "Strong Exact Match Author",
+      "context": {
+        "affiliation": "Universidad Nacional de Colombia"
+      },
+      "expected": {
+        "nil_detected": false,
+        "nil_reason": null,
+        "review_required": false,
+        "resolution_route": "hybrid_path",
+        "winner_authority_id": "A8B"
+      },
+      "candidates": [
+        {
+          "authority_source": "openalex",
+          "authority_id": "A8B",
+          "canonical_label": "Strong Exact Match Author",
+          "aliases": [],
+          "description": "Strong exact profile without ORCID",
+          "confidence": 0.88,
+          "uri": "https://example.org/openalex/A8B",
+          "score_breakdown": {
+            "identifiers": 0.67,
+            "name": 0.88,
+            "affiliation": 0.14,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "exact_name_strong_profile"
+          ],
+          "resolution_status": "exact_match",
+          "merged_sources": []
+        },
+        {
+          "authority_source": "wikidata",
+          "authority_id": "Q8B",
+          "canonical_label": "Strong Exact Runner Up",
+          "aliases": [],
+          "description": "Lower confidence runner up",
+          "confidence": 0.76,
+          "uri": "https://example.org/wikidata/Q8B",
+          "score_breakdown": {
+            "identifiers": 0.48,
+            "name": 0.76,
+            "affiliation": 0.12,
+            "coauthorship": 0.0,
+            "topic": 0.0
+          },
+          "evidence": [
+            "runner_up_profile"
+          ],
+          "resolution_status": "probable_match",
           "merged_sources": []
         }
       ]
