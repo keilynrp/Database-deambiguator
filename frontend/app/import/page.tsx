@@ -1,12 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { apiFetch } from "@/lib/api";
 import { PageHeader } from "../components/ui";
 import {
-    type ImportResult,
-    type PreviewData,
-    type WizardStep,
     STEPS,
     StepBar,
     StepDomain,
@@ -15,111 +10,28 @@ import {
     StepUpload,
     StepValidate,
 } from "./importWizardParts";
-
-function getErrorMessage(error: unknown, fallback: string) {
-    return error instanceof Error ? error.message : fallback;
-}
+import useImportWizardController from "./useImportWizardController";
 
 export default function ImportWizardPage() {
-    const [step, setStep] = useState<WizardStep>(1);
-    const [file, setFile] = useState<File | null>(null);
-    const [previewing, setPreviewing] = useState(false);
-    const [previewError, setPreviewError] = useState<string | null>(null);
-    const [preview, setPreview] = useState<PreviewData | null>(null);
-    const [mapping, setMapping] = useState<Record<string, string>>({});
-    const [domain, setDomain] = useState("default");
-    const [importing, setImporting] = useState(false);
-    const [importResult, setImportResult] = useState<ImportResult | null>(null);
-    const [importError, setImportError] = useState<string | null>(null);
-
-    const handleFile = useCallback(async (nextFile: File) => {
-        setFile(nextFile);
-        setPreview(null);
-        setPreviewError(null);
-        setPreviewing(true);
-        setStep(2);
-
-        const form = new FormData();
-        form.append("file", nextFile);
-
-        try {
-            const response = await apiFetch("/upload/preview", { method: "POST", body: form });
-            if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({ detail: "Preview failed" })) as { detail?: string };
-                setPreviewError(errorBody.detail ?? "Preview failed");
-                return;
-            }
-
-            const data = await response.json() as PreviewData;
-            setPreview(data);
-
-            const initialMapping: Record<string, string> = {};
-            for (const [column, model] of Object.entries(data.auto_mapping)) {
-                initialMapping[column] = model ?? "";
-            }
-            setMapping(initialMapping);
-        } catch (error: unknown) {
-            setPreviewError(getErrorMessage(error, "Network error"));
-        } finally {
-            setPreviewing(false);
-        }
-    }, []);
-
-    async function handleImport() {
-        if (!file) return;
-
-        setImporting(true);
-        setImportError(null);
-        setStep(5);
-
-        const form = new FormData();
-        form.append("file", file);
-        form.append("domain", domain);
-
-        const cleanMapping: Record<string, string> = {};
-        for (const [key, value] of Object.entries(mapping)) {
-            if (value) cleanMapping[key] = value;
-        }
-        form.append("field_mapping", JSON.stringify(cleanMapping));
-
-        try {
-            const response = await apiFetch("/upload", { method: "POST", body: form });
-            if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({ detail: "Import failed" })) as { detail?: string };
-                setImportError(errorBody.detail ?? "Import failed");
-                return;
-            }
-            setImportResult(await response.json() as ImportResult);
-        } catch (error: unknown) {
-            setImportError(getErrorMessage(error, "Network error"));
-        } finally {
-            setImporting(false);
-        }
-    }
-
-    const canNext: Record<WizardStep, boolean> = {
-        1: Boolean(file),
-        2: !previewing && !previewError && Boolean(preview),
-        3: Boolean(domain),
-        4: true,
-        5: false,
-    };
-
-    function handleNext() {
-        if (step === 4) {
-            void handleImport();
-            return;
-        }
-        if (step < 5) {
-            setStep(current => (current + 1) as WizardStep);
-        }
-    }
-
-    function handleBack() {
-        if (step > 1) {
-            setStep(current => (current - 1) as WizardStep);
-        }
-    }
+    const {
+        step,
+        file,
+        previewing,
+        previewError,
+        preview,
+        mapping,
+        domain,
+        importing,
+        importResult,
+        importError,
+        canNext,
+        setStep,
+        setMapping,
+        setDomain,
+        handleFile,
+        handleNext,
+        handleBack,
+    } = useImportWizardController();
 
     return (
         <div className="space-y-6">
