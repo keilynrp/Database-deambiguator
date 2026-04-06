@@ -1,0 +1,83 @@
+version: "3.9"
+
+# UKIP production-oriented compose for Dokploy.
+# Recommended pattern:
+# - Frontend domain: https://ukip.inbounduxd.com
+# - API domain:      https://api.ukip.inbounduxd.com
+# - PostgreSQL: managed separately in Dokploy, injected via DATABASE_URL
+# - Images: pulled from GHCR after CI builds and publishes them
+
+services:
+  ukip-backend:
+    image: ${UKIP_BACKEND_IMAGE:?Set UKIP_BACKEND_IMAGE}
+    restart: unless-stopped
+    environment:
+      PORT: 8000
+      RUN_DB_MIGRATIONS_ON_START: ${RUN_DB_MIGRATIONS_ON_START:-0}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY}
+      SESSION_SECRET_KEY: ${SESSION_SECRET_KEY:?Set SESSION_SECRET_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://ukip.inbounduxd.com}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      SCHOLAR_USE_FREE_PROXIES: ${SCHOLAR_USE_FREE_PROXIES:-0}
+      OPENALEX_EMAIL: ${OPENALEX_EMAIL:-}
+      WOS_API_KEY: ${WOS_API_KEY:-}
+      SCOPUS_API_KEY: ${SCOPUS_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      UKIP_ENABLE_LLM_QUERY_REFORMULATION: ${UKIP_ENABLE_LLM_QUERY_REFORMULATION:-0}
+      UKIP_LLM_QUERY_REFORMULATION_MODEL: ${UKIP_LLM_QUERY_REFORMULATION_MODEL:-gpt-4o-mini}
+      UKIP_LLM_QUERY_REFORMULATION_MAX_VARIANTS: ${UKIP_LLM_QUERY_REFORMULATION_MAX_VARIANTS:-3}
+      SENTRY_ENABLED: ${SENTRY_ENABLED:-0}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENABLE_TRACING: ${SENTRY_ENABLE_TRACING:-0}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.0}
+      SENTRY_SEND_DEFAULT_PII: ${SENTRY_SEND_DEFAULT_PII:-0}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+      SENTRY_DEBUG: ${SENTRY_DEBUG:-0}
+    volumes:
+      - ukip_static_data:/app/static
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    expose:
+      - "8000"
+
+  ukip-frontend:
+    image: ${UKIP_FRONTEND_IMAGE:?Set UKIP_FRONTEND_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      ukip-backend:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.ukip.inbounduxd.com}
+    expose:
+      - "3004"
+
+  ukip-migrate:
+    image: ${UKIP_BACKEND_IMAGE:?Set UKIP_BACKEND_IMAGE}
+    profiles: ["ops"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY}
+      SESSION_SECRET_KEY: ${SESSION_SECRET_KEY:?Set SESSION_SECRET_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://ukip.inbounduxd.com}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      RUN_DB_MIGRATIONS_ON_START: 0
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+volumes:
+  ukip_static_data:

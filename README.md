@@ -263,6 +263,8 @@ cd universal-knowledge-intelligence-platform
 
 Local development and deployment now share the same default database path: PostgreSQL. SQLite remains available only as an explicit fallback for constrained local scenarios.
 
+For a Dokploy-based VPS rollout, use [docker-compose.prod.yml](D:\universal-knowledge-intelligence-platform\docker-compose.prod.yml) together with the deployment checklist in [DOKPLOY_PRODUCTION_CHECKLIST.md](D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_PRODUCTION_CHECKLIST.md).
+
 ```bash
 python -m venv .venv
 
