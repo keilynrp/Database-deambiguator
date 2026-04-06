@@ -173,6 +173,7 @@ export default function ExecutiveDashboardPage() {
   const heatMax = data
     ? Math.max(1, ...data.brand_year_matrix.matrix.flat())
     : 1;
+  const briefBuilderHref = `/reports?preset=pilot-brief&domain=${encodeURIComponent(importedDomain ?? activeDomainId)}&rows=${encodeURIComponent(importedRows ?? String(data?.kpis.total_entities ?? 0))}&format=pdf&title=${encodeURIComponent(`UKIP Pilot Brief — ${importedDomain ?? activeDomainId}`)}`;
   const decisionHighlights = useMemo(() => {
     if (!data) return [];
 
@@ -302,6 +303,12 @@ export default function ExecutiveDashboardPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Link
+                href={briefBuilderHref}
+                className="rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-50 dark:border-violet-500/30 dark:bg-gray-900 dark:text-violet-300 dark:hover:bg-violet-500/10"
+              >
+                Prepare executive brief
+              </Link>
               <Link
                 href="/"
                 className="rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-50 dark:border-violet-500/30 dark:bg-gray-900 dark:text-violet-300 dark:hover:bg-violet-500/10"

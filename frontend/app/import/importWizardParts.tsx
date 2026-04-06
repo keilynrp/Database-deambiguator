@@ -633,6 +633,13 @@ export function StepImport({
         );
     };
 
+    const openBriefBuilder = () => {
+        setActiveDomainId(result.domain);
+        router.push(
+            `/reports?preset=pilot-brief&domain=${encodeURIComponent(result.domain)}&rows=${result.total_rows}&format=pdf&title=${encodeURIComponent(`UKIP Pilot Brief — ${result.domain}`)}`,
+        );
+    };
+
     return (
         <div className="flex flex-col items-center gap-6 py-8 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-500/10">
@@ -675,6 +682,12 @@ export function StepImport({
                     className="rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-violet-700"
                 >
                     Open Executive Dashboard
+                </button>
+                <button
+                    onClick={openBriefBuilder}
+                    className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                >
+                    Prepare Executive Brief
                 </button>
                 <button
                     onClick={() => router.push("/")}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader, Badge } from "../components/ui";
 import { apiFetch } from "../../lib/api";
 import { useDomain } from "../contexts/DomainContext";
@@ -55,9 +56,10 @@ const FORMAT_OPTIONS: { value: ExportFormat; label: string; desc: string; icon: 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
-  const { activeDomainId } = useDomain();
+  const { activeDomainId, setActiveDomainId } = useDomain();
   const { toast } = useToast();
   const { t } = useLanguage();
+  const searchParams = useSearchParams();
 
   const [sections, setSections] = useState<Section[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -72,6 +74,23 @@ export default function ReportsPage() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState("");
+  const [presetApplied, setPresetApplied] = useState(false);
+
+  const preset = searchParams.get("preset");
+  const presetDomain = searchParams.get("domain");
+  const importedRows = searchParams.get("rows");
+  const presetTitle = searchParams.get("title");
+  const presetFormat = searchParams.get("format");
+  const presetSections = useMemo(() => {
+    const explicit = searchParams.get("sections");
+    if (explicit) {
+      return explicit.split(",").map((value) => value.trim()).filter(Boolean);
+    }
+    if (preset === "pilot-brief") {
+      return ["entity_stats", "enrichment_coverage", "top_brands", "topic_clusters"];
+    }
+    return [];
+  }, [preset, searchParams]);
 
   // Fetch available sections from backend
   const loadSections = useCallback(async () => {
@@ -88,6 +107,31 @@ export default function ReportsPage() {
   }, []);
 
   useEffect(() => { loadSections(); }, [loadSections]);
+
+  useEffect(() => {
+    if (presetDomain && presetDomain !== activeDomainId) {
+      setActiveDomainId(presetDomain);
+    }
+  }, [activeDomainId, presetDomain, setActiveDomainId]);
+
+  useEffect(() => {
+    if (loadingSections || presetApplied || sections.length === 0) return;
+    if (!preset && !presetTitle && !presetFormat && presetSections.length === 0) return;
+
+    const validSections = presetSections.filter((sectionId) =>
+      sections.some((section) => section.id === sectionId),
+    );
+    if (validSections.length > 0) {
+      setSelected(new Set(validSections));
+    }
+    if (presetTitle) {
+      setTitle(presetTitle);
+    }
+    if (presetFormat === "pdf" || presetFormat === "html" || presetFormat === "excel" || presetFormat === "pptx") {
+      setFormat(presetFormat);
+    }
+    setPresetApplied(true);
+  }, [loadingSections, presetApplied, preset, presetFormat, presetSections, presetTitle, sections]);
 
   const loadTemplates = useCallback(async () => {
     if (templates.length > 0) return; // already loaded
@@ -141,7 +185,11 @@ export default function ReportsPage() {
   const toggleSection = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
 
@@ -239,6 +287,25 @@ export default function ReportsPage() {
           </button>
         }
       />
+
+      {preset === "pilot-brief" && (
+        <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-5 shadow-sm dark:border-blue-500/20 dark:from-blue-500/5 dark:to-indigo-500/5">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">
+                Pilot brief preset loaded
+              </p>
+              <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                {importedRows ? `${Number(importedRows).toLocaleString()} imported entities` : "This dataset"} in domain{" "}
+                <span className="font-semibold">{presetDomain ?? activeDomainId}</span> already has the recommended sections for a first stakeholder-facing brief.
+              </p>
+            </div>
+            <div className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-gray-900/80 dark:text-blue-300">
+              Format: {format.toUpperCase()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Templates panel */}
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
