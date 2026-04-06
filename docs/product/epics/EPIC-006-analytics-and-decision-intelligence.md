@@ -60,6 +60,7 @@ Excluye:
 | US-027 | Dashboard ejecutivo y metricas clave | Planned |
 | US-028 | Consulta natural conectada a OLAP | Planned |
 | US-029 | Simulaciones Monte Carlo y artefactos ROI | Planned |
+| US-060 | Pilot Decision Dashboard and Exportable Brief | Planned |
 
 ## 10. Sprint allocation
 
@@ -71,3 +72,4 @@ Excluye:
 
 - Codigo: `backend/routers/analytics.py`, `backend/routers/nlq.py`, `backend/olap.py`, `frontend/app/analytics/`
 - Docs: `README.md`, `API.md`
+- Story: `docs/product/stories/US-060-pilot-decision-dashboard-and-brief.md`

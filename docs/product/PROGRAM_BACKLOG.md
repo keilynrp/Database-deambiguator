@@ -10,6 +10,9 @@ Vision base:
 
 Foco comercial de corto plazo:
 
+- convertir datasets importados en salidas ejecutivas y demostrables con menor
+  friccion
+
 - wedge inicial en `research intelligence` para portafolios de publicaciones, autores y afiliaciones.
 
 Fuentes estrategicas relacionadas:
@@ -61,3 +64,9 @@ Abre una nueva epic solo si:
 - necesita identidad propia de roadmap
 
 No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic existente.
+## Prioridades siguientes recomendadas
+
+1. `US-060` - Pilot Decision Dashboard and Exportable Brief
+2. consolidar la experiencia post-import para que derive rapido a insight
+3. seguir endureciendo operacion solo en respuesta a hallazgos reales del
+   despliegue
