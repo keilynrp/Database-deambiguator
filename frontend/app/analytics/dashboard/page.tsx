@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   AreaChart,
   Area,
@@ -39,8 +40,9 @@ interface DashboardData {
   top_concepts: { concept: string; count: number; pct: number }[];
   top_entities: {
     id: number;
-    entity_name: string;
-    brand: string | null;
+    entity_name?: string | null;
+    primary_label?: string | null;
+    brand?: string | null;
     citation_count: number;
     source: string | null;
   }[];
@@ -89,13 +91,17 @@ function SourceBadge({ source }: { source: string | null }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ExecutiveDashboardPage() {
-  const { activeDomainId } = useDomain();
+  const { activeDomainId, setActiveDomainId } = useDomain();
+  const searchParams = useSearchParams();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL_SEC);
   const [exporting, setExporting] = useState(false);
+  const importedFlag = searchParams.get("imported") === "1";
+  const importedDomain = searchParams.get("domain");
+  const importedRows = searchParams.get("rows");
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -104,14 +110,20 @@ export default function ExecutiveDashboardPage() {
       const res = await apiFetch(`/dashboard/summary?domain_id=${activeDomainId}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json());
-    } catch (e: any) {
-      setError(e.message ?? "Failed to load dashboard");
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Failed to load dashboard");
     } finally {
       setLoading(false);
     }
   }, [activeDomainId]);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+
+  useEffect(() => {
+    if (importedDomain && importedDomain !== activeDomainId) {
+      setActiveDomainId(importedDomain);
+    }
+  }, [activeDomainId, importedDomain, setActiveDomainId]);
 
   // Auto-refresh countdown
   useEffect(() => {
@@ -161,6 +173,59 @@ export default function ExecutiveDashboardPage() {
   const heatMax = data
     ? Math.max(1, ...data.brand_year_matrix.matrix.flat())
     : 1;
+  const decisionHighlights = useMemo(() => {
+    if (!data) return [];
+
+    const highlights: { title: string; detail: string; tone: "violet" | "amber" | "emerald" }[] = [];
+
+    if (data.kpis.enrichment_pct < 40) {
+      highlights.push({
+        title: "Coverage is still shallow",
+        detail: `${data.kpis.enrichment_pct}% of entities are enriched. Run bulk enrichment before treating this dataset as decision-ready.`,
+        tone: "amber",
+      });
+    } else if (data.kpis.enrichment_pct >= 70) {
+      highlights.push({
+        title: "Coverage looks operational",
+        detail: `${data.kpis.enriched_count.toLocaleString()} entities are already enriched, which is enough to support a first executive readout.`,
+        tone: "emerald",
+      });
+    }
+
+    if (data.quality?.average != null && data.quality.average < 0.6) {
+      highlights.push({
+        title: "Data quality needs attention",
+        detail: `Average quality is ${Math.round(data.quality.average * 100)}%. Review low-quality records before exporting a stakeholder-facing brief.`,
+        tone: "amber",
+      });
+    }
+
+    if (data.top_entities[0]) {
+      const topEntity = data.top_entities[0];
+      const label = topEntity.entity_name || topEntity.primary_label || `Entity #${topEntity.id}`;
+      highlights.push({
+        title: "Top impact entity detected",
+        detail: `${label} leads the current portfolio with ${topEntity.citation_count.toLocaleString()} citations.`,
+        tone: "violet",
+      });
+    }
+
+    if (data.top_concepts[0]) {
+      highlights.push({
+        title: "Leading concept cluster",
+        detail: `${data.top_concepts[0].concept} is currently the strongest concept signal in this domain snapshot.`,
+        tone: "violet",
+      });
+    }
+
+    return highlights.slice(0, 3);
+  }, [data]);
+
+  const toneStyles: Record<"violet" | "amber" | "emerald", string> = {
+    violet: "border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-500/20 dark:bg-violet-500/5 dark:text-violet-200",
+    amber: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-200",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-200",
+  };
 
   return (
     <div className="flex flex-col gap-6 pb-10">
@@ -223,6 +288,51 @@ export default function ExecutiveDashboardPage() {
       />
 
       {error && <ErrorBanner message={error} onRetry={fetchDashboard} variant="card" />}
+
+      {importedFlag && (
+        <div className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 p-5 shadow-sm dark:border-violet-500/20 dark:from-violet-500/5 dark:to-indigo-500/5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-violet-900 dark:text-violet-200">
+                Fresh import ready for review
+              </p>
+              <p className="mt-1 text-sm text-violet-700 dark:text-violet-300">
+                {importedRows ? `${Number(importedRows).toLocaleString()} entities imported` : "Your latest import"} in domain{" "}
+                <span className="font-semibold">{importedDomain ?? activeDomainId}</span>. This dashboard is the fastest place to check coverage, impact, and next actions.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/"
+                className="rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-50 dark:border-violet-500/30 dark:bg-gray-900 dark:text-violet-300 dark:hover:bg-violet-500/10"
+              >
+                Open Knowledge Explorer
+              </Link>
+              <button
+                onClick={handleExportPDF}
+                disabled={exporting || loading || !data}
+                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700 disabled:opacity-50"
+              >
+                {exporting ? "Exporting…" : "Export PDF brief"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {decisionHighlights.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          {decisionHighlights.map((highlight) => (
+            <div
+              key={highlight.title}
+              className={`rounded-2xl border p-5 shadow-sm ${toneStyles[highlight.tone]}`}
+            >
+              <p className="text-sm font-semibold">{highlight.title}</p>
+              <p className="mt-2 text-sm opacity-90">{highlight.detail}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Section 1: Hero KPIs ── */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
@@ -475,11 +585,11 @@ export default function ExecutiveDashboardPage() {
                         href={`/entities/${e.id}`}
                         className="text-sm font-medium text-gray-900 hover:text-violet-600 dark:text-white dark:hover:text-violet-400"
                       >
-                        {e.entity_name ?? `Entity #${e.id}`}
+                        {e.entity_name || e.primary_label || `Entity #${e.id}`}
                       </Link>
                     </td>
                     <td className="py-3 pr-4 text-sm text-gray-500 dark:text-gray-400">
-                      {e.brand ?? "—"}
+                      {e.brand || e.primary_label || "—"}
                     </td>
                     <td className="py-3 pr-4 text-right">
                       <span className="text-sm font-bold text-violet-600 dark:text-violet-400">

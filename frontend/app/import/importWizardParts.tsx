@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { useDomain } from "../contexts/DomainContext";
 
 export interface PreviewData {
     format: string;
@@ -587,6 +588,7 @@ export function StepImport({
     error: string | null;
 }) {
     const router = useRouter();
+    const { setActiveDomainId } = useDomain();
 
     if (importing) {
         return (
@@ -624,6 +626,13 @@ export function StepImport({
 
     if (!result) return null;
 
+    const openExecutiveDashboard = () => {
+        setActiveDomainId(result.domain);
+        router.push(
+            `/analytics/dashboard?imported=1&domain=${encodeURIComponent(result.domain)}&rows=${result.total_rows}`,
+        );
+    };
+
     return (
         <div className="flex flex-col items-center gap-6 py-8 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-500/10">
@@ -651,7 +660,22 @@ export function StepImport({
                 )}
             </div>
 
-            <div className="flex gap-3">
+            <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-4 text-left shadow-sm dark:border-violet-500/20 dark:bg-violet-500/5">
+                <p className="text-sm font-semibold text-violet-900 dark:text-violet-200">
+                    Next best step
+                </p>
+                <p className="mt-1 text-sm text-violet-700 dark:text-violet-300">
+                    Open the Executive Dashboard to review coverage, top concepts, quality, and priority entities for this import.
+                </p>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-3">
+                <button
+                    onClick={openExecutiveDashboard}
+                    className="rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-violet-700"
+                >
+                    Open Executive Dashboard
+                </button>
                 <button
                     onClick={() => router.push("/")}
                     className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
