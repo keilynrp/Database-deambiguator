@@ -299,6 +299,21 @@ export default function ReportsPage() {
                 {importedRows ? `${Number(importedRows).toLocaleString()} imported entities` : "This dataset"} in domain{" "}
                 <span className="font-semibold">{presetDomain ?? activeDomainId}</span> already has the recommended sections for a first stakeholder-facing brief.
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[
+                  "Executive summary",
+                  "Coverage and enrichment",
+                  "Portfolio concentration",
+                  "Concept signal",
+                ].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-blue-700 shadow-sm dark:bg-gray-900/80 dark:text-blue-300"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
             </div>
             <div className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-gray-900/80 dark:text-blue-300">
               Format: {format.toUpperCase()}

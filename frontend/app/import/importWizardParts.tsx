@@ -653,6 +653,39 @@ export function StepImport({
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{result.message}</p>
             </div>
 
+            <div className="grid w-full max-w-3xl grid-cols-1 gap-3 md:grid-cols-3">
+                {[
+                    {
+                        step: "1",
+                        title: "Review the dashboard",
+                        detail: "Check coverage, quality, concepts, and impact before drawing conclusions.",
+                    },
+                    {
+                        step: "2",
+                        title: "Prepare the brief",
+                        detail: "Load the pilot brief preset with the most useful sections already selected.",
+                    },
+                    {
+                        step: "3",
+                        title: "Share the result",
+                        detail: "Export a PDF brief once the first readout looks solid enough for stakeholders.",
+                    },
+                ].map((item) => (
+                    <div
+                        key={item.step}
+                        className="rounded-2xl border border-gray-200 bg-white p-4 text-left shadow-sm dark:border-gray-800 dark:bg-gray-900"
+                    >
+                        <div className="flex items-center gap-3">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
+                                {item.step}
+                            </span>
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.title}</p>
+                        </div>
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{item.detail}</p>
+                    </div>
+                ))}
+            </div>
+
             <div className="flex flex-wrap justify-center gap-2">
                 <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-400">
                     Domain: {result.domain}
@@ -669,10 +702,10 @@ export function StepImport({
 
             <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-4 text-left shadow-sm dark:border-violet-500/20 dark:bg-violet-500/5">
                 <p className="text-sm font-semibold text-violet-900 dark:text-violet-200">
-                    Next best step
+                    Pilot decision flow unlocked
                 </p>
                 <p className="mt-1 text-sm text-violet-700 dark:text-violet-300">
-                    Open the Executive Dashboard to review coverage, top concepts, quality, and priority entities for this import.
+                    Start with the Executive Dashboard for the fast readout, then move to the brief builder when you are ready to package the result.
                 </p>
             </div>
 

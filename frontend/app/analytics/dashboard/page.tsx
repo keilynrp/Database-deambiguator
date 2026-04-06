@@ -295,12 +295,26 @@ export default function ExecutiveDashboardPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-semibold text-violet-900 dark:text-violet-200">
-                Fresh import ready for review
+                Fresh import ready for pilot review
               </p>
               <p className="mt-1 text-sm text-violet-700 dark:text-violet-300">
                 {importedRows ? `${Number(importedRows).toLocaleString()} entities imported` : "Your latest import"} in domain{" "}
                 <span className="font-semibold">{importedDomain ?? activeDomainId}</span>. This dashboard is the fastest place to check coverage, impact, and next actions.
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {[
+                  "Read the KPIs",
+                  "Scan the highlights",
+                  "Export a stakeholder brief",
+                ].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-violet-700 shadow-sm dark:bg-gray-900/80 dark:text-violet-300"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link
@@ -334,6 +348,9 @@ export default function ExecutiveDashboardPage() {
               key={highlight.title}
               className={`rounded-2xl border p-5 shadow-sm ${toneStyles[highlight.tone]}`}
             >
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-70">
+                Decision Highlight
+              </p>
               <p className="text-sm font-semibold">{highlight.title}</p>
               <p className="mt-2 text-sm opacity-90">{highlight.detail}</p>
             </div>
@@ -434,7 +451,7 @@ export default function ExecutiveDashboardPage() {
           Entities Over Time
         </h3>
         <p className="mb-5 text-xs text-gray-500 dark:text-gray-400">
-          Entity creation by year — extracted from <code>creation_date</code>
+          Entity creation by year — useful for spotting whether this dataset is concentrated in a narrow time window or spread across multiple periods.
         </p>
         {loading ? (
           <SkeletonCard lines={4} />
@@ -477,7 +494,7 @@ export default function ExecutiveDashboardPage() {
           Top Primary Labels by Year
         </h3>
         <p className="mb-5 text-xs text-gray-500 dark:text-gray-400">
-          Entity count per label × year — darker violet = higher volume
+          Entity count per label × year — darker violet means higher concentration and helps surface where the portfolio is densest.
         </p>
         {loading ? (
           <SkeletonCard lines={3} />
@@ -528,7 +545,7 @@ export default function ExecutiveDashboardPage() {
               Knowledge Concept Map
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Top concepts extracted from enriched entities — size reflects frequency
+              Top concepts extracted from enriched entities — this is the quickest semantic read of what the imported portfolio is really about.
             </p>
           </div>
           {data && (
@@ -555,7 +572,7 @@ export default function ExecutiveDashboardPage() {
               Top Entities by Impact
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Highest citation count among enriched entities
+              Highest citation count among enriched entities — a practical shortlist for stakeholder attention and follow-up.
             </p>
           </div>
           <Link
