@@ -60,13 +60,16 @@ Excluye:
 | US-027 | Dashboard ejecutivo y metricas clave | Planned |
 | US-028 | Consulta natural conectada a OLAP | Planned |
 | US-029 | Simulaciones Monte Carlo y artefactos ROI | Planned |
-| US-060 | Pilot Decision Dashboard and Exportable Brief | Planned |
-| US-061 | Decision Recommendations and Priority Actions | Planned |
+| US-060 | Pilot Decision Dashboard and Exportable Brief | Done |
+| US-061 | Decision Recommendations and Priority Actions | Done |
 | US-062 | Graph Visualization Read-Path Baseline | Planned |
 | US-063 | Visualization Preparation Jobs | Planned |
 | US-064 | Massive Graph WebGL Client | Planned |
 | US-065 | Precomputed Graph Views and Caching | Planned |
 | US-066 | Evaluate Native Graph Storage Extensions | Planned |
+| US-067 | Institutional Benchmark Profiles | Planned |
+| US-068 | Research Network Community Detection | Planned |
+| US-069 | Emerging Topic Trend Signals | Planned |
 
 ## 10. Sprint allocation
 
@@ -81,3 +84,6 @@ Excluye:
 - Story: `docs/product/stories/US-060-pilot-decision-dashboard-and-brief.md`
 - Story: `docs/product/stories/US-061-decision-recommendations-and-priority-actions.md`
 - Story: `docs/product/stories/US-062-graph-visualization-read-path-baseline.md`
+- Story: `docs/product/stories/US-067-institutional-benchmark-profiles.md`
+- Story: `docs/product/stories/US-068-research-network-community-detection.md`
+- Story: `docs/product/stories/US-069-emerging-topic-trend-signals.md`

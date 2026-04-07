@@ -66,11 +66,11 @@ Abre una nueva epic solo si:
 No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic existente.
 ## Prioridades siguientes recomendadas
 
-1. `US-060` - Pilot Decision Dashboard and Exportable Brief
-2. `US-061` - Decision Recommendations and Priority Actions
-3. consolidar la experiencia post-import para que derive rapido a insight
-4. seguir endureciendo operacion solo en respuesta a hallazgos reales del
-   despliegue
+1. validar `US-060` y `US-061` con un piloto real de import -> dashboard -> brief
+2. `US-067` - Institutional Benchmark Profiles
+3. `US-068` - Research Network Community Detection
+4. `US-069` - Emerging Topic Trend Signals
+5. seguir endureciendo operacion solo en respuesta a hallazgos reales del despliegue
 
 ## Arquitectura futura de visualizacion
 
@@ -79,3 +79,12 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
 - `US-064` - Massive Graph WebGL Client
 - `US-065` - Precomputed Graph Views and Caching
 - `US-066` - Evaluate Native Graph Storage Extensions
+
+## Proximo tramo I+D recomendado
+
+- `US-067` primero para traducir el producto a marcos de evaluacion
+  institucional con valor operativo real
+- `US-068` despues para fortalecer analitica de redes de colaboracion y
+  preparar visualizacion mas avanzada
+- `US-069` al final como capa experimental de senales emergentes, solo cuando
+  el volumen temporal y la cobertura de datos lo justifiquen
