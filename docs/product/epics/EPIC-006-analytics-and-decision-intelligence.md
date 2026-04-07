@@ -61,6 +61,12 @@ Excluye:
 | US-028 | Consulta natural conectada a OLAP | Planned |
 | US-029 | Simulaciones Monte Carlo y artefactos ROI | Planned |
 | US-060 | Pilot Decision Dashboard and Exportable Brief | Planned |
+| US-061 | Decision Recommendations and Priority Actions | Planned |
+| US-062 | Graph Visualization Read-Path Baseline | Planned |
+| US-063 | Visualization Preparation Jobs | Planned |
+| US-064 | Massive Graph WebGL Client | Planned |
+| US-065 | Precomputed Graph Views and Caching | Planned |
+| US-066 | Evaluate Native Graph Storage Extensions | Planned |
 
 ## 10. Sprint allocation
 
@@ -73,3 +79,5 @@ Excluye:
 - Codigo: `backend/routers/analytics.py`, `backend/routers/nlq.py`, `backend/olap.py`, `frontend/app/analytics/`
 - Docs: `README.md`, `API.md`
 - Story: `docs/product/stories/US-060-pilot-decision-dashboard-and-brief.md`
+- Story: `docs/product/stories/US-061-decision-recommendations-and-priority-actions.md`
+- Story: `docs/product/stories/US-062-graph-visualization-read-path-baseline.md`

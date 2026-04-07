@@ -67,6 +67,15 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
 ## Prioridades siguientes recomendadas
 
 1. `US-060` - Pilot Decision Dashboard and Exportable Brief
-2. consolidar la experiencia post-import para que derive rapido a insight
-3. seguir endureciendo operacion solo en respuesta a hallazgos reales del
+2. `US-061` - Decision Recommendations and Priority Actions
+3. consolidar la experiencia post-import para que derive rapido a insight
+4. seguir endureciendo operacion solo en respuesta a hallazgos reales del
    despliegue
+
+## Arquitectura futura de visualizacion
+
+- `US-062` - Graph Visualization Read-Path Baseline
+- `US-063` - Visualization Preparation Jobs
+- `US-064` - Massive Graph WebGL Client
+- `US-065` - Precomputed Graph Views and Caching
+- `US-066` - Evaluate Native Graph Storage Extensions
