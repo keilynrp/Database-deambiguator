@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend import models
 from backend.analyzers.topic_modeling import TopicAnalyzer
+from backend.institutional_benchmarks import evaluate_benchmark
 from backend.tenant_access import scope_query_to_org
 
 
@@ -218,6 +219,7 @@ class AnalyticsService:
             "quality": {"average": avg_quality, "distribution": quality_dist},
         }
         snapshot["recommended_actions"] = cls.build_recommended_actions(snapshot)
+        snapshot["institutional_benchmark"] = evaluate_benchmark(snapshot)
         return snapshot
 
     @staticmethod

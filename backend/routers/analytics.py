@@ -27,6 +27,7 @@ from backend.analyzers.correlation import CorrelationAnalyzer
 from backend.analyzers.roi_calculator import ROIParams, simulate as _roi_simulate
 from backend.analyzers.topic_modeling import TopicAnalyzer
 from backend.enterprise_readiness import get_enterprise_readiness_report
+from backend.institutional_benchmarks import evaluate_benchmark, list_benchmark_profiles
 from backend.logging_utils import current_log_format
 from backend.ops_checks import dispatch_operational_alert_if_needed, run_operational_checks
 from backend.telemetry import telemetry_status
@@ -284,6 +285,35 @@ def dashboard_compare(
             for did in domain_ids
         ]
     }
+
+
+@router.get("/analytics/benchmarks/profiles", tags=["analytics"])
+def list_institutional_benchmark_profiles(
+    _: models.User = Depends(get_current_user),
+):
+    return list_benchmark_profiles()
+
+
+@router.get("/analytics/benchmarks/evaluate", tags=["analytics"])
+def evaluate_institutional_benchmark(
+    domain_id: str = Query(default="default", min_length=1, max_length=64),
+    profile_id: str = Query(default="", max_length=80),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    org_id = resolve_request_org_id(db, current_user)
+    snapshot = AnalyticsService.get_domain_snapshot(
+        db,
+        _topic_analyzer,
+        domain_id,
+        org_id=org_id,
+        top_n_concepts=30,
+        top_n_entities=10,
+    )
+    try:
+        return evaluate_benchmark(snapshot, profile_id or None)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 # ── Cache management ──────────────────────────────────────────────────────────

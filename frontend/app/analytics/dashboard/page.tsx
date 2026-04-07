@@ -58,6 +58,26 @@ interface DashboardData {
     priority: "high" | "medium" | "low";
     category: string;
   }[];
+  institutional_benchmark: {
+    profile_id: string;
+    profile_name: string;
+    description: string;
+    region: string;
+    status: "ready" | "watch" | "gap";
+    readiness_pct: number;
+    passed_rules: number;
+    total_rules: number;
+    top_gaps: {
+      id: string;
+      label: string;
+      priority: "high" | "medium" | "low";
+      threshold: number;
+      observed: number;
+      passed: boolean;
+      message: string;
+      evidence: string;
+    }[];
+  };
 }
 
 // ── Heatmap cell with violet color scale ─────────────────────────────────────
@@ -201,6 +221,11 @@ export default function ExecutiveDashboardPage() {
     amber: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-200",
     emerald: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-200",
   };
+  const benchmarkTone =
+    !data ? toneStyles.violet :
+    data.institutional_benchmark.status === "ready" ? toneStyles.emerald :
+    data.institutional_benchmark.status === "watch" ? toneStyles.violet :
+    toneStyles.amber;
 
   return (
     <div className="flex flex-col gap-6 pb-10">
@@ -312,6 +337,53 @@ export default function ExecutiveDashboardPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {data?.institutional_benchmark && (
+        <div className={`rounded-2xl border p-5 shadow-sm ${benchmarkTone}`}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-70">
+                Institutional Benchmark Baseline
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <p className="text-lg font-semibold">{data.institutional_benchmark.profile_name}</p>
+                <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-current dark:bg-gray-900/60">
+                  {data.institutional_benchmark.status}
+                </span>
+              </div>
+              <p className="mt-2 text-sm opacity-90">{data.institutional_benchmark.description}</p>
+              <p className="mt-3 text-sm font-medium opacity-90">
+                Readiness {data.institutional_benchmark.readiness_pct}% with {data.institutional_benchmark.passed_rules} of {data.institutional_benchmark.total_rules} rules currently satisfied.
+              </p>
+            </div>
+            <div className="min-w-[180px] rounded-2xl bg-white/80 p-4 text-center shadow-sm dark:bg-gray-900/70">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                Benchmark Score
+              </p>
+              <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                {Math.round(data.institutional_benchmark.readiness_pct)}%
+              </p>
+            </div>
+          </div>
+
+          {data.institutional_benchmark.top_gaps.length > 0 && (
+            <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
+              {data.institutional_benchmark.top_gaps.map((gap) => (
+                <div key={gap.id} className="rounded-2xl bg-white/80 p-4 shadow-sm dark:bg-gray-900/70">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{gap.label}</p>
+                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                      {gap.priority}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">{gap.message}</p>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{gap.evidence}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

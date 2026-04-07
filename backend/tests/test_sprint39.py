@@ -45,6 +45,7 @@ def test_dashboard_summary_returns_shape(client, auth_headers, db_session):
     assert "top_concepts" in data
     assert "top_entities" in data
     assert "recommended_actions" in data
+    assert "institutional_benchmark" in data
 
     # KPI shape
     kpis = data["kpis"]
@@ -129,3 +130,31 @@ def test_dashboard_recommended_actions_are_explainable(client, auth_headers, db_
         assert action["detail"]
         assert action["evidence"]
         assert action["priority"] in {"high", "medium", "low"}
+
+
+def test_dashboard_includes_institutional_benchmark_summary(client, auth_headers, db_session):
+    _seed_entities(db_session, n=4)
+    response = client.get("/dashboard/summary", headers=auth_headers)
+    assert response.status_code == 200
+    benchmark = response.json()["institutional_benchmark"]
+    assert benchmark["profile_id"] == "research_portfolio_baseline"
+    assert benchmark["status"] in {"ready", "watch", "gap"}
+    assert "readiness_pct" in benchmark
+    assert isinstance(benchmark["rules"], list)
+
+
+def test_benchmark_profiles_endpoint_lists_builtins(client, auth_headers):
+    response = client.get("/analytics/benchmarks/profiles", headers=auth_headers)
+    assert response.status_code == 200
+    ids = {profile["id"] for profile in response.json()}
+    assert "research_portfolio_baseline" in ids
+    assert "ref_readiness_baseline" in ids
+    assert "sni_readiness_baseline" in ids
+
+
+def test_benchmark_evaluate_endpoint_rejects_unknown_profile(client, auth_headers):
+    response = client.get(
+        "/analytics/benchmarks/evaluate?domain_id=default&profile_id=not_real",
+        headers=auth_headers,
+    )
+    assert response.status_code == 404
