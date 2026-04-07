@@ -26,7 +26,17 @@ interface Section {
   label: string;
 }
 
+interface BenchmarkProfile {
+  id: string;
+  name: string;
+  description: string;
+  region: string;
+  rules_count: number;
+  is_default: boolean;
+}
+
 const SECTION_ICONS: Record<string, string> = {
+  institutional_benchmark: "🏛️",
   entity_stats:         "📊",
   enrichment_coverage:  "🔬",
   decision_recommendations: "🧭",
@@ -36,6 +46,7 @@ const SECTION_ICONS: Record<string, string> = {
 };
 
 const SECTION_DESCRIPTIONS: Record<string, string> = {
+  institutional_benchmark: "Institutional readiness baseline with explicit framework gaps",
   entity_stats:         "Total entities, validation status breakdown, distribution chart",
   enrichment_coverage:  "Coverage %, average citations, top enriched entities",
   decision_recommendations: "Short, explainable next actions derived from current KPI signals",
@@ -77,19 +88,22 @@ export default function ReportsPage() {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState("");
   const [presetApplied, setPresetApplied] = useState(false);
+  const [benchmarkProfiles, setBenchmarkProfiles] = useState<BenchmarkProfile[]>([]);
+  const [selectedBenchmarkProfile, setSelectedBenchmarkProfile] = useState("research_portfolio_baseline");
 
   const preset = searchParams.get("preset");
   const presetDomain = searchParams.get("domain");
   const importedRows = searchParams.get("rows");
   const presetTitle = searchParams.get("title");
   const presetFormat = searchParams.get("format");
+  const presetBenchmarkProfile = searchParams.get("benchmark_profile");
   const presetSections = useMemo(() => {
     const explicit = searchParams.get("sections");
     if (explicit) {
       return explicit.split(",").map((value) => value.trim()).filter(Boolean);
     }
     if (preset === "pilot-brief") {
-      return ["entity_stats", "enrichment_coverage", "decision_recommendations", "top_brands", "topic_clusters"];
+      return ["entity_stats", "enrichment_coverage", "decision_recommendations", "institutional_benchmark", "top_brands", "topic_clusters"];
     }
     return [];
   }, [preset, searchParams]);
@@ -109,6 +123,24 @@ export default function ReportsPage() {
   }, []);
 
   useEffect(() => { loadSections(); }, [loadSections]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadProfiles = async () => {
+      const res = await apiFetch("/analytics/benchmarks/profiles");
+      if (!res.ok) return;
+      const data: BenchmarkProfile[] = await res.json();
+      if (!cancelled) {
+        setBenchmarkProfiles(data);
+        if (!presetBenchmarkProfile) {
+          const defaultProfile = data.find((profile) => profile.is_default)?.id ?? data[0]?.id;
+          if (defaultProfile) setSelectedBenchmarkProfile(defaultProfile);
+        }
+      }
+    };
+    loadProfiles();
+    return () => { cancelled = true; };
+  }, [presetBenchmarkProfile]);
 
   useEffect(() => {
     if (presetDomain && presetDomain !== activeDomainId) {
@@ -132,8 +164,11 @@ export default function ReportsPage() {
     if (presetFormat === "pdf" || presetFormat === "html" || presetFormat === "excel" || presetFormat === "pptx") {
       setFormat(presetFormat);
     }
+    if (presetBenchmarkProfile) {
+      setSelectedBenchmarkProfile(presetBenchmarkProfile);
+    }
     setPresetApplied(true);
-  }, [loadingSections, presetApplied, preset, presetFormat, presetSections, presetTitle, sections]);
+  }, [loadingSections, presetApplied, preset, presetBenchmarkProfile, presetFormat, presetSections, presetTitle, sections]);
 
   const loadTemplates = useCallback(async () => {
     if (templates.length > 0) return; // already loaded
@@ -218,6 +253,7 @@ export default function ReportsPage() {
           domain_id: activeDomainId || "default",
           sections: Array.from(selected),
           title: title.trim() || null,
+          benchmark_profile_id: selectedBenchmarkProfile,
         }),
       });
       if (!res.ok) {
@@ -306,6 +342,7 @@ export default function ReportsPage() {
                   "Executive summary",
                   "Coverage and enrichment",
                   "Priority actions",
+                  "Institutional benchmark",
                   "Portfolio concentration",
                   "Concept signal",
                 ].map((item) => (
@@ -498,6 +535,25 @@ export default function ReportsPage() {
                   <Badge variant="info" size="sm">{t('page.reports.domain_active_badge')}</Badge>
                 </div>
                 <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{t('page.reports.domain_help')}</p>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                  Benchmark profile
+                </label>
+                <select
+                  value={selectedBenchmarkProfile}
+                  onChange={(e) => setSelectedBenchmarkProfile(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                >
+                  {benchmarkProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                  Used when the institutional benchmark section is part of the brief.
+                </p>
               </div>
             </div>
           </div>

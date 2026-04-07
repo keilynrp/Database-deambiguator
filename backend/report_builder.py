@@ -264,6 +264,69 @@ def _section_decision_recommendations(db: Session, domain_id: str, org_id: int |
     <p style="color:#9ca3af;padding:12px 0">No recommendation signals yet — import or enrich more records to generate a prioritized action list.</p>
 </section>"""
 
+
+def _section_institutional_benchmark(
+    db: Session,
+    domain_id: str,
+    org_id: int | None,
+    benchmark_profile_id: str | None = None,
+) -> str:
+    snapshot = AnalyticsService.get_domain_snapshot(
+        db,
+        TopicAnalyzer(),
+        domain_id,
+        org_id=org_id,
+        benchmark_profile_id=benchmark_profile_id,
+        top_n_concepts=10,
+        top_n_entities=5,
+    )
+    benchmark = snapshot.get("institutional_benchmark") or {}
+    top_gaps = benchmark.get("top_gaps") or []
+
+    status = benchmark.get("status", "watch")
+    status_badge = {
+        "ready": '<span class="badge badge-green">Ready</span>',
+        "watch": '<span class="badge badge-blue">Watch</span>',
+        "gap": '<span class="badge badge-amber">Gap</span>',
+    }.get(status, '<span class="badge badge-gray">Unknown</span>')
+
+    cards = f"""
+        <div class="stat-card">
+            <div class="label">Benchmark Profile</div>
+            <div class="value" style="font-size:18px">{benchmark.get("profile_name", "Institutional Benchmark")}</div>
+            <div class="sub">{benchmark.get("description", "")}</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Readiness</div>
+            <div class="value">{round(float(benchmark.get("readiness_pct") or 0))}%</div>
+            <div class="sub">{benchmark.get("passed_rules", 0)} of {benchmark.get("total_rules", 0)} rules satisfied</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Status</div>
+            <div class="value" style="font-size:18px">{status_badge}</div>
+            <div class="sub">Baseline evaluation for the current dataset</div>
+        </div>
+    """
+
+    rows = "".join(
+        f"""
+        <tr>
+            <td>{gap["label"]}</td>
+            <td>{gap["priority"]}</td>
+            <td>{gap["evidence"]}</td>
+        </tr>"""
+        for gap in top_gaps
+    )
+
+    return f"""<section>
+    <h2>Institutional Benchmark</h2>
+    <div class="grid">{cards}</div>
+    <table>
+        <thead><tr><th>Gap</th><th>Priority</th><th>Evidence</th></tr></thead>
+        <tbody>{rows if rows else '<tr><td colspan="3" style="color:#9ca3af;text-align:center;padding:20px">No major benchmark gaps detected.</td></tr>'}</tbody>
+    </table>
+</section>"""
+
     def _priority_badge(priority: str) -> str:
         if priority == "high":
             return '<span class="badge badge-red">High priority</span>'
@@ -297,6 +360,7 @@ SECTION_BUILDERS = {
     "entity_stats": _section_entity_stats,
     "enrichment_coverage": _section_enrichment_coverage,
     "decision_recommendations": _section_decision_recommendations,
+    "institutional_benchmark": _section_institutional_benchmark,
     "top_brands": _section_top_brands,
     "topic_clusters": _section_topic_clusters,
     "harmonization_log": _section_harmonization_log,
@@ -306,6 +370,7 @@ SECTION_LABELS = {
     "entity_stats": "Entity Statistics",
     "enrichment_coverage": "Enrichment Coverage",
     "decision_recommendations": "Suggested Next Actions",
+    "institutional_benchmark": "Institutional Benchmark",
     "top_brands": "Top Brands / Classifications",
     "topic_clusters": "Topic Clusters",
     "harmonization_log": "Harmonization Log",
@@ -318,6 +383,7 @@ def build(
     sections: List[str],
     title: str | None = None,
     org_id: int | None = None,
+    benchmark_profile_id: str | None = None,
 ) -> str:
     """Return a complete, self-contained HTML report string."""
     domain_name = domain_id
@@ -348,7 +414,10 @@ def build(
         builder = SECTION_BUILDERS.get(sec)
         if builder:
             try:
-                body_sections.append(builder(db, domain_id, org_id))
+                if sec == "institutional_benchmark":
+                    body_sections.append(builder(db, domain_id, org_id, benchmark_profile_id))
+                else:
+                    body_sections.append(builder(db, domain_id, org_id))
             except Exception as exc:
                 body_sections.append(f'<section><h2>{SECTION_LABELS.get(sec, sec)}</h2>'
                                      f'<p style="color:#ef4444">Error building section: {exc}</p></section>')

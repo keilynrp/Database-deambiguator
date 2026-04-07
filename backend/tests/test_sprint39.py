@@ -152,6 +152,17 @@ def test_benchmark_profiles_endpoint_lists_builtins(client, auth_headers):
     assert "sni_readiness_baseline" in ids
 
 
+def test_benchmark_evaluate_endpoint_accepts_known_profile(client, auth_headers):
+    response = client.get(
+        "/analytics/benchmarks/evaluate?domain_id=default&profile_id=sni_readiness_baseline",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["profile_id"] == "sni_readiness_baseline"
+    assert data["profile_name"] == "SNI Readiness Baseline"
+
+
 def test_benchmark_evaluate_endpoint_rejects_unknown_profile(client, auth_headers):
     response = client.get(
         "/analytics/benchmarks/evaluate?domain_id=default&profile_id=not_real",

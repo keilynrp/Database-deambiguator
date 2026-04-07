@@ -60,6 +60,7 @@ def test_reports_sections_include_decision_recommendations(client, auth_headers)
     assert resp.status_code == 200
     ids = {section["id"] for section in resp.json()}
     assert "decision_recommendations" in ids
+    assert "institutional_benchmark" in ids
 
 
 def test_html_report_accepts_decision_recommendations_section(client, auth_headers):
@@ -71,6 +72,19 @@ def test_html_report_accepts_decision_recommendations_section(client, auth_heade
     resp = client.post("/reports/generate", json=payload, headers=auth_headers)
     assert resp.status_code == 200
     assert "Suggested Next Actions" in resp.text
+
+
+def test_html_report_accepts_institutional_benchmark_section(client, auth_headers):
+    payload = {
+        "domain_id": "default",
+        "sections": ["institutional_benchmark"],
+        "benchmark_profile_id": "sni_readiness_baseline",
+        "title": "Benchmark Brief",
+    }
+    resp = client.post("/reports/generate", json=payload, headers=auth_headers)
+    assert resp.status_code == 200
+    assert "Institutional Benchmark" in resp.text
+    assert "SNI Readiness Baseline" in resp.text
 
 
 # ── Excel endpoint ─────────────────────────────────────────────────────────────

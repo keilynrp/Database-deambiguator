@@ -80,6 +80,15 @@ interface DashboardData {
   };
 }
 
+interface BenchmarkProfile {
+  id: string;
+  name: string;
+  description: string;
+  region: string;
+  rules_count: number;
+  is_default: boolean;
+}
+
 // ── Heatmap cell with violet color scale ─────────────────────────────────────
 
 function HeatCell({ value, max }: { value: number; max: number }) {
@@ -127,6 +136,10 @@ export default function ExecutiveDashboardPage() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL_SEC);
   const [exporting, setExporting] = useState(false);
+  const [benchmarkProfiles, setBenchmarkProfiles] = useState<BenchmarkProfile[]>([]);
+  const [selectedBenchmarkProfile, setSelectedBenchmarkProfile] = useState(
+    searchParams.get("benchmark_profile") || "research_portfolio_baseline",
+  );
   const importedFlag = searchParams.get("imported") === "1";
   const importedDomain = searchParams.get("domain");
   const importedRows = searchParams.get("rows");
@@ -135,7 +148,10 @@ export default function ExecutiveDashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch(`/dashboard/summary?domain_id=${activeDomainId}`);
+      const profileQuery = selectedBenchmarkProfile
+        ? `&profile_id=${encodeURIComponent(selectedBenchmarkProfile)}`
+        : "";
+      const res = await apiFetch(`/dashboard/summary?domain_id=${activeDomainId}${profileQuery}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json());
     } catch (error: unknown) {
@@ -143,9 +159,27 @@ export default function ExecutiveDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeDomainId]);
+  }, [activeDomainId, selectedBenchmarkProfile]);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadProfiles = async () => {
+      const res = await apiFetch("/analytics/benchmarks/profiles");
+      if (!res.ok) return;
+      const profiles: BenchmarkProfile[] = await res.json();
+      if (!cancelled) {
+        setBenchmarkProfiles(profiles);
+        if (!searchParams.get("benchmark_profile")) {
+          const defaultProfile = profiles.find((profile) => profile.is_default)?.id ?? profiles[0]?.id;
+          if (defaultProfile) setSelectedBenchmarkProfile(defaultProfile);
+        }
+      }
+    };
+    loadProfiles();
+    return () => { cancelled = true; };
+  }, [searchParams]);
 
   useEffect(() => {
     if (importedDomain && importedDomain !== activeDomainId) {
@@ -178,7 +212,8 @@ export default function ExecutiveDashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           domain_id: activeDomainId,
-          sections: ["entity_stats", "enrichment_coverage", "decision_recommendations", "top_brands", "topic_clusters"],
+          benchmark_profile_id: selectedBenchmarkProfile,
+          sections: ["entity_stats", "enrichment_coverage", "decision_recommendations", "institutional_benchmark", "top_brands", "topic_clusters"],
           title: "Executive Dashboard Report",
         }),
       });
@@ -201,7 +236,7 @@ export default function ExecutiveDashboardPage() {
   const heatMax = data
     ? Math.max(1, ...data.brand_year_matrix.matrix.flat())
     : 1;
-  const briefBuilderHref = `/reports?preset=pilot-brief&domain=${encodeURIComponent(importedDomain ?? activeDomainId)}&rows=${encodeURIComponent(importedRows ?? String(data?.kpis.total_entities ?? 0))}&format=pdf&title=${encodeURIComponent(`UKIP Pilot Brief — ${importedDomain ?? activeDomainId}`)}`;
+  const briefBuilderHref = `/reports?preset=pilot-brief&domain=${encodeURIComponent(importedDomain ?? activeDomainId)}&rows=${encodeURIComponent(importedRows ?? String(data?.kpis.total_entities ?? 0))}&format=pdf&benchmark_profile=${encodeURIComponent(selectedBenchmarkProfile)}&title=${encodeURIComponent(`UKIP Pilot Brief — ${importedDomain ?? activeDomainId}`)}`;
   const decisionHighlights = useMemo(() => {
     if (!data) return [];
 
@@ -354,6 +389,22 @@ export default function ExecutiveDashboardPage() {
                 </span>
               </div>
               <p className="mt-2 text-sm opacity-90">{data.institutional_benchmark.description}</p>
+              <div className="mt-3 max-w-sm">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] opacity-70">
+                  Benchmark profile
+                </label>
+                <select
+                  value={selectedBenchmarkProfile}
+                  onChange={(e) => setSelectedBenchmarkProfile(e.target.value)}
+                  className="w-full rounded-xl border border-white/70 bg-white/80 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-violet-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900/80 dark:text-white"
+                >
+                  {benchmarkProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <p className="mt-3 text-sm font-medium opacity-90">
                 Readiness {data.institutional_benchmark.readiness_pct}% with {data.institutional_benchmark.passed_rules} of {data.institutional_benchmark.total_rules} rules currently satisfied.
               </p>

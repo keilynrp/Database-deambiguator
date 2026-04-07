@@ -44,6 +44,7 @@ class _ReportRequest(BaseModel):
     domain_id: str          = Field(default="default", min_length=1, max_length=64)
     sections:  List[str]    = Field(default=_ALL_REPORT_SECTIONS, min_length=1, max_length=10)
     title:     Optional[str] = Field(default=None, max_length=200)
+    benchmark_profile_id: Optional[str] = Field(default=None, max_length=80)
 
 
 @router.post("/reports/generate", tags=["reports"])
@@ -66,6 +67,7 @@ def generate_report(
         payload.sections,
         payload.title,
         org_id=org_id,
+        benchmark_profile_id=payload.benchmark_profile_id,
     )
     filename = (
         f"ukip_report_{payload.domain_id}_"
@@ -106,6 +108,7 @@ def export_pdf(
         payload.sections,
         payload.title,
         org_id=org_id,
+        benchmark_profile_id=payload.benchmark_profile_id,
     )
     pdf_bytes = _make_pdf(html)
     filename = (

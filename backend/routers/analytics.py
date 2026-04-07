@@ -235,12 +235,14 @@ def analyzer_correlation(
 @router.get("/dashboard/summary", tags=["analytics"])
 def dashboard_summary(
     domain_id: str = Query(default="default", min_length=1, max_length=64),
+    profile_id: str = Query(default="", max_length=80),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
     """Aggregated KPIs + timeline + heatmap + concepts for the Executive Dashboard."""
     org_id = resolve_request_org_id(db, current_user)
-    _key = f"dashboard_{domain_id}_{scope_tag(org_id)}"
+    profile_key = profile_id or "default_profile"
+    _key = f"dashboard_{domain_id}_{profile_key}_{scope_tag(org_id)}"
     cached = _dashboard_cache.get(_key)
     if cached is not None:
         return cached
@@ -249,6 +251,7 @@ def dashboard_summary(
         _topic_analyzer,
         domain_id,
         org_id=org_id,
+        benchmark_profile_id=profile_id or None,
         top_n_concepts=30,
         top_n_entities=10,
     )
@@ -302,15 +305,16 @@ def evaluate_institutional_benchmark(
     current_user: models.User = Depends(get_current_user),
 ):
     org_id = resolve_request_org_id(db, current_user)
-    snapshot = AnalyticsService.get_domain_snapshot(
-        db,
-        _topic_analyzer,
-        domain_id,
-        org_id=org_id,
-        top_n_concepts=30,
-        top_n_entities=10,
-    )
     try:
+        snapshot = AnalyticsService.get_domain_snapshot(
+            db,
+            _topic_analyzer,
+            domain_id,
+            org_id=org_id,
+            benchmark_profile_id=profile_id or None,
+            top_n_concepts=30,
+            top_n_entities=10,
+        )
         return evaluate_benchmark(snapshot, profile_id or None)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
