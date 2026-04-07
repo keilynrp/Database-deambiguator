@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from backend import models
 from backend.analyzers.topic_modeling import TopicAnalyzer
 from backend.schema_registry import registry
+from backend.services.analytics_service import AnalyticsService
 from backend.tenant_access import scope_query_to_org
 
 # ── CSS (inline, print-friendly) ─────────────────────────────────────────────
@@ -246,11 +247,56 @@ def _section_harmonization_log(db: Session, domain_id: str, org_id: int | None) 
 </section>"""
 
 
+def _section_decision_recommendations(db: Session, domain_id: str, org_id: int | None) -> str:
+    snapshot = AnalyticsService.get_domain_snapshot(
+        db,
+        TopicAnalyzer(),
+        domain_id,
+        org_id=org_id,
+        top_n_concepts=10,
+        top_n_entities=5,
+    )
+    actions = snapshot.get("recommended_actions") or []
+
+    if not actions:
+        return """<section>
+    <h2>Suggested Next Actions</h2>
+    <p style="color:#9ca3af;padding:12px 0">No recommendation signals yet — import or enrich more records to generate a prioritized action list.</p>
+</section>"""
+
+    def _priority_badge(priority: str) -> str:
+        if priority == "high":
+            return '<span class="badge badge-red">High priority</span>'
+        if priority == "medium":
+            return '<span class="badge badge-amber">Medium priority</span>'
+        return '<span class="badge badge-gray">Low priority</span>'
+
+    cards = "".join(
+        f"""
+        <div class="stat-card">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+                <div class="label">{action["category"].replace("_", " ")}</div>
+                {_priority_badge(action["priority"])}
+            </div>
+            <div style="font-size:16px;font-weight:700;color:#111827;margin-top:8px">{action["title"]}</div>
+            <div class="sub" style="margin-top:8px;color:#4b5563">{action["detail"]}</div>
+            <div style="margin-top:10px;font-size:12px;color:#6b7280">{action["evidence"]}</div>
+        </div>"""
+        for action in actions
+    )
+
+    return f"""<section>
+    <h2>Suggested Next Actions</h2>
+    <div class="grid">{cards}</div>
+</section>"""
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 SECTION_BUILDERS = {
     "entity_stats": _section_entity_stats,
     "enrichment_coverage": _section_enrichment_coverage,
+    "decision_recommendations": _section_decision_recommendations,
     "top_brands": _section_top_brands,
     "topic_clusters": _section_topic_clusters,
     "harmonization_log": _section_harmonization_log,
@@ -259,6 +305,7 @@ SECTION_BUILDERS = {
 SECTION_LABELS = {
     "entity_stats": "Entity Statistics",
     "enrichment_coverage": "Enrichment Coverage",
+    "decision_recommendations": "Suggested Next Actions",
     "top_brands": "Top Brands / Classifications",
     "topic_clusters": "Topic Clusters",
     "harmonization_log": "Harmonization Log",

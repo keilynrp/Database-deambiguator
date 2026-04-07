@@ -29,6 +29,7 @@ interface Section {
 const SECTION_ICONS: Record<string, string> = {
   entity_stats:         "📊",
   enrichment_coverage:  "🔬",
+  decision_recommendations: "🧭",
   top_brands:           "🏷️",
   topic_clusters:       "🧩",
   harmonization_log:    "⚙️",
@@ -37,6 +38,7 @@ const SECTION_ICONS: Record<string, string> = {
 const SECTION_DESCRIPTIONS: Record<string, string> = {
   entity_stats:         "Total entities, validation status breakdown, distribution chart",
   enrichment_coverage:  "Coverage %, average citations, top enriched entities",
+  decision_recommendations: "Short, explainable next actions derived from current KPI signals",
   top_brands:           "Top 15 primary labels or classifications by entity count",
   topic_clusters:       "Most frequent concepts from enrichment data",
   harmonization_log:    "Last 10 harmonization steps with status",
@@ -87,7 +89,7 @@ export default function ReportsPage() {
       return explicit.split(",").map((value) => value.trim()).filter(Boolean);
     }
     if (preset === "pilot-brief") {
-      return ["entity_stats", "enrichment_coverage", "top_brands", "topic_clusters"];
+      return ["entity_stats", "enrichment_coverage", "decision_recommendations", "top_brands", "topic_clusters"];
     }
     return [];
   }, [preset, searchParams]);
@@ -303,6 +305,7 @@ export default function ReportsPage() {
                 {[
                   "Executive summary",
                   "Coverage and enrichment",
+                  "Priority actions",
                   "Portfolio concentration",
                   "Concept signal",
                 ].map((item) => (

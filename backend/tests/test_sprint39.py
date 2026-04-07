@@ -44,6 +44,7 @@ def test_dashboard_summary_returns_shape(client, auth_headers, db_session):
     assert "brand_year_matrix" in data
     assert "top_concepts" in data
     assert "top_entities" in data
+    assert "recommended_actions" in data
 
     # KPI shape
     kpis = data["kpis"]
@@ -103,3 +104,28 @@ def test_dashboard_brand_matrix_top5(client, auth_headers, db_session):
     assert response.status_code == 200
     brands = response.json()["brand_year_matrix"]["brands"]
     assert len(brands) <= 5
+
+
+def test_dashboard_recommended_actions_are_explainable(client, auth_headers, db_session):
+    for i in range(5):
+        db_session.add(models.RawEntity(
+            primary_label=f"Priority Entity {i}",
+            domain="decision_actions_test",
+            enrichment_status="completed" if i == 0 else "none",
+            enrichment_citation_count=120 if i == 0 else None,
+            enrichment_source="openalex" if i == 0 else None,
+            quality_score=0.25 if i > 0 else 0.4,
+        ))
+    db_session.commit()
+
+    response = client.get("/dashboard/summary?domain_id=decision_actions_test", headers=auth_headers)
+    assert response.status_code == 200
+    actions = response.json()["recommended_actions"]
+
+    assert any(action["id"] == "bulk_enrichment" for action in actions)
+    assert any(action["id"] == "review_low_quality_records" for action in actions)
+    for action in actions:
+        assert action["title"]
+        assert action["detail"]
+        assert action["evidence"]
+        assert action["priority"] in {"high", "medium", "low"}

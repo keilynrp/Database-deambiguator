@@ -19,6 +19,73 @@ class AnalyticsService:
     _TOP_BRANDS_N = 5
     _TOP_YEARS_N  = 6
 
+    @staticmethod
+    def build_recommended_actions(snapshot: dict) -> list[dict]:
+        """Return a short, deterministic list of explainable next actions."""
+        kpis = snapshot.get("kpis", {})
+        quality = snapshot.get("quality") or {}
+        top_entities = snapshot.get("top_entities") or []
+        top_concepts = snapshot.get("top_concepts") or []
+
+        total_entities = int(kpis.get("total_entities") or 0)
+        enrichment_pct = float(kpis.get("enrichment_pct") or 0)
+        enriched_count = int(kpis.get("enriched_count") or 0)
+        avg_quality = quality.get("average")
+
+        actions: list[dict] = []
+
+        if total_entities and enrichment_pct < 40:
+            actions.append({
+                "id": "bulk_enrichment",
+                "title": "Run bulk enrichment before external review",
+                "detail": "Coverage is still too shallow to treat this dataset as decision-ready.",
+                "evidence": (
+                    f"Only {enriched_count:,} of {total_entities:,} entities "
+                    f"are enriched ({enrichment_pct:.1f}% coverage)."
+                ),
+                "priority": "high",
+                "category": "coverage",
+            })
+
+        if avg_quality is not None and avg_quality < 0.6:
+            actions.append({
+                "id": "review_low_quality_records",
+                "title": "Review low-quality records before briefing stakeholders",
+                "detail": "Low-confidence records can distort the first executive readout.",
+                "evidence": f"Average quality is {round(avg_quality * 100)}%.",
+                "priority": "high" if avg_quality < 0.45 else "medium",
+                "category": "quality",
+            })
+
+        if top_entities:
+            lead_entity = top_entities[0]
+            label = lead_entity.get("primary_label") or f"Entity #{lead_entity.get('id')}"
+            citations = int(lead_entity.get("citation_count") or 0)
+            actions.append({
+                "id": "focus_top_impact_entity",
+                "title": "Prioritize the top-impact entity for manual analysis",
+                "detail": "A quick manual read of the strongest entity usually improves the pilot narrative.",
+                "evidence": f"{label} currently leads with {citations:,} citations.",
+                "priority": "medium",
+                "category": "impact",
+            })
+
+        if top_concepts and enrichment_pct >= 40:
+            lead_concept = top_concepts[0]
+            actions.append({
+                "id": "explore_leading_concept_cluster",
+                "title": "Explore the leading concept cluster",
+                "detail": "The strongest semantic cluster is a good candidate for the next decision lens.",
+                "evidence": (
+                    f"{lead_concept.get('concept', 'Top concept')} appears "
+                    f"{int(lead_concept.get('count') or 0):,} times in the current snapshot."
+                ),
+                "priority": "medium",
+                "category": "semantic",
+            })
+
+        return actions[:4]
+
     @classmethod
     def get_domain_snapshot(
         cls,
@@ -134,7 +201,7 @@ class AnalyticsService:
             "low":    sum(1 for v in quality_values if v < 0.3),
         }
 
-        return {
+        snapshot = {
             "domain_id": domain_id,
             "kpis": {
                 "total_entities": total_entities,
@@ -150,6 +217,8 @@ class AnalyticsService:
             "top_entities":       top_entities,
             "quality": {"average": avg_quality, "distribution": quality_dist},
         }
+        snapshot["recommended_actions"] = cls.build_recommended_actions(snapshot)
+        return snapshot
 
     @staticmethod
     def get_stats(db: Session, org_id: int | None = None) -> dict:

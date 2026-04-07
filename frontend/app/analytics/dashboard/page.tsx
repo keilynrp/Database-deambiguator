@@ -50,6 +50,14 @@ interface DashboardData {
     average: number | null;
     distribution: { high: number; medium: number; low: number };
   };
+  recommended_actions: {
+    id: string;
+    title: string;
+    detail: string;
+    evidence: string;
+    priority: "high" | "medium" | "low";
+    category: string;
+  }[];
 }
 
 // ── Heatmap cell with violet color scale ─────────────────────────────────────
@@ -150,7 +158,7 @@ export default function ExecutiveDashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           domain_id: activeDomainId,
-          sections: ["entity_stats", "enrichment_coverage", "top_brands", "topic_clusters"],
+          sections: ["entity_stats", "enrichment_coverage", "decision_recommendations", "top_brands", "topic_clusters"],
           title: "Executive Dashboard Report",
         }),
       });
@@ -177,49 +185,15 @@ export default function ExecutiveDashboardPage() {
   const decisionHighlights = useMemo(() => {
     if (!data) return [];
 
-    const highlights: { title: string; detail: string; tone: "violet" | "amber" | "emerald" }[] = [];
-
-    if (data.kpis.enrichment_pct < 40) {
-      highlights.push({
-        title: "Coverage is still shallow",
-        detail: `${data.kpis.enrichment_pct}% of entities are enriched. Run bulk enrichment before treating this dataset as decision-ready.`,
-        tone: "amber",
-      });
-    } else if (data.kpis.enrichment_pct >= 70) {
-      highlights.push({
-        title: "Coverage looks operational",
-        detail: `${data.kpis.enriched_count.toLocaleString()} entities are already enriched, which is enough to support a first executive readout.`,
-        tone: "emerald",
-      });
-    }
-
-    if (data.quality?.average != null && data.quality.average < 0.6) {
-      highlights.push({
-        title: "Data quality needs attention",
-        detail: `Average quality is ${Math.round(data.quality.average * 100)}%. Review low-quality records before exporting a stakeholder-facing brief.`,
-        tone: "amber",
-      });
-    }
-
-    if (data.top_entities[0]) {
-      const topEntity = data.top_entities[0];
-      const label = topEntity.entity_name || topEntity.primary_label || `Entity #${topEntity.id}`;
-      highlights.push({
-        title: "Top impact entity detected",
-        detail: `${label} leads the current portfolio with ${topEntity.citation_count.toLocaleString()} citations.`,
-        tone: "violet",
-      });
-    }
-
-    if (data.top_concepts[0]) {
-      highlights.push({
-        title: "Leading concept cluster",
-        detail: `${data.top_concepts[0].concept} is currently the strongest concept signal in this domain snapshot.`,
-        tone: "violet",
-      });
-    }
-
-    return highlights.slice(0, 3);
+    return data.recommended_actions.map((action) => ({
+      ...action,
+      tone:
+        action.priority === "high"
+          ? "amber"
+          : action.category === "impact"
+            ? "emerald"
+            : "violet",
+    }));
   }, [data]);
 
   const toneStyles: Record<"violet" | "amber" | "emerald", string> = {
@@ -349,10 +323,11 @@ export default function ExecutiveDashboardPage() {
               className={`rounded-2xl border p-5 shadow-sm ${toneStyles[highlight.tone]}`}
             >
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-70">
-                Decision Highlight
+                Suggested Next Action
               </p>
               <p className="text-sm font-semibold">{highlight.title}</p>
               <p className="mt-2 text-sm opacity-90">{highlight.detail}</p>
+              <p className="mt-3 text-xs font-medium opacity-75">{highlight.evidence}</p>
             </div>
           ))}
         </div>

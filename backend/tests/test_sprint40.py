@@ -55,6 +55,24 @@ def test_pdf_invalid_section_returns_422(client, auth_headers):
     assert resp.status_code == 422
 
 
+def test_reports_sections_include_decision_recommendations(client, auth_headers):
+    resp = client.get("/reports/sections", headers=auth_headers)
+    assert resp.status_code == 200
+    ids = {section["id"] for section in resp.json()}
+    assert "decision_recommendations" in ids
+
+
+def test_html_report_accepts_decision_recommendations_section(client, auth_headers):
+    payload = {
+        "domain_id": "default",
+        "sections": ["decision_recommendations"],
+        "title": "Decision Brief",
+    }
+    resp = client.post("/reports/generate", json=payload, headers=auth_headers)
+    assert resp.status_code == 200
+    assert "Suggested Next Actions" in resp.text
+
+
 # ── Excel endpoint ─────────────────────────────────────────────────────────────
 
 def test_excel_requires_auth(client):
