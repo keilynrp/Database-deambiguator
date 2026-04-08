@@ -326,6 +326,25 @@ class TestUploadWithFieldMapping:
         )
         assert resp.status_code == 201
 
+    def test_creation_date_virtual_mapping_persists_to_attributes_json(self, client, editor_headers, db_session):
+        from backend import models
+
+        buf = _csv_file([{"Title": "Temporal record", "Year": 2024}])
+        mapping = json.dumps({"Title": "primary_label", "Year": "creation_date"})
+        resp = client.post(
+            "/upload",
+            data={"domain": "science", "field_mapping": mapping},
+            files={"file": ("temporal.csv", buf, "text/csv")},
+            headers=editor_headers,
+        )
+        assert resp.status_code == 201, resp.text
+
+        stored = db_session.query(models.RawEntity).filter_by(primary_label="Temporal record").one()
+        assert stored.attributes_json is not None
+        attrs = json.loads(stored.attributes_json)
+        assert attrs["creation_date"] == "2024"
+        assert attrs["year"] == 2024
+
     def test_viewer_cannot_upload(self, client, viewer_headers):
         buf = _csv_file()
         resp = client.post(

@@ -51,6 +51,8 @@ MAPPABLE_MODEL_FIELDS = [
     "enrichment_source", "creation_date", "validation_status",
 ]
 
+_VIRTUAL_MODEL_FIELDS = {"creation_date"}
+
 _SCIENCE_AUTO_MAPPING = {
     "title":    "primary_label",
     "authors":  "secondary_label",
@@ -188,6 +190,20 @@ def _parse_file_to_records(filename: str, contents: bytes) -> tuple[str, list[di
         return "rdf", list(entities.values())
     else:
         raise HTTPException(status_code=400, detail="Unsupported file format for tabular parsing.")
+
+
+def _record_virtual_field(target: dict, field_name: str, value) -> None:
+    """Persist wizard-only virtual fields into attributes_json-compatible data."""
+    if value is None:
+        return
+
+    text_value = str(value)
+    target[field_name] = text_value
+
+    if field_name == "creation_date":
+        match = re.search(r"\b(19\d{2}|20\d{2})\b", text_value)
+        if match and "year" not in target:
+            target["year"] = int(match.group(1))
 
 
 # ── LLM-assisted mapping suggestion (Sprint 74) ───────────────────────────────
@@ -499,6 +515,7 @@ async def upload_file(
 
         row_data: dict = {"domain": domain, "org_id": stored_org_id}
         unmatched_data: dict = {}
+        virtual_field_data: dict = {}
 
         for k, val in row.items():
             is_nan = False
@@ -519,12 +536,23 @@ async def upload_file(
             if mapped_field == "" or mapped_field is None and sk not in valid_model_keys:
                 if mapped_field != "":  # only store if not explicitly skipped
                     unmatched_data[sk] = val
+            elif mapped_field in _VIRTUAL_MODEL_FIELDS:
+                _record_virtual_field(virtual_field_data, mapped_field, val)
             elif mapped_field:
                 row_data[mapped_field] = str(val) if val is not None else None
+            elif sk in _VIRTUAL_MODEL_FIELDS:
+                _record_virtual_field(virtual_field_data, sk, val)
             elif sk in valid_model_keys:
                 row_data[sk] = str(val) if val is not None else None
             else:
                 unmatched_data[sk] = val
+
+        if virtual_field_data:
+            row_data["attributes_json"] = json.dumps(
+                virtual_field_data,
+                default=str,
+                ensure_ascii=False,
+            )
 
         if unmatched_data:
             row_data["normalized_json"] = json.dumps(

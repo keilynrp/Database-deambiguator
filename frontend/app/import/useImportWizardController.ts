@@ -8,6 +8,17 @@ function getErrorMessage(error: unknown, fallback: string) {
     return error instanceof Error ? error.message : fallback;
 }
 
+async function parseErrorDetail(response: Response, fallback: string): Promise<string> {
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+        const errorBody = await response.json().catch(() => ({ detail: fallback })) as { detail?: unknown };
+        return formatApiDetail(errorBody.detail, fallback);
+    }
+
+    const text = await response.text().catch(() => "");
+    return text.trim() || fallback;
+}
+
 function formatApiDetail(detail: unknown, fallback: string): string {
     if (typeof detail === "string" && detail.trim()) {
         return detail;
@@ -66,8 +77,7 @@ export default function useImportWizardController() {
         try {
             const response = await apiFetch("/upload/preview", { method: "POST", body: form });
             if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({ detail: "Preview failed" })) as { detail?: unknown };
-                setPreviewError(formatApiDetail(errorBody.detail, "Preview failed"));
+                setPreviewError(await parseErrorDetail(response, "Preview failed"));
                 return;
             }
 
@@ -106,8 +116,7 @@ export default function useImportWizardController() {
         try {
             const response = await apiFetch("/upload", { method: "POST", body: form });
             if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({ detail: "Import failed" })) as { detail?: unknown };
-                setImportError(formatApiDetail(errorBody.detail, "Import failed"));
+                setImportError(await parseErrorDetail(response, "Import failed"));
                 return;
             }
             setImportResult(await response.json() as ImportResult);
