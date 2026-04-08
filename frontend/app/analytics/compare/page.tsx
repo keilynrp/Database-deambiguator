@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { PageHeader } from "../../components/ui";
 import { apiFetch } from "@/lib/api";
 
@@ -44,10 +45,9 @@ const DOMAIN_PRESETS = ["default", "science", "healthcare", "all"];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function KPICard({ label, values, colorIdx, formatter = String }: {
+function KPICard({ label, values, formatter = String }: {
   label: string;
   values: (string | number)[];
-  colorIdx: number;
   formatter?: (v: string | number) => string;
 }) {
   const winner = values.reduce<number>((best, v, i) =>
@@ -83,6 +83,7 @@ function MiniBar({ label, count, max, color }: { label: string; count: number; m
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function DomainComparePage() {
+  const { t } = useLanguage();
   const [selectedDomains, setSelectedDomains] = useState<string[]>(["default", "science"]);
   const [customA, setCustomA] = useState("");
   const [customB, setCustomB] = useState("");
@@ -98,11 +99,11 @@ export default function DomainComparePage() {
       if (!res.ok) throw new Error(`Server responded with ${res.status}`);
       setResult(await res.json());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load comparison");
+      setError(e instanceof Error ? e.message : t("page.compare.error_load"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(selectedDomains); }, [load, selectedDomains]);
 
@@ -122,17 +123,17 @@ export default function DomainComparePage() {
     <div className="space-y-6">
       <PageHeader
         breadcrumbs={[
-          { label: "Home", href: "/" },
-          { label: "Analytics", href: "/analytics" },
-          { label: "Domain Comparison" },
+          { label: t("nav.home"), href: "/" },
+          { label: t("nav.analytics"), href: "/analytics" },
+          { label: t("page.compare.title") },
         ]}
-        title="Domain Comparison"
-        description="Side-by-side KPI comparison across up to 4 domains"
+        title={t("page.compare.title")}
+        description={t("page.compare.description")}
       />
 
       {/* Domain selector */}
       <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">Compare domains</h3>
+        <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{t("page.compare.compare_domains")}</h3>
         <div className="flex flex-wrap gap-2 mb-4">
           {DOMAIN_PRESETS.map((d) => (
             <button
@@ -155,12 +156,12 @@ export default function DomainComparePage() {
         </div>
         <div className="flex gap-2">
           <input
-            type="text" placeholder="Custom domain A" value={customA}
+            type="text" placeholder={t("page.compare.custom_domain_a")} value={customA}
             onChange={e => setCustomA(e.target.value)}
             className="h-9 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
           />
           <input
-            type="text" placeholder="Custom domain B" value={customB}
+            type="text" placeholder={t("page.compare.custom_domain_b")} value={customB}
             onChange={e => setCustomB(e.target.value)}
             className="h-9 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
           />
@@ -168,7 +169,7 @@ export default function DomainComparePage() {
             onClick={addCustomDomain}
             className="h-9 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
           >
-            Compare
+            {t("page.compare.compare_button")}
           </button>
         </div>
       </div>
@@ -204,36 +205,32 @@ export default function DomainComparePage() {
         <>
           {/* KPI grid */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Key Metrics</h3>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t("page.compare.key_metrics")}</h3>
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <KPICard
-                label="Total Entities"
+                label={t("page.compare.total_entities")}
                 values={snapshots.map(s => s.kpis.total_entities)}
-                colorIdx={0}
                 formatter={v => Number(v).toLocaleString()}
               />
               <KPICard
-                label="Enriched Records"
+                label={t("page.compare.enriched_records")}
                 values={snapshots.map(s => s.kpis.enriched_count)}
-                colorIdx={0}
                 formatter={v => Number(v).toLocaleString()}
               />
               <KPICard
-                label="Enrichment %"
+                label={t("page.compare.enrichment_pct")}
                 values={snapshots.map(s => s.kpis.enrichment_pct)}
-                colorIdx={0}
                 formatter={v => `${v}%`}
               />
               <KPICard
-                label="Avg Citations"
+                label={t("page.compare.avg_citations")}
                 values={snapshots.map(s => s.kpis.avg_citations)}
-                colorIdx={0}
                 formatter={v => String(v)}
               />
               <KPICard
-                label="Unique Concepts"
+                label={t("page.compare.unique_concepts")}
                 values={snapshots.map(s => s.kpis.total_concepts)}
-                colorIdx={0}
                 formatter={v => Number(v).toLocaleString()}
               />
             </div>
@@ -255,13 +252,14 @@ export default function DomainComparePage() {
                   {/* Entity types */}
                   {snap.type_distribution.length > 0 && (
                     <div>
-                      <p className="mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400">Entity Types</p>
+                      <p className="mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400">{t("page.compare.entity_types")}</p>
+
                       <div className="space-y-1.5">
                         {snap.type_distribution.slice(0, 6).map(t => (
                           <MiniBar key={t.type} label={t.type} count={t.count} max={maxType} color={clr.bar} />
                         ))}
                         {snap.type_distribution.length === 0 && (
-                          <p className="text-xs text-gray-400">No data</p>
+                          <p className="text-xs text-gray-400">{t("common.no_data")}</p>
                         )}
                       </div>
                     </div>
@@ -270,7 +268,7 @@ export default function DomainComparePage() {
                   {/* Top concepts */}
                   {snap.top_concepts.length > 0 && (
                     <div>
-                      <p className="mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400">Top Concepts</p>
+                      <p className="mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400">{t("page.compare.top_concepts")}</p>
                       <div className="space-y-1.5">
                         {snap.top_concepts.slice(0, 8).map(c => (
                           <MiniBar key={c.concept} label={c.concept} count={c.count} max={maxConcept} color={clr.bar} />
@@ -282,7 +280,7 @@ export default function DomainComparePage() {
                   {/* Timeline sparkline (text) */}
                   {snap.entities_by_year.length > 0 && (
                     <div>
-                      <p className="mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400">Activity Timeline</p>
+                      <p className="mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400">{t("page.compare.activity_timeline")}</p>
                       <div className="flex flex-wrap gap-1">
                         {snap.entities_by_year.slice(-6).map(e => (
                           <div key={e.year} className="text-center">
@@ -297,7 +295,7 @@ export default function DomainComparePage() {
                   {/* Top entities */}
                   {snap.top_entities.length > 0 && (
                     <div>
-                      <p className="mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400">Top by Citations</p>
+                      <p className="mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400">{t("page.compare.top_by_citations")}</p>
                       <div className="space-y-1">
                         {snap.top_entities.slice(0, 4).map(e => (
                           <a key={e.id} href={`/entities/${e.id}`}
@@ -311,7 +309,7 @@ export default function DomainComparePage() {
                   )}
 
                   {snap.kpis.total_entities === 0 && (
-                    <p className="text-center text-sm text-gray-400 py-4">No data for this domain yet</p>
+                    <p className="text-center text-sm text-gray-400 py-4">{t("page.compare.no_data_domain")}</p>
                   )}
                 </div>
               );

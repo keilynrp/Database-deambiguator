@@ -262,15 +262,19 @@ export default function ExecutiveDashboardPage() {
   const decisionHighlights = useMemo(() => {
     if (!data) return [];
 
-    return data.recommended_actions.map((action) => ({
-      ...action,
-      tone:
+    return data.recommended_actions.map((action) => {
+      const tone: "amber" | "emerald" | "violet" =
         action.priority === "high"
           ? "amber"
           : action.category === "impact"
             ? "emerald"
-            : "violet",
-    }));
+            : "violet";
+
+      return {
+        ...action,
+        tone,
+      };
+    });
   }, [data]);
 
   const toneStyles: Record<"violet" | "amber" | "emerald", string> = {

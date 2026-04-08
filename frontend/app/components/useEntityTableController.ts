@@ -1,15 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useLanguage } from "../contexts/LanguageContext";
 import type { ActiveFacets } from "./FacetPanel";
 import type { EditableFields, Entity } from "./EntityTable.types";
+import type { ToastVariant } from "./ui";
 import { apiFetch } from "@/lib/api";
 
 interface UseEntityTableControllerOptions {
-    toast: (message: string, variant?: string) => void;
+    toast: (message: string, variant?: ToastVariant) => void;
 }
 
 export function useEntityTableController({ toast }: UseEntityTableControllerOptions) {
+    const { t } = useLanguage();
     const [entities, setEntities] = useState<Entity[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -73,12 +76,12 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
             if (!res.ok) throw new Error(`Server responded with ${res.status}`);
             setEntities(await res.json());
         } catch (error) {
-            const message = error instanceof Error ? error.message : "Unknown error";
+            const message = error instanceof Error ? error.message : t("page.entity_table.unknown_error");
             setFetchError(message);
         } finally {
             setLoading(false);
         }
-    }, [debouncedSearch, page, limit, minQuality, sortBy, sortOrder, activeFacets]);
+    }, [activeFacets, debouncedSearch, limit, minQuality, page, sortBy, sortOrder, t]);
 
     useEffect(() => {
         fetchEntities();
@@ -115,12 +118,12 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(editData),
             });
-            if (!res.ok) throw new Error("Failed to update");
+            if (!res.ok) throw new Error(t("page.entity_table.update_failed"));
             const updated = await res.json();
             setEntities((prev) => prev.map((entity) => (entity.id === editingId ? updated : entity)));
             setEditingId(null);
         } catch {
-            toast("Error updating entity", "error");
+            toast(t("page.entity_table.update_error"), "error");
         } finally {
             setSaving(false);
         }
@@ -130,11 +133,11 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
         setDeletingId(id);
         try {
             const res = await apiFetch(`/entities/${id}`, { method: "DELETE" });
-            if (!res.ok) throw new Error("Failed to delete");
+            if (!res.ok) throw new Error(t("page.entity_table.delete_failed"));
             setEntities((prev) => prev.filter((entity) => entity.id !== id));
-            toast("Entity deleted", "success");
+            toast(t("page.entity_table.delete_success"), "success");
         } catch {
-            toast("Error deleting entity", "error");
+            toast(t("page.entity_table.delete_error"), "error");
         } finally {
             setDeletingId(null);
         }
@@ -144,12 +147,12 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
         setEnrichingId(id);
         try {
             const res = await apiFetch(`/enrich/row/${id}`, { method: "POST" });
-            if (!res.ok) throw new Error("Failed to enrich");
+            if (!res.ok) throw new Error(t("page.entity_table.enrich_failed"));
             const enriched = await res.json();
             setEntities((prev) => prev.map((entity) => (entity.id === id ? { ...entity, ...enriched } : entity)));
-            toast("Enrichment complete", "success");
+            toast(t("page.entity_table.enrich_success"), "success");
         } catch {
-            toast("Error enriching entity", "error");
+            toast(t("page.entity_table.enrich_error"), "error");
         } finally {
             setEnrichingId(null);
         }
@@ -173,7 +176,7 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
     }
 
     async function handleBulkDelete() {
-        if (!confirm(`Delete ${selectedIds.size} selected entities?`)) return;
+        if (!confirm(t("page.entity_table.bulk_delete_confirm", { count: selectedIds.size }))) return;
         setBulkDeleting(true);
         try {
             const res = await apiFetch("/entities/bulk", {
@@ -181,13 +184,13 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ids: Array.from(selectedIds) }),
             });
-            if (!res.ok) throw new Error("Bulk delete failed");
+            if (!res.ok) throw new Error(t("page.entity_table.bulk_delete_failed"));
             const data = await res.json();
             setEntities((prev) => prev.filter((entity) => !selectedIds.has(entity.id)));
             setSelectedIds(new Set());
-            toast(`${data.deleted} entities deleted`, "success");
+            toast(t("page.entity_table.bulk_delete_success", { count: data.deleted }), "success");
         } catch {
-            toast("Bulk delete failed", "error");
+            toast(t("page.entity_table.bulk_delete_failed"), "error");
         } finally {
             setBulkDeleting(false);
         }
@@ -201,12 +204,12 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ids: Array.from(selectedIds) }),
             });
-            if (!res.ok) throw new Error("Bulk enrich failed");
+            if (!res.ok) throw new Error(t("page.entity_table.bulk_enrich_failed"));
             const data = await res.json();
-            toast(`${data.queued} entities queued for enrichment`, "success");
+            toast(t("page.entity_table.bulk_enrich_success", { count: data.queued }), "success");
             setSelectedIds(new Set());
         } catch {
-            toast("Bulk enrich failed", "error");
+            toast(t("page.entity_table.bulk_enrich_failed"), "error");
         } finally {
             setBulkEnriching(false);
         }
@@ -214,7 +217,17 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
 
     function handleBulkExport() {
         const selected = entities.filter((entity) => selectedIds.has(entity.id));
-        const headers = [
+        const headers: Array<
+            "id" |
+            "primary_label" |
+            "secondary_label" |
+            "canonical_id" |
+            "entity_type" |
+            "domain" |
+            "validation_status" |
+            "enrichment_status" |
+            "source"
+        > = [
             "id",
             "primary_label",
             "secondary_label",
@@ -228,7 +241,7 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
         const rows = selected.map((entity) =>
             headers
                 .map((header) => {
-                    const value = (entity as Record<string, unknown>)[header];
+                    const value = entity[header];
                     return value == null ? "" : `"${String(value).replace(/"/g, '""')}"`;
                 })
                 .join(","),
@@ -243,7 +256,7 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        toast(`${selected.length} entities exported as CSV`, "success");
+        toast(t("page.entity_table.bulk_export_success", { count: selected.length }), "success");
     }
 
     return {
@@ -270,6 +283,7 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
         setSortOrder,
         deletingId,
         selectedIds,
+        setSelectedIds,
         bulkDeleting,
         bulkEnriching,
         fetchError,

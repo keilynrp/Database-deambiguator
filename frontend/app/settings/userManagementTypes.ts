@@ -22,3 +22,10 @@ export const ROLE_LABELS: Record<UserRole, string> = {
     editor: "Editor",
     viewer: "Viewer",
 };
+
+export const ROLE_LABEL_KEYS: Record<UserRole, string> = {
+    super_admin: "users.role.super_admin",
+    admin: "users.role.admin",
+    editor: "users.role.editor",
+    viewer: "users.role.viewer",
+};

@@ -1,8 +1,9 @@
 "use client";
 
+import { useLanguage } from "../contexts/LanguageContext";
 import { PageHeader } from "../components/ui";
 import {
-    STEPS,
+    getSteps,
     StepBar,
     StepDomain,
     StepImport,
@@ -13,6 +14,7 @@ import {
 import useImportWizardController from "./useImportWizardController";
 
 export default function ImportWizardPage() {
+    const { t } = useLanguage();
     const {
         step,
         file,
@@ -32,16 +34,17 @@ export default function ImportWizardPage() {
         handleNext,
         handleBack,
     } = useImportWizardController();
+    const steps = getSteps(t);
 
     return (
         <div className="space-y-6">
             <PageHeader
                 breadcrumbs={[
-                    { label: "Home", href: "/" },
-                    { label: "Import Wizard" },
+                    { label: t("nav.home"), href: "/" },
+                    { label: t("page.import.title") },
                 ]}
-                title="Bulk Import Wizard"
-                description="Import CSV, Excel, BibTeX, RIS, JSON, XML, or Parquet files with guided field mapping and domain selection."
+                title={t("page.import.title")}
+                description={t("page.import.description")}
             />
 
             <div className="flex justify-center py-2">
@@ -50,7 +53,7 @@ export default function ImportWizardPage() {
 
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <h2 className="mb-5 text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                    Step {step} - {STEPS[step - 1].label}
+                    {t("page.import.step_label")} {step} - {steps[step - 1].label}
                 </h2>
 
                 {step === 1 && <StepUpload file={file} onFile={handleFile} />}
@@ -62,13 +65,13 @@ export default function ImportWizardPage() {
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                             </svg>
-                            <p className="text-sm text-gray-500">Parsing file and detecting columns...</p>
+                            <p className="text-sm text-gray-500">{t("page.import.loading_preview")}</p>
                         </div>
                     ) : previewError ? (
                         <div className="rounded-xl border border-red-200 bg-red-50 p-5 dark:border-red-500/30 dark:bg-red-500/5">
                             <p className="text-sm font-medium text-red-700 dark:text-red-400">{previewError}</p>
                             <button onClick={() => setStep(1)} className="mt-2 text-xs text-red-600 underline dark:text-red-400">
-                                Back and try another file
+                                {t("page.import.try_another_file")}
                             </button>
                         </div>
                     ) : preview ? (
@@ -93,7 +96,7 @@ export default function ImportWizardPage() {
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                         </svg>
-                        Back
+                        {t("common.back")}
                     </button>
 
                     <button
@@ -101,7 +104,7 @@ export default function ImportWizardPage() {
                         disabled={!canNext[step]}
                         className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-40"
                     >
-                        {step === 4 ? "Import Now" : "Next"}
+                        {step === 4 ? t("page.import.import_now") : t("common.next")}
                         {step < 4 && (
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

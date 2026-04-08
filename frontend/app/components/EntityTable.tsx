@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { useDomain } from "../contexts/DomainContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { useToast } from "./ui";
 import FacetPanel from "./FacetPanel";
 import EntityTablePagination from "./EntityTablePagination";
@@ -14,6 +15,7 @@ import { useEntityTableVirtualization } from "./useEntityTableVirtualization";
 
 export default function EntityTable() {
     const { activeDomain } = useDomain();
+    const { t } = useLanguage();
     const { toast } = useToast();
     const facetRefreshKey = 0;
     const {
@@ -40,6 +42,7 @@ export default function EntityTable() {
         setSortOrder,
         deletingId,
         selectedIds,
+        setSelectedIds,
         bulkDeleting,
         bulkEnriching,
         fetchError,
@@ -124,7 +127,10 @@ export default function EntityTable() {
                         onEditDataChange={setEditData}
                         onSelectEntity={setSelectedEntity}
                         onDeleteEntity={(entity) => {
-                            if (confirm(`Delete entity #${entity.id} "${entity.primary_label}"?`)) {
+                            if (confirm(t("page.entity_table.delete_single_confirm", {
+                                id: entity.id,
+                                label: entity.primary_label ?? t("page.entity_table.unnamed_entity"),
+                            }))) {
                                 deleteEntity(entity.id);
                             }
                         }}

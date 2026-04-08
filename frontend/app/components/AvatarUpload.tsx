@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useLanguage } from "../contexts/LanguageContext";
+import type { ToastVariant } from "./ui";
 import UserAvatar from "./UserAvatar";
 import { apiFetch } from "../../lib/api";
 
@@ -9,7 +11,7 @@ interface AvatarUploadProps {
   role: string;
   currentAvatarUrl?: string | null;
   onUpdated: (newUrl: string | null) => void;
-  toast: (msg: string, v?: any) => void;
+  toast: (msg: string, v?: ToastVariant) => void;
 }
 
 // Resize & center-crop image to 200×200, encode as JPEG base64
@@ -52,6 +54,7 @@ function processImage(file: File): Promise<string> {
 }
 
 export default function AvatarUpload({ username, role, currentAvatarUrl, onUpdated, toast }: AvatarUploadProps) {
+  const { t } = useLanguage();
   const [preview,   setPreview]   = useState<string | null>(null);
   const [dragOver,  setDragOver]  = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -73,18 +76,18 @@ export default function AvatarUpload({ username, role, currentAvatarUrl, onUpdat
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.detail || "Upload failed");
+        throw new Error(err.detail || t("settings.account.avatar_upload_failed"));
       }
       const updated = await res.json();
       onUpdated(updated.avatar_url);
-      toast("Avatar updated", "success");
-    } catch (err: any) {
+      toast(t("settings.account.avatar_updated"), "success");
+    } catch (err: unknown) {
       setPreview(null);
-      toast(err.message || "Failed to upload avatar", "error");
+      toast(err instanceof Error ? err.message : t("settings.account.avatar_upload_failed"), "error");
     } finally {
       setUploading(false);
     }
-  }, [onUpdated, toast]);
+  }, [onUpdated, t, toast]);
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
@@ -103,12 +106,12 @@ export default function AvatarUpload({ username, role, currentAvatarUrl, onUpdat
     setRemoving(true);
     try {
       const res = await apiFetch("/users/me/avatar", { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to remove avatar");
+      if (!res.ok) throw new Error(t("settings.account.avatar_remove_failed"));
       setPreview(null);
       onUpdated(null);
-      toast("Avatar removed", "success");
-    } catch (err: any) {
-      toast(err.message || "Failed to remove avatar", "error");
+      toast(t("settings.account.avatar_removed"), "success");
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : t("settings.account.avatar_remove_failed"), "error");
     } finally {
       setRemoving(false);
     }
@@ -147,9 +150,9 @@ export default function AvatarUpload({ username, role, currentAvatarUrl, onUpdat
               d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
           </svg>
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {dragOver ? "Drop to upload" : "Drag & drop or click to choose"}
+            {dragOver ? t("settings.account.avatar_drop_now") : t("settings.account.avatar_drag_or_click")}
           </p>
-          <p className="text-xs text-gray-400">JPEG, PNG, WebP — max 5 MB · cropped to 200×200</p>
+          <p className="text-xs text-gray-400">{t("settings.account.avatar_help")}</p>
         </div>
 
         <input
@@ -167,7 +170,7 @@ export default function AvatarUpload({ username, role, currentAvatarUrl, onUpdat
             disabled={removing || uploading}
             className="mt-2 text-xs text-red-500 hover:underline disabled:opacity-50 dark:text-red-400"
           >
-            {removing ? "Removing…" : "Remove avatar"}
+            {removing ? t("settings.account.removing") : t("settings.account.remove_avatar")}
           </button>
         )}
       </div>

@@ -30,12 +30,12 @@ export default function SettingsPage() {
     const isAdmin = user?.role === "super_admin" || user?.role === "admin";
 
     const tabs = [
-        { id: "preferences", label: "Preferences" },
-        { id: "account",     label: "Account" },
-        ...(isSuperAdmin ? [{ id: "users", label: "User Management" }] : []),
-        ...(isAdmin ? [{ id: "webhooks",      label: "Webhooks" }] : []),
-        ...(isAdmin ? [{ id: "notifications", label: "Notifications" }] : []),
-        ...(isAdmin ? [{ id: "branding",      label: "Branding" }] : []),
+        { id: "preferences", label: t("settings.tab.preferences") },
+        { id: "account", label: t("settings.tab.account") },
+        ...(isSuperAdmin ? [{ id: "users", label: t("settings.tab.users") }] : []),
+        ...(isAdmin ? [{ id: "webhooks", label: t("settings.tab.webhooks") }] : []),
+        ...(isAdmin ? [{ id: "notifications", label: t("settings.tab.notifications") }] : []),
+        ...(isAdmin ? [{ id: "branding", label: t("settings.tab.branding") }] : []),
     ];
 
     const [tab, setTab] = useState<Tab>("preferences");
@@ -43,7 +43,7 @@ export default function SettingsPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                breadcrumbs={[{ label: "Home", href: "/" }, { label: "Settings" }]}
+                breadcrumbs={[{ label: t("nav.home"), href: "/" }, { label: t("settings.title") }]}
                 title={t("settings.title")}
                 description={t("settings.subtitle")}
             />

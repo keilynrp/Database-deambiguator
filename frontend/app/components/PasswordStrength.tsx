@@ -1,5 +1,7 @@
 "use client";
 
+import { useLanguage } from "../contexts/LanguageContext";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Criteria {
@@ -67,10 +69,28 @@ interface Props {
 }
 
 export default function PasswordStrength({ password, showCriteria = true }: Props) {
+  const { t } = useLanguage();
   if (!password) return null;
 
   const { score, level, label, criteria } = getPasswordStrength(password);
   const { bar, text } = LEVEL_COLOR[level];
+  const localizedCriteria = criteria.map((criterion) => ({
+    ...criterion,
+    label: t(
+      criterion.label === "At least 8 characters" ? "settings.account.password_rule_min_8"
+        : criterion.label === "At least 12 characters" ? "settings.account.password_rule_min_12"
+          : criterion.label === "Uppercase letter (A–Z)" ? "settings.account.password_rule_upper"
+            : criterion.label === "Lowercase letter (a–z)" ? "settings.account.password_rule_lower"
+              : criterion.label === "Number (0–9)" ? "settings.account.password_rule_number"
+                : "settings.account.password_rule_special",
+    ),
+  }));
+  const localizedLabel =
+    label === "Too short" ? t("settings.account.password_label_short")
+      : label === "Weak" ? t("settings.account.password_label_weak")
+        : label === "Fair" ? t("settings.account.password_label_fair")
+          : label === "Good" ? t("settings.account.password_label_good")
+            : t("settings.account.password_label_strong");
 
   return (
     <div className="mt-2 space-y-2">
@@ -86,13 +106,13 @@ export default function PasswordStrength({ password, showCriteria = true }: Prop
             />
           ))}
         </div>
-        <span className={`shrink-0 text-xs font-semibold ${text}`}>{label}</span>
+        <span className={`shrink-0 text-xs font-semibold ${text}`}>{localizedLabel}</span>
       </div>
 
       {/* Criteria checklist */}
       {showCriteria && (
         <ul className="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
-          {criteria.map(c => (
+          {localizedCriteria.map(c => (
             <li key={c.label} className="flex items-center gap-1.5 text-[11px]">
               {c.met ? (
                 <svg className="h-3.5 w-3.5 shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

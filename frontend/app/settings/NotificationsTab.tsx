@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLanguage } from "../contexts/LanguageContext";
+import type { ToastVariant } from "../components/ui";
 import { apiFetch } from "@/lib/api";
-
-type ToastVariant = "success" | "error" | "warning" | "info" | "default";
 
 type NotificationForm = {
     smtp_host: string;
@@ -24,21 +24,6 @@ type NotificationFieldConfig = {
     placeholder: string;
 };
 
-const FIELD_CONFIGS: NotificationFieldConfig[] = [
-    { label: "SMTP Host", key: "smtp_host", type: "text", placeholder: "smtp.gmail.com" },
-    { label: "SMTP Port", key: "smtp_port", type: "number", placeholder: "587" },
-    { label: "SMTP User", key: "smtp_user", type: "text", placeholder: "user@example.com" },
-    { label: "SMTP Password", key: "smtp_password", type: "password", placeholder: "Leave blank to keep existing" },
-    { label: "From Email", key: "from_email", type: "email", placeholder: "noreply@example.com" },
-    { label: "Recipient Email", key: "recipient_email", type: "email", placeholder: "admin@example.com" },
-];
-
-const TOGGLE_CONFIGS: Array<{ label: string; key: keyof Pick<NotificationForm, "enabled" | "notify_on_enrichment_batch" | "notify_on_authority_confirm"> }> = [
-    { label: "Enable email alerts", key: "enabled" },
-    { label: "Notify on enrichment batch complete", key: "notify_on_enrichment_batch" },
-    { label: "Notify on authority record confirmed", key: "notify_on_authority_confirm" },
-];
-
 function getErrorMessage(error: unknown, fallback: string) {
     return error instanceof Error ? error.message : fallback;
 }
@@ -48,7 +33,21 @@ export default function NotificationsTab({
 }: {
     toast: (msg: string, v?: ToastVariant) => void;
 }) {
+    const { t } = useLanguage();
     const inputClass = "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
+    const fieldConfigs: NotificationFieldConfig[] = [
+        { label: t("settings.notifications.smtp_host"), key: "smtp_host", type: "text", placeholder: "smtp.gmail.com" },
+        { label: t("settings.notifications.smtp_port"), key: "smtp_port", type: "number", placeholder: "587" },
+        { label: t("settings.notifications.smtp_user"), key: "smtp_user", type: "text", placeholder: "user@example.com" },
+        { label: t("settings.notifications.smtp_password"), key: "smtp_password", type: "password", placeholder: t("settings.notifications.smtp_password_placeholder") },
+        { label: t("settings.notifications.from_email"), key: "from_email", type: "email", placeholder: "noreply@example.com" },
+        { label: t("settings.notifications.recipient_email"), key: "recipient_email", type: "email", placeholder: "admin@example.com" },
+    ];
+    const toggleConfigs: Array<{ label: string; key: keyof Pick<NotificationForm, "enabled" | "notify_on_enrichment_batch" | "notify_on_authority_confirm"> }> = [
+        { label: t("settings.notifications.toggle_enabled"), key: "enabled" },
+        { label: t("settings.notifications.toggle_enrichment"), key: "notify_on_enrichment_batch" },
+        { label: t("settings.notifications.toggle_authority"), key: "notify_on_authority_confirm" },
+    ];
 
     const [form, setForm] = useState<NotificationForm>({
         smtp_host: "",
@@ -72,13 +71,13 @@ export default function NotificationsTab({
             try {
                 const response = await apiFetch("/notifications/settings");
                 if (!response.ok) {
-                    throw new Error("Failed to load notification settings");
+                    throw new Error(t("settings.notifications.toast.load_failed"));
                 }
                 const data = await response.json() as Partial<NotificationForm>;
                 if (!mounted) return;
                 setForm(prev => ({ ...prev, ...data, smtp_password: "" }));
             } catch (error: unknown) {
-                toast(getErrorMessage(error, "Failed to load notification settings"), "error");
+                toast(getErrorMessage(error, t("settings.notifications.toast.load_failed")), "error");
             } finally {
                 if (mounted) {
                     setLoading(false);
@@ -89,7 +88,7 @@ export default function NotificationsTab({
         return () => {
             mounted = false;
         };
-    }, [toast]);
+    }, [t, toast]);
 
     const setField = <K extends keyof NotificationForm>(key: K, value: NotificationForm[K]) => {
         setForm(prev => ({ ...prev, [key]: value }));
@@ -108,12 +107,12 @@ export default function NotificationsTab({
                 body: JSON.stringify(payload),
             });
             if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({ detail: "Save failed" })) as { detail?: string };
-                throw new Error(errorBody.detail || "Save failed");
+                const errorBody = await response.json().catch(() => ({ detail: t("settings.notifications.toast.save_failed") })) as { detail?: string };
+                throw new Error(errorBody.detail || t("settings.notifications.toast.save_failed"));
             }
-            toast("Notification settings saved", "success");
+            toast(t("settings.notifications.toast.saved"), "success");
         } catch (error: unknown) {
-            toast(getErrorMessage(error, "Save failed"), "error");
+            toast(getErrorMessage(error, t("settings.notifications.toast.save_failed")), "error");
         } finally {
             setSaving(false);
         }
@@ -125,27 +124,27 @@ export default function NotificationsTab({
             const response = await apiFetch("/notifications/test", { method: "POST" });
             const data = await response.json().catch(() => ({ sent: false })) as { sent?: boolean };
             if (data.sent) {
-                toast("Test email sent successfully", "success");
+                toast(t("settings.notifications.toast.test_sent"), "success");
             } else {
-                toast("Email not sent — check settings and ensure alerts are enabled", "warning");
+                toast(t("settings.notifications.toast.test_not_sent"), "warning");
             }
         } catch {
-            toast("Test failed", "error");
+            toast(t("settings.notifications.toast.test_failed"), "error");
         } finally {
             setTesting(false);
         }
     };
 
     if (loading) {
-        return <div className="py-10 text-center text-sm text-gray-400">Loading...</div>;
+        return <div className="py-10 text-center text-sm text-gray-400">{t("common.loading")}</div>;
     }
 
     return (
         <div className="space-y-4">
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <h3 className="mb-4 text-base font-semibold text-gray-900 dark:text-white">SMTP Configuration</h3>
+                <h3 className="mb-4 text-base font-semibold text-gray-900 dark:text-white">{t("settings.notifications.smtp_config")}</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    {FIELD_CONFIGS.map(({ label, key, type, placeholder }) => (
+                    {fieldConfigs.map(({ label, key, type, placeholder }) => (
                         <div key={key}>
                             <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">{label}</label>
                             <input
@@ -164,9 +163,9 @@ export default function NotificationsTab({
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <h3 className="mb-4 text-base font-semibold text-gray-900 dark:text-white">Alert Preferences</h3>
+                <h3 className="mb-4 text-base font-semibold text-gray-900 dark:text-white">{t("settings.notifications.alert_preferences")}</h3>
                 <div className="space-y-3">
-                    {TOGGLE_CONFIGS.map(({ label, key }) => (
+                    {toggleConfigs.map(({ label, key }) => (
                         <label key={key} className="flex cursor-pointer items-center gap-3">
                             <div
                                 onClick={() => setField(key, !form[key])}
@@ -186,14 +185,14 @@ export default function NotificationsTab({
                     disabled={saving}
                     className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
                 >
-                    {saving ? "Saving..." : "Save Settings"}
+                    {saving ? t("settings.notifications.saving") : t("settings.notifications.save")}
                 </button>
                 <button
                     onClick={handleTest}
                     disabled={testing}
                     className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
-                    {testing ? "Sending..." : "Send Test Email"}
+                    {testing ? t("settings.notifications.sending") : t("settings.notifications.send_test")}
                 </button>
             </div>
         </div>

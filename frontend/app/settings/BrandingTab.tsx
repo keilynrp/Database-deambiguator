@@ -3,11 +3,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useBranding } from "../contexts/BrandingContext";
+import { useLanguage } from "../contexts/LanguageContext";
+import type { ToastVariant } from "../components/ui";
 import { apiFetch } from "@/lib/api";
 import FaviconDropZone from "./FaviconDropZone";
 import LogoDropZone from "./LogoDropZone";
-
-type ToastVariant = "success" | "error" | "warning" | "info" | "default";
 
 function getErrorMessage(error: unknown, fallback: string) {
     return error instanceof Error ? error.message : fallback;
@@ -15,6 +15,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export default function BrandingTab({ toast }: { toast: (msg: string, v?: ToastVariant) => void }) {
     const { branding, refreshBranding } = useBranding();
+    const { t } = useLanguage();
     const inputClass = "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
 
     const [form, setForm] = useState({
@@ -39,26 +40,26 @@ export default function BrandingTab({ toast }: { toast: (msg: string, v?: ToastV
     const handleLogoUploaded = useCallback(async (url: string) => {
         setForm(prev => ({ ...prev, logo_url: url }));
         await refreshBranding();
-        toast("Logo updated", "success");
-    }, [refreshBranding, toast]);
+        toast(t("settings.branding.toast.logo_updated"), "success");
+    }, [refreshBranding, t, toast]);
 
     const handleLogoRemoved = useCallback(async () => {
         setForm(prev => ({ ...prev, logo_url: "" }));
         await refreshBranding();
-        toast("Logo removed", "success");
-    }, [refreshBranding, toast]);
+        toast(t("settings.branding.toast.logo_removed"), "success");
+    }, [refreshBranding, t, toast]);
 
     const handleFaviconUploaded = useCallback(async (url: string) => {
         setForm(prev => ({ ...prev, favicon_url: url }));
         await refreshBranding();
-        toast("Favicon updated", "success");
-    }, [refreshBranding, toast]);
+        toast(t("settings.branding.toast.favicon_updated"), "success");
+    }, [refreshBranding, t, toast]);
 
     const handleFaviconRemoved = useCallback(async () => {
         setForm(prev => ({ ...prev, favicon_url: "" }));
         await refreshBranding();
-        toast("Favicon removed", "success");
-    }, [refreshBranding, toast]);
+        toast(t("settings.branding.toast.favicon_removed"), "success");
+    }, [refreshBranding, t, toast]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -70,12 +71,12 @@ export default function BrandingTab({ toast }: { toast: (msg: string, v?: ToastV
             });
             if (!r.ok) {
                 const err = await r.json();
-                throw new Error(err.detail || "Save failed");
+                throw new Error(err.detail || t("settings.branding.toast.save_failed"));
             }
             await refreshBranding();
-            toast("Branding updated", "success");
+            toast(t("settings.branding.toast.updated"), "success");
         } catch (error: unknown) {
-            toast(getErrorMessage(error, "Save failed"), "error");
+            toast(getErrorMessage(error, t("settings.branding.toast.save_failed")), "error");
         } finally {
             setSaving(false);
         }
@@ -92,14 +93,14 @@ export default function BrandingTab({ toast }: { toast: (msg: string, v?: ToastV
     return (
         <div className="space-y-4">
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <h3 className="mb-4 text-base font-semibold text-gray-900 dark:text-white">Platform Identity</h3>
+                <h3 className="mb-4 text-base font-semibold text-gray-900 dark:text-white">{t("settings.branding.identity_title")}</h3>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <div>
-                        <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Platform Name</label>
+                        <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">{t("settings.branding.platform_name")}</label>
                         <input className={inputClass} value={form.platform_name} onChange={fld("platform_name")} placeholder="UKIP" />
                     </div>
                     <div>
-                        <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Accent Color</label>
+                        <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">{t("settings.branding.accent_color")}</label>
                         <div className="flex items-center gap-2">
                             <input
                                 type="color"
@@ -129,14 +130,14 @@ export default function BrandingTab({ toast }: { toast: (msg: string, v?: ToastV
                     </div>
 
                     <div className="sm:col-span-2">
-                        <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Footer Text</label>
-                        <input className={inputClass} value={form.footer_text} onChange={fld("footer_text")} placeholder="Universal Knowledge Intelligence Platform" />
+                        <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">{t("settings.branding.footer_text")}</label>
+                        <input className={inputClass} value={form.footer_text} onChange={fld("footer_text")} placeholder={t("settings.branding.footer_placeholder")} />
                     </div>
                 </div>
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Preview</h3>
+                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("common.preview")}</h3>
                 <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/50">
                     <div
                         className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg"
@@ -162,7 +163,7 @@ export default function BrandingTab({ toast }: { toast: (msg: string, v?: ToastV
                 disabled={saving}
                 className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
             >
-                {saving ? "Saving..." : "Save Branding"}
+                {saving ? t("settings.branding.saving") : t("settings.branding.save")}
             </button>
         </div>
     );

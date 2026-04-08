@@ -97,7 +97,7 @@ function translateOrFallback(t: (key: string) => string, key: string, fallback: 
     return value === key ? fallback : value;
 }
 
-function getSteps(t: (key: string) => string) {
+export function getSteps(t: (key: string) => string) {
     return [
         { n: 1 as WizardStep, label: translateOrFallback(t, "page.import.step.upload", "Upload") },
         { n: 2 as WizardStep, label: translateOrFallback(t, "page.import.step.map", "Map Fields") },

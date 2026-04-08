@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useLanguage } from "../contexts/LanguageContext";
 import { apiFetch } from "@/lib/api";
 
 const LOGO_MAX_KB = 512;
@@ -22,6 +23,7 @@ export default function LogoDropZone({
     onUploaded: (url: string) => void | Promise<void>;
     onRemove: () => void | Promise<void>;
 }) {
+    const { t } = useLanguage();
     const [dragging, setDragging] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export default function LogoDropZone({
     const upload = useCallback(async (file: File) => {
         setError(null);
         if (file.size > LOGO_MAX_KB * 1024) {
-            setError(`Logo exceeds ${LOGO_MAX_KB} KB.`);
+            setError(t("settings.branding.logo_too_large", { size: LOGO_MAX_KB }));
             return;
         }
         setUploading(true);
@@ -43,17 +45,17 @@ export default function LogoDropZone({
                 body: fd,
             });
             if (!res.ok) {
-                const err = await res.json().catch(() => ({ detail: "Upload failed" }));
-                throw new Error(err.detail ?? "Upload failed");
+                const err = await res.json().catch(() => ({ detail: t("settings.branding.upload_failed") }));
+                throw new Error(err.detail ?? t("settings.branding.upload_failed"));
             }
             const data = await res.json();
             await onUploaded(data.logo_url);
         } catch (error: unknown) {
-            setError(getErrorMessage(error, "Upload failed"));
+            setError(getErrorMessage(error, t("settings.branding.upload_failed")));
         } finally {
             setUploading(false);
         }
-    }, [onUploaded]);
+    }, [onUploaded, t]);
 
     function handleDrop(e: React.DragEvent) {
         e.preventDefault();
@@ -74,7 +76,7 @@ export default function LogoDropZone({
             await apiFetch("/branding/logo", { method: "DELETE" });
             await onRemove();
         } catch {
-            setError("Failed to remove logo.");
+            setError(t("settings.branding.logo_remove_failed"));
         }
     }
 
@@ -85,8 +87,8 @@ export default function LogoDropZone({
     return (
         <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                Logo
-                <span className="ml-1 font-normal text-gray-400">(PNG, JPG, SVG, WEBP · max {LOGO_MAX_KB} KB)</span>
+                {t("settings.branding.logo")}
+                <span className="ml-1 font-normal text-gray-400">({t("settings.branding.logo_help", { size: LOGO_MAX_KB })})</span>
             </label>
             <div
                 onDragOver={e => { e.preventDefault(); setDragging(true); }}
@@ -111,20 +113,20 @@ export default function LogoDropZone({
                         >
                             <img
                                 src={previewUrl}
-                                alt="Current logo"
+                                alt={t("settings.branding.current_logo")}
                                 className="h-full w-full object-contain p-1"
                                 onError={e => (e.currentTarget.hidden = true)}
                             />
                         </div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">Current logo</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{t("settings.branding.current_logo")}</span>
                     </div>
                 ) : null}
                 {uploading ? (
-                    <span className="text-sm text-indigo-600 dark:text-indigo-400">Uploading...</span>
+                    <span className="text-sm text-indigo-600 dark:text-indigo-400">{t("settings.branding.uploading")}</span>
                 ) : (
                     <>
-                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Drop your logo here</p>
-                        <p className="mt-0.5 text-xs text-gray-400">or click to browse</p>
+                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{t("settings.branding.logo_drop")}</p>
+                        <p className="mt-0.5 text-xs text-gray-400">{t("settings.branding.or_click_browse")}</p>
                     </>
                 )}
             </div>
@@ -134,7 +136,7 @@ export default function LogoDropZone({
                     onClick={handleRemove}
                     className="mt-2 text-xs font-medium text-red-500 hover:text-red-700"
                 >
-                    Remove logo
+                    {t("settings.branding.remove_logo")}
                 </button>
             )}
             {error && (

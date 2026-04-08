@@ -1,12 +1,14 @@
 "use client";
 
-type ToastVariant = "success" | "error" | "warning" | "info";
+import { useLanguage } from "../contexts/LanguageContext";
+import type { ToastVariant } from "../components/ui";
 
 export default function WebhooksTab({
     toast,
 }: {
     toast: (msg: string, v?: ToastVariant) => void;
 }) {
+    const { t } = useLanguage();
     void toast;
 
     return (
@@ -19,9 +21,9 @@ export default function WebhooksTab({
                         </svg>
                     </div>
                     <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Webhooks Management</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t("settings.webhooks.title")}</h3>
                         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            Configure outbound HTTP callbacks, view delivery history, and send test pings.
+                            {t("settings.webhooks.description")}
                         </p>
                     </div>
                 </div>
@@ -29,7 +31,7 @@ export default function WebhooksTab({
                     href="/settings/webhooks"
                     className="mt-6 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-md"
                 >
-                    Open Webhooks Panel
+                    {t("settings.webhooks.open_panel")}
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>

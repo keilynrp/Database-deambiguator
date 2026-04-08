@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useLanguage } from "../contexts/LanguageContext";
 import { apiFetch } from "@/lib/api";
 
 const FAVICON_MAX_KB = 128;
@@ -20,6 +21,7 @@ export default function FaviconDropZone({
     onUploaded: (url: string) => void | Promise<void>;
     onRemove: () => void | Promise<void>;
 }) {
+    const { t } = useLanguage();
     const [dragging, setDragging] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export default function FaviconDropZone({
     const upload = useCallback(async (file: File) => {
         setError(null);
         if (file.size > FAVICON_MAX_KB * 1024) {
-            setError(`Favicon exceeds ${FAVICON_MAX_KB} KB.`);
+            setError(t("settings.branding.favicon_too_large", { size: FAVICON_MAX_KB }));
             return;
         }
         setUploading(true);
@@ -40,17 +42,17 @@ export default function FaviconDropZone({
                 body: fd,
             });
             if (!res.ok) {
-                const err = await res.json().catch(() => ({ detail: "Upload failed" }));
-                throw new Error(err.detail ?? "Upload failed");
+                const err = await res.json().catch(() => ({ detail: t("settings.branding.upload_failed") }));
+                throw new Error(err.detail ?? t("settings.branding.upload_failed"));
             }
             const data = await res.json();
             await onUploaded(data.favicon_url);
         } catch (error: unknown) {
-            setError(getErrorMessage(error, "Upload failed"));
+            setError(getErrorMessage(error, t("settings.branding.upload_failed")));
         } finally {
             setUploading(false);
         }
-    }, [onUploaded]);
+    }, [onUploaded, t]);
 
     function handleDrop(e: React.DragEvent) {
         e.preventDefault();
@@ -71,7 +73,7 @@ export default function FaviconDropZone({
             await apiFetch("/branding/favicon", { method: "DELETE" });
             await onRemove();
         } catch {
-            setError("Failed to remove favicon.");
+            setError(t("settings.branding.favicon_remove_failed"));
         }
     }
 
@@ -83,8 +85,8 @@ export default function FaviconDropZone({
     return (
         <div>
             <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                Favicon
-                <span className="ml-1 font-normal text-gray-400">(ICO, PNG, SVG · max {FAVICON_MAX_KB} KB)</span>
+                {t("settings.branding.favicon")}
+                <span className="ml-1 font-normal text-gray-400">({t("settings.branding.favicon_help", { size: FAVICON_MAX_KB })})</span>
             </label>
             <div
                 onDragOver={e => { e.preventDefault(); setDragging(true); }}
@@ -105,19 +107,19 @@ export default function FaviconDropZone({
                     <div className="mb-3 flex items-center gap-3">
                         <img
                             src={previewUrl}
-                            alt="Current favicon"
+                            alt={t("settings.branding.current_favicon")}
                             className="h-8 w-8 object-contain"
                             onError={e => (e.currentTarget.hidden = true)}
                         />
-                        <span className="text-xs text-gray-500 dark:text-gray-400">Current favicon</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{t("settings.branding.current_favicon")}</span>
                     </div>
                 ) : null}
                 {uploading ? (
-                    <span className="text-sm text-indigo-600 dark:text-indigo-400">Uploading...</span>
+                    <span className="text-sm text-indigo-600 dark:text-indigo-400">{t("settings.branding.uploading")}</span>
                 ) : (
                     <>
-                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Drop your favicon here</p>
-                        <p className="mt-0.5 text-xs text-gray-400">or click to browse</p>
+                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{t("settings.branding.favicon_drop")}</p>
+                        <p className="mt-0.5 text-xs text-gray-400">{t("settings.branding.or_click_browse")}</p>
                     </>
                 )}
             </div>
@@ -127,7 +129,7 @@ export default function FaviconDropZone({
                     onClick={handleRemove}
                     className="mt-2 text-xs font-medium text-red-500 hover:text-red-700"
                 >
-                    Remove favicon
+                    {t("settings.branding.remove_favicon")}
                 </button>
             )}
             {error && (

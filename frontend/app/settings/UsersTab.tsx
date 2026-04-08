@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Badge } from "../components/ui";
+import { useLanguage } from "../contexts/LanguageContext";
+import { Badge, type ToastVariant } from "../components/ui";
 import { apiFetch } from "@/lib/api";
-import { ROLE_LABELS, ROLE_VARIANTS, type UserRecord, type UserRole } from "./userManagementTypes";
-
-type ToastVariant = "success" | "error" | "warning" | "info" | "default";
+import { ROLE_LABEL_KEYS, ROLE_VARIANTS, type UserRecord, type UserRole } from "./userManagementTypes";
 
 function getErrorMessage(error: unknown, fallback: string) {
     return error instanceof Error ? error.message : fallback;
@@ -18,6 +17,7 @@ export default function UsersTab({
     currentUserId: number;
     toast: (msg: string, v?: ToastVariant) => void;
 }) {
+    const { t } = useLanguage();
     const [users, setUsers] = useState<UserRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -35,15 +35,15 @@ export default function UsersTab({
         try {
             const res = await apiFetch("/users");
             if (!res.ok) {
-                throw new Error("Error loading users");
+                throw new Error(t("settings.users.toast.load_failed"));
             }
             setUsers(await res.json());
         } catch (error: unknown) {
-            toast(getErrorMessage(error, "Error loading users"), "error");
+            toast(getErrorMessage(error, t("settings.users.toast.load_failed")), "error");
         } finally {
             setLoading(false);
         }
-    }, [toast]);
+    }, [t, toast]);
 
     useEffect(() => {
         void fetchUsers();
@@ -52,7 +52,7 @@ export default function UsersTab({
     async function handleCreate(event: React.FormEvent) {
         event.preventDefault();
         if (form.password.length < 8) {
-            toast("Password must be at least 8 characters", "error");
+            toast(t("settings.users.toast.password_too_short"), "error");
             return;
         }
         setSaving(true);
@@ -63,15 +63,15 @@ export default function UsersTab({
                 body: JSON.stringify(form),
             });
             if (!res.ok) {
-                const err = await res.json().catch(() => ({ detail: "Failed to create user" })) as { detail?: string };
-                throw new Error(err.detail || "Failed to create user");
+                const err = await res.json().catch(() => ({ detail: t("settings.users.toast.create_failed") })) as { detail?: string };
+                throw new Error(err.detail || t("settings.users.toast.create_failed"));
             }
-            toast(`User "${form.username}" created`, "success");
+            toast(t("settings.users.toast.created", { username: form.username }), "success");
             setForm({ username: "", email: "", password: "", role: "viewer" });
             setShowForm(false);
             await fetchUsers();
         } catch (error: unknown) {
-            toast(getErrorMessage(error, "Error creating user"), "error");
+            toast(getErrorMessage(error, t("settings.users.toast.create_error")), "error");
         } finally {
             setSaving(false);
         }
@@ -86,31 +86,31 @@ export default function UsersTab({
                 body: JSON.stringify({ role: newRole }),
             });
             if (!res.ok) {
-                const err = await res.json().catch(() => ({ detail: "Failed to update role" })) as { detail?: string };
-                throw new Error(err.detail || "Failed to update role");
+                const err = await res.json().catch(() => ({ detail: t("settings.users.toast.update_role_failed") })) as { detail?: string };
+                throw new Error(err.detail || t("settings.users.toast.update_role_failed"));
             }
             setUsers(prev => prev.map(user => (user.id === userId ? { ...user, role: newRole } : user)));
-            toast("Role updated", "success");
+            toast(t("settings.users.toast.role_updated"), "success");
         } catch (error: unknown) {
-            toast(getErrorMessage(error, "Error updating role"), "error");
+            toast(getErrorMessage(error, t("settings.users.toast.update_role_error")), "error");
         } finally {
             setActionId(null);
         }
     }
 
     async function handleDeactivate(userId: number, username: string) {
-        if (!confirm(`Deactivate user "${username}"?`)) return;
+        if (!confirm(t("settings.users.deactivate_confirm", { username }))) return;
         setActionId(userId);
         try {
             const res = await apiFetch(`/users/${userId}`, { method: "DELETE" });
             if (!res.ok) {
-                const err = await res.json().catch(() => ({ detail: "Failed to deactivate" })) as { detail?: string };
-                throw new Error(err.detail || "Failed to deactivate");
+                const err = await res.json().catch(() => ({ detail: t("settings.users.toast.deactivate_failed") })) as { detail?: string };
+                throw new Error(err.detail || t("settings.users.toast.deactivate_failed"));
             }
             setUsers(prev => prev.map(user => (user.id === userId ? { ...user, is_active: false } : user)));
-            toast(`User "${username}" deactivated`, "warning");
+            toast(t("settings.users.toast.deactivated", { username }), "warning");
         } catch (error: unknown) {
-            toast(getErrorMessage(error, "Error deactivating user"), "error");
+            toast(getErrorMessage(error, t("settings.users.toast.deactivate_error")), "error");
         } finally {
             setActionId(null);
         }
@@ -122,7 +122,10 @@ export default function UsersTab({
         <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {users.filter(user => user.is_active).length} active · {users.filter(user => !user.is_active).length} inactive
+                    {t("settings.users.count_summary", {
+                        active: users.filter(user => user.is_active).length,
+                        inactive: users.filter(user => !user.is_active).length,
+                    })}
                 </p>
                 <button
                     onClick={() => setShowForm(value => !value)}
@@ -131,16 +134,16 @@ export default function UsersTab({
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showForm ? "M6 18L18 6M6 6l12 12" : "M12 4v16m8-8H4"} />
                     </svg>
-                    {showForm ? "Cancel" : "New User"}
+                    {showForm ? t("common.cancel") : t("settings.users.new_user")}
                 </button>
             </div>
 
             {showForm && (
                 <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-6 shadow-sm dark:border-blue-500/20 dark:bg-blue-500/5 toast-enter">
-                    <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">Create New User</h3>
+                    <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{t("settings.users.create_title")}</h3>
                     <form onSubmit={handleCreate} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                            <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Username *</label>
+                            <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">{t("settings.account.username")} *</label>
                             <input
                                 className={inputClass}
                                 value={form.username}
@@ -152,7 +155,7 @@ export default function UsersTab({
                             />
                         </div>
                         <div>
-                            <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Email</label>
+                            <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">{t("settings.account.email")}</label>
                             <input
                                 type="email"
                                 className={inputClass}
@@ -162,7 +165,7 @@ export default function UsersTab({
                             />
                         </div>
                         <div>
-                            <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Password * <span className="font-normal text-gray-400">(min. 8)</span></label>
+                            <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">{t("settings.users.password")} * <span className="font-normal text-gray-400">({t("settings.users.password_help")})</span></label>
                             <input
                                 type="password"
                                 className={inputClass}
@@ -174,16 +177,16 @@ export default function UsersTab({
                             />
                         </div>
                         <div>
-                            <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Role *</label>
+                            <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">{t("settings.account.role")} *</label>
                             <select
                                 className={inputClass}
                                 value={form.role}
                                 onChange={event => setForm(prev => ({ ...prev, role: event.target.value as UserRole }))}
                             >
-                                <option value="viewer">Viewer</option>
-                                <option value="editor">Editor</option>
-                                <option value="admin">Admin</option>
-                                <option value="super_admin">Super Admin</option>
+                                <option value="viewer">{t("users.role.viewer")}</option>
+                                <option value="editor">{t("users.role.editor")}</option>
+                                <option value="admin">{t("users.role.admin")}</option>
+                                <option value="super_admin">{t("users.role.super_admin")}</option>
                             </select>
                         </div>
                         <div className="flex justify-end gap-2 pt-1 sm:col-span-2">
@@ -192,7 +195,7 @@ export default function UsersTab({
                                 onClick={() => setShowForm(false)}
                                 className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
-                                Cancel
+                                {t("common.cancel")}
                             </button>
                             <button
                                 type="submit"
@@ -205,7 +208,7 @@ export default function UsersTab({
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                     </svg>
                                 )}
-                                Create User
+                                {t("settings.users.create_button")}
                             </button>
                         </div>
                     </form>
@@ -226,7 +229,11 @@ export default function UsersTab({
                             <tr className="border-b border-gray-200 dark:border-gray-800">
                                 {["User", "Email", "Role", "Status", "Actions"].map(header => (
                                     <th key={header} className="px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                                        {header}
+                                        {header === "User" ? t("settings.users.header_user")
+                                            : header === "Email" ? t("settings.users.header_email")
+                                            : header === "Role" ? t("settings.users.header_role")
+                                            : header === "Status" ? t("common.status")
+                                            : t("common.actions")}
                                     </th>
                                 ))}
                             </tr>
@@ -242,7 +249,7 @@ export default function UsersTab({
                                             <div>
                                                 <p className="font-medium text-gray-900 dark:text-white">{user.username}</p>
                                                 {user.id === currentUserId && (
-                                                    <p className="text-[10px] text-blue-500">you</p>
+                                                    <p className="text-[10px] text-blue-500">{t("settings.users.you")}</p>
                                                 )}
                                             </div>
                                         </div>
@@ -251,7 +258,7 @@ export default function UsersTab({
                                     <td className="px-5 py-3.5">
                                         {user.id === currentUserId ? (
                                             <Badge variant={ROLE_VARIANTS[user.role] ?? "default"}>
-                                                {ROLE_LABELS[user.role] ?? user.role}
+                                                {t(ROLE_LABEL_KEYS[user.role])}
                                             </Badge>
                                         ) : (
                                             <select
@@ -260,16 +267,16 @@ export default function UsersTab({
                                                 disabled={actionId === user.id || !user.is_active}
                                                 className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium text-gray-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
                                             >
-                                                <option value="viewer">Viewer</option>
-                                                <option value="editor">Editor</option>
-                                                <option value="admin">Admin</option>
-                                                <option value="super_admin">Super Admin</option>
+                                                <option value="viewer">{t("users.role.viewer")}</option>
+                                                <option value="editor">{t("users.role.editor")}</option>
+                                                <option value="admin">{t("users.role.admin")}</option>
+                                                <option value="super_admin">{t("users.role.super_admin")}</option>
                                             </select>
                                         )}
                                     </td>
                                     <td className="px-5 py-3.5">
                                         <Badge variant={user.is_active ? "success" : "default"} dot>
-                                            {user.is_active ? "Active" : "Inactive"}
+                                            {user.is_active ? t("common.active") : t("common.inactive")}
                                         </Badge>
                                     </td>
                                     <td className="px-5 py-3.5">
@@ -278,7 +285,7 @@ export default function UsersTab({
                                                 onClick={() => handleDeactivate(user.id, user.username)}
                                                 disabled={actionId === user.id}
                                                 className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                                                title="Deactivate user"
+                                                title={t("users.deactivate")}
                                             >
                                                 {actionId === user.id ? (
                                                     <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
