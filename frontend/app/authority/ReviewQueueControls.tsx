@@ -1,7 +1,9 @@
 "use client";
 
 import type { DomainAttribute, DomainSchema } from "../contexts/DomainContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import type { QueueSummary } from "./reviewQueueTypes";
+import { getEntityTypeLabel, getRouteLabel } from "./reviewQueueI18n";
 
 interface ReviewQueueControlsProps {
     activeDomain: DomainSchema | null;
@@ -60,6 +62,8 @@ export default function ReviewQueueControls({
     onBatchResolve,
     onBulkAction,
 }: ReviewQueueControlsProps) {
+    const { t } = useLanguage();
+
     return (
         <>
             <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -71,7 +75,7 @@ export default function ReviewQueueControls({
                             : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                     }`}
                 >
-                    Generic Queue
+                    {t("page.authority.queue_generic")}
                 </button>
                 <button
                     onClick={() => onQueueModeChange("authors")}
@@ -81,16 +85,16 @@ export default function ReviewQueueControls({
                             : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                     }`}
                 >
-                    Author Queue
+                    {t("page.authority.queue_authors")}
                 </button>
             </div>
 
             {queueMode === "generic" && (
                 <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                    <h3 className="mb-3 text-sm font-medium text-gray-900 dark:text-white">Batch Resolve</h3>
+                    <h3 className="mb-3 text-sm font-medium text-gray-900 dark:text-white">{t("page.authority.batch_resolve")}</h3>
                     <div className="flex flex-wrap items-end gap-4">
                         <div className="min-w-[160px]">
-                            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Field</label>
+                            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t("page.authority.field")}</label>
                             <select
                                 value={batchField}
                                 onChange={e => onBatchFieldChange(e.target.value)}
@@ -103,24 +107,24 @@ export default function ReviewQueueControls({
                                             <option key={attr.name} value={attr.name}>{attr.label}</option>
                                         ))
                                 ) : (
-                                    <option value="">Loading...</option>
+                                    <option value="">{t("common.loading")}</option>
                                 )}
                             </select>
                         </div>
                         <div className="min-w-[130px]">
-                            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Entity Type</label>
+                            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t("page.authority.entity_type")}</label>
                             <select
                                 value={batchEntityType}
                                 onChange={e => onBatchEntityTypeChange(e.target.value)}
                                 className="h-9 w-full rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                             >
                                 {["general", "person", "organization", "concept", "institution"].map(et => (
-                                    <option key={et} value={et}>{et}</option>
+                                    <option key={et} value={et}>{getEntityTypeLabel(et, t)}</option>
                                 ))}
                             </select>
                         </div>
                         <div className="w-20">
-                            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Limit</label>
+                            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t("page.authority.limit")}</label>
                             <input
                                 type="number"
                                 min={1}
@@ -141,9 +145,9 @@ export default function ReviewQueueControls({
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                     </svg>
-                                    Resolving...
+                                    {t("page.authority.resolving")}
                                 </>
-                            ) : "Resolve All"}
+                            ) : t("page.authority.resolve_all")}
                         </button>
                     </div>
                     {resolveResult && (
@@ -162,9 +166,9 @@ export default function ReviewQueueControls({
                             onChange={e => onStatusFilterChange(e.target.value)}
                             className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                         >
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="rejected">Rejected</option>
+                            <option value="pending">{t("page.authority.filter_pending")}</option>
+                            <option value="confirmed">{t("page.authority.filter_confirmed")}</option>
+                            <option value="rejected">{t("page.authority.filter_rejected")}</option>
                         </select>
                         {queueMode === "generic" ? (
                             <select
@@ -172,7 +176,7 @@ export default function ReviewQueueControls({
                                 onChange={e => onFieldFilterChange(e.target.value)}
                                 className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                             >
-                                <option value="">All fields</option>
+                                <option value="">{t("page.authority.all_fields")}</option>
                                 {summary?.by_field.map(f => (
                                     <option key={f.field_name} value={f.field_name}>{f.field_name}</option>
                                 ))}
@@ -184,20 +188,20 @@ export default function ReviewQueueControls({
                                     onChange={e => onAuthorRouteFilterChange(e.target.value)}
                                     className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                                 >
-                                    <option value="">All routes</option>
-                                    <option value="fast_path">fast_path</option>
-                                    <option value="hybrid_path">hybrid_path</option>
-                                    <option value="llm_path">llm_path</option>
-                                    <option value="manual_review">manual_review</option>
+                                    <option value="">{t("page.authority.all_routes")}</option>
+                                    <option value="fast_path">{getRouteLabel("fast_path", t)}</option>
+                                    <option value="hybrid_path">{getRouteLabel("hybrid_path", t)}</option>
+                                    <option value="llm_path">{getRouteLabel("llm_path", t)}</option>
+                                    <option value="manual_review">{getRouteLabel("manual_review", t)}</option>
                                 </select>
                                 <select
                                     value={authorReviewFilter}
                                     onChange={e => onAuthorReviewFilterChange(e.target.value)}
                                     className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
                                 >
-                                    <option value="required">Needs review</option>
-                                    <option value="all">All review states</option>
-                                    <option value="not_required">No review needed</option>
+                                    <option value="required">{t("page.authority.needs_review")}</option>
+                                    <option value="all">{t("page.authority.all_review_states")}</option>
+                                    <option value="not_required">{t("page.authority.no_review_needed")}</option>
                                 </select>
                                 <label className="inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                                     <input
@@ -206,7 +210,7 @@ export default function ReviewQueueControls({
                                         onChange={e => onAuthorNilOnlyChange(e.target.checked)}
                                         className="rounded border-gray-300"
                                     />
-                                    NIL only
+                                    {t("page.authority.nil_only")}
                                 </label>
                             </>
                         )}
@@ -218,14 +222,14 @@ export default function ReviewQueueControls({
                                 disabled={acting || selectedCount === 0}
                                 className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-green-600 px-3 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
                             >
-                                Confirm ({selectedCount})
+                                {t("page.authority.confirm_button")} ({selectedCount})
                             </button>
                             <button
                                 onClick={() => onBulkAction("bulk-reject")}
                                 disabled={acting || selectedCount === 0}
                                 className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
                             >
-                                Reject ({selectedCount})
+                                {t("page.authority.reject_button")} ({selectedCount})
                             </button>
                         </div>
                     )}

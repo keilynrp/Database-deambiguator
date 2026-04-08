@@ -3,12 +3,18 @@
 import { Fragment } from "react";
 import { Badge } from "../components/ui";
 import AnnotationThread from "../components/AnnotationThread";
+import { useLanguage } from "../contexts/LanguageContext";
 import AuthorReviewExpandedPanel from "./AuthorReviewExpandedPanel";
 import {
     type AuthorCompareResponse,
     type AuthorityRecord,
     SOURCE_COLORS,
 } from "./reviewQueueTypes";
+import {
+    getNilReasonLabel,
+    getRouteLabel,
+    getStatusLabel,
+} from "./reviewQueueI18n";
 
 interface ReviewQueueRecordsTableProps {
     queueMode: "generic" | "authors";
@@ -41,6 +47,8 @@ export default function ReviewQueueRecordsTable({
     onReviewRecord,
     onToggleExpanded,
 }: ReviewQueueRecordsTableProps) {
+    const { t } = useLanguage();
+
     if (loadingRecords) {
         return (
             <div className="flex items-center justify-center py-12">
@@ -56,7 +64,7 @@ export default function ReviewQueueRecordsTable({
         return (
             <div className="flex flex-col items-center justify-center py-12">
                 <p className="text-sm text-gray-400 dark:text-gray-500">
-                    No {statusFilter} records found
+                    {t("page.authority.no_records")}
                 </p>
             </div>
         );
@@ -77,13 +85,13 @@ export default function ReviewQueueRecordsTable({
                                 />
                             </th>
                         )}
-                        <th className="px-4 py-2">Original Value</th>
-                        <th className="px-4 py-2">{queueMode === "authors" ? "Candidate" : "Canonical Label"}</th>
-                        <th className="px-4 py-2">Source</th>
-                        <th className="px-4 py-2">Confidence</th>
-                        <th className="px-4 py-2">{queueMode === "authors" ? "Route" : "Field"}</th>
-                        <th className="px-4 py-2">Status</th>
-                        <th className="px-4 py-2">{queueMode === "authors" ? "Actions" : ""}</th>
+                        <th className="px-4 py-2">{t("page.authority.original_value")}</th>
+                        <th className="px-4 py-2">{queueMode === "authors" ? t("page.authority.candidate") : t("page.authority.canonical_label")}</th>
+                        <th className="px-4 py-2">{t("page.authority.table_source")}</th>
+                        <th className="px-4 py-2">{t("page.authority.table_confidence")}</th>
+                        <th className="px-4 py-2">{queueMode === "authors" ? t("page.authority.table_route") : t("page.authority.field")}</th>
+                        <th className="px-4 py-2">{t("common.status")}</th>
+                        <th className="px-4 py-2">{queueMode === "authors" ? t("common.actions") : ""}</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
@@ -107,7 +115,7 @@ export default function ReviewQueueRecordsTable({
                                     <div className="flex items-center gap-2">
                                         {rec.canonical_label}
                                         {rec.resolution_status === "partial_ancestor_match" && (
-                                            <Badge variant="info">Ancestor Match</Badge>
+                                            <Badge variant="info">{t("page.authority.ancestor_match")}</Badge>
                                         )}
                                         {queueMode === "authors" && rec.nil_reason && (
                                             <Badge variant="error">NIL</Badge>
@@ -118,7 +126,7 @@ export default function ReviewQueueRecordsTable({
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="text-blue-500 hover:text-blue-600"
-                                                title="View in authority source"
+                                                title={t("page.authority.view_in_authority_source")}
                                             >
                                                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -133,12 +141,12 @@ export default function ReviewQueueRecordsTable({
                                     )}
                                     {queueMode === "authors" && rec.nil_reason && (
                                         <p className="mt-0.5 text-xs text-rose-500 dark:text-rose-400">
-                                            {rec.nil_reason}
+                                            {getNilReasonLabel(rec.nil_reason, t)}
                                         </p>
                                     )}
                                     {queueMode !== "authors" && rec.resolution_status === "partial_ancestor_match" && typeof rec.hierarchy_distance === "number" && (
                                         <p className="mt-0.5 text-xs text-indigo-600 dark:text-indigo-400">
-                                            ancestor distance {rec.hierarchy_distance}
+                                            {t("page.authority.ancestor_distance")} {rec.hierarchy_distance}
                                         </p>
                                     )}
                                 </td>
@@ -161,28 +169,28 @@ export default function ReviewQueueRecordsTable({
                                 <td className="px-4 py-2.5 font-mono text-xs text-gray-500">
                                     {queueMode === "authors" ? (
                                         <div className="space-y-1">
-                                            <div>{rec.resolution_route || "legacy"}</div>
+                                            <div>{getRouteLabel(rec.resolution_route, t)}</div>
                                             <div className="text-[11px] text-gray-400">
-                                                complexity {typeof rec.complexity_score === "number" ? rec.complexity_score.toFixed(2) : "--"}
+                                                {t("page.authority.complexity")} {typeof rec.complexity_score === "number" ? rec.complexity_score.toFixed(2) : "--"}
                                             </div>
                                             <div className="text-[11px] text-rose-500 dark:text-rose-400">
-                                                nil {typeof rec.nil_score === "number" ? `${(rec.nil_score * 100).toFixed(0)}%` : "--"}
+                                                {t("page.authority.nil_short")} {typeof rec.nil_score === "number" ? `${(rec.nil_score * 100).toFixed(0)}%` : "--"}
                                             </div>
                                         </div>
                                     ) : rec.field_name}
                                     {queueMode !== "authors" && rec.resolution_status === "partial_ancestor_match" && typeof rec.hierarchy_distance === "number" && (
                                         <div className="mt-1 text-[11px] text-indigo-500 dark:text-indigo-400">
-                                            ancestor +{rec.hierarchy_distance}
+                                            {t("page.authority.ancestor_short")} +{rec.hierarchy_distance}
                                         </div>
                                     )}
                                 </td>
                                 <td className="px-4 py-2.5">
                                     <div className="flex flex-col items-start gap-1">
                                         <Badge variant={rec.status === "confirmed" ? "success" : rec.status === "rejected" ? "error" : "warning"}>
-                                            {rec.status}
+                                            {getStatusLabel(rec.status, t)}
                                         </Badge>
                                         {queueMode === "authors" && rec.review_required && (
-                                            <span className="text-[11px] text-amber-600 dark:text-amber-400">needs review</span>
+                                            <span className="text-[11px] text-amber-600 dark:text-amber-400">{t("page.authority.needs_review")}</span>
                                         )}
                                     </div>
                                 </td>
@@ -195,21 +203,21 @@ export default function ReviewQueueRecordsTable({
                                                     disabled={rowActionId === rec.id}
                                                     className="inline-flex h-7 items-center rounded-md bg-green-600 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
                                                 >
-                                                    {rowActionId === rec.id ? "Saving..." : rec.nil_reason ? "Accept NIL" : "Confirm"}
+                                                    {rowActionId === rec.id ? t("page.authority.saving") : rec.nil_reason ? t("page.authority.accept_nil") : t("page.authority.confirm_button")}
                                                 </button>
                                                 <button
                                                     onClick={() => onReviewRecord(rec, "reject")}
                                                     disabled={rowActionId === rec.id}
                                                     className="inline-flex h-7 items-center rounded-md bg-red-600 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
                                                 >
-                                                    Reject
+                                                    {t("page.authority.reject_button")}
                                                 </button>
                                             </>
                                         )}
                                         <button
                                             onClick={() => onToggleExpanded(rec)}
                                             className={`rounded p-1 transition-colors ${expandedId === rec.id ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"}`}
-                                            title="Toggle comments"
+                                            title={t("page.authority.toggle_comments")}
                                         >
                                             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />

@@ -1,7 +1,13 @@
 "use client";
 
+import { useLanguage } from "../contexts/LanguageContext";
 import type { AuthorityRecord, AuthorCompareResponse } from "./reviewQueueTypes";
 import { SOURCE_COLORS } from "./reviewQueueTypes";
+import {
+    getNilReasonLabel,
+    getResolutionStatusLabel,
+    getRouteLabel,
+} from "./reviewQueueI18n";
 
 export interface AuthorReviewExpandedPanelProps {
     record: AuthorityRecord;
@@ -14,20 +20,22 @@ export default function AuthorReviewExpandedPanel({
     compare,
     loadingCompare,
 }: AuthorReviewExpandedPanelProps) {
+    const { t } = useLanguage();
+
     return (
         <div className="space-y-4">
             {loadingCompare ? (
                 <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-400">
-                    Loading candidate comparison...
+                    {t("page.authority.loading_candidate_comparison")}
                 </div>
             ) : compare?.peer_count ? (
                 <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/60">
                     <div className="mb-3 flex items-center justify-between gap-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                            Winner vs Runner-Up
+                            {t("page.authority.winner_vs_runner_up")}
                         </p>
                         <span className="text-xs text-gray-400 dark:text-gray-500">
-                            {compare.peer_count} alternate candidates
+                            {compare.peer_count} {t("page.authority.alternate_candidates")}
                         </span>
                     </div>
                     <div className="space-y-3">
@@ -44,23 +52,23 @@ export default function AuthorReviewExpandedPanel({
                                         </span>
                                     </div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        {peer.authority_id} · {peer.resolution_status}
+                                        {peer.authority_id} · {getResolutionStatusLabel(peer.resolution_status, t)}
                                     </p>
                                 </div>
                                 <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 dark:text-gray-400">
                                     <div>
-                                        <p className="uppercase tracking-wide">Confidence</p>
+                                        <p className="uppercase tracking-wide">{t("page.authority.table_confidence")}</p>
                                         <p className="mt-1 font-mono text-gray-900 dark:text-white">{(peer.confidence * 100).toFixed(0)}%</p>
                                     </div>
                                     <div>
-                                        <p className="uppercase tracking-wide">Delta</p>
+                                        <p className="uppercase tracking-wide">{t("page.authority.delta")}</p>
                                         <p className="mt-1 font-mono text-gray-900 dark:text-white">
-                                            {((record.confidence - peer.confidence) * 100).toFixed(0)} pts
+                                            {((record.confidence - peer.confidence) * 100).toFixed(0)} {t("page.authority.points_suffix")}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="uppercase tracking-wide">Route</p>
-                                        <p className="mt-1 font-mono text-gray-900 dark:text-white">{peer.resolution_route || "legacy"}</p>
+                                        <p className="uppercase tracking-wide">{t("page.authority.table_route")}</p>
+                                        <p className="mt-1 font-mono text-gray-900 dark:text-white">{getRouteLabel(peer.resolution_route, t)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -72,49 +80,49 @@ export default function AuthorReviewExpandedPanel({
             <div className="grid gap-4 lg:grid-cols-3">
                 <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/60">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        Resolution Decision
+                        {t("page.authority.resolution_decision")}
                     </p>
                     <dl className="mt-3 space-y-2 text-sm">
                         <div className="flex items-center justify-between gap-3">
-                            <dt className="text-gray-500 dark:text-gray-400">Route</dt>
-                            <dd className="font-mono text-gray-900 dark:text-white">{record.resolution_route || "legacy"}</dd>
+                            <dt className="text-gray-500 dark:text-gray-400">{t("page.authority.table_route")}</dt>
+                            <dd className="font-mono text-gray-900 dark:text-white">{getRouteLabel(record.resolution_route, t)}</dd>
                         </div>
                         <div className="flex items-center justify-between gap-3">
-                            <dt className="text-gray-500 dark:text-gray-400">Complexity</dt>
+                            <dt className="text-gray-500 dark:text-gray-400">{t("page.authority.complexity")}</dt>
                             <dd className="text-gray-900 dark:text-white">
                                 {typeof record.complexity_score === "number" ? record.complexity_score.toFixed(2) : "--"}
                             </dd>
                         </div>
                         <div className="flex items-center justify-between gap-3">
-                            <dt className="text-gray-500 dark:text-gray-400">NIL score</dt>
+                            <dt className="text-gray-500 dark:text-gray-400">{t("page.authority.nil_score")}</dt>
                             <dd className="text-rose-600 dark:text-rose-400">
                                 {typeof record.nil_score === "number" ? `${(record.nil_score * 100).toFixed(0)}%` : "--"}
                             </dd>
                         </div>
                         <div className="flex items-center justify-between gap-3">
-                            <dt className="text-gray-500 dark:text-gray-400">Authority ID</dt>
+                            <dt className="text-gray-500 dark:text-gray-400">{t("page.authority.authority_id")}</dt>
                             <dd className="font-mono text-gray-900 dark:text-white">{record.authority_id}</dd>
                         </div>
                         <div className="flex items-center justify-between gap-3">
-                            <dt className="text-gray-500 dark:text-gray-400">Resolution</dt>
-                            <dd className="text-gray-900 dark:text-white">{record.resolution_status}</dd>
+                            <dt className="text-gray-500 dark:text-gray-400">{t("page.authority.resolution")}</dt>
+                            <dd className="text-gray-900 dark:text-white">{getResolutionStatusLabel(record.resolution_status, t)}</dd>
                         </div>
                         {record.nil_reason && (
                             <div className="flex items-center justify-between gap-3">
-                                <dt className="text-gray-500 dark:text-gray-400">NIL reason</dt>
-                                <dd className="font-mono text-rose-600 dark:text-rose-400">{record.nil_reason}</dd>
+                                <dt className="text-gray-500 dark:text-gray-400">{t("page.authority.nil_reason")}</dt>
+                                <dd className="font-mono text-rose-600 dark:text-rose-400">{getNilReasonLabel(record.nil_reason, t)}</dd>
                             </div>
                         )}
                         {record.reformulation_trace?.attempted && (
                             <>
                                 <div className="flex items-center justify-between gap-3">
-                                    <dt className="text-gray-500 dark:text-gray-400">Reformulation</dt>
+                                    <dt className="text-gray-500 dark:text-gray-400">{t("page.authority.reformulation")}</dt>
                                     <dd className="text-blue-600 dark:text-blue-400">
-                                        {record.reformulation_trace.applied ? "applied" : "attempted"}
+                                        {record.reformulation_trace.applied ? t("page.authority.applied_state") : t("page.authority.attempted_state")}
                                     </dd>
                                 </div>
                                 <div className="flex items-center justify-between gap-3">
-                                    <dt className="text-gray-500 dark:text-gray-400">Retrieval gain</dt>
+                                    <dt className="text-gray-500 dark:text-gray-400">{t("page.authority.retrieval_gain")}</dt>
                                     <dd className="text-gray-900 dark:text-white">{record.reformulation_gain ?? 0}</dd>
                                 </div>
                             </>
@@ -124,7 +132,7 @@ export default function AuthorReviewExpandedPanel({
 
                 <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/60">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        Score Breakdown
+                        {t("page.authority.score_breakdown")}
                     </p>
                     <div className="mt-3 space-y-2">
                         {record.score_breakdown && Object.keys(record.score_breakdown).length > 0 ? (
@@ -137,13 +145,13 @@ export default function AuthorReviewExpandedPanel({
                                 </div>
                             ))
                         ) : (
-                            <p className="text-sm text-gray-400 dark:text-gray-500">No structured score breakdown.</p>
+                            <p className="text-sm text-gray-400 dark:text-gray-500">{t("page.authority.no_score_breakdown")}</p>
                         )}
                     </div>
                 </div>
 
                 <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/60">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Evidence</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("page.authority.evidence")}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                         {record.evidence && record.evidence.length > 0 ? (
                             record.evidence.map((item) => (
@@ -155,12 +163,12 @@ export default function AuthorReviewExpandedPanel({
                                 </span>
                             ))
                         ) : (
-                            <p className="text-sm text-gray-400 dark:text-gray-500">No evidence captured.</p>
+                            <p className="text-sm text-gray-400 dark:text-gray-500">{t("page.authority.no_evidence")}</p>
                         )}
                     </div>
                     <div className="mt-4 space-y-3">
                         <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Merged Sources</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("page.authority.merged_sources")}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                                 {record.merged_sources && record.merged_sources.length > 0 ? (
                                     record.merged_sources.map((source) => (
@@ -172,12 +180,12 @@ export default function AuthorReviewExpandedPanel({
                                         </span>
                                     ))
                                 ) : (
-                                    <span className="text-xs text-gray-400 dark:text-gray-500">None</span>
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">{t("common.none")}</span>
                                 )}
                             </div>
                         </div>
                         <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Aliases</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("page.authority.aliases")}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                                 {record.aliases && record.aliases.length > 0 ? (
                                     record.aliases.map((alias) => (
@@ -189,14 +197,14 @@ export default function AuthorReviewExpandedPanel({
                                         </span>
                                     ))
                                 ) : (
-                                    <span className="text-xs text-gray-400 dark:text-gray-500">None</span>
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">{t("common.none")}</span>
                                 )}
                             </div>
                         </div>
                         {record.reformulation_trace?.attempted && (
                             <div>
                                 <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                    Reformulation Trace
+                                    {t("page.authority.reformulation_trace")}
                                 </p>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                     {record.reformulation_trace.generated_queries && record.reformulation_trace.generated_queries.length > 0 ? (
@@ -209,11 +217,11 @@ export default function AuthorReviewExpandedPanel({
                                             </span>
                                         ))
                                     ) : (
-                                        <span className="text-xs text-gray-400 dark:text-gray-500">No alternate queries kept</span>
+                                        <span className="text-xs text-gray-400 dark:text-gray-500">{t("page.authority.no_alternate_queries")}</span>
                                     )}
                                 </div>
                                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                    {record.reformulation_trace.provider || "provider-unavailable"}
+                                    {record.reformulation_trace.provider || t("page.authority.provider_unavailable")}
                                     {record.reformulation_trace.model ? ` · ${record.reformulation_trace.model}` : ""}
                                     {typeof record.reformulation_cost_estimate === "number" ? ` · est. $${record.reformulation_cost_estimate.toFixed(4)}` : ""}
                                 </p>
