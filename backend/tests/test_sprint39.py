@@ -1,8 +1,13 @@
 """
 Sprint 39 regression tests — Executive Dashboard GET /dashboard/summary
 """
+import json
+from unittest.mock import patch
+
+import pandas as pd
 import pytest
 from backend import models
+from backend.analyzers.topic_modeling import TopicAnalyzer
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -13,6 +18,7 @@ def _seed_entities(db, n=5):
         db.add(models.RawEntity(
             primary_label=f"Entity {i}",
             domain="default",
+            attributes_json=json.dumps({"year": 2020 + i}),
             enrichment_status="completed" if i % 2 == 0 else "none",
             enrichment_citation_count=10 * (i + 1) if i % 2 == 0 else None,
             enrichment_source="openalex" if i % 2 == 0 else None,
@@ -43,6 +49,7 @@ def test_dashboard_summary_returns_shape(client, auth_headers, db_session):
     assert "entities_by_year" in data
     assert "brand_year_matrix" in data
     assert "top_concepts" in data
+    assert "emerging_topic_signals" in data
     assert "top_entities" in data
     assert "recommended_actions" in data
     assert "institutional_benchmark" in data
@@ -89,6 +96,25 @@ def test_dashboard_entities_by_year_sorted(client, auth_headers, db_session):
     assert response.status_code == 200
     years_list = [item["year"] for item in response.json()["entities_by_year"]]
     assert years_list == sorted(years_list)
+
+
+def test_dashboard_entities_by_year_reads_attributes_json(client, auth_headers, db_session):
+    for year in (2022, 2022, 2023):
+        db_session.add(models.RawEntity(
+            primary_label=f"Paper {year}",
+            domain="timeline_test",
+            attributes_json=json.dumps({"year": year}),
+            enrichment_status="completed",
+            enrichment_concepts="AI, Graphs",
+        ))
+    db_session.commit()
+
+    response = client.get("/dashboard/summary?domain_id=timeline_test", headers=auth_headers)
+    assert response.status_code == 200
+    assert response.json()["entities_by_year"] == [
+        {"year": 2022, "count": 2},
+        {"year": 2023, "count": 1},
+    ]
 
 
 def test_dashboard_brand_matrix_top5(client, auth_headers, db_session):
@@ -141,6 +167,101 @@ def test_dashboard_includes_institutional_benchmark_summary(client, auth_headers
     assert benchmark["status"] in {"ready", "watch", "gap"}
     assert "readiness_pct" in benchmark
     assert isinstance(benchmark["rules"], list)
+
+
+def test_dashboard_includes_emerging_topic_signals(client, auth_headers, db_session):
+    records = [
+        ("AI, Machine Learning", 2021),
+        ("AI, Machine Learning", 2022),
+        ("AI, Machine Learning", 2023),
+        ("Quantum Systems, AI", 2024),
+        ("Quantum Systems, Graph Learning", 2024),
+        ("Quantum Systems, AI", 2025),
+        ("Quantum Systems, Graph Learning", 2025),
+    ]
+    for idx, (concepts, year) in enumerate(records):
+        db_session.add(models.RawEntity(
+            primary_label=f"Trend Entity {idx}",
+            domain="default",
+            attributes_json=json.dumps({"year": year}),
+            enrichment_status="completed",
+            enrichment_concepts=concepts,
+        ))
+    db_session.commit()
+
+    response = client.get("/dashboard/summary?domain_id=default", headers=auth_headers)
+    assert response.status_code == 200
+    signals = response.json()["emerging_topic_signals"]
+
+    assert signals["is_experimental"] is True
+    assert len(signals["recent_years"]) == 2
+    assert max(signals["recent_years"]) >= 2024
+    assert signals["baseline_years"]
+    assert isinstance(signals["signals"], list)
+
+
+def test_topic_analyzer_emerging_signals_detects_acceleration():
+    df = pd.DataFrame([
+        {
+            "id": 1,
+            "enrichment_concepts": "AI, Machine Learning",
+            "attributes_json": json.dumps({"year": 2021}),
+            "primary_label": "Paper 1",
+            "secondary_label": None,
+        },
+        {
+            "id": 2,
+            "enrichment_concepts": "AI, Machine Learning",
+            "attributes_json": json.dumps({"year": 2022}),
+            "primary_label": "Paper 2",
+            "secondary_label": None,
+        },
+        {
+            "id": 3,
+            "enrichment_concepts": "AI, Machine Learning",
+            "attributes_json": json.dumps({"year": 2023}),
+            "primary_label": "Paper 3",
+            "secondary_label": None,
+        },
+        {
+            "id": 4,
+            "enrichment_concepts": "Quantum Systems, AI",
+            "attributes_json": json.dumps({"year": 2024}),
+            "primary_label": "Paper 4",
+            "secondary_label": None,
+        },
+        {
+            "id": 5,
+            "enrichment_concepts": "Quantum Systems, Graph Learning",
+            "attributes_json": json.dumps({"year": 2024}),
+            "primary_label": "Paper 5",
+            "secondary_label": None,
+        },
+        {
+            "id": 6,
+            "enrichment_concepts": "Quantum Systems, AI",
+            "attributes_json": json.dumps({"year": 2025}),
+            "primary_label": "Paper 6",
+            "secondary_label": None,
+        },
+        {
+            "id": 7,
+            "enrichment_concepts": "Quantum Systems, Graph Learning",
+            "attributes_json": json.dumps({"year": 2025}),
+            "primary_label": "Paper 7",
+            "secondary_label": None,
+        },
+    ])
+
+    with patch("backend.analyzers.topic_modeling._load_concepts_timeseries_df", return_value=df):
+        result = TopicAnalyzer().emerging_signals("default", top_n=4)
+
+    assert result["recent_years"] == [2024, 2025]
+    assert result["baseline_years"] == [2021, 2022, 2023]
+    assert any(signal["concept"] == "Quantum Systems" for signal in result["signals"])
+    for signal in result["signals"]:
+        assert signal["confidence"] in {"high", "medium", "low"}
+        assert signal["evidence"]
 
 
 def test_benchmark_profiles_endpoint_lists_builtins(client, auth_headers):

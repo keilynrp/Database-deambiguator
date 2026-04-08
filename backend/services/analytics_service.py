@@ -1,4 +1,5 @@
 from collections import defaultdict
+import json
 import re
 
 from sqlalchemy import func
@@ -19,6 +20,38 @@ class AnalyticsService:
     _YEAR_RE = re.compile(r"\b(20\d{2}|19\d{2})\b")
     _TOP_BRANDS_N = 5
     _TOP_YEARS_N  = 6
+
+    @classmethod
+    def _extract_temporal_year(
+        cls,
+        attributes_json: str | None,
+        primary_label: str | None = None,
+        secondary_label: str | None = None,
+    ) -> int | None:
+        """Extract a plausible scientific year from attrs first, then labels."""
+        attrs: dict = {}
+        if attributes_json:
+            try:
+                attrs = json.loads(attributes_json) or {}
+            except (TypeError, ValueError):
+                attrs = {}
+
+        for key in ("publication_year", "year", "creation_date", "published_at", "date"):
+            value = attrs.get(key)
+            if value is None:
+                continue
+            match = cls._YEAR_RE.search(str(value))
+            if match:
+                return int(match.group(1))
+
+        for fallback in (primary_label, secondary_label):
+            if not fallback:
+                continue
+            match = cls._YEAR_RE.search(str(fallback))
+            if match:
+                return int(match.group(1))
+
+        return None
 
     @staticmethod
     def build_recommended_actions(snapshot: dict) -> list[dict]:
@@ -137,13 +170,56 @@ class AnalyticsService:
         )
         type_distribution = [{"type": r[0], "count": r[1]} for r in type_rows]
 
-        entities_by_year = []
+        temporal_rows = (
+            _q().with_entities(
+                models.RawEntity.attributes_json,
+                models.RawEntity.primary_label,
+                models.RawEntity.secondary_label,
+            ).all()
+        )
+        entities_by_year_counter = defaultdict(int)
+        label_totals = defaultdict(int)
+        label_year_raw = defaultdict(lambda: defaultdict(int))
+        all_years_set = set()
+
+        for attributes_json, primary_label, secondary_label in temporal_rows:
+            year = cls._extract_temporal_year(attributes_json, primary_label, secondary_label)
+            if year is None:
+                continue
+
+            entities_by_year_counter[year] += 1
+            if secondary_label:
+                label_totals[secondary_label] += 1
+                label_year_raw[secondary_label][year] += 1
+                all_years_set.add(year)
+
+        entities_by_year = [
+            {"year": year, "count": entities_by_year_counter[year]}
+            for year in sorted(entities_by_year_counter)
+        ]
 
         # Top concepts via TopicAnalyzer
         top_concepts = []
         try:
             result = topic_analyzer.top_topics(domain_id, top_n=top_n_concepts, org_id=org_id)
             top_concepts = result.get("topics", [])
+        except Exception:
+            pass
+
+        emerging_topic_signals = {
+            "domain_id": domain_id,
+            "is_experimental": True,
+            "years_available": [],
+            "baseline_years": [],
+            "recent_years": [],
+            "signals": [],
+        }
+        try:
+            emerging_topic_signals = topic_analyzer.emerging_signals(
+                domain_id,
+                top_n=4,
+                org_id=org_id,
+            )
         except Exception:
             pass
 
@@ -166,26 +242,12 @@ class AnalyticsService:
             for r in top_entity_rows
         ]
 
-        # Heatmap: secondary_label × domain
-        label_domain_rows = (
-            _q().with_entities(models.RawEntity.secondary_label, models.RawEntity.domain)
-            .filter(models.RawEntity.secondary_label != None, models.RawEntity.secondary_label != "")
-            .all()
-        )
-        label_totals = defaultdict(int)
-        label_domain_raw = defaultdict(lambda: defaultdict(int))
-        all_domains_set = set()
-        for (label, dom) in label_domain_rows:
-            label_totals[label] += 1
-            dom_key = dom or "default"
-            label_domain_raw[label][dom_key] += 1
-            all_domains_set.add(dom_key)
-        
+        # Heatmap: secondary_label x year
         top_labels = sorted(label_totals, key=lambda b: label_totals[b], reverse=True)[:cls._TOP_BRANDS_N]
-        heatmap_domains = sorted(all_domains_set)[:cls._TOP_YEARS_N]
+        heatmap_domains = sorted(all_years_set)[-cls._TOP_YEARS_N:]
         brand_year_matrix = {
             "brands": top_labels, "years": heatmap_domains,
-            "matrix": [[label_domain_raw[b].get(d, 0) for d in heatmap_domains] for b in top_labels],
+            "matrix": [[label_year_raw[b].get(d, 0) for d in heatmap_domains] for b in top_labels],
         }
 
         # Quality KPI
@@ -216,6 +278,7 @@ class AnalyticsService:
             "entities_by_year":   entities_by_year,
             "brand_year_matrix":  brand_year_matrix,
             "top_concepts":       top_concepts,
+            "emerging_topic_signals": emerging_topic_signals,
             "top_entities":       top_entities,
             "quality": {"average": avg_quality, "distribution": quality_dist},
         }

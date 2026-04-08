@@ -6,9 +6,11 @@ concepts as a comma-separated string: "Machine Learning, Neural Network, ...".
 """
 from __future__ import annotations
 
+import json
 import logging
 import math
-from collections import Counter
+import re
+from collections import Counter, defaultdict
 from itertools import combinations
 from typing import Any
 
@@ -22,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Concepts stored as "A, B, C" — split on ", " then strip each
 _SEP = ","
+_YEAR_RE = re.compile(r"\b(19\d{2}|20\d{2})\b")
 
 
 def _parse_concepts(raw: str | None) -> list[str]:
@@ -29,6 +32,45 @@ def _parse_concepts(raw: str | None) -> list[str]:
     if not raw:
         return []
     return [c.strip() for c in raw.split(_SEP) if c.strip()]
+
+
+def _extract_year(value: Any) -> int | None:
+    """Extract a plausible year from ints/strings used in scientific metadata."""
+    if value is None:
+        return None
+    if isinstance(value, int) and 1900 <= value <= 2100:
+        return value
+    match = _YEAR_RE.search(str(value))
+    if not match:
+        return None
+    year = int(match.group(1))
+    return year if 1900 <= year <= 2100 else None
+
+
+def _extract_record_year(
+    attributes_json: str | None,
+    primary_label: str | None = None,
+    secondary_label: str | None = None,
+) -> int | None:
+    """Resolve a temporal year from structured attrs first, then text fallback."""
+    attrs: dict[str, Any] = {}
+    if attributes_json:
+        try:
+            attrs = json.loads(attributes_json) or {}
+        except (ValueError, TypeError):
+            attrs = {}
+
+    for key in ("publication_year", "year", "creation_date", "published_at", "date"):
+        year = _extract_year(attrs.get(key))
+        if year is not None:
+            return year
+
+    for fallback in (primary_label, secondary_label):
+        year = _extract_year(fallback)
+        if year is not None:
+            return year
+
+    return None
 
 
 def _load_concepts_df(domain_id: str, org_id: int | None = None) -> pd.DataFrame:
@@ -54,6 +96,37 @@ def _load_concepts_df(domain_id: str, org_id: int | None = None) -> pd.DataFrame
     with engine.connect() as conn:
         df = pd.read_sql(
             f"SELECT id, enrichment_concepts FROM raw_entities WHERE {' AND '.join(where_clauses)}",
+            conn,
+            params=params,
+        )
+    return df
+
+
+def _load_concepts_timeseries_df(domain_id: str, org_id: int | None = None) -> pd.DataFrame:
+    """
+    Load concept-bearing rows with enough metadata to derive temporal signals.
+    Returns: id, enrichment_concepts, attributes_json, primary_label, secondary_label.
+    """
+    domain = registry.get_domain(domain_id)
+    if domain is None:
+        raise ValueError(f"Domain '{domain_id}' not found")
+
+    where_clauses = ["enrichment_concepts IS NOT NULL", "enrichment_concepts != ''"]
+    params: dict[str, object] = {}
+    if domain_id != "all":
+        if domain_id == "default":
+            where_clauses.append("(domain = :domain_id OR domain IS NULL)")
+        else:
+            where_clauses.append("domain = :domain_id")
+        params["domain_id"] = domain_id
+    add_org_sql_filter(where_clauses, params, org_id)
+
+    with engine.connect() as conn:
+        df = pd.read_sql(
+            (
+                "SELECT id, enrichment_concepts, attributes_json, primary_label, secondary_label "
+                f"FROM raw_entities WHERE {' AND '.join(where_clauses)}"
+            ),
             conn,
             params=params,
         )
@@ -237,4 +310,117 @@ class TopicAnalyzer:
             "domain_id": domain_id,
             "n_clusters": len(clusters),
             "clusters": clusters,
+        }
+
+    def emerging_signals(
+        self,
+        domain_id: str,
+        *,
+        recent_window: int = 2,
+        baseline_window: int = 3,
+        top_n: int = 5,
+        org_id: int | None = None,
+    ) -> dict[str, Any]:
+        """
+        Detect conservative early signals by comparing recent concept momentum
+        against the immediately preceding time window.
+        """
+        df = _load_concepts_timeseries_df(domain_id, org_id=org_id)
+
+        year_totals: Counter[int] = Counter()
+        concept_year_counts: dict[str, Counter[int]] = defaultdict(Counter)
+
+        for row in df.itertuples(index=False):
+            year = _extract_record_year(
+                getattr(row, "attributes_json", None),
+                getattr(row, "primary_label", None),
+                getattr(row, "secondary_label", None),
+            )
+            if year is None:
+                continue
+
+            concepts = sorted(set(_parse_concepts(getattr(row, "enrichment_concepts", None))))
+            if not concepts:
+                continue
+
+            year_totals[year] += 1
+            for concept in concepts:
+                concept_year_counts[concept][year] += 1
+
+        years_available = sorted(year_totals)
+        if len(years_available) < recent_window + 1:
+            return {
+                "domain_id": domain_id,
+                "is_experimental": True,
+                "years_available": years_available,
+                "baseline_years": [],
+                "recent_years": [],
+                "signals": [],
+            }
+
+        recent_years = years_available[-recent_window:]
+        baseline_years = years_available[max(0, len(years_available) - recent_window - baseline_window): -recent_window]
+        if not baseline_years:
+            return {
+                "domain_id": domain_id,
+                "is_experimental": True,
+                "years_available": years_available,
+                "baseline_years": [],
+                "recent_years": recent_years,
+                "signals": [],
+            }
+
+        baseline_total = sum(year_totals[y] for y in baseline_years)
+        recent_total = sum(year_totals[y] for y in recent_years)
+        signals: list[dict[str, Any]] = []
+
+        for concept, counts in concept_year_counts.items():
+            baseline_count = sum(counts[y] for y in baseline_years)
+            recent_count = sum(counts[y] for y in recent_years)
+            if recent_count < 2 or recent_count <= baseline_count:
+                continue
+
+            baseline_share = (baseline_count / baseline_total) if baseline_total else 0.0
+            recent_share = (recent_count / recent_total) if recent_total else 0.0
+            acceleration_score = round(recent_share - baseline_share, 4)
+            if acceleration_score <= 0 and recent_count < baseline_count + 2:
+                continue
+
+            if recent_count >= 4 and acceleration_score >= 0.18:
+                confidence = "high"
+            elif recent_count >= 3 and acceleration_score >= 0.08:
+                confidence = "medium"
+            else:
+                confidence = "low"
+
+            signals.append({
+                "concept": concept,
+                "recent_count": recent_count,
+                "baseline_count": baseline_count,
+                "recent_share": round(recent_share * 100, 1),
+                "baseline_share": round(baseline_share * 100, 1),
+                "acceleration_score": round(acceleration_score * 100, 1),
+                "confidence": confidence,
+                "evidence": (
+                    f"{concept} appears {recent_count} times in {recent_years[0]}-{recent_years[-1]} "
+                    f"vs {baseline_count} in {baseline_years[0]}-{baseline_years[-1]}."
+                ),
+            })
+
+        signals.sort(
+            key=lambda signal: (
+                signal["acceleration_score"],
+                signal["recent_count"],
+                signal["concept"].lower(),
+            ),
+            reverse=True,
+        )
+
+        return {
+            "domain_id": domain_id,
+            "is_experimental": True,
+            "years_available": years_available,
+            "baseline_years": baseline_years,
+            "recent_years": recent_years,
+            "signals": signals[:top_n],
         }

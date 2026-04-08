@@ -38,6 +38,22 @@ interface DashboardData {
     matrix: number[][];
   };
   top_concepts: { concept: string; count: number; pct: number }[];
+  emerging_topic_signals: {
+    is_experimental: boolean;
+    years_available: number[];
+    baseline_years: number[];
+    recent_years: number[];
+    signals: {
+      concept: string;
+      recent_count: number;
+      baseline_count: number;
+      recent_share: number;
+      baseline_share: number;
+      acceleration_score: number;
+      confidence: "high" | "medium" | "low";
+      evidence: string;
+    }[];
+  };
   top_entities: {
     id: number;
     entity_name?: string | null;
@@ -261,6 +277,11 @@ export default function ExecutiveDashboardPage() {
     data.institutional_benchmark.status === "ready" ? toneStyles.emerald :
     data.institutional_benchmark.status === "watch" ? toneStyles.violet :
     toneStyles.amber;
+  const signalToneStyles: Record<"high" | "medium" | "low", string> = {
+    high: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-200",
+    medium: "border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-500/20 dark:bg-violet-500/5 dark:text-violet-200",
+    low: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-200",
+  };
 
   return (
     <div className="flex flex-col gap-6 pb-10">
@@ -587,6 +608,72 @@ export default function ExecutiveDashboardPage() {
       </div>
 
       {/* ── Section 3: Brand × Year Heatmap ── */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+              Emerging Topic Signals
+            </h3>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Experimental early signals based on recent concept acceleration across the years detected in the imported portfolio.
+            </p>
+          </div>
+          {data?.emerging_topic_signals?.is_experimental && (
+            <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+              Experimental
+            </span>
+          )}
+        </div>
+        {loading ? (
+          <SkeletonCard lines={3} />
+        ) : !data ? null : data.emerging_topic_signals.signals.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-400">
+            No reliable early signals yet. UKIP needs concept coverage across multiple years before surfacing acceleration.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {data.emerging_topic_signals.signals.map((signal) => (
+              <div
+                key={signal.concept}
+                className={`rounded-2xl border p-5 shadow-sm ${signalToneStyles[signal.confidence]}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-70">
+                      Early Signal
+                    </p>
+                    <p className="text-base font-semibold">{signal.concept}</p>
+                  </div>
+                  <span className="rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-current dark:bg-gray-900/60">
+                    {signal.confidence}
+                  </span>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+                  <div className="rounded-xl bg-white/80 p-3 dark:bg-gray-900/70">
+                    <p className="text-xs opacity-70">Acceleration</p>
+                    <p className="mt-1 text-lg font-semibold">+{signal.acceleration_score}%</p>
+                  </div>
+                  <div className="rounded-xl bg-white/80 p-3 dark:bg-gray-900/70">
+                    <p className="text-xs opacity-70">Recent share</p>
+                    <p className="mt-1 text-lg font-semibold">{signal.recent_share}%</p>
+                  </div>
+                  <div className="rounded-xl bg-white/80 p-3 dark:bg-gray-900/70">
+                    <p className="text-xs opacity-70">Baseline share</p>
+                    <p className="mt-1 text-lg font-semibold">{signal.baseline_share}%</p>
+                  </div>
+                </div>
+                <p className="mt-4 text-sm opacity-90">{signal.evidence}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {!!data?.emerging_topic_signals?.recent_years.length && !!data?.emerging_topic_signals?.baseline_years.length && (
+          <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+            Comparing {data.emerging_topic_signals.recent_years[0]}-{data.emerging_topic_signals.recent_years[data.emerging_topic_signals.recent_years.length - 1]} against {data.emerging_topic_signals.baseline_years[0]}-{data.emerging_topic_signals.baseline_years[data.emerging_topic_signals.baseline_years.length - 1]}.
+          </p>
+        )}
+      </div>
+
       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <h3 className="mb-1 text-base font-semibold text-gray-900 dark:text-white">
           Top Primary Labels by Year
