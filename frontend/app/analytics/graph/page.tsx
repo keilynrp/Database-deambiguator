@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { PageHeader, StatCard } from "../../components/ui";
 
 // ── Export helpers ────────────────────────────────────────────────────────────
@@ -89,6 +90,7 @@ interface CommunityResponse {
 }
 
 export default function GraphAnalyticsPage() {
+  const { t } = useLanguage();
   const [stats, setStats] = useState<GraphStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [errorStats, setErrorStats] = useState<string | null>(null);
@@ -113,18 +115,18 @@ export default function GraphAnalyticsPage() {
     apiFetch("/graph/stats")
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((data) => setStats(data))
-      .catch((e) => setErrorStats(`Failed to load graph stats (${e})`))
+      .catch((e) => setErrorStats(`${t("page.graph.error_load_stats")} (${e})`))
       .finally(() => setLoadingStats(false));
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     setLoadingCommunities(true);
     apiFetch("/graph/communities?limit=8")
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((data) => setCommunities(data))
-      .catch((e) => setCommunityError(`Failed to load communities (${e})`))
+      .catch((e) => setCommunityError(`${t("page.graph.error_load_communities")} (${e})`))
       .finally(() => setLoadingCommunities(false));
-  }, []);
+  }, [t]);
 
   async function handleExport(format: ExportFormat) {
     setExportingFormat(format);
@@ -132,7 +134,7 @@ export default function GraphAnalyticsPage() {
     try {
       await downloadGraph(format, exportDomain);
     } catch (e: unknown) {
-      setExportError(e instanceof Error ? e.message : "Export failed");
+      setExportError(e instanceof Error ? e.message : t("page.graph.export_failed"));
     } finally {
       setExportingFormat(null);
     }
@@ -152,7 +154,7 @@ export default function GraphAnalyticsPage() {
         setPathError(body.detail ?? `Error ${r.status}`);
       }
     } catch {
-      setPathError("Network error");
+      setPathError(t("page.graph.network_error"));
     } finally {
       setLoadingPath(false);
     }
@@ -162,8 +164,8 @@ export default function GraphAnalyticsPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <PageHeader
-          title="Graph Analytics"
-          description="Centrality scores, connected components, and shortest paths across the knowledge graph."
+          title={t("page.graph.title")}
+          description={t("page.graph.description")}
         />
 
         {/* Stats cards */}
@@ -182,7 +184,7 @@ export default function GraphAnalyticsPage() {
           <>
             <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
               <StatCard
-                label="Total Nodes"
+                label={t("page.graph.total_nodes")}
                 value={stats.total_nodes.toLocaleString()}
                 icon={
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -192,7 +194,7 @@ export default function GraphAnalyticsPage() {
                 }
               />
               <StatCard
-                label="Total Edges"
+                label={t("page.graph.total_edges")}
                 value={stats.total_edges.toLocaleString()}
                 icon={
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -202,7 +204,7 @@ export default function GraphAnalyticsPage() {
                 }
               />
               <StatCard
-                label="Components"
+                label={t("page.graph.components")}
                 value={stats.total_components.toLocaleString()}
                 icon={
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -212,7 +214,7 @@ export default function GraphAnalyticsPage() {
                 }
               />
               <StatCard
-                label="Largest Component"
+                label={t("page.graph.largest_component")}
                 value={stats.largest_component_size.toLocaleString()}
                 icon={
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -229,9 +231,9 @@ export default function GraphAnalyticsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                     d="M13.5 16.875h3.375m0 0h3.375m-3.375 0V13.5m0 3.375v3.375M6 10.5h2.25a2.25 2.25 0 002.25-2.25V6a2.25 2.25 0 00-2.25-2.25H6A2.25 2.25 0 003.75 6v2.25A2.25 2.25 0 006 10.5zm0 9.75h2.25A2.25 2.25 0 0010.5 18v-2.25a2.25 2.25 0 00-2.25-2.25H6a2.25 2.25 0 00-2.25 2.25V18A2.25 2.25 0 006 20.25zm9.75-9.75H18a2.25 2.25 0 002.25-2.25V6A2.25 2.25 0 0018 3.75h-2.25A2.25 2.25 0 0013.5 6v2.25a2.25 2.25 0 002.25 2.25z" />
                 </svg>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No relationships found</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{t("page.graph.no_relationships")}</p>
                 <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                  Add relationships to entities to see graph analytics.
+                  {t("page.graph.add_relationships_hint")}
                 </p>
               </div>
             ) : (
@@ -240,17 +242,17 @@ export default function GraphAnalyticsPage() {
                 {/* Top by PageRank */}
                 <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
                   <h2 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
-                    Top by PageRank
+                    {t("page.graph.top_by_pagerank")}
                   </h2>
                   {stats.top_pagerank.length === 0 ? (
-                    <p className="text-xs text-gray-400">No data</p>
+                    <p className="text-xs text-gray-400">{t("common.no_data")}</p>
                   ) : (
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-gray-100 dark:border-gray-800">
                           <th className="pb-2 text-left text-xs font-medium text-gray-400">#</th>
-                          <th className="pb-2 text-left text-xs font-medium text-gray-400">Entity</th>
-                          <th className="pb-2 text-right text-xs font-medium text-gray-400">Score</th>
+                          <th className="pb-2 text-left text-xs font-medium text-gray-400">{t("page.graph.entity")}</th>
+                          <th className="pb-2 text-right text-xs font-medium text-gray-400">{t("page.graph.score")}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50 dark:divide-gray-800/50">
@@ -278,17 +280,17 @@ export default function GraphAnalyticsPage() {
                 {/* Top by Degree */}
                 <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
                   <h2 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
-                    Top by Degree
+                    {t("page.graph.top_by_degree")}
                   </h2>
                   {stats.top_degree.length === 0 ? (
-                    <p className="text-xs text-gray-400">No data</p>
+                    <p className="text-xs text-gray-400">{t("common.no_data")}</p>
                   ) : (
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-gray-100 dark:border-gray-800">
                           <th className="pb-2 text-left text-xs font-medium text-gray-400">#</th>
-                          <th className="pb-2 text-left text-xs font-medium text-gray-400">Entity</th>
-                          <th className="pb-2 text-right text-xs font-medium text-gray-400">Degree</th>
+                          <th className="pb-2 text-left text-xs font-medium text-gray-400">{t("page.graph.entity")}</th>
+                          <th className="pb-2 text-right text-xs font-medium text-gray-400">{t("page.graph.degree")}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50 dark:divide-gray-800/50">
@@ -318,15 +320,15 @@ export default function GraphAnalyticsPage() {
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
                     <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Research Communities
+                      {t("page.graph.research_communities")}
                     </h2>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Lightweight community detection over the current collaboration graph.
+                      {t("page.graph.research_communities_description")}
                     </p>
                   </div>
                   {communities && (
                     <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
-                      {communities.total_communities} detected
+                      {communities.total_communities} {t("page.graph.detected")}
                     </span>
                   )}
                 </div>
@@ -349,27 +351,27 @@ export default function GraphAnalyticsPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                              Community {community.community_id + 1}
+                              {t("page.graph.community")} {community.community_id + 1}
                             </p>
                             <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
-                              Leader: {community.leader.primary_label ?? `Entity #${community.leader.entity_id}`}
+                              {t("page.graph.leader")}: {community.leader.primary_label ?? `Entity #${community.leader.entity_id}`}
                             </p>
                           </div>
                           <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-                            {community.size} nodes
+                            {community.size} {t("page.graph.nodes")}
                           </span>
                         </div>
                         <div className="mt-4 grid grid-cols-3 gap-3 text-center">
                           <div className="rounded-xl bg-white p-3 dark:bg-gray-900">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Density</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{t("page.graph.density")}</p>
                             <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{community.density}</p>
                           </div>
                           <div className="rounded-xl bg-white p-3 dark:bg-gray-900">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Edges</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{t("page.graph.edges")}</p>
                             <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{community.internal_edges}</p>
                           </div>
                           <div className="rounded-xl bg-white p-3 dark:bg-gray-900">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Leader degree</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{t("page.graph.leader_degree")}</p>
                             <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{community.leader.total_degree}</p>
                           </div>
                         </div>
@@ -390,7 +392,7 @@ export default function GraphAnalyticsPage() {
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    No graph communities detected yet.
+                    {t("page.graph.no_communities")}
                   </p>
                 )}
               </div>
@@ -401,14 +403,14 @@ export default function GraphAnalyticsPage() {
 
         {/* Path Finder */}
         <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-          <h2 className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Path Finder</h2>
+          <h2 className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">{t("page.graph.path_finder")}</h2>
           <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
-            Find the shortest directed path between two entities using BFS.
+            {t("page.graph.path_finder_description")}
           </p>
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                From Entity ID
+                {t("page.graph.from_entity_id")}
               </label>
               <input
                 type="number"
@@ -416,12 +418,12 @@ export default function GraphAnalyticsPage() {
                 value={fromId}
                 onChange={(e) => setFromId(e.target.value)}
                 className="w-36 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                placeholder="e.g. 1"
+                placeholder={t("page.graph.entity_id_example_1")}
               />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                To Entity ID
+                {t("page.graph.to_entity_id")}
               </label>
               <input
                 type="number"
@@ -429,7 +431,7 @@ export default function GraphAnalyticsPage() {
                 value={toId}
                 onChange={(e) => setToId(e.target.value)}
                 className="w-36 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                placeholder="e.g. 5"
+                placeholder={t("page.graph.entity_id_example_5")}
               />
             </div>
             <button
@@ -437,7 +439,7 @@ export default function GraphAnalyticsPage() {
               disabled={loadingPath || !fromId || !toId}
               className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loadingPath ? "Searching…" : "Find Path"}
+              {loadingPath ? t("page.graph.searching") : t("page.graph.find_path")}
             </button>
           </div>
 
@@ -455,20 +457,20 @@ export default function GraphAnalyticsPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                       d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                   </svg>
-                  No directed path found from entity {fromId} to entity {toId}.
+                  {t("page.graph.no_directed_path")} {fromId} {t("page.graph.to_entity")} {toId}.
                 </div>
               ) : (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-900/10">
                   <div className="mb-3 flex items-center gap-3 text-xs">
                     <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                      Path found
+                      {t("page.graph.path_found")}
                     </span>
                     <span className="text-emerald-600 dark:text-emerald-500">
-                      Length: {pathResult.length} hop{pathResult.length !== 1 ? "s" : ""}
+                      {t("page.graph.length")}: {pathResult.length} {pathResult.length !== 1 ? t("page.graph.hops") : t("page.graph.hop")}
                     </span>
                     {pathResult.relations && pathResult.relations.length > 0 && (
                       <span className="text-emerald-600 dark:text-emerald-500">
-                        Via: {pathResult.relations.join(" → ")}
+                        {t("page.graph.via")}: {pathResult.relations.join(" → ")}
                       </span>
                     )}
                   </div>
@@ -505,21 +507,21 @@ export default function GraphAnalyticsPage() {
 
         {/* Export Graph */}
         <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-          <h2 className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Export Graph</h2>
+          <h2 className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">{t("page.graph.export_graph")}</h2>
           <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
-            Download the knowledge graph in a standard format for external analysis tools.
+            {t("page.graph.export_graph_description")}
           </p>
 
           {/* Domain filter */}
           <div className="mb-4">
             <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
-              Domain filter <span className="font-normal text-gray-400">(leave blank for all domains)</span>
+              {t("page.graph.domain_filter")} <span className="font-normal text-gray-400">({t("page.graph.leave_blank_all_domains")})</span>
             </label>
             <input
               type="text"
               value={exportDomain}
               onChange={(e) => setExportDomain(e.target.value)}
-              placeholder="e.g. science"
+              placeholder={t("page.graph.domain_example")}
               className="w-56 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
           </div>
@@ -547,7 +549,7 @@ export default function GraphAnalyticsPage() {
                     </svg>
                   )}
                   <div>
-                    <p className="text-xs font-semibold">{isLoading ? "Exporting…" : fmt.label}</p>
+                    <p className="text-xs font-semibold">{isLoading ? t("page.graph.exporting") : fmt.label}</p>
                     <p className="text-[10px] opacity-70">{fmt.desc}</p>
                   </div>
                 </button>

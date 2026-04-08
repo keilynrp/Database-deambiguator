@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
+import { useLanguage } from "../contexts/LanguageContext";
 import { ErrorBanner, useToast } from "../components/ui";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -60,20 +61,28 @@ const STATUS_COLOR = (code: number | null) => {
   return "text-red-600 dark:text-red-400";
 };
 
-function fmtDate(iso: string | null) {
+function fmtDate(iso: string | null, locale: string) {
   if (!iso) return "—";
   const d = new Date(iso);
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString(locale, {
     year: "2-digit", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", second: "2-digit",
     hour12: false,
   });
 }
 
+function getActionLabel(action: string, t: (key: string) => string) {
+  if (action === "CREATE") return t("common.create");
+  if (action === "UPDATE") return t("common.update");
+  if (action === "DELETE") return t("common.delete");
+  return action;
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function AuditLogPage() {
   const { toast } = useToast();
+  const { language, t } = useLanguage();
   // ── Filter state
   const [filterAction,   setFilterAction]   = useState("");
   const [filterResource, setFilterResource] = useState("");
@@ -124,11 +133,11 @@ export default function AuditLogPage() {
       if (!res.ok) { setError(await res.text()); return; }
       setPage(await res.json());
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load audit log");
+      setError(e instanceof Error ? e.message : t("page.audit.error_load"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // ── Effects
 
@@ -173,7 +182,7 @@ export default function AuditLogPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      toast("Export failed", "error");
+      toast(t("page.audit.export_failed"), "error");
     }
   }
 
@@ -189,27 +198,27 @@ export default function AuditLogPage() {
       {/* ── Stats bar ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-5">
         <StatCard
-          label="Total events"
+          label={t("page.audit.total_events")}
           value={loadingStats ? "…" : String(stats?.total ?? 0)}
           color="blue"
         />
         <StatCard
-          label="Creates"
+          label={t("page.audit.creates")}
           value={loadingStats ? "…" : String(stats?.by_action?.CREATE ?? 0)}
           color="green"
         />
         <StatCard
-          label="Updates"
+          label={t("page.audit.updates")}
           value={loadingStats ? "…" : String(stats?.by_action?.UPDATE ?? 0)}
           color="amber"
         />
         <StatCard
-          label="Deletes"
+          label={t("page.audit.deletes")}
           value={loadingStats ? "…" : String(stats?.by_action?.DELETE ?? 0)}
           color="red"
         />
         <StatCard
-          label="Active users"
+          label={t("page.audit.active_users")}
           value={loadingStats ? "…" : String(stats?.top_users?.length ?? 0)}
           color="purple"
         />
@@ -221,10 +230,10 @@ export default function AuditLogPage() {
           {/* Bar chart */}
           <div className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
             <p className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Activity — last 7 days
+              {t("page.audit.activity_last_7_days")}
             </p>
             {stats.last_7_days.length === 0 ? (
-              <p className="text-sm text-gray-400">No activity data yet.</p>
+              <p className="text-sm text-gray-400">{t("page.audit.no_activity_data")}</p>
             ) : (
               <ResponsiveContainer width="100%" height={120}>
                 <BarChart data={stats.last_7_days} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
@@ -232,7 +241,7 @@ export default function AuditLogPage() {
                   <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
                   <Tooltip
                     contentStyle={{ fontSize: 12, borderRadius: 6 }}
-                    formatter={(v) => [Number(v) || 0, "Events"]}
+                    formatter={(v) => [Number(v) || 0, t("page.audit.events_label")]}
                   />
                   <Bar dataKey="count" fill="#3b82f6" radius={[3, 3, 0, 0]} />
                 </BarChart>
@@ -242,9 +251,9 @@ export default function AuditLogPage() {
 
           {/* Top users */}
           <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-            <p className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Top users</p>
+            <p className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">{t("page.audit.top_users")}</p>
             {stats.top_users.length === 0 ? (
-              <p className="text-sm text-gray-400">No user data yet.</p>
+              <p className="text-sm text-gray-400">{t("page.audit.no_user_data")}</p>
             ) : (
               <ul className="space-y-2">
                 {stats.top_users.slice(0, 8).map((u) => (
@@ -268,32 +277,32 @@ export default function AuditLogPage() {
         <div className="flex flex-wrap items-end gap-3">
           {/* Action */}
           <div className="min-w-[130px]">
-            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Action</label>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{t("page.audit.action")}</label>
             <select
               value={filterAction}
               onChange={(e) => setFilterAction(e.target.value)}
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             >
               {ACTION_OPTIONS.map((a) => (
-                <option key={a} value={a}>{a || "All actions"}</option>
+                <option key={a} value={a}>{a ? getActionLabel(a, t) : t("page.audit.all_actions")}</option>
               ))}
             </select>
           </div>
 
           {/* Resource type */}
           <div className="min-w-[150px]">
-            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Resource type</label>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{t("page.audit.resource_type")}</label>
             <input
               value={filterResource}
               onChange={(e) => setFilterResource(e.target.value)}
-              placeholder="entity, rule, …"
+              placeholder={t("page.audit.resource_placeholder")}
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             />
           </div>
 
           {/* Username */}
           <div className="min-w-[140px]">
-            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Username</label>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{t("page.audit.username")}</label>
             <input
               value={filterUser}
               onChange={(e) => setFilterUser(e.target.value)}
@@ -304,7 +313,7 @@ export default function AuditLogPage() {
 
           {/* From date */}
           <div className="min-w-[160px]">
-            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">From</label>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{t("page.audit.from")}</label>
             <input
               type="datetime-local"
               value={filterFrom}
@@ -315,7 +324,7 @@ export default function AuditLogPage() {
 
           {/* To date */}
           <div className="min-w-[160px]">
-            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">To</label>
+            <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{t("page.audit.to")}</label>
             <input
               type="datetime-local"
               value={filterTo}
@@ -330,13 +339,13 @@ export default function AuditLogPage() {
               onClick={handleApply}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              Apply
+              {t("common.apply")}
             </button>
             <button
               onClick={handleReset}
               className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
             >
-              Reset
+              {t("common.reset")}
             </button>
           </div>
 
@@ -349,7 +358,7 @@ export default function AuditLogPage() {
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
               </svg>
-              Export CSV
+              {t("page.audit.export_csv")}
             </button>
           </div>
         </div>
@@ -360,12 +369,12 @@ export default function AuditLogPage() {
         {/* Header row */}
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
           <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            Audit Timeline
+            {t("page.audit.timeline")}
           </p>
           <span />
           {page && (
             <p className="text-xs text-gray-400">
-              {page.total.toLocaleString()} total event{page.total !== 1 ? "s" : ""}
+              {page.total.toLocaleString()} {t("page.audit.total_events_label")}
             </p>
           )}
         </div>
@@ -400,7 +409,7 @@ export default function AuditLogPage() {
                 <svg className="mx-auto mb-3 h-10 w-10 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
-                <p className="text-sm text-gray-500 dark:text-gray-400">No audit events match the current filters.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t("page.audit.no_events_filtered")}</p>
               </div>
             ) : (
               <ul className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -416,7 +425,7 @@ export default function AuditLogPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         {/* Action badge */}
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ACTION_STYLES[entry.action] ?? "bg-gray-100 text-gray-600"}`}>
-                          {entry.action}
+                          {getActionLabel(entry.action, t)}
                         </span>
                         {/* Resource */}
                         {entry.resource_type && (
@@ -459,7 +468,7 @@ export default function AuditLogPage() {
                     {/* Timestamp */}
                     <div className="shrink-0 text-right">
                       <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-                        {fmtDate(entry.created_at)}
+                        {fmtDate(entry.created_at, language)}
                       </span>
                     </div>
                   </li>
@@ -478,17 +487,17 @@ export default function AuditLogPage() {
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
-                  Prev
+                  {t("page.audit.prev")}
                 </button>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  Page {currentPage} of {totalPages}
+                  {t("common.page")} {currentPage} {t("common.of")} {totalPages}
                 </span>
                 <button
                   onClick={() => setSkip(skip + PAGE_SIZE)}
                   disabled={skip + PAGE_SIZE >= page.total}
                   className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
-                  Next
+                  {t("page.audit.next")}
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
