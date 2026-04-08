@@ -8,6 +8,39 @@ function getErrorMessage(error: unknown, fallback: string) {
     return error instanceof Error ? error.message : fallback;
 }
 
+function formatApiDetail(detail: unknown, fallback: string): string {
+    if (typeof detail === "string" && detail.trim()) {
+        return detail;
+    }
+    if (Array.isArray(detail) && detail.length > 0) {
+        const first = detail[0];
+        if (typeof first === "string") {
+            return first;
+        }
+        if (first && typeof first === "object") {
+            const msg = "msg" in first ? first.msg : null;
+            const loc = "loc" in first && Array.isArray(first.loc) ? first.loc.join(" > ") : null;
+            if (typeof msg === "string" && loc) {
+                return `${loc}: ${msg}`;
+            }
+            if (typeof msg === "string") {
+                return msg;
+            }
+        }
+    }
+    if (detail && typeof detail === "object") {
+        if ("msg" in detail && typeof detail.msg === "string") {
+            return detail.msg;
+        }
+        try {
+            return JSON.stringify(detail);
+        } catch {
+            return fallback;
+        }
+    }
+    return fallback;
+}
+
 export default function useImportWizardController() {
     const [step, setStep] = useState<WizardStep>(1);
     const [file, setFile] = useState<File | null>(null);
@@ -33,8 +66,8 @@ export default function useImportWizardController() {
         try {
             const response = await apiFetch("/upload/preview", { method: "POST", body: form });
             if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({ detail: "Preview failed" })) as { detail?: string };
-                setPreviewError(errorBody.detail ?? "Preview failed");
+                const errorBody = await response.json().catch(() => ({ detail: "Preview failed" })) as { detail?: unknown };
+                setPreviewError(formatApiDetail(errorBody.detail, "Preview failed"));
                 return;
             }
 
@@ -73,8 +106,8 @@ export default function useImportWizardController() {
         try {
             const response = await apiFetch("/upload", { method: "POST", body: form });
             if (!response.ok) {
-                const errorBody = await response.json().catch(() => ({ detail: "Import failed" })) as { detail?: string };
-                setImportError(errorBody.detail ?? "Import failed");
+                const errorBody = await response.json().catch(() => ({ detail: "Import failed" })) as { detail?: unknown };
+                setImportError(formatApiDetail(errorBody.detail, "Import failed"));
                 return;
             }
             setImportResult(await response.json() as ImportResult);
