@@ -16,7 +16,12 @@ async function parseErrorDetail(response: Response, fallback: string): Promise<s
     }
 
     const text = await response.text().catch(() => "");
-    return text.trim() || fallback;
+    const normalized = text.trim();
+    if (response.status >= 500 && normalized === "Internal Server Error") {
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+        return `Frontend proxy could not reach backend at ${backendUrl}. Is the backend running?`;
+    }
+    return normalized || fallback;
 }
 
 function formatApiDetail(detail: unknown, fallback: string): string {
