@@ -29,6 +29,10 @@ def upgrade() -> None:
     bind = op.get_bind()
     columns = _column_names(bind, "authority_records")
     indexes = _index_names(bind, "authority_records")
+    authority_records = sa.table(
+        "authority_records",
+        sa.column("review_required", sa.Boolean()),
+    )
 
     with op.batch_alter_table("authority_records") as batch_op:
         if "resolution_route" not in columns:
@@ -48,13 +52,9 @@ def upgrade() -> None:
             batch_op.create_index("ix_authority_records_review_required", ["review_required"], unique=False)
 
     op.execute(
-        sa.text(
-            """
-            UPDATE authority_records
-            SET review_required = 0
-            WHERE review_required IS NULL
-            """
-        )
+        authority_records.update()
+        .where(authority_records.c.review_required.is_(None))
+        .values(review_required=sa.false())
     )
 
 
