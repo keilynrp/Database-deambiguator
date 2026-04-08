@@ -103,7 +103,9 @@ describe("OnboardingChecklist", () => {
     });
 
     expect(screen.getByText("Initial commercial focus")).toBeInTheDocument();
-    expect(screen.getByText("Fastest path to first value.")).toBeInTheDocument();
+    expect(
+      screen.getByText("This is the fastest next step to unlock first value in the research intelligence flow.")
+    ).toBeInTheDocument();
     expect(screen.getByText("Recommended now")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go now" })).toHaveAttribute("href", "/import-export");
   });

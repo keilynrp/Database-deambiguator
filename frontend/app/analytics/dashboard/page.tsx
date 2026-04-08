@@ -106,6 +106,17 @@ interface BenchmarkProfile {
   is_default: boolean;
 }
 
+interface BenchmarkGap {
+  id: string;
+  label: string;
+  priority: "high" | "medium" | "low";
+  threshold: number;
+  observed: number;
+  passed: boolean;
+  message: string;
+  evidence: string;
+}
+
 // ── Heatmap cell with violet color scale ─────────────────────────────────────
 
 function HeatCell({ value, max }: { value: number; max: number }) {
@@ -161,10 +172,55 @@ export default function ExecutiveDashboardPage() {
   const importedFlag = searchParams.get("imported") === "1";
   const importedDomain = searchParams.get("domain");
   const importedRows = searchParams.get("rows");
-  const tr = (key: string, fallback: string) => {
+  const tr = useCallback((key: string, fallback: string) => {
     const value = t(key);
     return value === key ? fallback : value;
+  }, [t]);
+  const formatObservedValue = (value: number) => (
+    Number.isInteger(value)
+      ? value.toLocaleString()
+      : value.toLocaleString(undefined, { maximumFractionDigits: 1 })
+  );
+  const translateBenchmarkProfileName = (profileId: string, fallback: string) => (
+    tr(`page.exec_dashboard.benchmark_profile_name.${profileId}`, fallback)
+  );
+  const translateBenchmarkProfileDescription = (profileId: string, fallback: string) => (
+    tr(`page.exec_dashboard.benchmark_profile_description.${profileId}`, fallback)
+  );
+  const translateBenchmarkStatus = (status: string) => (
+    tr(`page.exec_dashboard.benchmark_status.${status}`, status)
+  );
+  const translatePriority = (priority: string) => (
+    tr(`page.exec_dashboard.priority.${priority}`, priority)
+  );
+  const translateRuleLabel = (ruleId: string, fallback: string) => (
+    tr(`page.exec_dashboard.benchmark_rule_label.${ruleId}`, fallback)
+  );
+  const translateRuleMessage = (
+    profileId: string,
+    ruleId: string,
+    passed: boolean,
+    fallback: string,
+  ) => {
+    const stateKey = passed ? "pass" : "fail";
+    const profileSpecific = t(`page.exec_dashboard.benchmark_rule_message.${profileId}.${ruleId}.${stateKey}`);
+    if (profileSpecific !== `page.exec_dashboard.benchmark_rule_message.${profileId}.${ruleId}.${stateKey}`) {
+      return profileSpecific;
+    }
+    const generic = t(`page.exec_dashboard.benchmark_rule_message.${ruleId}.${stateKey}`);
+    return generic === `page.exec_dashboard.benchmark_rule_message.${ruleId}.${stateKey}` ? fallback : generic;
   };
+  const translateBenchmarkEvidence = (profileId: string, gap: BenchmarkGap) => (
+    t("page.exec_dashboard.benchmark_evidence", {
+      label: translateRuleLabel(gap.id, gap.label),
+      observed: formatObservedValue(gap.observed),
+      threshold: formatObservedValue(gap.threshold),
+      profile: translateBenchmarkProfileName(profileId, profileId),
+    })
+  );
+  const translateConfidence = (confidence: "high" | "medium" | "low") => (
+    tr(`page.exec_dashboard.confidence.${confidence}`, confidence)
+  );
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -177,11 +233,11 @@ export default function ExecutiveDashboardPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json());
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Failed to load dashboard");
+      setError(error instanceof Error ? error.message : tr("page.exec_dashboard.dashboard_load_failed", "Failed to load dashboard"));
     } finally {
       setLoading(false);
     }
-  }, [activeDomainId, selectedBenchmarkProfile]);
+  }, [activeDomainId, selectedBenchmarkProfile, tr]);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
@@ -236,10 +292,10 @@ export default function ExecutiveDashboardPage() {
           domain_id: activeDomainId,
           benchmark_profile_id: selectedBenchmarkProfile,
           sections: ["entity_stats", "enrichment_coverage", "decision_recommendations", "institutional_benchmark", "top_brands", "topic_clusters"],
-          title: "Executive Dashboard Report",
+          title: tr("page.exec_dashboard.export_title", "Executive Dashboard Report"),
         }),
       });
-      if (!res.ok) { setError("PDF export failed (WeasyPrint may not be installed)"); return; }
+      if (!res.ok) { setError(tr("page.exec_dashboard.pdf_export_failed", "PDF export failed (WeasyPrint may not be installed)")); return; }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -248,7 +304,7 @@ export default function ExecutiveDashboardPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      setError("PDF export error");
+      setError(tr("page.exec_dashboard.pdf_export_error", "PDF export error"));
     } finally {
       setExporting(false);
     }
@@ -363,8 +419,13 @@ export default function ExecutiveDashboardPage() {
                 {tr("page.exec_dashboard.fresh_import_title", "Fresh import ready for pilot review")}
               </p>
               <p className="mt-1 text-sm text-violet-700 dark:text-violet-300">
-                {importedRows ? `${Number(importedRows).toLocaleString()} ${tr("page.import.entities_imported", "entities imported")}` : "Your latest import"} in domain{" "}
-                <span className="font-semibold">{importedDomain ?? activeDomainId}</span>. {tr("page.exec_dashboard.fresh_import_description", "This dashboard is the fastest place to check coverage, impact, and next actions.")}
+                {t("page.exec_dashboard.imported_into_domain", {
+                  summary: importedRows
+                    ? `${Number(importedRows).toLocaleString()} ${tr("page.import.entities_imported", "entities imported")}`
+                    : tr("page.exec_dashboard.latest_import", "Your latest import"),
+                  domain: importedDomain ?? activeDomainId,
+                })}{" "}
+                {tr("page.exec_dashboard.fresh_import_description", "This dashboard is the fastest place to check coverage, impact, and next actions.")}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {[
@@ -414,12 +475,22 @@ export default function ExecutiveDashboardPage() {
                 {tr("page.exec_dashboard.benchmark_baseline", "Institutional Benchmark Baseline")}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <p className="text-lg font-semibold">{data.institutional_benchmark.profile_name}</p>
+                <p className="text-lg font-semibold">
+                  {translateBenchmarkProfileName(
+                    data.institutional_benchmark.profile_id,
+                    data.institutional_benchmark.profile_name,
+                  )}
+                </p>
                 <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-current dark:bg-gray-900/60">
-                  {data.institutional_benchmark.status}
+                  {translateBenchmarkStatus(data.institutional_benchmark.status)}
                 </span>
               </div>
-              <p className="mt-2 text-sm opacity-90">{data.institutional_benchmark.description}</p>
+              <p className="mt-2 text-sm opacity-90">
+                {translateBenchmarkProfileDescription(
+                  data.institutional_benchmark.profile_id,
+                  data.institutional_benchmark.description,
+                )}
+              </p>
               <div className="mt-3 max-w-sm">
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] opacity-70">
                   {tr("page.exec_dashboard.benchmark_profile", "Benchmark profile")}
@@ -431,13 +502,17 @@ export default function ExecutiveDashboardPage() {
                 >
                   {benchmarkProfiles.map((profile) => (
                     <option key={profile.id} value={profile.id}>
-                      {profile.name}
+                      {translateBenchmarkProfileName(profile.id, profile.name)}
                     </option>
                   ))}
                 </select>
               </div>
               <p className="mt-3 text-sm font-medium opacity-90">
-                Readiness {data.institutional_benchmark.readiness_pct}% with {data.institutional_benchmark.passed_rules} of {data.institutional_benchmark.total_rules} rules currently satisfied.
+                {t("page.exec_dashboard.readiness_summary", {
+                  readiness: data.institutional_benchmark.readiness_pct,
+                  passed: data.institutional_benchmark.passed_rules,
+                  total: data.institutional_benchmark.total_rules,
+                })}
               </p>
             </div>
             <div className="min-w-[180px] rounded-2xl bg-white/80 p-4 text-center shadow-sm dark:bg-gray-900/70">
@@ -455,13 +530,19 @@ export default function ExecutiveDashboardPage() {
               {data.institutional_benchmark.top_gaps.map((gap) => (
                 <div key={gap.id} className="rounded-2xl bg-white/80 p-4 shadow-sm dark:bg-gray-900/70">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{gap.label}</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {translateRuleLabel(gap.id, gap.label)}
+                    </p>
                     <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
-                      {gap.priority}
+                      {translatePriority(gap.priority)}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">{gap.message}</p>
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{gap.evidence}</p>
+                  <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                    {translateRuleMessage(data.institutional_benchmark.profile_id, gap.id, gap.passed, gap.message)}
+                  </p>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    {translateBenchmarkEvidence(data.institutional_benchmark.profile_id, gap)}
+                  </p>
                 </div>
               ))}
             </div>
@@ -554,16 +635,16 @@ export default function ExecutiveDashboardPage() {
                 </div>
               </div>
               {data.quality?.distribution && (
-                <div className="mt-3 flex gap-1" title="High / Medium / Low quality distribution">
+                <div className="mt-3 flex gap-1" title={tr("page.exec_dashboard.quality_distribution_title", "High / Medium / Low quality distribution")}>
                   {(() => {
                     const { high, medium, low } = data.quality.distribution;
                     const total = high + medium + low;
                     if (total === 0) return <span className="text-xs text-gray-400">{tr("page.exec_dashboard.no_scored_entities", "No scored entities")}</span>;
                     return (
                       <div className="flex w-full overflow-hidden rounded-full h-2 gap-px">
-                        {high > 0 && <div className="bg-emerald-500 h-2 rounded-l-full" style={{ width: `${(high / total) * 100}%` }} title={`High: ${high}`} />}
-                        {medium > 0 && <div className="bg-amber-400 h-2" style={{ width: `${(medium / total) * 100}%` }} title={`Medium: ${medium}`} />}
-                        {low > 0 && <div className="bg-red-500 h-2 rounded-r-full" style={{ width: `${(low / total) * 100}%` }} title={`Low: ${low}`} />}
+                        {high > 0 && <div className="bg-emerald-500 h-2 rounded-l-full" style={{ width: `${(high / total) * 100}%` }} title={t("page.exec_dashboard.quality_segment", { label: tr("page.exec_dashboard.quality_high", "High"), count: high })} />}
+                        {medium > 0 && <div className="bg-amber-400 h-2" style={{ width: `${(medium / total) * 100}%` }} title={t("page.exec_dashboard.quality_segment", { label: tr("page.exec_dashboard.quality_medium", "Medium"), count: medium })} />}
+                        {low > 0 && <div className="bg-red-500 h-2 rounded-r-full" style={{ width: `${(low / total) * 100}%` }} title={t("page.exec_dashboard.quality_segment", { label: tr("page.exec_dashboard.quality_low", "Low"), count: low })} />}
                       </div>
                     );
                   })()}
@@ -655,7 +736,7 @@ export default function ExecutiveDashboardPage() {
                     <p className="text-base font-semibold">{signal.concept}</p>
                   </div>
                   <span className="rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-current dark:bg-gray-900/60">
-                    {signal.confidence}
+                    {translateConfidence(signal.confidence)}
                   </span>
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-3 text-center">
@@ -679,7 +760,12 @@ export default function ExecutiveDashboardPage() {
         )}
         {!!data?.emerging_topic_signals?.recent_years.length && !!data?.emerging_topic_signals?.baseline_years.length && (
           <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-            Comparing {data.emerging_topic_signals.recent_years[0]}-{data.emerging_topic_signals.recent_years[data.emerging_topic_signals.recent_years.length - 1]} against {data.emerging_topic_signals.baseline_years[0]}-{data.emerging_topic_signals.baseline_years[data.emerging_topic_signals.baseline_years.length - 1]}.
+            {t("page.exec_dashboard.comparing_ranges", {
+              recentStart: data.emerging_topic_signals.recent_years[0],
+              recentEnd: data.emerging_topic_signals.recent_years[data.emerging_topic_signals.recent_years.length - 1],
+              baselineStart: data.emerging_topic_signals.baseline_years[0],
+              baselineEnd: data.emerging_topic_signals.baseline_years[data.emerging_topic_signals.baseline_years.length - 1],
+            })}
           </p>
         )}
       </div>

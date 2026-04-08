@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -51,6 +51,15 @@ interface OnboardingStatus {
 }
 
 const DISMISSED_KEY = "ukip_onboarding_dismissed_v1";
+
+function translateWithFallback(
+  t: (key: string, params?: Record<string, string | number>) => string,
+  key: string,
+  fallback: string,
+) {
+  const value = t(key);
+  return value === key ? fallback : value;
+}
 
 function StepIcon({ icon, completed }: { icon: string; completed: boolean }) {
   const iconMap: Record<string, React.ReactNode> = {
@@ -126,12 +135,60 @@ export default function OnboardingChecklist({ token }: { token: string | null })
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  const localizedStatus = useMemo(() => {
+    if (!status) return null;
+
+    const translateStep = <T extends { key: string; label: string; description: string }>(step: T): T => ({
+      ...step,
+      label: translateWithFallback(t, `onboarding.step.${step.key}.label`, step.label),
+      description: translateWithFallback(t, `onboarding.step.${step.key}.description`, step.description),
+    });
+
+    return {
+      ...status,
+      steps: status.steps.map(translateStep),
+      commercial_mvp: {
+        ...status.commercial_mvp,
+        label: translateWithFallback(t, `onboarding.mvp.${status.commercial_mvp.key}.label`, status.commercial_mvp.label),
+        summary: translateWithFallback(t, `onboarding.mvp.${status.commercial_mvp.key}.summary`, status.commercial_mvp.summary),
+        ideal_customer: translateWithFallback(t, `onboarding.mvp.${status.commercial_mvp.key}.ideal_customer`, status.commercial_mvp.ideal_customer),
+        initial_dataset: translateWithFallback(t, `onboarding.mvp.${status.commercial_mvp.key}.initial_dataset`, status.commercial_mvp.initial_dataset),
+        time_to_first_value: translateWithFallback(
+          t,
+          `onboarding.mvp.${status.commercial_mvp.key}.time_to_first_value`,
+          status.commercial_mvp.time_to_first_value,
+        ),
+        primary_outcomes: status.commercial_mvp.primary_outcomes.map((outcome, index) =>
+          translateWithFallback(
+            t,
+            `onboarding.mvp.${status.commercial_mvp.key}.outcome_${index + 1}`,
+            outcome,
+          )),
+      },
+      journey: status.journey.map((step) => ({
+        ...step,
+        label: translateWithFallback(t, `onboarding.journey.${step.key}.label`, step.label),
+        description: translateWithFallback(t, `onboarding.journey.${step.key}.description`, step.description),
+      })),
+      next_recommended_step: status.next_recommended_step
+        ? {
+            ...translateStep(status.next_recommended_step),
+            reason: translateWithFallback(
+              t,
+              `onboarding.step.${status.next_recommended_step.key}.reason`,
+              status.next_recommended_step.reason,
+            ),
+          }
+        : null,
+    };
+  }, [status, t]);
+
   const dismiss = () => {
     localStorage.setItem(DISMISSED_KEY, "1");
     setDismissed(true);
   };
 
-  if (dismissed || !status || status.all_done) return null;
+  if (dismissed || !localizedStatus || localizedStatus.all_done) return null;
 
   return (
     <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm dark:border-violet-900/50 dark:bg-slate-900">
@@ -140,19 +197,19 @@ export default function OnboardingChecklist({ token }: { token: string | null })
         onClick={() => setCollapsed((current) => !current)}
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
-            {status.completed}/{status.total}
-          </div>
-          <div>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
+            {localizedStatus.completed}/{localizedStatus.total}
+              </div>
+              <div>
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('onboarding.getting_started')}</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500">{status.percent}% {t('onboarding.complete')}</p>
-          </div>
-        </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500">{localizedStatus.percent}% {t('onboarding.complete')}</p>
+              </div>
+            </div>
         <div className="flex items-center gap-2">
           <div className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700 sm:block">
-            <div
+              <div
               className="h-full rounded-full bg-violet-500 transition-all"
-              style={{ width: `${status.percent}%` }}
+              style={{ width: `${localizedStatus.percent}%` }}
             />
           </div>
           <svg
@@ -174,33 +231,33 @@ export default function OnboardingChecklist({ token }: { token: string | null })
                 {t('onboarding.commercial_focus')}
               </p>
               <h3 className="mt-2 text-base font-semibold text-slate-900 dark:text-slate-100">
-                {status.commercial_mvp.label}
+                {localizedStatus.commercial_mvp.label}
               </h3>
               <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-                {status.commercial_mvp.summary}
+                {localizedStatus.commercial_mvp.summary}
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     {t('onboarding.ideal_customer')}
                   </p>
-                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{status.commercial_mvp.ideal_customer}</p>
+                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{localizedStatus.commercial_mvp.ideal_customer}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     {t('onboarding.first_dataset')}
                   </p>
-                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{status.commercial_mvp.initial_dataset}</p>
+                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{localizedStatus.commercial_mvp.initial_dataset}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     {t('onboarding.time_to_value')}
                   </p>
-                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{status.commercial_mvp.time_to_first_value}</p>
+                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{localizedStatus.commercial_mvp.time_to_first_value}</p>
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                {status.commercial_mvp.primary_outcomes.map((outcome) => (
+                {localizedStatus.commercial_mvp.primary_outcomes.map((outcome) => (
                   <span
                     key={outcome}
                     className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300"
@@ -212,19 +269,19 @@ export default function OnboardingChecklist({ token }: { token: string | null })
             </div>
 
             <div className="space-y-3">
-              {status.next_recommended_step && (
+              {localizedStatus.next_recommended_step && (
                 <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-4 dark:border-violet-900/50 dark:bg-violet-950/40">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-600 dark:text-violet-400">
                     {t('onboarding.recommended_next')}
                   </p>
                   <h3 className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {status.next_recommended_step.label}
+                    {localizedStatus.next_recommended_step.label}
                   </h3>
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    {status.next_recommended_step.reason}
+                    {localizedStatus.next_recommended_step.reason}
                   </p>
                   <Link
-                    href={status.next_recommended_step.href}
+                    href={localizedStatus.next_recommended_step.href}
                     className="mt-3 inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700"
                   >
                     {t('onboarding.go_now')}
@@ -240,7 +297,7 @@ export default function OnboardingChecklist({ token }: { token: string | null })
                   {t('onboarding.fast_path')}
                 </p>
                 <div className="mt-3 space-y-3">
-                  {status.journey.map((step, index) => (
+                  {localizedStatus.journey.map((step, index) => (
                     <div key={step.key} className="flex items-start gap-3">
                       <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">
                         {index + 1}
@@ -259,8 +316,8 @@ export default function OnboardingChecklist({ token }: { token: string | null })
           </div>
 
           <div className="divide-y divide-slate-50 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
-            {status.steps.map((step) => {
-              const isRecommended = status.next_recommended_step?.key === step.key;
+            {localizedStatus.steps.map((step) => {
+              const isRecommended = localizedStatus.next_recommended_step?.key === step.key;
               return (
                 <Link
                   key={step.key}
