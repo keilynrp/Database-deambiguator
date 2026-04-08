@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { useDomain } from "../contexts/DomainContext";
+import { useLanguage } from "../contexts/LanguageContext";
 
 export interface PreviewData {
     format: string;
@@ -32,14 +33,6 @@ export interface ImportResult {
 
 export type WizardStep = 1 | 2 | 3 | 4 | 5;
 
-export const STEPS = [
-    { n: 1 as WizardStep, label: "Upload" },
-    { n: 2 as WizardStep, label: "Map Fields" },
-    { n: 3 as WizardStep, label: "Domain" },
-    { n: 4 as WizardStep, label: "Validate" },
-    { n: 5 as WizardStep, label: "Import" },
-];
-
 const SUPPORTED_FORMATS = [
     { ext: "CSV", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400" },
     { ext: "Excel", color: "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400" },
@@ -48,21 +41,6 @@ const SUPPORTED_FORMATS = [
     { ext: "JSON", color: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" },
     { ext: "XML", color: "bg-orange-100 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400" },
     { ext: "Parquet", color: "bg-pink-100 text-pink-700 dark:bg-pink-500/10 dark:text-pink-400" },
-];
-
-const UKIP_FIELDS: { value: string; label: string }[] = [
-    { value: "", label: "-- skip column --" },
-    { value: "primary_label", label: "Primary Label (title / name)" },
-    { value: "secondary_label", label: "Secondary Label (brand / author)" },
-    { value: "canonical_id", label: "Canonical ID (SKU / DOI / barcode)" },
-    { value: "entity_type", label: "Entity Type" },
-    { value: "domain", label: "Domain" },
-    { value: "enrichment_doi", label: "DOI" },
-    { value: "enrichment_citation_count", label: "Citation Count" },
-    { value: "enrichment_concepts", label: "Concepts / Keywords" },
-    { value: "enrichment_source", label: "Enrichment Source" },
-    { value: "creation_date", label: "Creation Date" },
-    { value: "validation_status", label: "Validation Status" },
 ];
 
 const FORMAT_DISPLAY: Record<string, string> = {
@@ -114,10 +92,45 @@ function formatApiDetail(detail: unknown, fallback: string) {
     return fallback;
 }
 
+function translateOrFallback(t: (key: string) => string, key: string, fallback: string) {
+    const value = t(key);
+    return value === key ? fallback : value;
+}
+
+function getSteps(t: (key: string) => string) {
+    return [
+        { n: 1 as WizardStep, label: translateOrFallback(t, "page.import.step.upload", "Upload") },
+        { n: 2 as WizardStep, label: translateOrFallback(t, "page.import.step.map", "Map Fields") },
+        { n: 3 as WizardStep, label: translateOrFallback(t, "page.import.step.domain", "Domain") },
+        { n: 4 as WizardStep, label: translateOrFallback(t, "page.import.step.validate", "Validate") },
+        { n: 5 as WizardStep, label: translateOrFallback(t, "page.import.step.import", "Import") },
+    ];
+}
+
+function getUkipFields(t: (key: string) => string): { value: string; label: string }[] {
+    return [
+        { value: "", label: translateOrFallback(t, "page.import.skip_column", "-- skip column --") },
+        { value: "primary_label", label: translateOrFallback(t, "page.import.field.primary_label", "Primary Label (title / name)") },
+        { value: "secondary_label", label: translateOrFallback(t, "page.import.field.secondary_label", "Secondary Label (brand / author)") },
+        { value: "canonical_id", label: translateOrFallback(t, "page.import.field.canonical_id", "Canonical ID (SKU / DOI / barcode)") },
+        { value: "entity_type", label: translateOrFallback(t, "page.import.field.entity_type", "Entity Type") },
+        { value: "domain", label: translateOrFallback(t, "page.import.field.domain", "Domain") },
+        { value: "enrichment_doi", label: translateOrFallback(t, "page.import.field.enrichment_doi", "DOI") },
+        { value: "enrichment_citation_count", label: translateOrFallback(t, "page.import.field.enrichment_citation_count", "Citation Count") },
+        { value: "enrichment_concepts", label: translateOrFallback(t, "page.import.field.enrichment_concepts", "Concepts / Keywords") },
+        { value: "enrichment_source", label: translateOrFallback(t, "page.import.field.enrichment_source", "Enrichment Source") },
+        { value: "creation_date", label: translateOrFallback(t, "page.import.field.creation_date", "Creation Date") },
+        { value: "validation_status", label: translateOrFallback(t, "page.import.field.validation_status", "Validation Status") },
+    ];
+}
+
 export function StepBar({ current }: { current: WizardStep }) {
+    const { t } = useLanguage();
+    const steps = getSteps(t);
+
     return (
         <div className="flex items-center gap-0">
-            {STEPS.map((step, index) => (
+            {steps.map((step, index) => (
                 <div key={step.n} className="flex items-center">
                     <div className="flex flex-col items-center">
                         <div
@@ -139,7 +152,7 @@ export function StepBar({ current }: { current: WizardStep }) {
                             {step.label}
                         </span>
                     </div>
-                    {index < STEPS.length - 1 && (
+                    {index < steps.length - 1 && (
                         <div className={`mx-2 mb-5 h-0.5 w-10 transition-colors sm:w-16 ${step.n < current ? "bg-indigo-600" : "bg-gray-200 dark:bg-gray-700"}`} />
                     )}
                 </div>
@@ -155,6 +168,8 @@ export function StepUpload({
     file: File | null;
     onFile: (file: File) => void | Promise<void>;
 }) {
+    const { t } = useLanguage();
+    const tr = (key: string, fallback: string) => translateOrFallback(t, key, fallback);
     const [dragging, setDragging] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -200,7 +215,7 @@ export function StepUpload({
                         </div>
                         <p className="mt-4 text-base font-semibold text-gray-900 dark:text-white">{file.name}</p>
                         <p className="text-sm text-gray-500 dark:text-gray-400">{formatBytes(file.size)}</p>
-                        <p className="mt-1 text-xs text-indigo-600 dark:text-indigo-400">Click to change file</p>
+                        <p className="mt-1 text-xs text-indigo-600 dark:text-indigo-400">{tr("page.import.upload.change", "Click to change file")}</p>
                     </>
                 ) : (
                     <>
@@ -209,8 +224,8 @@ export function StepUpload({
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                             </svg>
                         </div>
-                        <p className="mt-4 text-base font-semibold text-gray-700 dark:text-gray-200">Drop your file here, or click to browse</p>
-                        <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">Maximum 20 MB</p>
+                        <p className="mt-4 text-base font-semibold text-gray-700 dark:text-gray-200">{tr("page.import.upload.drop", "Drop your file here, or click to browse")}</p>
+                        <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">{tr("page.import.upload.max_size", "Maximum 20 MB")}</p>
                     </>
                 )}
                 <input ref={inputRef} type="file" className="hidden" onChange={handleChange} accept=".csv,.xlsx,.json,.jsonld,.xml,.parquet,.bib,.ris,.rdf,.ttl" />
@@ -236,9 +251,12 @@ export function StepMapping({
     mapping: Record<string, string>;
     onMappingChange: (mapping: Record<string, string>) => void;
 }) {
+    const { t } = useLanguage();
+    const tr = (key: string, fallback: string) => translateOrFallback(t, key, fallback);
     const [suggesting, setSuggesting] = useState(false);
     const [aiProvider, setAiProvider] = useState<string | null>(null);
     const [aiError, setAiError] = useState<string | null>(null);
+    const ukipFields = getUkipFields(t);
 
     async function handleAISuggest() {
         setSuggesting(true);
@@ -263,7 +281,7 @@ export function StepMapping({
                 mapping?: Record<string, string | null>;
             };
             if (!data.available) {
-                setAiError("No AI provider configured. Add one in Settings -> AI Language Models.");
+                setAiError(tr("page.import.mapping.ai_no_provider", "No AI provider configured. Add one in Settings -> AI Language Models."));
                 return;
             }
 
@@ -290,18 +308,18 @@ export function StepMapping({
             <div className="space-y-4">
                 <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/5">
                     <p className="text-sm font-medium text-indigo-800 dark:text-indigo-300">
-                        Auto-mapped - {FORMAT_DISPLAY[preview.format] ?? preview.format} fields are semantically understood.
+                        {tr("page.import.mapping.auto", "Auto-mapped")} - {FORMAT_DISPLAY[preview.format] ?? preview.format} fields are semantically understood.
                     </p>
                     <p className="mt-0.5 text-xs text-indigo-600 dark:text-indigo-400">
-                        {preview.row_count.toLocaleString()} records detected. No manual mapping needed.
+                        {preview.row_count.toLocaleString()} {tr("page.import.mapping.records_detected", "records detected. No manual mapping needed.")}
                     </p>
                 </div>
                 <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-gray-800">
                     <table className="w-full text-sm">
                         <thead className="bg-gray-50 dark:bg-gray-800">
                             <tr>
-                                <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">Source Field</th>
-                                <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">Maps To</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">{tr("page.import.mapping.source_field", "Source Field")}</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">{tr("page.import.mapping.maps_to", "Maps To")}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
@@ -333,7 +351,7 @@ export function StepMapping({
                 </span>
                 {total - matched > 0 && (
                     <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
-                        {total - matched} unmatched - will go to Extended Attributes
+                        {total - matched} {tr("page.import.mapping.unmatched_suffix", "unmatched - will go to Extended Attributes")}
                     </span>
                 )}
 
@@ -341,7 +359,7 @@ export function StepMapping({
                     onClick={handleAISuggest}
                     disabled={suggesting}
                     className="ml-auto flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-50"
-                    title="Ask the active AI model to suggest mappings for unmatched columns"
+                    title={tr("page.import.mapping.ai_suggest", "AI Suggest")}
                 >
                     {suggesting ? (
                         <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -353,7 +371,7 @@ export function StepMapping({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
                         </svg>
                     )}
-                    {suggesting ? "Asking AI..." : "AI Suggest"}
+                    {suggesting ? tr("page.import.mapping.ai_asking", "Asking AI...") : tr("page.import.mapping.ai_suggest", "AI Suggest")}
                 </button>
             </div>
 
@@ -363,7 +381,7 @@ export function StepMapping({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     <p className="text-xs font-medium text-violet-700 dark:text-violet-300">
-                        AI suggestions applied - suggested by <span className="font-bold">{aiProvider}</span>
+                        {tr("page.import.mapping.ai_applied", "AI suggestions applied")} - {tr("page.import.mapping.ai_suggested_by", "suggested by")} <span className="font-bold">{aiProvider}</span>
                     </p>
                     <button onClick={() => setAiProvider(null)} className="ml-auto text-violet-400 hover:text-violet-600 dark:hover:text-violet-300">
                         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -391,9 +409,9 @@ export function StepMapping({
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 dark:bg-gray-800">
                         <tr>
-                            <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">Source Column</th>
-                            <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">Sample Value</th>
-                            <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">Maps To</th>
+                            <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">{tr("page.import.mapping.source_column", "Source Column")}</th>
+                            <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">{tr("page.import.mapping.sample_value", "Sample Value")}</th>
+                            <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">{tr("page.import.mapping.maps_to", "Maps To")}</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
@@ -417,7 +435,7 @@ export function StepMapping({
                                                     : "border-gray-200 bg-white text-gray-500 dark:border-gray-700"
                                             }`}
                                         >
-                                            {UKIP_FIELDS.map(field => (
+                                            {ukipFields.map(field => (
                                                 <option key={field.value} value={field.value}>
                                                     {field.label}
                                                 </option>
@@ -441,6 +459,8 @@ export function StepDomain({
     selected: string;
     onSelect: (id: string) => void;
 }) {
+    const { t } = useLanguage();
+    const tr = (key: string, fallback: string) => translateOrFallback(t, key, fallback);
     const [domains, setDomains] = useState<Domain[]>([]);
 
     useEffect(() => {
@@ -460,7 +480,7 @@ export function StepDomain({
     return (
         <div className="space-y-4">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-                Select the domain to tag imported entities with. You can change this later in the entity list.
+                {tr("page.import.domain.help", "Select the domain to tag imported entities with. You can change this later in the entity list.")}
             </p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {domains.map(domain => {
@@ -487,7 +507,7 @@ export function StepDomain({
                             )}
                             {isSelected && (
                                 <span className="mt-2 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">
-                                    Selected
+                                    {tr("page.import.domain.selected", "Selected")}
                                 </span>
                             )}
                         </button>
@@ -507,6 +527,8 @@ export function StepValidate({
     mapping: Record<string, string>;
     domain: string;
 }) {
+    const { t } = useLanguage();
+    const tr = (key: string, fallback: string) => translateOrFallback(t, key, fallback);
     const mappedColumns = Object.entries(mapping).filter(([, value]) => Boolean(value));
     const skippedColumns = Object.entries(mapping).filter(([, value]) => value === "");
     const unmappedColumns = preview.columns.filter(column => !mapping[column]);
@@ -516,10 +538,10 @@ export function StepValidate({
         <div className="space-y-5">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
-                    { label: "Total Rows", value: preview.row_count.toLocaleString(), color: "text-indigo-600" },
-                    { label: "Mapped Columns", value: mappedColumns.length, color: "text-emerald-600" },
-                    { label: "Skipped Columns", value: skippedColumns.length, color: "text-gray-500" },
-                    { label: "Unmatched", value: unmappedColumns.length, color: "text-amber-600" },
+                    { label: tr("page.import.validate.total_rows", "Total Rows"), value: preview.row_count.toLocaleString(), color: "text-indigo-600" },
+                    { label: tr("page.import.validate.mapped_columns", "Mapped Columns"), value: mappedColumns.length, color: "text-emerald-600" },
+                    { label: tr("page.import.validate.skipped_columns", "Skipped Columns"), value: skippedColumns.length, color: "text-gray-500" },
+                    { label: tr("page.import.validate.unmatched", "Unmatched"), value: unmappedColumns.length, color: "text-amber-600" },
                 ].map(summary => (
                     <div key={summary.label} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <p className="text-xs text-gray-500 dark:text-gray-400">{summary.label}</p>
@@ -530,7 +552,7 @@ export function StepValidate({
 
             <div className="flex flex-wrap gap-2">
                 <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-400">
-                    Domain: {domain}
+                    {tr("page.import.field.domain", "Domain")}: {domain}
                 </span>
                 <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
                     Format: {FORMAT_DISPLAY[preview.format] ?? preview.format}
@@ -543,9 +565,9 @@ export function StepValidate({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     <div>
-                        <p className="text-sm font-medium text-amber-800 dark:text-amber-300">No Primary Label mapped</p>
+                        <p className="text-sm font-medium text-amber-800 dark:text-amber-300">{tr("page.import.validate.no_primary_title", "No Primary Label mapped")}</p>
                         <p className="text-xs text-amber-600 dark:text-amber-400">
-                            Consider mapping a column to Primary Label so entities have a human-readable name.
+                            {tr("page.import.validate.no_primary_hint", "Consider mapping a column to Primary Label so entities have a human-readable name.")}
                         </p>
                     </div>
                 </div>
@@ -554,7 +576,7 @@ export function StepValidate({
             {unmappedColumns.length > 0 && (
                 <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-800/50">
                     <p className="mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
-                        {unmappedColumns.length} column{unmappedColumns.length > 1 ? "s" : ""} will be stored in Extended Attributes:
+                        {unmappedColumns.length} column{unmappedColumns.length > 1 ? "s" : ""} {tr("page.import.validate.extended_attributes", "will be stored in Extended Attributes:")}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                         {unmappedColumns.map(column => (
@@ -569,7 +591,7 @@ export function StepValidate({
             {preview.sample_rows.length > 0 && (
                 <div>
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                        Sample Preview (first {Math.min(preview.sample_rows.length, 3)} rows)
+                        {tr("page.import.validate.sample_preview", "Sample Preview")} ({tr("page.import.validate.first_rows", "first rows")} {Math.min(preview.sample_rows.length, 3)})
                     </p>
                     <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-800">
                         <table className="w-full text-xs">
@@ -612,6 +634,8 @@ export function StepImport({
 }) {
     const router = useRouter();
     const { setActiveDomainId } = useDomain();
+    const { t } = useLanguage();
+    const tr = (key: string, fallback: string) => translateOrFallback(t, key, fallback);
 
     if (importing) {
         return (
@@ -620,7 +644,7 @@ export function StepImport({
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Importing your data...</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{tr("page.import.importing", "Importing your data...")}</p>
             </div>
         );
     }
@@ -634,14 +658,14 @@ export function StepImport({
                     </svg>
                 </div>
                 <div>
-                    <p className="text-base font-semibold text-gray-900 dark:text-white">Import failed</p>
+                    <p className="text-base font-semibold text-gray-900 dark:text-white">{tr("page.import.import_failed", "Import failed")}</p>
                     <p className="mt-1 max-w-sm text-sm text-red-600 dark:text-red-400">{error}</p>
                 </div>
                 <button
                     onClick={() => router.push("/")}
                     className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                 >
-                    Back to Knowledge Explorer
+                    {tr("page.import.back_to_explorer", "Back to Knowledge Explorer")}
                 </button>
             </div>
         );
@@ -672,7 +696,7 @@ export function StepImport({
             </div>
 
             <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{result.total_rows.toLocaleString()} entities imported</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{result.total_rows.toLocaleString()} {tr("page.import.entities_imported", "entities imported")}</p>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{result.message}</p>
             </div>
 
@@ -680,18 +704,18 @@ export function StepImport({
                 {[
                     {
                         step: "1",
-                        title: "Review the dashboard",
-                        detail: "Check coverage, quality, concepts, and impact before drawing conclusions.",
+                        title: tr("page.import.success.read_kpis", "Read the KPIs"),
+                        detail: tr("page.import.success.review_dashboard_detail", "Check coverage, quality, concepts, and impact before drawing conclusions."),
                     },
                     {
                         step: "2",
-                        title: "Prepare the brief",
-                        detail: "Load the pilot brief preset with the most useful sections already selected.",
+                        title: tr("page.import.success.open_brief", "Prepare Executive Brief"),
+                        detail: tr("page.import.success.prepare_brief_detail", "Load the pilot brief preset with the most useful sections already selected."),
                     },
                     {
                         step: "3",
-                        title: "Share the result",
-                        detail: "Export a PDF brief once the first readout looks solid enough for stakeholders.",
+                        title: tr("page.import.success.share_result", "Share the result"),
+                        detail: tr("page.import.success.share_result_detail", "Export a PDF brief once the first readout looks solid enough for stakeholders."),
                     },
                 ].map((item) => (
                     <div
@@ -711,24 +735,24 @@ export function StepImport({
 
             <div className="flex flex-wrap justify-center gap-2">
                 <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-400">
-                    Domain: {result.domain}
+                    {tr("page.import.field.domain", "Domain")}: {result.domain}
                 </span>
                 <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400">
-                    {result.matched_columns.length} mapped columns
+                    {result.matched_columns.length} {tr("page.import.validate.mapped_columns", "Mapped Columns").toLowerCase()}
                 </span>
                 {result.unmatched_columns.length > 0 && (
                     <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
-                        {result.unmatched_columns.length} in extended attrs
+                        {result.unmatched_columns.length} {tr("page.import.validate.extended_attributes", "will be stored in Extended Attributes:").replace("will be stored in ", "").replace(":", "")}
                     </span>
                 )}
             </div>
 
             <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-4 text-left shadow-sm dark:border-violet-500/20 dark:bg-violet-500/5">
                 <p className="text-sm font-semibold text-violet-900 dark:text-violet-200">
-                    Pilot decision flow unlocked
+                    {tr("page.import.success.next_steps", "Suggested next steps")}
                 </p>
                 <p className="mt-1 text-sm text-violet-700 dark:text-violet-300">
-                    Start with the Executive Dashboard for the fast readout, then move to the brief builder when you are ready to package the result.
+                    {tr("page.import.success.pilot_flow_detail", "Start with the Executive Dashboard for the fast readout, then move to the brief builder when you are ready to package the result.")}
                 </p>
             </div>
 
@@ -737,25 +761,25 @@ export function StepImport({
                     onClick={openExecutiveDashboard}
                     className="rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-violet-700"
                 >
-                    Open Executive Dashboard
+                    {tr("page.import.success.open_dashboard", "Open Executive Dashboard")}
                 </button>
                 <button
                     onClick={openBriefBuilder}
                     className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                 >
-                    Prepare Executive Brief
+                    {tr("page.import.success.open_brief", "Prepare Executive Brief")}
                 </button>
                 <button
                     onClick={() => router.push("/")}
                     className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
                 >
-                    View in Knowledge Explorer
+                    {tr("page.import.back_to_explorer", "Back to Knowledge Explorer")}
                 </button>
                 <button
                     onClick={() => window.location.reload()}
                     className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
-                    Import Another File
+                    {tr("common.retry", "Retry")}
                 </button>
             </div>
         </div>

@@ -15,6 +15,7 @@ import {
 import { PageHeader, StatCard, ErrorBanner, SkeletonCard } from "../../components/ui";
 import ConceptCloud from "../../components/ConceptCloud";
 import { useDomain } from "../../contexts/DomainContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { apiFetch } from "@/lib/api";
 import { Analytics } from "@/lib/analytics";
 
@@ -145,6 +146,7 @@ function SourceBadge({ source }: { source: string | null }) {
 
 export default function ExecutiveDashboardPage() {
   const { activeDomainId, setActiveDomainId } = useDomain();
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -159,6 +161,10 @@ export default function ExecutiveDashboardPage() {
   const importedFlag = searchParams.get("imported") === "1";
   const importedDomain = searchParams.get("domain");
   const importedRows = searchParams.get("rows");
+  const tr = (key: string, fallback: string) => {
+    const value = t(key);
+    return value === key ? fallback : value;
+  };
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -286,18 +292,18 @@ export default function ExecutiveDashboardPage() {
   return (
     <div className="flex flex-col gap-6 pb-10">
       <PageHeader
-        title="Executive Dashboard"
-        description="High-level KPIs, temporal trends, and concept landscape for decision makers"
+        title={tr("page.exec_dashboard.title", "Executive Dashboard")}
+        description={tr("page.exec_dashboard.description", "High-level KPIs, temporal trends, and concept landscape for decision makers")}
         breadcrumbs={[
-          { label: "Analytics", href: "/analytics" },
-          { label: "Executive Dashboard" },
+          { label: tr("page.exec_dashboard.breadcrumb_analytics", "Analytics"), href: "/analytics" },
+          { label: tr("page.exec_dashboard.title", "Executive Dashboard") },
         ]}
         actions={
           <div className="flex items-center gap-2">
             {/* Auto-refresh toggle */}
             <button
               onClick={() => setAutoRefresh(v => !v)}
-              title={autoRefresh ? `Auto-refresh on — next in ${mm}:${ss}` : "Enable auto-refresh every 5 min"}
+              title={autoRefresh ? `${tr("page.exec_dashboard.auto_refresh_active", "Auto-refresh on")} — next in ${mm}:${ss}` : tr("page.exec_dashboard.auto_refresh_enable", "Enable auto-refresh every 5 min")}
               className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition ${
                 autoRefresh
                   ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
@@ -307,7 +313,7 @@ export default function ExecutiveDashboardPage() {
               <svg className={`h-3.5 w-3.5 ${autoRefresh ? "animate-spin" : ""}`} aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
               </svg>
-              <span className="tabular-nums">{autoRefresh ? `${mm}:${ss}` : "Auto"}</span>
+              <span className="tabular-nums">{autoRefresh ? `${mm}:${ss}` : tr("page.exec_dashboard.auto_label", "Auto")}</span>
             </button>
 
             {/* Manual refresh */}
@@ -318,7 +324,7 @@ export default function ExecutiveDashboardPage() {
               <svg className="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
               </svg>
-              Refresh
+              {tr("page.exec_dashboard.refresh", "Refresh")}
             </button>
 
             {/* Export Dashboard PDF */}
@@ -337,7 +343,7 @@ export default function ExecutiveDashboardPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                 </svg>
               )}
-              {exporting ? "Exporting…" : "Export PDF"}
+              {exporting ? tr("page.exec_dashboard.exporting", "Exporting…") : tr("page.exec_dashboard.export_pdf", "Export PDF")}
             </button>
           </div>
         }
@@ -350,17 +356,17 @@ export default function ExecutiveDashboardPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-semibold text-violet-900 dark:text-violet-200">
-                Fresh import ready for pilot review
+                {tr("page.exec_dashboard.fresh_import_title", "Fresh import ready for pilot review")}
               </p>
               <p className="mt-1 text-sm text-violet-700 dark:text-violet-300">
-                {importedRows ? `${Number(importedRows).toLocaleString()} entities imported` : "Your latest import"} in domain{" "}
-                <span className="font-semibold">{importedDomain ?? activeDomainId}</span>. This dashboard is the fastest place to check coverage, impact, and next actions.
+                {importedRows ? `${Number(importedRows).toLocaleString()} ${tr("page.import.entities_imported", "entities imported")}` : "Your latest import"} in domain{" "}
+                <span className="font-semibold">{importedDomain ?? activeDomainId}</span>. {tr("page.exec_dashboard.fresh_import_description", "This dashboard is the fastest place to check coverage, impact, and next actions.")}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {[
-                  "Read the KPIs",
-                  "Scan the highlights",
-                  "Export a stakeholder brief",
+                  tr("page.import.success.read_kpis", "Read the KPIs"),
+                  tr("page.import.success.scan_highlights", "Scan the highlights"),
+                  tr("page.import.success.prepare_brief", "Prepare an executive brief"),
                 ].map((item) => (
                   <span
                     key={item}
@@ -376,20 +382,20 @@ export default function ExecutiveDashboardPage() {
                 href={briefBuilderHref}
                 className="rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-50 dark:border-violet-500/30 dark:bg-gray-900 dark:text-violet-300 dark:hover:bg-violet-500/10"
               >
-                Prepare executive brief
+                {tr("page.import.success.open_brief", "Prepare Executive Brief")}
               </Link>
               <Link
                 href="/"
                 className="rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-50 dark:border-violet-500/30 dark:bg-gray-900 dark:text-violet-300 dark:hover:bg-violet-500/10"
               >
-                Open Knowledge Explorer
+                {tr("page.exec_dashboard.open_explorer", "Open Knowledge Explorer")}
               </Link>
               <button
                 onClick={handleExportPDF}
                 disabled={exporting || loading || !data}
                 className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700 disabled:opacity-50"
               >
-                {exporting ? "Exporting…" : "Export PDF brief"}
+                {exporting ? tr("page.exec_dashboard.exporting", "Exporting…") : tr("page.exec_dashboard.export_brief", "Export PDF brief")}
               </button>
             </div>
           </div>
@@ -401,7 +407,7 @@ export default function ExecutiveDashboardPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-2xl">
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-70">
-                Institutional Benchmark Baseline
+                {tr("page.exec_dashboard.benchmark_baseline", "Institutional Benchmark Baseline")}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <p className="text-lg font-semibold">{data.institutional_benchmark.profile_name}</p>
@@ -412,7 +418,7 @@ export default function ExecutiveDashboardPage() {
               <p className="mt-2 text-sm opacity-90">{data.institutional_benchmark.description}</p>
               <div className="mt-3 max-w-sm">
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] opacity-70">
-                  Benchmark profile
+                  {tr("page.exec_dashboard.benchmark_profile", "Benchmark profile")}
                 </label>
                 <select
                   value={selectedBenchmarkProfile}
@@ -432,7 +438,7 @@ export default function ExecutiveDashboardPage() {
             </div>
             <div className="min-w-[180px] rounded-2xl bg-white/80 p-4 text-center shadow-sm dark:bg-gray-900/70">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
-                Benchmark Score
+                {tr("page.exec_dashboard.benchmark_score", "Benchmark Score")}
               </p>
               <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
                 {Math.round(data.institutional_benchmark.readiness_pct)}%
@@ -467,7 +473,7 @@ export default function ExecutiveDashboardPage() {
               className={`rounded-2xl border p-5 shadow-sm ${toneStyles[highlight.tone]}`}
             >
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-70">
-                Suggested Next Action
+                {tr("page.exec_dashboard.suggested_next_action", "Suggested Next Action")}
               </p>
               <p className="text-sm font-semibold">{highlight.title}</p>
               <p className="mt-2 text-sm opacity-90">{highlight.detail}</p>
@@ -490,7 +496,7 @@ export default function ExecutiveDashboardPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
               }
-              label="Total Entities"
+              label={tr("page.exec_dashboard.kpi.total_entities", "Total Entities")}
               value={data.kpis.total_entities.toLocaleString()}
             />
             <StatCard
@@ -500,7 +506,7 @@ export default function ExecutiveDashboardPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               }
-              label="Enrichment Coverage"
+              label={tr("page.exec_dashboard.kpi.enrichment_coverage", "Enrichment Coverage")}
               value={`${data.kpis.enrichment_pct}%`}
               trend={{
                 value: `${data.kpis.enriched_count.toLocaleString()} enriched`,
@@ -515,7 +521,7 @@ export default function ExecutiveDashboardPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
                 </svg>
               }
-              label="Avg Citations"
+              label={tr("page.exec_dashboard.kpi.avg_citations", "Avg Citations")}
               value={data.kpis.avg_citations}
             />
             <StatCard
@@ -525,7 +531,7 @@ export default function ExecutiveDashboardPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               }
-              label="Distinct Concepts"
+              label={tr("page.exec_dashboard.kpi.distinct_concepts", "Distinct Concepts")}
               value={data.kpis.total_concepts.toLocaleString()}
             />
             {/* Quality KPI */}
@@ -537,7 +543,7 @@ export default function ExecutiveDashboardPage() {
                   </svg>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Avg Quality</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{tr("page.exec_dashboard.kpi.avg_quality", "Avg Quality")}</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
                     {data.quality?.average != null ? `${Math.round(data.quality.average * 100)}%` : "—"}
                   </p>
@@ -548,7 +554,7 @@ export default function ExecutiveDashboardPage() {
                   {(() => {
                     const { high, medium, low } = data.quality.distribution;
                     const total = high + medium + low;
-                    if (total === 0) return <span className="text-xs text-gray-400">No scored entities</span>;
+                    if (total === 0) return <span className="text-xs text-gray-400">{tr("page.exec_dashboard.no_scored_entities", "No scored entities")}</span>;
                     return (
                       <div className="flex w-full overflow-hidden rounded-full h-2 gap-px">
                         {high > 0 && <div className="bg-emerald-500 h-2 rounded-l-full" style={{ width: `${(high / total) * 100}%` }} title={`High: ${high}`} />}
@@ -567,16 +573,16 @@ export default function ExecutiveDashboardPage() {
       {/* ── Section 2: Impact Over Time ── */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <h3 className="mb-1 text-base font-semibold text-gray-900 dark:text-white">
-          Entities Over Time
+          {tr("page.exec_dashboard.entities_over_time", "Entities Over Time")}
         </h3>
         <p className="mb-5 text-xs text-gray-500 dark:text-gray-400">
-          Entity creation by year — useful for spotting whether this dataset is concentrated in a narrow time window or spread across multiple periods.
+          {tr("page.exec_dashboard.entities_over_time_desc", "Entity creation by year — useful for spotting whether this dataset is concentrated in a narrow time window or spread across multiple periods.")}
         </p>
         {loading ? (
           <SkeletonCard lines={4} />
         ) : !data || data.entities_by_year.length === 0 ? (
           <div className="flex h-52 items-center justify-center text-sm text-gray-400">
-            No date data available — upload entities with a <code>creation_date</code> field.
+            {tr("page.exec_dashboard.no_date_data", "No date data available — upload entities with a creation_date field.")}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={220}>
@@ -592,7 +598,7 @@ export default function ExecutiveDashboardPage() {
               <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#6b7280" }} />
               <Tooltip
                 contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", fontSize: "12px" }}
-                formatter={(v) => [(Number(v) || 0).toLocaleString(), "Entities"]}
+                formatter={(v) => [(Number(v) || 0).toLocaleString(), tr("page.exec_dashboard.tooltip.entities", "Entities")]}
               />
               <Area
                 type="monotone"
@@ -612,15 +618,15 @@ export default function ExecutiveDashboardPage() {
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-              Emerging Topic Signals
+              {tr("page.exec_dashboard.emerging_signals", "Emerging Topic Signals")}
             </h3>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Experimental early signals based on recent concept acceleration across the years detected in the imported portfolio.
+              {tr("page.exec_dashboard.emerging_signals_desc", "Experimental early signals based on recent concept acceleration across the years detected in the imported portfolio.")}
             </p>
           </div>
           {data?.emerging_topic_signals?.is_experimental && (
             <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-              Experimental
+              {tr("page.exec_dashboard.experimental", "Experimental")}
             </span>
           )}
         </div>
@@ -628,7 +634,7 @@ export default function ExecutiveDashboardPage() {
           <SkeletonCard lines={3} />
         ) : !data ? null : data.emerging_topic_signals.signals.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-400">
-            No reliable early signals yet. UKIP needs concept coverage across multiple years before surfacing acceleration.
+            {tr("page.exec_dashboard.no_signals", "No reliable early signals yet. UKIP needs concept coverage across multiple years before surfacing acceleration.")}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -640,7 +646,7 @@ export default function ExecutiveDashboardPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] opacity-70">
-                      Early Signal
+                      {tr("page.exec_dashboard.experimental", "Experimental")}
                     </p>
                     <p className="text-base font-semibold">{signal.concept}</p>
                   </div>
@@ -650,15 +656,15 @@ export default function ExecutiveDashboardPage() {
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-3 text-center">
                   <div className="rounded-xl bg-white/80 p-3 dark:bg-gray-900/70">
-                    <p className="text-xs opacity-70">Acceleration</p>
+                    <p className="text-xs opacity-70">{tr("page.exec_dashboard.acceleration", "Acceleration")}</p>
                     <p className="mt-1 text-lg font-semibold">+{signal.acceleration_score}%</p>
                   </div>
                   <div className="rounded-xl bg-white/80 p-3 dark:bg-gray-900/70">
-                    <p className="text-xs opacity-70">Recent share</p>
+                    <p className="text-xs opacity-70">{tr("page.exec_dashboard.recent_share", "Recent share")}</p>
                     <p className="mt-1 text-lg font-semibold">{signal.recent_share}%</p>
                   </div>
                   <div className="rounded-xl bg-white/80 p-3 dark:bg-gray-900/70">
-                    <p className="text-xs opacity-70">Baseline share</p>
+                    <p className="text-xs opacity-70">{tr("page.exec_dashboard.baseline_share", "Baseline share")}</p>
                     <p className="mt-1 text-lg font-semibold">{signal.baseline_share}%</p>
                   </div>
                 </div>
@@ -676,16 +682,16 @@ export default function ExecutiveDashboardPage() {
 
       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <h3 className="mb-1 text-base font-semibold text-gray-900 dark:text-white">
-          Top Primary Labels by Year
+          {tr("page.exec_dashboard.top_labels_by_year", "Top Primary Labels by Year")}
         </h3>
         <p className="mb-5 text-xs text-gray-500 dark:text-gray-400">
-          Entity count per label × year — darker violet means higher concentration and helps surface where the portfolio is densest.
+          {tr("page.exec_dashboard.top_labels_by_year_desc", "Entity count per label × year — darker violet means higher concentration and helps surface where the portfolio is densest.")}
         </p>
         {loading ? (
           <SkeletonCard lines={3} />
         ) : !data || data.brand_year_matrix.brands.length === 0 ? (
           <div className="flex h-40 items-center justify-center text-sm text-gray-400">
-            No brand data available.
+            {tr("common.no_data", "No data available")}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -693,7 +699,7 @@ export default function ExecutiveDashboardPage() {
               <thead>
                 <tr>
                   <th className="border border-gray-100 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400">
-                    Label
+                    {tr("page.exec_dashboard.label", "Label")}
                   </th>
                   {data.brand_year_matrix.years.map((yr) => (
                     <th
@@ -727,10 +733,10 @@ export default function ExecutiveDashboardPage() {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-              Knowledge Concept Map
+              {tr("page.exec_dashboard.knowledge_concept_map", "Knowledge Concept Map")}
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Top concepts extracted from enriched entities — this is the quickest semantic read of what the imported portfolio is really about.
+              {tr("page.exec_dashboard.knowledge_concept_map_desc", "Top concepts extracted from enriched entities — this is the quickest semantic read of what the imported portfolio is really about.")}
             </p>
           </div>
           {data && (
@@ -738,7 +744,7 @@ export default function ExecutiveDashboardPage() {
               href="/analytics/topics"
               className="text-xs font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400"
             >
-              Full analysis →
+              {tr("page.exec_dashboard.full_analysis", "Full analysis →")}
             </Link>
           )}
         </div>
@@ -754,24 +760,24 @@ export default function ExecutiveDashboardPage() {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-              Top Entities by Impact
+              {tr("page.exec_dashboard.top_entities_impact", "Top Entities by Impact")}
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Highest citation count among enriched entities — a practical shortlist for stakeholder attention and follow-up.
+              {tr("page.exec_dashboard.top_entities_impact_desc", "Highest citation count among enriched entities — a practical shortlist for stakeholder attention and follow-up.")}
             </p>
           </div>
           <Link
             href="/"
             className="text-xs font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400"
           >
-            View all →
+            {tr("page.exec_dashboard.view_all", "View all →")}
           </Link>
         </div>
         {loading ? (
           <SkeletonCard lines={4} />
         ) : !data || data.top_entities.length === 0 ? (
           <div className="flex h-32 items-center justify-center text-sm text-gray-400">
-            No enriched entities yet. Run enrichment to populate this table.
+            {tr("page.exec_dashboard.no_top_entities", "No enriched entities yet. Run enrichment to populate this table.")}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -779,10 +785,10 @@ export default function ExecutiveDashboardPage() {
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
                   <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-wide text-gray-500">#</th>
-                  <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-wide text-gray-500">Entity</th>
-                  <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-wide text-gray-500">Primary Label</th>
-                  <th className="pb-3 pr-4 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Citations</th>
-                  <th className="pb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Source</th>
+                  <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-wide text-gray-500">{tr("page.exec_dashboard.entity", "Entity")}</th>
+                  <th className="pb-3 pr-4 text-xs font-semibold uppercase tracking-wide text-gray-500">{tr("page.exec_dashboard.primary_label", "Primary Label")}</th>
+                  <th className="pb-3 pr-4 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">{tr("page.exec_dashboard.citations", "Citations")}</th>
+                  <th className="pb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">{tr("page.exec_dashboard.source", "Source")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-800">

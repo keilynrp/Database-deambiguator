@@ -44,6 +44,10 @@ export default function Sidebar() {
   const { collapsed, toggle, mobileOpen, closeMobile } = useSidebar();
   const { t } = useLanguage();
   const { branding } = useBranding();
+  const tr = (key: string, fallback: string) => {
+    const value = t(key);
+    return value === key ? fallback : value;
+  };
 
   // On desktop: fixed sidebar, collapsed or expanded
   // On mobile: full-width drawer, hidden until mobileOpen
@@ -75,7 +79,7 @@ export default function Sidebar() {
           {/* Desktop collapse toggle — hidden on mobile */}
           <button
             onClick={toggle}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? tr("sidebar.expand", "Expand sidebar") : tr("sidebar.collapse", "Collapse sidebar")}
             className="hidden rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:block"
           >
             <svg className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,7 +93,7 @@ export default function Sidebar() {
           {/* Mobile close button */}
           <button
             onClick={closeMobile}
-            aria-label="Close navigation"
+            aria-label={tr("sidebar.close_navigation", "Close navigation")}
             className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:hidden"
           >
             <svg className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">

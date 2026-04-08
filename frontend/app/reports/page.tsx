@@ -45,26 +45,9 @@ const SECTION_ICONS: Record<string, string> = {
   harmonization_log:    "⚙️",
 };
 
-const SECTION_DESCRIPTIONS: Record<string, string> = {
-  institutional_benchmark: "Institutional readiness baseline with explicit framework gaps",
-  entity_stats:         "Total entities, validation status breakdown, distribution chart",
-  enrichment_coverage:  "Coverage %, average citations, top enriched entities",
-  decision_recommendations: "Short, explainable next actions derived from current KPI signals",
-  top_brands:           "Top 15 primary labels or classifications by entity count",
-  topic_clusters:       "Most frequent concepts from enrichment data",
-  harmonization_log:    "Last 10 harmonization steps with status",
-};
-
 // ── Format types ──────────────────────────────────────────────────────────────
 
 type ExportFormat = "html" | "pdf" | "excel" | "pptx";
-
-const FORMAT_OPTIONS: { value: ExportFormat; label: string; desc: string; icon: string }[] = [
-  { value: "html",  label: "HTML",       desc: "Preview in browser, Ctrl+P to print",               icon: "🌐" },
-  { value: "pdf",   label: "PDF",        desc: "Professional branded PDF download",                  icon: "📄" },
-  { value: "excel", label: "Excel",      desc: "Multi-sheet workbook with KPIs, entities & concepts", icon: "📊" },
-  { value: "pptx",  label: "PowerPoint", desc: "Branded slide deck for presentations",               icon: "📑" },
-];
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -72,6 +55,10 @@ export default function ReportsPage() {
   const { activeDomainId, setActiveDomainId } = useDomain();
   const { toast } = useToast();
   const { t } = useLanguage();
+  const tr = useCallback((key: string, fallback: string) => {
+    const value = t(key);
+    return value === key ? fallback : value;
+  }, [t]);
   const searchParams = useSearchParams();
 
   const [sections, setSections] = useState<Section[]>([]);
@@ -107,6 +94,21 @@ export default function ReportsPage() {
     }
     return [];
   }, [preset, searchParams]);
+  const sectionDescriptions = useMemo<Record<string, string>>(() => ({
+    institutional_benchmark: tr("page.reports.section.institutional_benchmark", "Institutional readiness baseline with explicit framework gaps"),
+    entity_stats: tr("page.reports.section.entity_stats", "Total entities, validation status breakdown, distribution chart"),
+    enrichment_coverage: tr("page.reports.section.enrichment_coverage", "Coverage %, average citations, top enriched entities"),
+    decision_recommendations: tr("page.reports.section.decision_recommendations", "Short, explainable next actions derived from current KPI signals"),
+    top_brands: tr("page.reports.section.top_brands", "Top 15 primary labels or classifications by entity count"),
+    topic_clusters: tr("page.reports.section.topic_clusters", "Most frequent concepts from enrichment data"),
+    harmonization_log: tr("page.reports.section.harmonization_log", "Last 10 harmonization steps with status"),
+  }), [tr]);
+  const formatOptions: { value: ExportFormat; label: string; desc: string; icon: string }[] = useMemo(() => ([
+    { value: "html",  label: "HTML",       desc: tr("page.reports.format.html", "Preview in browser, Ctrl+P to print"), icon: "🌐" },
+    { value: "pdf",   label: "PDF",        desc: tr("page.reports.format.pdf", "Professional branded PDF download"), icon: "📄" },
+    { value: "excel", label: "Excel",      desc: tr("page.reports.format.excel", "Multi-sheet workbook with KPIs, entities & concepts"), icon: "📊" },
+    { value: "pptx",  label: "PowerPoint", desc: tr("page.reports.format.pptx", "Branded slide deck for presentations"), icon: "📑" },
+  ]), [tr]);
 
   // Fetch available sections from backend
   const loadSections = useCallback(async () => {
@@ -185,12 +187,12 @@ export default function ReportsPage() {
     setSelected(new Set(tpl.sections));
     if (tpl.default_title) setTitle(tpl.default_title);
     setShowTemplates(false);
-    toast(`Template "${tpl.name}" applied`, "success");
+    toast(`${tr("page.reports.toast.template_applied", "Template applied")}: "${tpl.name}"`, "success");
   };
 
   const saveAsTemplate = async () => {
     if (!newTemplateName.trim()) {
-      toast("Enter a template name", "warning");
+      toast(tr("page.reports.toast.enter_template_name", "Enter a template name"), "warning");
       return;
     }
     setSavingTemplate(true);
@@ -209,10 +211,10 @@ export default function ReportsPage() {
         const created = await res.json();
         setTemplates((prev) => [...prev, created]);
         setNewTemplateName("");
-        toast("Template saved", "success");
+        toast(tr("page.reports.toast.template_saved", "Template saved"), "success");
       } else {
         const err = await res.text();
-        toast(`Failed: ${err}`, "error");
+        toast(`${tr("page.reports.toast.template_save_failed", "Failed to save template")}: ${err}`, "error");
       }
     } finally {
       setSavingTemplate(false);
@@ -235,7 +237,7 @@ export default function ReportsPage() {
 
   const handleGenerate = async () => {
     if (selected.size === 0) {
-      toast("Select at least one section", "warning");
+      toast(tr("page.reports.toast.select_section", "Select at least one section"), "warning");
       return;
     }
     setGenerating(true);
@@ -258,7 +260,7 @@ export default function ReportsPage() {
       });
       if (!res.ok) {
         const err = await res.text();
-        toast(`Generation failed: ${err}`, "error");
+        toast(`${tr("page.reports.toast.generation_failed", "Generation failed")}: ${err}`, "error");
         return;
       }
 
@@ -282,9 +284,9 @@ export default function ReportsPage() {
       a.download = match ? match[1] : defaultName;
       a.click();
       URL.revokeObjectURL(url);
-      toast("Report downloaded", "success");
+      toast(tr("page.reports.toast.downloaded", "Report downloaded"), "success");
     } catch {
-      toast("Failed to generate report", "error");
+      toast(tr("page.reports.toast.generate_error", "Failed to generate report"), "error");
     } finally {
       setGenerating(false);
     }
@@ -498,7 +500,7 @@ export default function ReportsPage() {
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        {SECTION_DESCRIPTIONS[sec.id] ?? ""}
+                        {sectionDescriptions[sec.id] ?? ""}
                       </p>
                     </div>
                   </button>
@@ -583,7 +585,7 @@ export default function ReportsPage() {
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{t('page.reports.format_title')}</h3>
             <div className="space-y-2">
-              {FORMAT_OPTIONS.map((opt) => (
+              {formatOptions.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setFormat(opt.value)}
