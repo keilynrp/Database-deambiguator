@@ -10,6 +10,7 @@ Sprint 73 — Graph Analytics
   GET  /graph/stats                    — global graph statistics
   GET  /graph/path                     — BFS shortest path
   GET  /graph/components               — list connected components
+  GET  /graph/communities              — community summaries
 """
 import logging
 from collections import defaultdict, deque
@@ -172,6 +173,45 @@ def get_graph_components(
                 "entity_ids": sorted(comp_members[comp_id]),
             }
             for comp_id, size in sorted_comps
+        ],
+    }
+
+
+@router.get("/graph/communities")
+def get_graph_communities(
+    limit: int = Query(default=10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Return lightweight community-detection summaries over the current graph."""
+    org_id = resolve_request_org_id(db, current_user)
+    edges = graph_analytics.fetch_edges(db, org_id=org_id)
+
+    if not edges:
+        return {"total_communities": 0, "communities": []}
+
+    communities = graph_analytics.detect_communities(edges)
+    summaries = graph_analytics.community_summaries(edges, communities)[:limit]
+    leader_ids = {summary["leader_id"] for summary in summaries}
+    label_map = {
+        entity.id: entity.primary_label
+        for entity in scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+        .filter(models.RawEntity.id.in_(leader_ids))
+        .all()
+    }
+
+    return {
+        "total_communities": len({community_id for community_id in communities.values()}),
+        "communities": [
+            {
+                **summary,
+                "leader": {
+                    "entity_id": summary["leader_id"],
+                    "primary_label": label_map.get(summary["leader_id"]),
+                    "total_degree": summary["leader_degree"],
+                },
+            }
+            for summary in summaries
         ],
     }
 

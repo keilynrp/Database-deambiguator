@@ -11,6 +11,8 @@ degree_centrality(entity_id, edges) → dict
 pagerank(edges, damping, max_iter, tol) → dict[int, float]
 connected_components(edges)       → dict[int, int]  (node → component_id)
 component_sizes(components)       → dict[int, int]  (component_id → size)
+detect_communities(edges)         → dict[int, int]  (node → community_id)
+community_summaries(edges, communities) → list[dict]
 shortest_path(source, target, edges) → dict | None
 """
 from __future__ import annotations
@@ -158,6 +160,115 @@ def component_sizes(components: dict[int, int]) -> dict[int, int]:
     for comp_id in components.values():
         sizes[comp_id] += 1
     return dict(sizes)
+
+
+def detect_communities(
+    edges: EdgeList,
+    max_iter: int = 25,
+) -> dict[int, int]:
+    """
+    Lightweight deterministic label-propagation over an undirected projection.
+    Good enough for medium subgraphs without extra dependencies.
+    """
+    adj: dict[int, dict[int, float]] = defaultdict(dict)
+    nodes: set[int] = set()
+
+    for src, dst, _, weight in edges:
+        w = float(weight or 1.0)
+        adj[src][dst] = adj[src].get(dst, 0.0) + w
+        adj[dst][src] = adj[dst].get(src, 0.0) + w
+        nodes.add(src)
+        nodes.add(dst)
+
+    if not nodes:
+        return {}
+
+    labels = {node: node for node in nodes}
+
+    for _ in range(max_iter):
+        changed = False
+        for node in sorted(nodes):
+            neighbor_weights = adj.get(node, {})
+            if not neighbor_weights:
+                continue
+
+            scores: dict[int, float] = defaultdict(float)
+            for neighbor, weight in neighbor_weights.items():
+                scores[labels[neighbor]] += weight
+
+            best_label = min(
+                (label for label, score in scores.items() if score == max(scores.values())),
+                default=labels[node],
+            )
+            if best_label != labels[node]:
+                labels[node] = best_label
+                changed = True
+        if not changed:
+            break
+
+    normalized: dict[int, int] = {}
+    label_map: dict[int, int] = {}
+    for node in sorted(nodes):
+        original = labels[node]
+        if original not in label_map:
+            label_map[original] = len(label_map)
+        normalized[node] = label_map[original]
+    return normalized
+
+
+def community_summaries(edges: EdgeList, communities: dict[int, int]) -> list[dict]:
+    """Summarise communities by size, density, leader, and relation mix."""
+    if not communities:
+        return []
+
+    members: dict[int, set[int]] = defaultdict(set)
+    internal_edges: dict[int, int] = defaultdict(int)
+    relation_mix: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    degree_map: dict[int, int] = defaultdict(int)
+
+    for node_id, community_id in communities.items():
+        members[community_id].add(node_id)
+
+    for src, dst, rel, _ in edges:
+        degree_map[src] += 1
+        degree_map[dst] += 1
+        src_comm = communities.get(src)
+        dst_comm = communities.get(dst)
+        if src_comm is not None and src_comm == dst_comm:
+            internal_edges[src_comm] += 1
+            relation_mix[src_comm][rel] += 1
+
+    summaries = []
+    for community_id, entity_ids in members.items():
+        size = len(entity_ids)
+        possible_edges = max((size * (size - 1)) / 2, 1)
+        density = round(internal_edges[community_id] / possible_edges, 3) if size > 1 else 0.0
+        leader_id = max(
+            entity_ids,
+            key=lambda node_id: (degree_map.get(node_id, 0), -node_id),
+        )
+        relation_breakdown = relation_mix[community_id]
+        top_relations = sorted(
+            relation_breakdown.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )[:3]
+
+        summaries.append({
+            "community_id": community_id,
+            "size": size,
+            "internal_edges": internal_edges[community_id],
+            "density": density,
+            "entity_ids": sorted(entity_ids),
+            "leader_id": leader_id,
+            "leader_degree": degree_map.get(leader_id, 0),
+            "top_relations": [
+                {"relation_type": rel, "count": count}
+                for rel, count in top_relations
+            ],
+        })
+
+    return sorted(summaries, key=lambda item: (item["size"], item["internal_edges"]), reverse=True)
 
 
 # ── Shortest Path (BFS, directed) ────────────────────────────────────────────

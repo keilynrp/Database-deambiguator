@@ -13,6 +13,8 @@ from backend.graph_analytics import (
     pagerank,
     connected_components,
     component_sizes,
+    detect_communities,
+    community_summaries,
     shortest_path,
 )
 
@@ -175,6 +177,41 @@ class TestConnectedComponents:
         size_values = sorted(sizes.values(), reverse=True)
         assert size_values[0] == 3
         assert size_values[1] == 2
+
+
+class TestCommunityDetection:
+    def test_empty_graph_returns_empty(self):
+        assert detect_communities([]) == {}
+
+    def test_two_dense_clusters_split_into_two_communities(self):
+        edges = [
+            (1, 2, "cites", 1.0),
+            (2, 3, "cites", 1.0),
+            (1, 3, "cites", 1.0),
+            (4, 5, "cites", 1.0),
+            (5, 6, "cites", 1.0),
+            (4, 6, "cites", 1.0),
+            (3, 4, "related-to", 0.2),
+        ]
+        communities = detect_communities(edges)
+        groups = {frozenset(node for node, cid in communities.items() if cid == community_id) for community_id in set(communities.values())}
+        assert frozenset({1, 2, 3}) in groups
+        assert frozenset({4, 5, 6}) in groups
+
+    def test_community_summaries_include_leader_and_density(self):
+        edges = [
+            (1, 2, "cites", 1.0),
+            (2, 3, "cites", 1.0),
+            (1, 3, "related-to", 1.0),
+        ]
+        communities = detect_communities(edges)
+        summaries = community_summaries(edges, communities)
+        assert len(summaries) == 1
+        summary = summaries[0]
+        assert summary["size"] == 3
+        assert "leader_id" in summary
+        assert summary["density"] > 0
+        assert len(summary["top_relations"]) >= 1
 
 
 # ── Unit tests: shortest_path ─────────────────────────────────────────────────
@@ -430,3 +467,40 @@ class TestComponentsEndpoint:
         data = resp.json()
         sizes = [c["size"] for c in data["components"]]
         assert sizes == sorted(sizes, reverse=True)
+
+
+class TestCommunitiesEndpoint:
+    def test_requires_auth(self, client):
+        resp = client.get("/graph/communities")
+        assert resp.status_code in (401, 403)
+
+    def test_empty_returns_zero(self, client, auth_headers, db_session):
+        resp = client.get("/graph/communities", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_communities"] == 0
+        assert data["communities"] == []
+
+    def test_returns_community_summaries(self, client, auth_headers, db_session):
+        e1 = _entity(db_session, "GroupA1")
+        e2 = _entity(db_session, "GroupA2")
+        e3 = _entity(db_session, "GroupA3")
+        e4 = _entity(db_session, "GroupB1")
+        e5 = _entity(db_session, "GroupB2")
+        e6 = _entity(db_session, "GroupB3")
+        _rel(db_session, e1.id, e2.id, "cites")
+        _rel(db_session, e2.id, e3.id, "cites")
+        _rel(db_session, e1.id, e3.id, "related-to")
+        _rel(db_session, e4.id, e5.id, "cites")
+        _rel(db_session, e5.id, e6.id, "cites")
+        _rel(db_session, e4.id, e6.id, "related-to")
+        _rel(db_session, e3.id, e4.id, "belongs-to", weight=0.2)
+
+        resp = client.get("/graph/communities?limit=5", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_communities"] >= 2
+        first = data["communities"][0]
+        assert "leader" in first
+        assert "density" in first
+        assert "top_relations" in first

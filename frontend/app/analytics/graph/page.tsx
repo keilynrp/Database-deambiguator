@@ -69,6 +69,25 @@ interface PathResult {
   steps?: Array<{ entity_id: number; primary_label: string | null }>;
 }
 
+interface CommunitySummary {
+  community_id: number;
+  size: number;
+  internal_edges: number;
+  density: number;
+  entity_ids: number[];
+  top_relations: Array<{ relation_type: string; count: number }>;
+  leader: {
+    entity_id: number;
+    primary_label: string | null;
+    total_degree: number;
+  };
+}
+
+interface CommunityResponse {
+  total_communities: number;
+  communities: CommunitySummary[];
+}
+
 export default function GraphAnalyticsPage() {
   const [stats, setStats] = useState<GraphStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -80,6 +99,9 @@ export default function GraphAnalyticsPage() {
   const [pathResult, setPathResult] = useState<PathResult | null>(null);
   const [loadingPath, setLoadingPath] = useState(false);
   const [pathError, setPathError] = useState<string | null>(null);
+  const [communities, setCommunities] = useState<CommunityResponse | null>(null);
+  const [loadingCommunities, setLoadingCommunities] = useState(true);
+  const [communityError, setCommunityError] = useState<string | null>(null);
 
   // Export state
   const [exportDomain, setExportDomain] = useState("");
@@ -95,13 +117,22 @@ export default function GraphAnalyticsPage() {
       .finally(() => setLoadingStats(false));
   }, []);
 
+  useEffect(() => {
+    setLoadingCommunities(true);
+    apiFetch("/graph/communities?limit=8")
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((data) => setCommunities(data))
+      .catch((e) => setCommunityError(`Failed to load communities (${e})`))
+      .finally(() => setLoadingCommunities(false));
+  }, []);
+
   async function handleExport(format: ExportFormat) {
     setExportingFormat(format);
     setExportError(null);
     try {
       await downloadGraph(format, exportDomain);
-    } catch (e: any) {
-      setExportError(e.message ?? "Export failed");
+    } catch (e: unknown) {
+      setExportError(e instanceof Error ? e.message : "Export failed");
     } finally {
       setExportingFormat(null);
     }
@@ -204,6 +235,7 @@ export default function GraphAnalyticsPage() {
                 </p>
               </div>
             ) : (
+              <>
               <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
                 {/* Top by PageRank */}
                 <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
@@ -281,6 +313,88 @@ export default function GraphAnalyticsPage() {
                   )}
                 </div>
               </div>
+
+              <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      Research Communities
+                    </h2>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Lightweight community detection over the current collaboration graph.
+                    </p>
+                  </div>
+                  {communities && (
+                    <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+                      {communities.total_communities} detected
+                    </span>
+                  )}
+                </div>
+
+                {loadingCommunities ? (
+                  <div className="flex h-20 items-center justify-center">
+                    <svg className="h-5 w-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  </div>
+                ) : communityError ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+                    {communityError}
+                  </div>
+                ) : communities && communities.communities.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                    {communities.communities.map((community) => (
+                      <div key={community.community_id} className="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-gray-800 dark:bg-gray-950/60">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                              Community {community.community_id + 1}
+                            </p>
+                            <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
+                              Leader: {community.leader.primary_label ?? `Entity #${community.leader.entity_id}`}
+                            </p>
+                          </div>
+                          <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                            {community.size} nodes
+                          </span>
+                        </div>
+                        <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+                          <div className="rounded-xl bg-white p-3 dark:bg-gray-900">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Density</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{community.density}</p>
+                          </div>
+                          <div className="rounded-xl bg-white p-3 dark:bg-gray-900">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Edges</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{community.internal_edges}</p>
+                          </div>
+                          <div className="rounded-xl bg-white p-3 dark:bg-gray-900">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Leader degree</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{community.leader.total_degree}</p>
+                          </div>
+                        </div>
+                        {community.top_relations.length > 0 && (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {community.top_relations.map((relation) => (
+                              <span
+                                key={`${community.community_id}-${relation.relation_type}`}
+                                className="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                              >
+                                {relation.relation_type} · {relation.count}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No graph communities detected yet.
+                  </p>
+                )}
+              </div>
+              </>
             )}
           </>
         ) : null}
