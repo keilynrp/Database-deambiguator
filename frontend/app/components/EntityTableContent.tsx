@@ -2,6 +2,7 @@
 
 import type React from "react";
 import Link from "next/link";
+import { useLanguage } from "../contexts/LanguageContext";
 import { Badge, ErrorBanner, QualityBadge, SkeletonTableBody } from "./ui";
 import type { EntityTableDomain, EditableFields, Entity } from "./EntityTable.types";
 
@@ -15,9 +16,9 @@ function parseNormalizedJson(normalizedJson: string | null): Record<string, unkn
     }
 }
 
-function renderDisplayValue(attributeName: string, value: unknown) {
+function renderDisplayValue(attributeName: string, value: unknown, emptyLabel: string) {
     if (value === null || value === "") {
-        return <span className="text-gray-400">-</span>;
+        return <span className="text-gray-400">{emptyLabel}</span>;
     }
 
     if (attributeName === "canonical_id" || attributeName === "doi") {
@@ -98,6 +99,7 @@ export default function EntityTableContent({
     onDeleteEntity,
     onEnrichEntity,
 }: EntityTableContentProps) {
+    const { t } = useLanguage();
     const thClass = "px-5 py-3.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400";
     const inputClass =
         "h-8 w-full rounded border border-gray-200 bg-white px-2 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
@@ -124,10 +126,10 @@ export default function EntityTableContent({
                                         }
                                     }}
                                     onChange={onToggleSelectAll}
-                                    aria-label="Select all"
+                                    aria-label={t("page.entity_table.select_all")}
                                 />
                             </th>
-                            <th className={`${thClass} no-wrap w-16`}>ID</th>
+                            <th className={`${thClass} no-wrap w-16`}>{t("page.entity_table.id")}</th>
                             {activeDomain ? (
                                 activeDomain.attributes.map((attribute) => (
                                     <th key={attribute.name} className={`${thClass} no-wrap`}>
@@ -135,24 +137,24 @@ export default function EntityTableContent({
                                     </th>
                                 ))
                             ) : (
-                                <th className={`${thClass} no-wrap`}>Primary Label</th>
+                                <th className={`${thClass} no-wrap`}>{t("entities.primary_label")}</th>
                             )}
-                            <th className={`${thClass} no-wrap`}>System Status</th>
+                            <th className={`${thClass} no-wrap`}>{t("page.entity_table.system_status")}</th>
                             <th
                                 className={`${thClass} no-wrap cursor-pointer select-none`}
                                 onClick={onSortQuality}
-                                title="Sort by quality score"
+                                title={t("page.entity_table.sort_quality")}
                             >
-                                Quality {sortBy === "quality_score" ? (sortOrder === "desc" ? "↓" : "↑") : ""}
+                                {t("entities.quality")} {sortBy === "quality_score" ? (sortOrder === "desc" ? "↓" : "↑") : ""}
                             </th>
-                            <th className={`${thClass} no-wrap text-right`}>Actions</th>
+                            <th className={`${thClass} no-wrap text-right`}>{t("common.actions")}</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                         {fetchError ? (
                             <tr>
                                 <td colSpan={11} className="px-5">
-                                    <ErrorBanner variant="row" message="Failed to load entities" detail={fetchError} onRetry={onRetry} />
+                                    <ErrorBanner variant="row" message={t("page.entity_table.failed_load")} detail={fetchError} onRetry={onRetry} />
                                 </td>
                             </tr>
                         ) : loading ? (
@@ -169,7 +171,7 @@ export default function EntityTableContent({
                                                 d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                                             />
                                         </svg>
-                                        <span className="text-sm text-gray-500 dark:text-gray-400">No entities found</span>
+                                        <span className="text-sm text-gray-500 dark:text-gray-400">{t("entities.empty")}</span>
                                     </div>
                                 </td>
                             </tr>
@@ -209,7 +211,7 @@ export default function EntityTableContent({
                                                                         }
                                                                     }}
                                                                     disabled={!attribute.is_core}
-                                                                    title={!attribute.is_core ? "Extended attributes cannot be edited natively yet" : ""}
+                                                                    title={!attribute.is_core ? t("page.entity_table.extended_attributes_readonly") : ""}
                                                                 />
                                                             </td>
                                                         );
@@ -233,9 +235,9 @@ export default function EntityTableContent({
                                                             onEditDataChange({ ...editData, validation_status: event.target.value })
                                                         }
                                                     >
-                                                        <option value="pending">pending</option>
-                                                        <option value="valid">valid</option>
-                                                        <option value="invalid">invalid</option>
+                                                        <option value="pending">{t("page.entity_table.status_pending")}</option>
+                                                        <option value="valid">{t("page.entity_table.status_valid")}</option>
+                                                        <option value="invalid">{t("page.entity_table.status_invalid")}</option>
                                                     </select>
                                                 </td>
                                                 <td className="px-5 py-2.5">
@@ -247,7 +249,7 @@ export default function EntityTableContent({
                                                             onClick={onSaveEdit}
                                                             disabled={saving}
                                                             className="rounded-lg p-1.5 text-green-600 hover:bg-green-100 disabled:opacity-50 dark:text-green-400 dark:hover:bg-green-500/10"
-                                                            title="Save"
+                                                            title={t("common.save")}
                                                         >
                                                             {saving ? (
                                                                 <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -263,7 +265,7 @@ export default function EntityTableContent({
                                                         <button
                                                             onClick={onCancelEdit}
                                                             className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                                            title="Cancel"
+                                                            title={t("common.cancel")}
                                                         >
                                                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -288,7 +290,7 @@ export default function EntityTableContent({
                                                     className="h-4 w-4 rounded border-gray-300 accent-blue-600"
                                                     checked={selectedIds.has(entity.id)}
                                                     onChange={() => onToggleSelect(entity.id)}
-                                                    aria-label={`Select entity ${entity.id}`}
+                                                    aria-label={`${t("page.entity_table.select_entity")} ${entity.id}`}
                                                 />
                                             </td>
                                             <td className="px-5 py-3.5 text-gray-500 dark:text-gray-400">{entity.id}</td>
@@ -300,7 +302,7 @@ export default function EntityTableContent({
 
                                                     return (
                                                         <td key={attribute.name} className="px-5 py-3.5 text-gray-600 dark:text-gray-300">
-                                                            {renderDisplayValue(attribute.name, value)}
+                                                            {renderDisplayValue(attribute.name, value, t("page.entity_table.empty_value"))}
                                                         </td>
                                                     );
                                                 })
@@ -319,7 +321,17 @@ export default function EntityTableContent({
                                                                 : "warning"
                                                     }
                                                 >
-                                                    {entity.validation_status}
+                                                    {entity.validation_status === "pending"
+                                                        ? t("page.entity_table.status_pending")
+                                                        : entity.validation_status === "valid"
+                                                          ? t("page.entity_table.status_valid")
+                                                          : entity.validation_status === "invalid"
+                                                            ? t("page.entity_table.status_invalid")
+                                                            : entity.validation_status === "active"
+                                                              ? t("common.active")
+                                                              : entity.validation_status === "inactive"
+                                                                ? t("common.inactive")
+                                                                : entity.validation_status}
                                                 </Badge>
                                             </td>
                                             <td className="px-5 py-3.5">
@@ -330,7 +342,7 @@ export default function EntityTableContent({
                                                     <button
                                                         onClick={() => onSelectEntity(entity)}
                                                         className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
-                                                        title="Quick view"
+                                                        title={t("page.entity_table.quick_view")}
                                                     >
                                                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -340,7 +352,7 @@ export default function EntityTableContent({
                                                     <Link
                                                         href={`/entities/${entity.id}`}
                                                         className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-500/10 dark:hover:text-blue-400"
-                                                        title="View full details"
+                                                        title={t("page.entity_table.view_full_details")}
                                                     >
                                                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
@@ -349,7 +361,7 @@ export default function EntityTableContent({
                                                     <button
                                                         onClick={() => onStartEdit(entity)}
                                                         className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-500/10 dark:hover:text-blue-400"
-                                                        title="Edit"
+                                                        title={t("common.edit")}
                                                     >
                                                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
@@ -359,7 +371,7 @@ export default function EntityTableContent({
                                                         onClick={() => onDeleteEntity(entity)}
                                                         disabled={deletingId === entity.id}
                                                         className="rounded-lg p-1.5 text-gray-400 hover:bg-red-100 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                                                        title="Delete"
+                                                        title={t("common.delete")}
                                                     >
                                                         {deletingId === entity.id ? (
                                                             <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -376,7 +388,7 @@ export default function EntityTableContent({
                                                         onClick={() => onEnrichEntity(entity.id)}
                                                         disabled={enrichingId === entity.id}
                                                         className="rounded-lg p-1.5 text-gray-400 hover:bg-purple-100 hover:text-purple-600 disabled:opacity-50 dark:hover:bg-purple-500/10 dark:hover:text-purple-400"
-                                                        title="Enrich entity"
+                                                        title={t("page.entity_table.enrich_entity")}
                                                     >
                                                         {enrichingId === entity.id ? (
                                                             <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">

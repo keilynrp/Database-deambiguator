@@ -1,5 +1,6 @@
 "use client";
 
+import { useLanguage } from "../contexts/LanguageContext";
 import MonteCarloChart from "./MonteCarloChart";
 import type { Entity } from "./EntityTable.types";
 
@@ -9,6 +10,7 @@ export interface EntityTableDetailsModalProps {
 }
 
 export default function EntityTableDetailsModal({ entity, onClose }: EntityTableDetailsModalProps) {
+    const { t } = useLanguage();
     if (!entity) return null;
 
     return (
@@ -17,7 +19,7 @@ export default function EntityTableDetailsModal({ entity, onClose }: EntityTable
                 <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
                     <div>
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white">{entity.primary_label}</h2>
-                        <p className="text-sm text-gray-500">Full details and attributes</p>
+                        <p className="text-sm text-gray-500">{t("page.entity_table.full_details")}</p>
                     </div>
                     <button onClick={onClose} className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800">
                         <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -39,7 +41,7 @@ export default function EntityTableDetailsModal({ entity, onClose }: EntityTable
                                 <div key={key} className="flex flex-col gap-1 border-b border-gray-50 pb-2 dark:border-gray-800/50">
                                     <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{label}</span>
                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {value !== null && value !== "" ? String(value) : <span className="italic text-gray-300">No data</span>}
+                                        {value !== null && value !== "" ? String(value) : <span className="italic text-gray-300">{t("common.no_data")}</span>}
                                     </span>
                                 </div>
                             );
@@ -56,7 +58,7 @@ export default function EntityTableDetailsModal({ entity, onClose }: EntityTable
                         onClick={onClose}
                         className="w-full rounded-xl bg-gray-100 py-2.5 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
                     >
-                        Close Details
+                        {t("page.entity_table.close_details")}
                     </button>
                 </div>
             </div>

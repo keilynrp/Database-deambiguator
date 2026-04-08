@@ -1,5 +1,6 @@
 "use client";
 
+import { useLanguage } from "../contexts/LanguageContext";
 import type { ActiveFacets } from "./FacetPanel";
 
 export interface EntityTableToolbarProps {
@@ -21,6 +22,7 @@ export default function EntityTableToolbar({
     onMinQualityChange,
     onClearFacet,
 }: EntityTableToolbarProps) {
+    const { t } = useLanguage();
     const hasActiveFacets = Object.entries(activeFacets).some(([, value]) => value);
 
     return (
@@ -64,27 +66,27 @@ export default function EntityTableToolbar({
                         </svg>
                         <input
                             type="text"
-                            placeholder="Search entities..."
+                            placeholder={t("entities.search_placeholder")}
                             className="h-10 w-80 rounded-lg border border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-700 placeholder-gray-400 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:focus:border-blue-500"
                             value={search}
                             onChange={(event) => onSearchChange(event.target.value)}
                         />
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Min Quality:</label>
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("page.entity_table.min_quality")}:</label>
                         <select
                             value={minQuality}
                             onChange={(event) => onMinQualityChange(event.target.value)}
                             className="h-10 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
                         >
-                            <option value="">All</option>
+                            <option value="">{t("common.all")}</option>
                             <option value="0.7">70%+</option>
                             <option value="0.3">30%+</option>
-                            <option value="0.0">Under 30% (show all scored)</option>
+                            <option value="0.0">{t("page.entity_table.under_30")}</option>
                         </select>
                     </div>
                 </div>
-                <span className="text-sm text-gray-500 dark:text-gray-400">Page {page + 1}</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">{t("common.page")} {page + 1}</span>
             </div>
         </>
     );
