@@ -87,12 +87,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const data = await res.json();
     localStorage.setItem("ukip_token", data.access_token);
     setToken(data.access_token);
-
-    // Fetch user profile after login
-    const meRes = await fetch(`${API_BASE}/users/me`, {
-      headers: { Authorization: `Bearer ${data.access_token}` },
-    });
-    if (meRes.ok) setUser(await meRes.json());
   }, []);
 
   const logout = useCallback(() => {
