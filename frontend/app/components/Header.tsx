@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useTheme } from "../contexts/ThemeContext";
 import { useDomain } from "../contexts/DomainContext";
 import { useBranding } from "../contexts/BrandingContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { useSidebar } from "./SidebarProvider";
 import NotificationBell from "./NotificationBell";
 import UserMenu from "./UserMenu";
@@ -13,33 +14,33 @@ import { apiFetch } from "@/lib/api";
 
 // ── Page title map ──────────────────────────────────────────────────────────────
 
-const pageTitles: Record<string, { title: string; subtitle: string }> = {
-  "/": { title: "Master Data Hub", subtitle: "Browse and search your entity database" },
-  "/disambiguation": { title: "Data Disambiguation", subtitle: "Find and resolve data inconsistencies" },
-  "/analytics": { title: "Analytics", subtitle: "Key metrics and data quality insights" },
-  "/authority": { title: "Authority Control", subtitle: "Normalize and harmonize field values with canonical rules" },
-  "/harmonization": { title: "Data Harmonization", subtitle: "Automated pipeline for cleaning and consolidating entity data" },
-  "/import-export": { title: "Import / Export", subtitle: "Upload and download dataset in Excel format" },
-  "/rag": { title: "Semantic RAG", subtitle: "AI-powered retrieval and semantic analysis" },
-  "/domains": { title: "Domain Registry", subtitle: "Manage workspace schemas and entity type definitions" },
-  "/analytics/olap": { title: "OLAP Cube Explorer", subtitle: "Multi-dimensional analysis and drill-down across your data" },
-  "/analytics/nlq":  { title: "Natural Language Query", subtitle: "Ask your data anything in plain English — AI translates it to OLAP" },
-  "/analytics/topics": { title: "Topic Modeling", subtitle: "Concept frequency, co-occurrence, clusters, and field correlations" },
-  "/artifacts": { title: "Artifact Studio", subtitle: "Build and export strategic intelligence artifacts" },
-  "/artifacts/gaps": { title: "Knowledge Gap Detector", subtitle: "Identify and prioritize data quality issues in your domain" },
-  "/context":   { title: "Context Engineering", subtitle: "Domain context snapshots, sessions, and tool invocations" },
-  "/audit-log": { title: "Audit Log", subtitle: "Complete history of all platform mutations and user activity" },
-  "/search":        { title: "Search", subtitle: "Full-text search across entities, authority records, and annotations" },
-  "/entities/link":   { title: "Entity Linker",          subtitle: "Detect and resolve near-duplicate entities" },
-  "/notifications":       { title: "Notification Center",   subtitle: "Activity feed with read/unread state and action links" },
-  "/reports/scheduled":  { title: "Scheduled Reports",    subtitle: "Recurring report delivery via email — PDF, Excel, and HTML" },
-  "/dashboards":          { title: "My Dashboards",          subtitle: "Personalised widget dashboards — build your own data view" },
-  "/settings/alerts":    { title: "Alert Channels",         subtitle: "Push platform events to Slack, Teams, Discord, or any webhook" },
-  "/settings/api-keys":  { title: "API Keys",               subtitle: "Generate and manage long-lived API keys for programmatic access" },
-  "/settings/organizations": { title: "Organizations", subtitle: "Manage multi-tenant workspaces and member access" },
-  "/settings/users":   { title: "User Management",       subtitle: "Manage user accounts, roles, and platform access" },
-  "/profile":          { title: "My Profile",             subtitle: "Manage your personal information, avatar, and password" },
-  "/demo/sales":       { title: "Sales Deck",             subtitle: "Executive narrative — printable to PDF for prospects and stakeholders" },
+const pageTitles: Record<string, { titleKey: string; subtitleKey: string; titleFallback: string; subtitleFallback: string }> = {
+  "/": { titleKey: "header.page.home.title", subtitleKey: "header.page.home.subtitle", titleFallback: "Master Data Hub", subtitleFallback: "Browse and search your entity database" },
+  "/disambiguation": { titleKey: "header.page.disambiguation.title", subtitleKey: "header.page.disambiguation.subtitle", titleFallback: "Data Disambiguation", subtitleFallback: "Find and resolve data inconsistencies" },
+  "/analytics": { titleKey: "header.page.analytics.title", subtitleKey: "header.page.analytics.subtitle", titleFallback: "Analytics", subtitleFallback: "Key metrics and data quality insights" },
+  "/authority": { titleKey: "header.page.authority.title", subtitleKey: "header.page.authority.subtitle", titleFallback: "Authority Control", subtitleFallback: "Normalize and harmonize field values with canonical rules" },
+  "/harmonization": { titleKey: "header.page.harmonization.title", subtitleKey: "header.page.harmonization.subtitle", titleFallback: "Data Harmonization", subtitleFallback: "Automated pipeline for cleaning and consolidating entity data" },
+  "/import-export": { titleKey: "header.page.import_export.title", subtitleKey: "header.page.import_export.subtitle", titleFallback: "Import / Export", subtitleFallback: "Upload and download dataset in Excel format" },
+  "/rag": { titleKey: "header.page.rag.title", subtitleKey: "header.page.rag.subtitle", titleFallback: "Semantic RAG", subtitleFallback: "AI-powered retrieval and semantic analysis" },
+  "/domains": { titleKey: "header.page.domains.title", subtitleKey: "header.page.domains.subtitle", titleFallback: "Domain Registry", subtitleFallback: "Manage workspace schemas and entity type definitions" },
+  "/analytics/olap": { titleKey: "header.page.analytics_olap.title", subtitleKey: "header.page.analytics_olap.subtitle", titleFallback: "OLAP Cube Explorer", subtitleFallback: "Multi-dimensional analysis and drill-down across your data" },
+  "/analytics/nlq":  { titleKey: "header.page.analytics_nlq.title", subtitleKey: "header.page.analytics_nlq.subtitle", titleFallback: "Natural Language Query", subtitleFallback: "Ask your data anything in plain English — AI translates it to OLAP" },
+  "/analytics/topics": { titleKey: "header.page.analytics_topics.title", subtitleKey: "header.page.analytics_topics.subtitle", titleFallback: "Topic Modeling", subtitleFallback: "Concept frequency, co-occurrence, clusters, and field correlations" },
+  "/artifacts": { titleKey: "header.page.artifacts.title", subtitleKey: "header.page.artifacts.subtitle", titleFallback: "Artifact Studio", subtitleFallback: "Build and export strategic intelligence artifacts" },
+  "/artifacts/gaps": { titleKey: "header.page.artifacts_gaps.title", subtitleKey: "header.page.artifacts_gaps.subtitle", titleFallback: "Knowledge Gap Detector", subtitleFallback: "Identify and prioritize data quality issues in your domain" },
+  "/context":   { titleKey: "header.page.context.title", subtitleKey: "header.page.context.subtitle", titleFallback: "Context Engineering", subtitleFallback: "Domain context snapshots, sessions, and tool invocations" },
+  "/audit-log": { titleKey: "header.page.audit_log.title", subtitleKey: "header.page.audit_log.subtitle", titleFallback: "Audit Log", subtitleFallback: "Complete history of all platform mutations and user activity" },
+  "/search": { titleKey: "header.page.search.title", subtitleKey: "header.page.search.subtitle", titleFallback: "Search", subtitleFallback: "Full-text search across entities, authority records, and annotations" },
+  "/entities/link": { titleKey: "header.page.entities_link.title", subtitleKey: "header.page.entities_link.subtitle", titleFallback: "Entity Linker", subtitleFallback: "Detect and resolve near-duplicate entities" },
+  "/notifications": { titleKey: "header.page.notifications.title", subtitleKey: "header.page.notifications.subtitle", titleFallback: "Notification Center", subtitleFallback: "Activity feed with read/unread state and action links" },
+  "/reports/scheduled": { titleKey: "header.page.reports_scheduled.title", subtitleKey: "header.page.reports_scheduled.subtitle", titleFallback: "Scheduled Reports", subtitleFallback: "Recurring report delivery via email — PDF, Excel, and HTML" },
+  "/dashboards": { titleKey: "header.page.dashboards.title", subtitleKey: "header.page.dashboards.subtitle", titleFallback: "My Dashboards", subtitleFallback: "Personalised widget dashboards — build your own data view" },
+  "/settings/alerts": { titleKey: "header.page.settings_alerts.title", subtitleKey: "header.page.settings_alerts.subtitle", titleFallback: "Alert Channels", subtitleFallback: "Push platform events to Slack, Teams, Discord, or any webhook" },
+  "/settings/api-keys": { titleKey: "header.page.settings_api_keys.title", subtitleKey: "header.page.settings_api_keys.subtitle", titleFallback: "API Keys", subtitleFallback: "Generate and manage long-lived API keys for programmatic access" },
+  "/settings/organizations": { titleKey: "header.page.settings_organizations.title", subtitleKey: "header.page.settings_organizations.subtitle", titleFallback: "Organizations", subtitleFallback: "Manage multi-tenant workspaces and member access" },
+  "/settings/users": { titleKey: "header.page.settings_users.title", subtitleKey: "header.page.settings_users.subtitle", titleFallback: "User Management", subtitleFallback: "Manage user accounts, roles, and platform access" },
+  "/profile": { titleKey: "header.page.profile.title", subtitleKey: "header.page.profile.subtitle", titleFallback: "My Profile", subtitleFallback: "Manage your personal information, avatar, and password" },
+  "/demo/sales": { titleKey: "header.page.demo_sales.title", subtitleKey: "header.page.demo_sales.subtitle", titleFallback: "Sales Deck", subtitleFallback: "Executive narrative — printable to PDF for prospects and stakeholders" },
 };
 
 // ── Search result type ─────────────────────────────────────────────────────────
@@ -62,6 +63,7 @@ const HIT_BADGE: Record<string, string> = {
 
 function GlobalSearch() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [open,    setOpen]    = useState(false);
   const [query,   setQuery]   = useState("");
   const [hits,    setHits]    = useState<SearchHit[]>([]);
@@ -70,6 +72,7 @@ function GlobalSearch() {
   const inputRef    = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownId = "global-search-results";
 
   // Close on outside click
   useEffect(() => {
@@ -151,9 +154,10 @@ function GlobalSearch() {
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}
-          placeholder="Search… (Enter for full results)"
-          aria-label="Search entities, annotations and authority records"
+          placeholder={t("header.search.placeholder")}
+          aria-label={t("header.search.aria")}
           aria-autocomplete="list"
+          aria-controls={showDropdown ? dropdownId : undefined}
           aria-expanded={showDropdown}
           role="combobox"
           className="h-8 w-52 rounded-lg border border-gray-200 bg-white pl-7 pr-3 text-xs text-gray-700 placeholder-gray-400 outline-none transition-all focus:w-72 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500 dark:focus:border-blue-500"
@@ -162,9 +166,9 @@ function GlobalSearch() {
 
       {/* Dropdown */}
       {showDropdown && (
-        <div className="absolute left-0 top-full z-50 mt-1.5 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+        <div id={dropdownId} className="absolute left-0 top-full z-50 mt-1.5 w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
           {hits.length === 0 && !loading && (
-            <p className="px-4 py-3 text-xs text-gray-400">No results for &ldquo;{query}&rdquo;</p>
+            <p className="px-4 py-3 text-xs text-gray-400">{t("header.search.no_results", { query })}</p>
           )}
           {hits.map((hit) => (
             <Link
@@ -178,7 +182,7 @@ function GlobalSearch() {
               </span>
               <div className="min-w-0">
                 <p className="truncate text-xs font-medium text-gray-800 dark:text-gray-200">
-                  {hit.title || "(no title)"}
+                  {hit.title || t("header.search.no_title")}
                 </p>
                 {hit.snippet && (
                   <p className="truncate text-[10px] text-gray-400">{hit.snippet}</p>
@@ -193,7 +197,7 @@ function GlobalSearch() {
                 onClick={() => { setOpen(false); }}
                 className="block px-3 py-2 text-center text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
               >
-                See all results →
+                {t("header.search.view_all")}
               </Link>
             </div>
           )}
@@ -207,12 +211,18 @@ function GlobalSearch() {
 
 export default function Header() {
   const pathname = usePathname();
+  const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const { domains, activeDomainId, setActiveDomainId, isLoading } = useDomain();
   const { branding } = useBranding();
   const { toggleMobile } = useSidebar();
 
-  const page = pageTitles[pathname] || { title: "Dashboard", subtitle: "" };
+  const page = pageTitles[pathname] || {
+    titleKey: "header.page.default.title",
+    subtitleKey: "header.page.default.subtitle",
+    titleFallback: "Dashboard",
+    subtitleFallback: "",
+  };
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center border-b border-gray-200 bg-white/80 shadow-sm backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/80">
@@ -222,7 +232,7 @@ export default function Header() {
           <button
             onClick={toggleMobile}
             className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:hidden"
-            aria-label="Open navigation"
+            aria-label={t("header.mobile.open_navigation")}
           >
             <svg className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -230,10 +240,10 @@ export default function Header() {
           </button>
           <div>
             <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {page.title}
+              {t(page.titleKey) === page.titleKey ? page.titleFallback : t(page.titleKey)}
             </h1>
             <p className="hidden text-xs text-gray-500 dark:text-gray-400 sm:block">
-              {page.subtitle || branding.platform_name}
+              {(t(page.subtitleKey) === page.subtitleKey ? page.subtitleFallback : t(page.subtitleKey)) || branding.platform_name}
             </p>
           </div>
         </div>
@@ -245,7 +255,7 @@ export default function Header() {
 
           {/* Domain Selector */}
           <div className="flex items-center gap-2">
-            <span className="hidden text-sm font-medium text-gray-500 dark:text-gray-400 lg:inline">Workspace:</span>
+            <span className="hidden text-sm font-medium text-gray-500 dark:text-gray-400 lg:inline">{t("header.workspace.label")}</span>
             {isLoading ? (
               <div className="h-9 w-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800"></div>
             ) : (
@@ -253,7 +263,7 @@ export default function Header() {
                 id="workspace-select"
                 value={activeDomainId}
                 onChange={(e) => setActiveDomainId(e.target.value)}
-                aria-label="Active workspace domain"
+                aria-label={t("header.workspace.aria")}
                 className="h-9 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-50 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
               >
                 {domains.map((domain) => (
@@ -270,7 +280,7 @@ export default function Header() {
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
-            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            aria-label={theme === "dark" ? t("header.theme.switch_light") : t("header.theme.switch_dark")}
             className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
           >
             {theme === "dark" ? (

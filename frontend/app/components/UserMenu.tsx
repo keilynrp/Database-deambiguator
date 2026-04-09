@@ -4,16 +4,18 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import UserAvatar from "./UserAvatar";
 
-const ROLE_COLORS: Record<string, { pill: string; label: string }> = {
-  super_admin: { pill: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400",    label: "Super Admin" },
-  admin:       { pill: "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400", label: "Admin" },
-  editor:      { pill: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400", label: "Editor" },
-  viewer:      { pill: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400",    label: "Viewer" },
+const ROLE_COLORS: Record<string, { pill: string; labelKey: string }> = {
+  super_admin: { pill: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400", labelKey: "header.user.role.super_admin" },
+  admin:       { pill: "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400", labelKey: "header.user.role.admin" },
+  editor:      { pill: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400", labelKey: "header.user.role.editor" },
+  viewer:      { pill: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400", labelKey: "header.user.role.viewer" },
 };
 
 export default function UserMenu() {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const { user, logout }  = useAuth();
   const router = useRouter();
@@ -43,7 +45,7 @@ export default function UserMenu() {
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2.5 rounded-full pl-1 pr-3 py-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
-        aria-label="User menu"
+        aria-label={t("header.user.aria")}
       >
         {/* Avatar */}
         <UserAvatar username={user?.username ?? "?"} role={role} avatarUrl={user?.avatar_url} size="sm" />
@@ -53,7 +55,7 @@ export default function UserMenu() {
             {user?.display_name || user?.username || "…"}
           </span>
           <span className="text-[11px] font-medium capitalize text-gray-400 dark:text-gray-500">
-            {role.replace("_", " ")}
+            {t(roleInfo.labelKey)}
           </span>
         </div>
         {/* Chevron */}
@@ -84,7 +86,7 @@ export default function UserMenu() {
                 </p>
               )}
               <span className={`mt-1.5 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${roleInfo.pill}`}>
-                {roleInfo.label}
+                {t(roleInfo.labelKey)}
               </span>
             </div>
           </div>
@@ -103,7 +105,7 @@ export default function UserMenu() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </span>
-              Settings
+              {t("settings.title")}
             </Link>
 
             <Link
@@ -117,7 +119,7 @@ export default function UserMenu() {
                     d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                 </svg>
               </span>
-              My Profile
+              {t("header.user.profile")}
             </Link>
 
             <div className="my-1.5 border-t border-gray-100 dark:border-gray-800" />
@@ -132,7 +134,7 @@ export default function UserMenu() {
                     d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
                 </svg>
               </span>
-              Sign out
+              {t("auth.logout")}
             </button>
           </div>
         </div>

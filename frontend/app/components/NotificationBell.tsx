@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { apiFetch } from "../../lib/api";
+import { useLanguage } from "../contexts/LanguageContext";
 
 interface FeedEntry {
   id: number;
@@ -14,15 +15,15 @@ interface FeedEntry {
   created_at: string | null;
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  "upload":              "File uploaded",
-  "entity.update":       "Entity updated",
-  "entity.delete":       "Entity deleted",
-  "entity.bulk_delete":  "Entities bulk-deleted",
-  "harmonization.apply": "Harmonization applied",
-  "authority.confirm":   "Authority record confirmed",
-  "authority.reject":    "Authority record rejected",
-  "entity.merge":        "Entities merged",
+const ACTION_LABEL_KEYS: Record<string, string> = {
+  "upload":              "header.notifications.action.upload",
+  "entity.update":       "header.notifications.action.entity_update",
+  "entity.delete":       "header.notifications.action.entity_delete",
+  "entity.bulk_delete":  "header.notifications.action.entity_bulk_delete",
+  "harmonization.apply": "header.notifications.action.harmonization_apply",
+  "authority.confirm":   "header.notifications.action.authority_confirm",
+  "authority.reject":    "header.notifications.action.authority_reject",
+  "entity.merge":        "header.notifications.action.entity_merge",
 };
 
 const ACTION_COLOR: Record<string, string> = {
@@ -37,32 +38,35 @@ const ACTION_COLOR: Record<string, string> = {
 
 const LS_KEY = "ukip_notif_last_read";
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, t: (key: string, params?: Record<string, string | number>) => string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
+  if (s < 60) return t("header.notifications.time.seconds", { count: s });
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return t("header.notifications.time.minutes", { count: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return t("header.notifications.time.hours", { count: h });
+  return t("header.notifications.time.days", { count: Math.floor(h / 24) });
 }
 
-function entryDetail(entry: FeedEntry): string {
+function entryDetail(entry: FeedEntry, t: (key: string, params?: Record<string, string | number>) => string): string {
   const d = entry.details;
   if (!d) return "";
-  if (entry.action === "upload")              return `${d.filename ?? ""} · ${d.rows} rows`;
+  if (entry.action === "upload")              return t("header.notifications.detail.upload", { filename: String(d.filename ?? ""), rows: Number(d.rows ?? 0) });
   if (entry.action === "entity.update") {
     const fields = Array.isArray(d.fields) ? (d.fields as string[]).join(", ") : "";
-    return fields ? `Fields: ${fields}` : `Entity #${entry.entity_id}`;
+    return fields
+      ? t("header.notifications.detail.entity_update_fields", { fields })
+      : t("header.notifications.detail.entity_update_entity", { id: entry.entity_id ?? "?" });
   }
-  if (entry.action === "entity.bulk_delete")  return `${d.deleted} entities removed`;
-  if (entry.action === "harmonization.apply") return `${d.step_name ?? d.step_id} · ${d.records_updated} records`;
-  if (entry.action === "authority.confirm")   return `"${d.canonical_label}"${d.rule_created ? " + rule" : ""}`;
+  if (entry.action === "entity.bulk_delete")  return t("header.notifications.detail.entity_bulk_delete", { count: Number(d.deleted ?? 0) });
+  if (entry.action === "harmonization.apply") return t("header.notifications.detail.harmonization_apply", { step: String(d.step_name ?? d.step_id ?? ""), count: Number(d.records_updated ?? 0) });
+  if (entry.action === "authority.confirm")   return t("header.notifications.detail.authority_confirm", { label: String(d.canonical_label ?? ""), suffix: d.rule_created ? t("header.notifications.detail.rule_suffix") : "" });
   return "";
 }
 
 export default function NotificationBell() {
+  const { t } = useLanguage();
   const [open, setOpen]       = useState(false);
   const [entries, setEntries] = useState<FeedEntry[]>([]);
   const [lastRead, setLastRead] = useState<number>(() => {
@@ -80,9 +84,14 @@ export default function NotificationBell() {
 
   // Initial load + 60s polling
   useEffect(() => {
-    fetchFeed();
+    const timer = window.setTimeout(() => {
+      void fetchFeed();
+    }, 0);
     const t = setInterval(fetchFeed, 60_000);
-    return () => clearInterval(t);
+    return () => {
+      window.clearTimeout(timer);
+      clearInterval(t);
+    };
   }, [fetchFeed]);
 
   // Close on click-outside
@@ -119,7 +128,7 @@ export default function NotificationBell() {
       <button
         onClick={handleOpen}
         className="relative flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-        aria-label="Notifications"
+        aria-label={t("header.notifications.aria")}
       >
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -138,10 +147,10 @@ export default function NotificationBell() {
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</span>
+              <span className="text-sm font-semibold text-gray-900 dark:text-white">{t("header.notifications.title")}</span>
               {unread > 0 && (
                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
-                  {unread} new
+                  {t("header.notifications.new_count", { count: unread })}
                 </span>
               )}
             </div>
@@ -150,7 +159,7 @@ export default function NotificationBell() {
                 onClick={markAllRead}
                 className="text-xs text-blue-600 hover:underline dark:text-blue-400"
               >
-                Mark all read
+                {t("header.notifications.mark_all_read")}
               </button>
             )}
           </div>
@@ -163,14 +172,14 @@ export default function NotificationBell() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                     d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
                 </svg>
-                <p className="mt-2 text-sm text-gray-400 dark:text-gray-500">No notifications yet</p>
+                <p className="mt-2 text-sm text-gray-400 dark:text-gray-500">{t("header.notifications.empty")}</p>
               </li>
             ) : (
               entries.map((entry) => {
                 const isUnread = entry.created_at
                   ? new Date(entry.created_at).getTime() > lastRead
                   : false;
-                const detail = entryDetail(entry);
+                const detail = entryDetail(entry, t);
                 const dotColor = ACTION_COLOR[entry.action] ?? "bg-gray-400";
                 return (
                   <li
@@ -186,13 +195,13 @@ export default function NotificationBell() {
                     {/* Text */}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-900 dark:text-white leading-snug">
-                        {ACTION_LABELS[entry.action] ?? entry.action}
+                        {ACTION_LABEL_KEYS[entry.action] ? t(ACTION_LABEL_KEYS[entry.action]) : entry.action}
                       </p>
                       {detail && (
                         <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{detail}</p>
                       )}
                       <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                        {entry.created_at ? timeAgo(entry.created_at) : ""}
+                        {entry.created_at ? timeAgo(entry.created_at, t) : ""}
                       </p>
                     </div>
                     {/* Unread dot */}
@@ -212,7 +221,7 @@ export default function NotificationBell() {
               onClick={() => setOpen(false)}
               className="flex w-full items-center justify-center gap-1.5 py-3 text-xs font-medium text-blue-600 transition-colors hover:bg-gray-50 dark:text-blue-400 dark:hover:bg-gray-800"
             >
-              View all notifications
+              {t("header.notifications.view_all")}
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
