@@ -29,7 +29,7 @@ vi.mock("../app/components/ui", async (importOriginal) => {
 
 // FacetPanel is a heavy dependency — stub it out
 vi.mock("../app/components/FacetPanel", () => ({
-  default: ({ onFacetChange }: { onFacetChange: (f: string, v: string | null) => void }) => (
+  default: () => (
     <div data-testid="facet-panel">FacetPanel</div>
   ),
 }));

@@ -15,7 +15,6 @@ test.describe("Home dashboard", () => {
     await expect(page.locator("h1")).toBeVisible({ timeout: 10_000 });
 
     // StatCards should appear (4 cards: Entities, Enriched, Domains, Indexed)
-    const cards = page.locator("[data-testid='stat-card'], .bg-white.rounded-xl");
     // At minimum the heading and some numeric values render
     await expect(page.getByText("120")).toBeVisible();
   });

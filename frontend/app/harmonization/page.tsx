@@ -122,7 +122,7 @@ export default function HarmonizationPage() {
             if (!res.ok) throw new Error("Failed to load pipeline");
             const data: PipelineStatus = await res.json();
             setPipeline(data);
-        } catch (error) {
+        } catch {
             toast("Error loading pipeline status", "error");
         } finally {
             setLoading(false);
@@ -137,7 +137,7 @@ export default function HarmonizationPage() {
             const data: PreviewResult = await res.json();
             setPreviewData((prev) => ({ ...prev, [stepId]: data }));
             setExpandedStep(stepId);
-        } catch (error) {
+        } catch {
             toast("Error previewing step", "error");
         } finally {
             setPreviewing(null);
@@ -160,7 +160,7 @@ export default function HarmonizationPage() {
             setExpandedStep(null);
             // Refresh pipeline status
             fetchPipeline();
-        } catch (error) {
+        } catch {
             toast("Error applying step", "error");
         } finally {
             setApplying(null);
@@ -183,7 +183,7 @@ export default function HarmonizationPage() {
             setApplyResults(newResults);
             setPreviewData({});
             fetchPipeline();
-        } catch (error) {
+        } catch {
             toast("Error running pipeline", "error");
         } finally {
             setRunningAll(false);
@@ -196,7 +196,7 @@ export default function HarmonizationPage() {
             if (!res.ok) throw new Error("Failed to load logs");
             const data: LogEntry[] = await res.json();
             setLogs(data);
-        } catch (error) {
+        } catch {
         }
     }
 

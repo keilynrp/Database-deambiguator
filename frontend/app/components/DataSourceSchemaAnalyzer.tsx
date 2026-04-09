@@ -36,7 +36,7 @@ export default function DataSourceSchemaAnalyzer() {
                 try {
                     const err = await res.json();
                     errMessage = err.detail || errMessage;
-                } catch (e) { }
+                } catch { }
                 throw new Error(errMessage);
             }
 

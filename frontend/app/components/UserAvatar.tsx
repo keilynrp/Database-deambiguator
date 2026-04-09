@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 interface UserAvatarProps {
   username: string;
   role: string;
@@ -25,14 +27,24 @@ export default function UserAvatar({ username, role, avatarUrl, size = "md", cla
   const initials = username?.[0]?.toUpperCase() ?? "?";
   const bg = ROLE_BG[role] ?? ROLE_BG.viewer;
   const sizeCls = SIZE_CLS[size];
+  const imageSizes: Record<NonNullable<UserAvatarProps["size"]>, string> = {
+    sm: "32px",
+    md: "36px",
+    lg: "56px",
+  };
 
   if (avatarUrl) {
     return (
-      <img
-        src={avatarUrl}
-        alt={username}
-        className={`${sizeCls} rounded-full object-cover ${className}`}
-      />
+      <span className={`relative inline-block overflow-hidden rounded-full ${sizeCls} ${className}`}>
+        <Image
+          src={avatarUrl}
+          alt={username}
+          fill
+          sizes={imageSizes[size]}
+          unoptimized
+          className="object-cover"
+        />
+      </span>
     );
   }
 
