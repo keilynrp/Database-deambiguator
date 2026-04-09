@@ -13,6 +13,13 @@ interface AIIntegration {
     is_active: boolean;
 }
 
+interface AIIntegrationPayload {
+    provider_name: string;
+    base_url: string;
+    api_key?: string;
+    model_name: string;
+}
+
 const AI_PROVIDERS: Record<string, { label: string; color: string; bgColor: string; icon: string; requiresBaseUrl: boolean; tag: string }> = {
     openai: { label: "OpenAI", color: "text-emerald-700 dark:text-emerald-400", bgColor: "bg-emerald-50 dark:bg-emerald-500/10", icon: "🤖", requiresBaseUrl: false, tag: "Cloud" },
     anthropic: { label: "Anthropic (Claude)", color: "text-orange-700 dark:text-orange-400", bgColor: "bg-orange-50 dark:bg-orange-500/10", icon: "🧠", requiresBaseUrl: false, tag: "Cloud" },
@@ -42,7 +49,7 @@ export default function AIIntegrations() {
         try {
             const res = await apiFetch("/ai-integrations");
             if (res.ok) setIntegrations(await res.json());
-        } catch (error) {
+        } catch {
         } finally {
             setLoading(false);
         }
@@ -71,7 +78,7 @@ export default function AIIntegrations() {
         e.preventDefault();
         setSaving(true);
         try {
-            const payload: any = { ...formData };
+            const payload: AIIntegrationPayload = { ...formData };
             if (editingId && !payload.api_key) delete payload.api_key; // Keep old key if empty
 
             const path = editingId ? `/ai-integrations/${editingId}` : "/ai-integrations";
@@ -90,7 +97,7 @@ export default function AIIntegrations() {
 
             resetForm();
             fetchIntegrations();
-        } catch (error) {
+        } catch {
         } finally {
             setSaving(false);
         }
@@ -100,7 +107,7 @@ export default function AIIntegrations() {
         try {
             await apiFetch(`/ai-integrations/${id}/activate`, { method: "POST" });
             fetchIntegrations();
-        } catch (error) {
+        } catch {
         }
     }
 
@@ -109,7 +116,7 @@ export default function AIIntegrations() {
         try {
             await apiFetch(`/ai-integrations/${id}`, { method: "DELETE" });
             fetchIntegrations();
-        } catch (error) {
+        } catch {
         }
     }
 

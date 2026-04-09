@@ -9,7 +9,6 @@ import GuidedTour, { resetTour } from "./components/GuidedTour";
 import WelcomeModal from "./components/WelcomeModal";
 import OnboardingChecklist from "./components/OnboardingChecklist";
 import { PageHeader, StatCard } from "./components/ui";
-import { useDomain } from "./contexts/DomainContext";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "./contexts/AuthContext";
 import { useLanguage } from "./contexts/LanguageContext";
@@ -34,7 +33,6 @@ export default function Home() {
   const [domainCount, setDomainCount] = useState<number>(0);
   const [demoStatus, setDemoStatus] = useState<DemoStatus | null>(null);
   const [demoLoading, setDemoLoading] = useState(false);
-  const { activeDomainId } = useDomain();
   const { token } = useAuth();
   const { t } = useLanguage();
 

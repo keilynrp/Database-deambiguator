@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import AIIntegrations from "./AIIntegrations";
 import { apiFetch } from "@/lib/api";
@@ -18,6 +18,17 @@ interface StoreConnection {
     entity_count: number;
     sync_direction: string;
     notes: string | null;
+}
+
+interface StorePayload {
+    name: string;
+    platform: string;
+    base_url: string;
+    api_key?: string;
+    api_secret?: string;
+    access_token?: string;
+    sync_direction: string;
+    notes: string;
 }
 
 const PLATFORM_META: Record<string, { label: string; color: string; bgColor: string; icon: string }> = {
@@ -55,7 +66,7 @@ export default function IntegrationsPage() {
         notes: "",
     });
 
-    async function fetchStores() {
+    const fetchStores = useCallback(async () => {
         try {
             const res = await apiFetch("/stores");
             if (!res.ok) throw new Error("Failed");
@@ -66,9 +77,9 @@ export default function IntegrationsPage() {
         } finally {
             setLoading(false);
         }
-    }
+    }, [toast]);
 
-    useEffect(() => { fetchStores(); }, []);
+    useEffect(() => { fetchStores(); }, [fetchStores]);
 
     function resetForm() {
         setFormData({ name: "", platform: "woocommerce", base_url: "", api_key: "", api_secret: "", access_token: "", sync_direction: "bidirectional", notes: "" });
@@ -96,7 +107,7 @@ export default function IntegrationsPage() {
         setSaving(true);
 
         try {
-            const payload: Record<string, any> = { ...formData };
+            const payload: StorePayload = { ...formData };
             // Don't send empty credential fields on update
             if (editingStore) {
                 if (!payload.api_key) delete payload.api_key;

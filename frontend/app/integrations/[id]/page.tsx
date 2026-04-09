@@ -6,13 +6,6 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { PageHeader, TabNav, Badge } from "../../components/ui";
 
-const PLATFORM_META: Record<string, { label: string; color: string; bgColor: string }> = {
-    woocommerce: { label: "WooCommerce", color: "text-purple-700 dark:text-purple-400", bgColor: "bg-purple-50 dark:bg-purple-500/10" },
-    shopify: { label: "Shopify", color: "text-green-700 dark:text-green-400", bgColor: "bg-green-50 dark:bg-green-500/10" },
-    bsale: { label: "Bsale", color: "text-blue-700 dark:text-blue-400", bgColor: "bg-blue-50 dark:bg-blue-500/10" },
-    custom: { label: "Custom API", color: "text-amber-700 dark:text-amber-400", bgColor: "bg-amber-50 dark:bg-amber-500/10" },
-};
-
 interface StoreDetail {
     id: number; name: string; platform: string; base_url: string; is_active: boolean;
     last_sync_at: string | null; created_at: string | null; entity_count: number;
@@ -142,8 +135,6 @@ export default function StoreDetailPage() {
             <Link href="/integrations" className="text-blue-600 hover:underline text-sm">← Back to Integrations</Link>
         </div>
     );
-
-    const meta = PLATFORM_META[store.platform] || PLATFORM_META.custom;
 
     const statusBadgeVariant = (status: string) =>
         status === "approved" || status === "synced" || status === "success" ? "success" as const :

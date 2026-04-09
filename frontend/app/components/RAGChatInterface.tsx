@@ -6,20 +6,44 @@ import { Badge } from "./ui";
 import { useDomain } from "../contexts/DomainContext";
 import { useLanguage } from "../contexts/LanguageContext";
 
+interface RAGSource {
+    id: string | number;
+    similarity_score: number;
+    metadata?: {
+        entity_name?: string | null;
+    } | null;
+}
+
 interface ToolCall {
     tool: string;
-    params: Record<string, any>;
-    result: any;
+    params: Record<string, unknown>;
+    result: unknown;
 }
 
 interface Message {
     role: "user" | "assistant" | "system";
     content: string;
-    sources?: any[];
+    sources?: RAGSource[];
     provider?: string;
     model?: string;
     isLoading?: boolean;
     toolsUsed?: ToolCall[];
+    iterations?: number;
+    agentic?: boolean;
+}
+
+interface RAGIndexResponse {
+    indexed: number;
+    skipped?: number;
+}
+
+interface RAGQueryResponse {
+    error?: string;
+    answer: string;
+    sources?: RAGSource[];
+    provider?: string;
+    model?: string;
+    tools_used?: ToolCall[];
     iterations?: number;
     agentic?: boolean;
 }
@@ -61,13 +85,13 @@ export default function RAGChatInterface() {
         try {
             const res = await apiFetch("/rag/index", { method: "POST" });
             if (!res.ok) throw new Error("Indexing failed");
-            const data = await res.json();
+            const data: RAGIndexResponse = await res.json();
             setMessages(prev => [...prev, {
                 role: "assistant",
                 content: `✅ ${t('rag.index.success')} ${data.indexed} items embedded and stored in the Vector Database. ${data.skipped || 0} entities skipped (insufficient data). You can now ask questions about your knowledge hub.`
             }]);
             fetchStats();
-        } catch (e) {
+        } catch {
             setMessages(prev => [...prev, { role: "assistant", content: "❌ Indexing failed. Make sure an AI provider is configured and active." }]);
         } finally {
             setIsIndexing(false);
@@ -97,7 +121,7 @@ export default function RAGChatInterface() {
                     use_tools: useTools,
                 })
             });
-            const data = await res.json();
+            const data: RAGQueryResponse = await res.json();
 
             setMessages(prev => {
                 const next = [...prev];
@@ -126,7 +150,7 @@ export default function RAGChatInterface() {
         }
     }
 
-    const formatSourceLabel = (src: any) => {
+    const formatSourceLabel = (src: RAGSource) => {
         const name = src.metadata?.entity_name || src.id;
         const score = Math.round(src.similarity_score * 100);
         return `${name} (${score}%)`;

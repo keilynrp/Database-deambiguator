@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../components/ui";
+import type { ToastVariant } from "../../components/ui";
 import { apiFetch } from "../../../lib/api";
 import UserAvatar from "../../components/UserAvatar";
 import PasswordStrength from "../../components/PasswordStrength";
@@ -45,18 +46,15 @@ const ROLE_COLORS: Record<UserRole, string> = {
   viewer:      "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
 };
 
-const ROLE_AVATAR_BG: Record<UserRole, string> = {
-  super_admin: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400",
-  admin:       "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400",
-  editor:      "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400",
-  viewer:      "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
-};
-
 const inputCls = "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
@@ -77,7 +75,7 @@ interface UserFormProps {
   initial?: Partial<UserRecord>;
   onClose: () => void;
   onSaved: () => void;
-  toast: (msg: string, v?: any) => void;
+  toast: (msg: string, v?: ToastVariant) => void;
 }
 
 function UserFormSlider({ initial, onClose, onSaved, toast }: UserFormProps) {
@@ -120,8 +118,8 @@ function UserFormSlider({ initial, onClose, onSaved, toast }: UserFormProps) {
       toast(isEdit ? "User updated" : `User "${form.username}" created`, "success");
       onSaved();
       onClose();
-    } catch (err: any) {
-      toast(err.message || "Error", "error");
+    } catch (err: unknown) {
+      toast(getErrorMessage(err, "Error"), "error");
     } finally {
       setSaving(false);
     }
@@ -324,8 +322,8 @@ export default function UsersManagementPage() {
       if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
       toast("Role updated", "success");
-    } catch (err: any) {
-      toast(err.message || "Failed to update role", "error");
+    } catch (err: unknown) {
+      toast(getErrorMessage(err, "Failed to update role"), "error");
     } finally {
       setActionId(null);
     }
@@ -347,8 +345,8 @@ export default function UsersManagementPage() {
         inactive: prev.inactive + (u.is_active ?  1 : -1),
       } : prev);
       toast(u.is_active ? `"${u.username}" deactivated` : `"${u.username}" reactivated`, u.is_active ? "warning" : "success");
-    } catch (err: any) {
-      toast(err.message || "Action failed", "error");
+    } catch (err: unknown) {
+      toast(getErrorMessage(err, "Action failed"), "error");
     } finally {
       setActionId(null);
     }
@@ -502,7 +500,7 @@ export default function UsersManagementPage() {
                     {/* User */}
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <UserAvatar username={u.username} role={u.role} avatarUrl={(u as any).avatar_url} size="md" />
+                        <UserAvatar username={u.username} role={u.role} avatarUrl={u.avatar_url} size="md" />
                         <div>
                           <p className="font-medium text-gray-900 dark:text-white">{u.username}</p>
                           {isMe && <p className="text-[10px] font-semibold text-blue-500">you</p>}

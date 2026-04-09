@@ -10,7 +10,6 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
-    Legend
 } from "recharts";
 
 interface MonteCarloData {
@@ -24,6 +23,10 @@ interface MonteCarloData {
         median: number;
         pessimistic: number;
     }>;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+    return error instanceof Error ? error.message : fallback;
 }
 
 export default function MonteCarloChart({ productId }: { productId: number }) {
@@ -45,8 +48,8 @@ export default function MonteCarloChart({ productId }: { productId: number }) {
                 }
                 const parsed = await res.json();
                 if (isMounted) setData(parsed);
-            } catch (err: any) {
-                if (isMounted) setError(err.message);
+            } catch (err: unknown) {
+                if (isMounted) setError(getErrorMessage(err, "Failed to load Monte Carlo simulation"));
             } finally {
                 if (isMounted) setLoading(false);
             }

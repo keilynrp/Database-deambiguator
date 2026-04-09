@@ -12,6 +12,31 @@ import RelationshipManager from "../../components/RelationshipManager";
 import PresenceAvatars from "../../components/PresenceAvatars";
 import { useWebSocket } from "@/lib/useWebSocket";
 
+type EntityValue =
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+    | string[]
+    | number[]
+    | Record<string, unknown>;
+
+interface QualityBreakdownDimension {
+    weight?: number;
+    contribution?: number;
+    raw?: number;
+    score?: number;
+    label?: string;
+    explanation?: string;
+}
+
+interface EntityQualityData {
+    score: number;
+    stored_score: number | null;
+    breakdown: Record<string, QualityBreakdownDimension>;
+}
+
 interface Entity {
     id: number;
     entity_name: string | null;
@@ -36,7 +61,7 @@ interface Entity {
     enrichment_concepts: string | null;
     enrichment_source: string | null;
     normalized_json: string | null;
-    [key: string]: any;
+    [key: string]: EntityValue;
 }
 
 interface AuthorityRecord {
@@ -130,7 +155,7 @@ export default function EntityDetailPage() {
     const [graphKey, setGraphKey] = useState(0);
 
     // Quality score
-    const [qualityData, setQualityData] = useState<{ score: number; stored_score: number | null; breakdown: Record<string, any> } | null>(null);
+    const [qualityData, setQualityData] = useState<EntityQualityData | null>(null);
 
     const fetchEntity = useCallback(async () => {
         setLoading(true);
@@ -155,22 +180,7 @@ export default function EntityDetailPage() {
             .catch(() => {});
     }, [entity]);
 
-    useEffect(() => {
-        if (tab === "authority" && entity) {
-            fetchAuthority();
-        }
-    }, [tab, entity]);
-
-    useEffect(() => {
-        if (tab === "overview" && entity && !qualityData) {
-            apiFetch(`/entities/${entity.id}/quality`)
-                .then((r) => r.ok ? r.json() : null)
-                .then((data) => { if (data) setQualityData(data); })
-                .catch(() => {});
-        }
-    }, [tab, entity, qualityData]);
-
-    async function fetchAuthority() {
+    const fetchAuthority = useCallback(async () => {
         if (!entity) return;
         setAuthorityLoading(true);
         try {
@@ -189,7 +199,22 @@ export default function EntityDetailPage() {
         } finally {
             setAuthorityLoading(false);
         }
-    }
+    }, [entity]);
+
+    useEffect(() => {
+        if (tab === "authority" && entity) {
+            fetchAuthority();
+        }
+    }, [tab, entity, fetchAuthority]);
+
+    useEffect(() => {
+        if (tab === "overview" && entity && !qualityData) {
+            apiFetch(`/entities/${entity.id}/quality`)
+                .then((r) => r.ok ? r.json() : null)
+                .then((data: EntityQualityData | null) => { if (data) setQualityData(data); })
+                .catch(() => {});
+        }
+    }, [tab, entity, qualityData]);
 
     function startEdit() {
         if (!entity) return;
@@ -402,25 +427,29 @@ export default function EntityDetailPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                                    {Object.entries(qualityData.breakdown).map(([key, dim]: [string, any]) => (
+                                    {Object.entries(qualityData.breakdown).map(([key, dim]) => {
+                                        const weight = dim.weight ?? 0;
+                                        const contribution = dim.contribution ?? 0;
+                                        return (
                                         <tr key={key}>
                                             <td className="py-2 text-xs font-medium text-gray-600 dark:text-gray-300">
                                                 {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                                             </td>
-                                            <td className="py-2 text-right text-xs text-gray-500">{Math.round((dim.weight ?? 0) * 100)}%</td>
+                                            <td className="py-2 text-right text-xs text-gray-500">{Math.round(weight * 100)}%</td>
                                             <td className="py-2 text-right text-xs font-semibold text-indigo-600 dark:text-indigo-400">
-                                                +{Math.round((dim.contribution ?? 0) * 100)}%
+                                                +{Math.round(contribution * 100)}%
                                             </td>
                                             <td className="py-2 pl-4">
                                                 <div className="w-24 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800">
                                                     <div
                                                         className="h-1.5 rounded-full bg-indigo-400"
-                                                        style={{ width: dim.weight > 0 ? `${((dim.contribution ?? 0) / dim.weight) * 100}%` : "0%" }}
+                                                        style={{ width: weight > 0 ? `${(contribution / weight) * 100}%` : "0%" }}
                                                     />
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))}
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

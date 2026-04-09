@@ -23,6 +23,10 @@ function formatJoined(iso: string | null | undefined) {
     return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+    return error instanceof Error ? error.message : fallback;
+}
+
 // ── Section wrapper ──────────────────────────────────────────────────────────
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
@@ -75,8 +79,8 @@ export default function ProfilePage() {
             if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Failed to save profile"); }
             await refreshUser();
             toast("Profile updated successfully", "success");
-        } catch (err: any) {
-            toast(err.message || "Error saving profile", "error");
+        } catch (err: unknown) {
+            toast(getErrorMessage(err, "Error saving profile"), "error");
         } finally {
             setProfileSaving(false);
         }
@@ -102,8 +106,8 @@ export default function ProfilePage() {
             if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Failed to change password"); }
             toast("Password updated successfully", "success");
             setCurrentPw(""); setNewPw(""); setConfirmPw("");
-        } catch (err: any) {
-            toast(err.message || "Error changing password", "error");
+        } catch (err: unknown) {
+            toast(getErrorMessage(err, "Error changing password"), "error");
         } finally {
             setPwSaving(false);
         }
