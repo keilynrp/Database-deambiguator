@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useDomain } from "../../contexts/DomainContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { apiFetch } from "@/lib/api";
 import { SkeletonList, ErrorBanner, EmptyState as UiEmptyState } from "../../components/ui";
 
@@ -99,13 +100,14 @@ function PctBar({ value, max, color = "bg-blue-500" }: { value: number; max: num
 }
 
 function PMIBadge({ pmi }: { pmi: number }) {
+  const { t } = useLanguage();
   const color =
     pmi > 1 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" :
     pmi > 0 ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" :
                "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400";
   return (
     <span className={`rounded px-1.5 py-0.5 text-xs font-mono font-medium ${color}`}>
-      PMI {pmi.toFixed(2)}
+      {t("page.topics.pmi", { value: pmi.toFixed(2) })}
     </span>
   );
 }
@@ -113,10 +115,10 @@ function PMIBadge({ pmi }: { pmi: number }) {
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { key: "topics",       label: "Top Concepts" },
-  { key: "cooccurrence", label: "Co-occurrence" },
-  { key: "clusters",     label: "Topic Clusters" },
-  { key: "correlation",  label: "Field Correlation" },
+  { key: "topics",       labelKey: "page.topics.tab.top_concepts" },
+  { key: "cooccurrence", labelKey: "page.topics.tab.cooccurrence" },
+  { key: "clusters",     labelKey: "page.topics.tab.clusters" },
+  { key: "correlation",  labelKey: "page.topics.tab.correlation" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -125,6 +127,7 @@ type TabKey = (typeof TABS)[number]["key"];
 
 export default function TopicsPage() {
   const { activeDomainId } = useDomain();
+  const { t } = useLanguage();
   const [tab, setTab] = useState<TabKey>("topics");
   const [loading, setLoading] = useState(false);
   const [tabError, setTabError] = useState<string | null>(null);
@@ -134,33 +137,33 @@ export default function TopicsPage() {
   const [clustersData,    setClustersData]     = useState<ClustersResult | null>(null);
   const [correlationData, setCorrelationData]  = useState<CorrelationResult | null>(null);
 
-  const fetchTab = useCallback(async (t: TabKey, domainId: string) => {
+  const fetchTab = useCallback(async (tabKey: TabKey, domainId: string) => {
     setLoading(true);
     setTabError(null);
     try {
-      if (t === "topics") {
+      if (tabKey === "topics") {
         const r = await apiFetch(`/analyzers/topics/${domainId}?top_n=30`);
         if (!r.ok) throw new Error(`Server responded with ${r.status}`);
         setTopicsData(await r.json());
-      } else if (t === "cooccurrence") {
+      } else if (tabKey === "cooccurrence") {
         const r = await apiFetch(`/analyzers/cooccurrence/${domainId}?top_n=20`);
         if (!r.ok) throw new Error(`Server responded with ${r.status}`);
         setCooccData(await r.json());
-      } else if (t === "clusters") {
+      } else if (tabKey === "clusters") {
         const r = await apiFetch(`/analyzers/clusters/${domainId}?n_clusters=6`);
         if (!r.ok) throw new Error(`Server responded with ${r.status}`);
         setClustersData(await r.json());
-      } else if (t === "correlation") {
+      } else if (tabKey === "correlation") {
         const r = await apiFetch(`/analyzers/correlation/${domainId}?top_n=20`);
         if (!r.ok) throw new Error(`Server responded with ${r.status}`);
         setCorrelationData(await r.json());
       }
     } catch (err) {
-      setTabError(err instanceof Error ? err.message : "Analysis failed");
+      setTabError(err instanceof Error ? err.message : t("page.topics.analysis_failed"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchTab(tab, activeDomainId);
@@ -172,34 +175,34 @@ export default function TopicsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Topic Modeling
+            {t("page.topics.title")}
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Concept frequency, co-occurrence, and correlation analysis from enrichment data
+            {t("page.topics.subtitle")}
           </p>
         </div>
         <Link
           href="/analytics"
           className="text-sm text-blue-600 hover:underline dark:text-blue-400"
         >
-          ← Analytics
+          ← {t("nav.analytics")}
         </Link>
       </div>
 
       {/* Tabs */}
       <div className="border-b border-gray-200 dark:border-gray-800">
         <nav className="-mb-px flex gap-1">
-          {TABS.map((t) => (
+          {TABS.map((tabOption) => (
             <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
+              key={tabOption.key}
+              onClick={() => setTab(tabOption.key)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                tab === t.key
+                tab === tabOption.key
                   ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
                   : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               }`}
             >
-              {t.label}
+              {t(tabOption.labelKey)}
             </button>
           ))}
         </nav>
@@ -215,7 +218,7 @@ export default function TopicsPage() {
       {/* Error state */}
       {!loading && tabError && (
         <ErrorBanner
-          message="Failed to load analysis data"
+          message={t("page.topics.error_load")}
           detail={tabError}
           onRetry={() => fetchTab(tab, activeDomainId)}
         />
@@ -226,12 +229,13 @@ export default function TopicsPage() {
         <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {topicsData.topics.length} concepts across{" "}
-              <strong>{topicsData.total_enriched}</strong> enriched entities
+              {topicsData.topics.length} {t("page.topics.concepts_label")}{" "}
+              {t("page.topics.across")}{" "}
+              <strong>{topicsData.total_enriched}</strong> {t("page.topics.enriched_entities")}
             </span>
           </div>
           {topicsData.topics.length === 0 ? (
-            <UiEmptyState icon="sparkles" color="blue" title="No concepts yet" description="Run the enrichment pipeline first to populate topic data." size="compact" />
+            <UiEmptyState icon="sparkles" color="blue" title={t("page.topics.empty_concepts_title")} description={t("page.topics.empty_concepts_description")} size="compact" />
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {topicsData.topics.map((t, i) => {
@@ -266,12 +270,12 @@ export default function TopicsPage() {
         <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
           <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {cooccData.pairs.length} concept pairs from{" "}
-              <strong>{cooccData.total_enriched}</strong> enriched entities
+              {cooccData.pairs.length} {t("page.topics.pairs_label")} {t("page.topics.from")}{" "}
+              <strong>{cooccData.total_enriched}</strong> {t("page.topics.enriched_entities")}
             </span>
           </div>
           {cooccData.pairs.length === 0 ? (
-            <UiEmptyState icon="sparkles" color="violet" title="No co-occurrences found" description="Entities need at least 2 enriched concepts each to compute pairs." size="compact" />
+            <UiEmptyState icon="sparkles" color="violet" title={t("page.topics.empty_pairs_title")} description={t("page.topics.empty_pairs_description")} size="compact" />
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {cooccData.pairs.map((p, i) => {
@@ -310,7 +314,7 @@ export default function TopicsPage() {
         <div>
           {clustersData.clusters.length === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-              <UiEmptyState icon="sparkles" color="amber" title="No clusters found" description="Enrich entities to populate topic clusters." size="compact" />
+              <UiEmptyState icon="sparkles" color="amber" title={t("page.topics.empty_clusters_title")} description={t("page.topics.empty_clusters_description")} size="compact" />
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -328,7 +332,7 @@ export default function TopicsPage() {
                         {cluster.seed}
                       </span>
                       <span className="ml-auto rounded-full bg-white/60 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-900/60 dark:text-gray-400">
-                        {cluster.size} terms
+                        {t("page.topics.terms_label", { count: cluster.size })}
                       </span>
                     </div>
                     {/* Members */}
@@ -343,7 +347,7 @@ export default function TopicsPage() {
                       ))}
                       {cluster.members.length > 8 && (
                         <li className="px-4 py-2 text-xs text-gray-400">
-                          +{cluster.members.length - 8} more
+                          {t("page.topics.more_members", { count: cluster.members.length - 8 })}
                         </li>
                       )}
                     </ul>
@@ -360,23 +364,23 @@ export default function TopicsPage() {
         <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {correlationData.fields_analyzed} fields analyzed across{" "}
-              <strong>{correlationData.n_entities}</strong> entities
+              {correlationData.fields_analyzed} {t("page.topics.fields_analyzed")} {t("page.topics.across")}{" "}
+              <strong>{correlationData.n_entities}</strong> {t("page.topics.entities")}
             </span>
             <div className="flex items-center gap-3 text-xs">
               <span className="flex items-center gap-1">
-                <span className="inline-block h-2 w-4 rounded bg-red-500" /> strong ≥ 0.5
+                <span className="inline-block h-2 w-4 rounded bg-red-500" /> {t("page.topics.strong_threshold")}
               </span>
               <span className="flex items-center gap-1">
-                <span className="inline-block h-2 w-4 rounded bg-amber-400" /> moderate ≥ 0.2
+                <span className="inline-block h-2 w-4 rounded bg-amber-400" /> {t("page.topics.moderate_threshold")}
               </span>
               <span className="flex items-center gap-1">
-                <span className="inline-block h-2 w-4 rounded bg-blue-400" /> weak
+                <span className="inline-block h-2 w-4 rounded bg-blue-400" /> {t("page.topics.weak_label")}
               </span>
             </div>
           </div>
           {correlationData.correlations.length === 0 ? (
-            <UiEmptyState icon="chart" color="slate" title="No significant correlations" description="Cramér's V < 0.05 for all field pairs. More diverse data may reveal patterns." size="compact" />
+            <UiEmptyState icon="chart" color="slate" title={t("page.topics.empty_correlation_title")} description={t("page.topics.empty_correlation_description")} size="compact" />
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {correlationData.correlations.map((c, i) => (
@@ -403,7 +407,7 @@ export default function TopicsPage() {
                     {c.cramers_v.toFixed(3)}
                   </span>
                   <span className={`w-16 text-right text-xs font-medium capitalize ${STRENGTH_TEXT[c.strength]}`}>
-                    {c.strength}
+                    {t(`page.topics.strength.${c.strength}`)}
                   </span>
                 </div>
               ))}

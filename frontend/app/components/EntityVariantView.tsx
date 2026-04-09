@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useDomain } from "../contexts/DomainContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { apiFetch } from "@/lib/api";
 import { Badge } from "./ui";
 
@@ -11,7 +12,7 @@ interface Variant {
     variant: string;
     validation_status: string;
     normalized_json?: string;
-    [key: string]: any; // Allow arbitrary attributes
+    [key: string]: unknown;
 }
 
 interface EntityGroup {
@@ -22,6 +23,7 @@ interface EntityGroup {
 
 export default function EntityVariantView() {
     const { activeDomain, activeDomainId } = useDomain();
+    const { t } = useLanguage();
     const [entityGroups, setEntityGroups] = useState<EntityGroup[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -51,17 +53,17 @@ export default function EntityVariantView() {
                 }
 
                 const res = await apiFetch(`/entities/grouped?${queryParams}`);
-                if (!res.ok) throw new Error("Failed to fetch products");
+                if (!res.ok) throw new Error(t("page.variant_view.fetch_failed"));
                 const data = await res.json();
                 setEntityGroups(data);
-            } catch (error) {
+            } catch {
             } finally {
                 setLoading(false);
             }
         }
 
         fetchEntities();
-    }, [debouncedSearch, page, limit, activeDomainId]);
+    }, [debouncedSearch, page, limit, activeDomainId, t]);
 
     const toggleGroup = (productName: string) => {
         setExpandedGroups(prev => {
@@ -79,12 +81,12 @@ export default function EntityVariantView() {
         <div className="w-full max-w-7xl mx-auto p-4">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold dark:text-white">Entity Hub - Variant View</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Entities grouped by core data showing all variants</p>
+                    <h2 className="text-2xl font-bold dark:text-white">{t("page.variant_view.title")}</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t("page.variant_view.subtitle")}</p>
                 </div>
                 <input
                     type="text"
-                    placeholder="Search entities..."
+                    placeholder={t("page.variant_view.search_placeholder")}
                     className="p-2 border rounded w-64 dark:bg-zinc-800 dark:text-white dark:border-zinc-700"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -102,13 +104,13 @@ export default function EntityVariantView() {
                         </div>
                     ) : entityGroups.length === 0 ? (
                         <div className="py-12 text-center text-gray-500 dark:text-gray-400">
-                            No entities found
+                            {t("page.variant_view.empty")}
                         </div>
                     ) : (
-                        entityGroups.map((group) => {
+                        entityGroups.map((group, groupIndex) => {
                             const isExpanded = expandedGroups.has(group.entity_name);
                             return (
-                                <div key={group.entity_name} className="bg-white dark:bg-zinc-800">
+                                <div key={`${group.entity_name}-${groupIndex}`} className="bg-white dark:bg-zinc-800">
                                     {/* Group header */}
                                     <div
                                         className="px-6 py-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors"
@@ -129,7 +131,7 @@ export default function EntityVariantView() {
                                                 </span>
                                             </div>
                                             <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">
-                                                {group.variant_count} {group.variant_count === 1 ? 'variant' : 'variants'}
+                                                {t(group.variant_count === 1 ? "page.variant_view.variant_singular" : "page.variant_view.variant_plural", { count: group.variant_count })}
                                             </span>
                                         </div>
                                     </div>
@@ -140,39 +142,40 @@ export default function EntityVariantView() {
                                             <table className="w-full min-w-[1000px] text-sm text-left">
                                                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-zinc-900 dark:text-gray-400">
                                                     <tr>
-                                                        <th className="px-6 py-3">ID</th>
+                                                        <th className="px-6 py-3">{t("page.variant_view.id")}</th>
                                                         {activeDomain ? (
-                                                            activeDomain.attributes.map(attr => (
-                                                                <th key={attr.name} className="px-6 py-3">{attr.label}</th>
+                                                            activeDomain.attributes.map((attr, attrIndex) => (
+                                                                <th key={`header-${groupIndex}-${attr.name}-${attrIndex}`} className="px-6 py-3">{attr.label}</th>
                                                             ))
                                                         ) : (
-                                                            <th className="px-6 py-3">Variant</th>
+                                                            <th className="px-6 py-3">{t("page.variant_view.variant")}</th>
                                                         )}
-                                                        <th className="px-6 py-3">Status</th>
+                                                        <th className="px-6 py-3">{t("common.status")}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                                    {group.variants.map((variant) => {
-                                                        let parsedJson: Record<string, any> = {};
+                                                    {group.variants.map((variant, variantIndex) => {
+                                                        let parsedJson: Record<string, unknown> = {};
                                                         if (variant.normalized_json) {
-                                                            try { parsedJson = JSON.parse(variant.normalized_json); } catch (e) { }
+                                                            try { parsedJson = JSON.parse(variant.normalized_json) as Record<string, unknown>; } catch { }
                                                         }
 
                                                         return (
-                                                            <tr key={variant.id} className="bg-white dark:bg-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-700">
+                                                            <tr key={`${groupIndex}-${variant.id}-${variantIndex}`} className="bg-white dark:bg-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-700">
                                                                 <td className="px-6 py-3 text-gray-500 dark:text-gray-400">{variant.id}</td>
                                                                 {activeDomain ? (
-                                                                    activeDomain.attributes.map(attr => {
-                                                                        const val = attr.is_core ? variant[attr.name] : (parsedJson[attr.name] || "");
+                                                                    activeDomain.attributes.map((attr, attrIndex) => {
+                                                                        const rawValue = attr.is_core ? variant[attr.name] : parsedJson[attr.name];
+                                                                        const val = typeof rawValue === "string" || typeof rawValue === "number" ? String(rawValue) : "";
                                                                         return (
-                                                                            <td key={attr.name} className="px-6 py-3 text-gray-700 dark:text-gray-300">
-                                                                                {val || '-'}
+                                                                            <td key={`cell-${variant.id}-${attr.name}-${attrIndex}`} className="px-6 py-3 text-gray-700 dark:text-gray-300">
+                                                                                {val || t("page.entity_table.empty_value")}
                                                                             </td>
                                                                         );
                                                                     })
                                                                 ) : (
                                                                     <td className="px-6 py-3 font-medium text-gray-900 dark:text-white">
-                                                                        {variant.variant || '-'}
+                                                                        {variant.variant || t("page.entity_table.empty_value")}
                                                                     </td>
                                                                 )}
                                                                 <td className="px-6 py-3">
@@ -197,7 +200,7 @@ export default function EntityVariantView() {
 
             <div className="flex items-center justify-between mt-4">
                 <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Rows per page:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">{t("common.rows_per_page")}:</span>
                     <select
                         value={limit}
                         onChange={(e) => {
@@ -222,7 +225,7 @@ export default function EntityVariantView() {
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                         </svg>
-                        Previous
+                        {t("page.audit.prev")}
                     </button>
                     <div className="flex items-center gap-2">
                         <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-medium text-white">
@@ -234,7 +237,7 @@ export default function EntityVariantView() {
                         disabled={entityGroups.length < limit || loading}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                     >
-                        Next
+                        {t("page.audit.next")}
                         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>

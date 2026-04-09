@@ -3,11 +3,12 @@
 import { useState } from "react";
 import {
   AreaChart, Area, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { PageHeader, Badge } from "../../components/ui";
+import { PageHeader } from "../../components/ui";
 import { apiFetch } from "../../../lib/api";
 import { useToast } from "../../components/ui";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -136,6 +137,7 @@ function ScenarioCard({
 }: {
   label: string; roi: number; net: number; color: "red" | "blue" | "green";
 }) {
+  const { t } = useLanguage();
   const ring = { red: "ring-red-200 dark:ring-red-500/20", blue: "ring-blue-200 dark:ring-blue-500/20", green: "ring-green-200 dark:ring-green-500/20" }[color];
   const textColor = { red: "text-red-600 dark:text-red-400", blue: "text-blue-600 dark:text-blue-400", green: "text-green-600 dark:text-green-400" }[color];
   const bg = { red: "bg-red-50 dark:bg-red-500/5", blue: "bg-blue-50 dark:bg-blue-500/5", green: "bg-green-50 dark:bg-green-500/5" }[color];
@@ -144,7 +146,7 @@ function ScenarioCard({
       <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{label}</p>
       <p className={`mt-2 text-3xl font-black tabular-nums ${textColor}`}>{pct(roi)}</p>
       <p className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">
-        Net: {net >= 0 ? "+" : ""}{fmt(net)}
+        {t("page.roi.net_label")} {net >= 0 ? "+" : ""}{fmt(net)}
       </p>
     </div>
   );
@@ -165,6 +167,7 @@ const DEFAULT: FormState = {
 
 export default function ROICalculatorPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [form, setForm] = useState<FormState>(DEFAULT);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<ROIResult | null>(null);
@@ -187,14 +190,14 @@ export default function ROICalculatorPage() {
       });
       if (!res.ok) {
         const err = await res.text();
-        toast(`Simulation failed: ${err}`, "error");
+        toast(`${t("page.roi.simulation_failed")}: ${err}`, "error");
         return;
       }
       const data: ROIResult = await res.json();
       setResult(data);
-      toast("Simulation complete", "success");
+      toast(t("page.roi.simulation_complete"), "success");
     } catch {
-      toast("Failed to reach backend", "error");
+      toast(t("page.roi.backend_unreachable"), "error");
     } finally {
       setRunning(false);
     }
@@ -206,23 +209,23 @@ export default function ROICalculatorPage() {
     <div className="space-y-6">
       <PageHeader
         breadcrumbs={[
-          { label: "Home", href: "/" },
-          { label: "Analytics", href: "/analytics" },
-          { label: "ROI Calculator" },
+          { label: t("nav.home"), href: "/" },
+          { label: t("nav.analytics"), href: "/analytics" },
+          { label: t("page.roi.title") },
         ]}
-        title="ROI Calculator"
-        description="Monte Carlo I+D projection — adoption uncertainty over time"
+        title={t("page.roi.title")}
+        description={t("page.roi.subtitle")}
         actions={
           <div className="flex items-center gap-2">
             {result && (
               <button
                 onClick={() => exportCsv(result)}
                 className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
-              >
+                >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                 </svg>
-                Export CSV
+                {t("page.roi.export_csv")}
               </button>
             )}
             <button
@@ -236,14 +239,14 @@ export default function ROICalculatorPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Simulating…
+                  {t("page.roi.simulating")}
                 </>
               ) : (
                 <>
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
                   </svg>
-                  Run Simulation
+                  {t("page.roi.run_simulation")}
                 </>
               )}
             </button>
@@ -256,10 +259,10 @@ export default function ROICalculatorPage() {
         <div className="space-y-5">
           {/* Investment */}
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">Investment</h3>
+            <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{t("page.roi.investment_section")}</h3>
             <div className="space-y-4">
               <NumberInput
-                label="Initial Investment"
+                label={t("page.roi.initial_investment")}
                 value={form.investment}
                 min={1}
                 step={1000}
@@ -267,7 +270,7 @@ export default function ROICalculatorPage() {
                 onChange={(v) => set("investment", v)}
               />
               <NumberInput
-                label="Annual Operating Cost"
+                label={t("page.roi.annual_operating_cost")}
                 value={form.annual_cost}
                 min={0}
                 step={500}
@@ -279,17 +282,17 @@ export default function ROICalculatorPage() {
 
           {/* Market */}
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">Market</h3>
+            <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{t("page.roi.market_section")}</h3>
             <div className="space-y-4">
               <NumberInput
-                label="Total Addressable Market (units)"
+                label={t("page.roi.total_addressable_market")}
                 value={form.market_size}
                 min={1}
                 step={1000}
                 onChange={(v) => set("market_size", v)}
               />
               <NumberInput
-                label="Revenue per Unit / Year"
+                label={t("page.roi.revenue_per_unit")}
                 value={form.revenue_per_unit}
                 min={1}
                 step={10}
@@ -301,16 +304,16 @@ export default function ROICalculatorPage() {
 
           {/* Adoption */}
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">Adoption Model</h3>
+            <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{t("page.roi.adoption_model")}</h3>
             <div className="space-y-5">
               <SliderInput
-                label="Base Adoption Rate"
+                label={t("page.roi.base_adoption_rate")}
                 value={form.base_adoption_rate}
                 min={0} max={100} step={1} unit="%"
                 onChange={(v) => set("base_adoption_rate", v)}
               />
               <SliderInput
-                label="Adoption Volatility (σ)"
+                label={t("page.roi.adoption_volatility")}
                 value={form.adoption_volatility}
                 min={0} max={50} step={1} unit="%"
                 onChange={(v) => set("adoption_volatility", v)}
@@ -320,12 +323,12 @@ export default function ROICalculatorPage() {
 
           {/* Simulation */}
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">Simulation</h3>
+            <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{t("page.roi.simulation_section")}</h3>
             <div className="space-y-4">
               {/* Horizon */}
               <div>
                 <label className="mb-2 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                  Projection Horizon
+                  {t("page.roi.projection_horizon")}
                 </label>
                 <div className="flex gap-2">
                   {horizonOptions.map((h) => (
@@ -338,7 +341,7 @@ export default function ROICalculatorPage() {
                           : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
                       }`}
                     >
-                      {h}yr
+                      {t("page.roi.year_short", { count: h })}
                     </button>
                   ))}
                 </div>
@@ -347,7 +350,7 @@ export default function ROICalculatorPage() {
               {/* N simulations */}
               <div>
                 <label className="mb-2 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                  Iterations
+                  {t("page.roi.iterations")}
                 </label>
                 <div className="flex gap-2">
                   {[500, 2000, 5000].map((n) => (
@@ -378,10 +381,10 @@ export default function ROICalculatorPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
                 </svg>
                 <p className="mt-3 text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Configure parameters and run a simulation
+                  {t("page.roi.empty_title")}
                 </p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  Results will appear here
+                  {t("page.roi.empty_description")}
                 </p>
               </div>
             </div>
@@ -389,15 +392,15 @@ export default function ROICalculatorPage() {
             <>
               {/* Scenario cards */}
               <div className="grid grid-cols-3 gap-4">
-                <ScenarioCard label="Pessimistic (P10)" roi={result.pessimistic_roi} net={result.net_p10} color="red" />
-                <ScenarioCard label="Base (P50)" roi={result.base_roi} net={result.net_p50} color="blue" />
-                <ScenarioCard label="Optimistic (P90)" roi={result.optimistic_roi} net={result.net_p90} color="green" />
+                <ScenarioCard label={t("page.roi.scenario_pessimistic")} roi={result.pessimistic_roi} net={result.net_p10} color="red" />
+                <ScenarioCard label={t("page.roi.scenario_base")} roi={result.base_roi} net={result.net_p50} color="blue" />
+                <ScenarioCard label={t("page.roi.scenario_optimistic")} roi={result.optimistic_roi} net={result.net_p90} color="green" />
               </div>
 
               {/* Break-even stats */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Break-even Probability</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("page.roi.break_even_probability")}</p>
                   <p className="mt-2 text-3xl font-black tabular-nums text-gray-900 dark:text-white">
                     {(result.breakeven_prob * 100).toFixed(1)}%
                   </p>
@@ -408,20 +411,20 @@ export default function ROICalculatorPage() {
                     />
                   </div>
                   <p className="mt-1.5 text-xs text-gray-400">
-                    {result.n_simulations.toLocaleString()} simulations
+                    {t("page.roi.simulations_count", { count: result.n_simulations.toLocaleString() })}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Median Break-even Year</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("page.roi.median_break_even_year")}</p>
                   {result.breakeven_year === -1 ? (
-                    <p className="mt-2 text-3xl font-black text-red-500">Never</p>
+                    <p className="mt-2 text-3xl font-black text-red-500">{t("page.roi.never")}</p>
                   ) : (
                     <>
                       <p className="mt-2 text-3xl font-black tabular-nums text-gray-900 dark:text-white">
-                        Yr {result.breakeven_year}
+                        {t("page.roi.year_label", { count: result.breakeven_year })}
                       </p>
                       <p className="mt-1.5 text-xs text-gray-400">
-                        of {form.horizon_years}-year horizon
+                        {t("page.roi.of_horizon", { count: form.horizon_years })}
                       </p>
                     </>
                   )}
@@ -432,13 +435,13 @@ export default function ROICalculatorPage() {
               <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                 <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Year-by-Year ROI Trajectory</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">P10 / P50 / P90 bands across all simulations</p>
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("page.roi.trajectory_title")}</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">{t("page.roi.trajectory_description")}</p>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-500">
-                    <span className="flex items-center gap-1"><span className="inline-block h-2 w-6 rounded bg-green-400 opacity-60" />Optimistic</span>
-                    <span className="flex items-center gap-1"><span className="inline-block h-2 w-6 rounded bg-blue-500" />Median</span>
-                    <span className="flex items-center gap-1"><span className="inline-block h-2 w-6 rounded bg-red-400 opacity-60" />Pessimistic</span>
+                    <span className="flex items-center gap-1"><span className="inline-block h-2 w-6 rounded bg-green-400 opacity-60" />{t("page.roi.legend_optimistic")}</span>
+                    <span className="flex items-center gap-1"><span className="inline-block h-2 w-6 rounded bg-blue-500" />{t("page.roi.legend_median")}</span>
+                    <span className="flex items-center gap-1"><span className="inline-block h-2 w-6 rounded bg-red-400 opacity-60" />{t("page.roi.legend_pessimistic")}</span>
                   </div>
                 </div>
                 <div className="h-56">
@@ -462,11 +465,11 @@ export default function ROICalculatorPage() {
                         contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", fontSize: "12px" }}
                       />
                       <Area type="monotone" dataKey="optimistic" stroke="#4ade80" strokeWidth={1.5}
-                        fill="#4ade80" fillOpacity={0.1} strokeDasharray="4 2" name="Optimistic" />
+                        fill="#4ade80" fillOpacity={0.1} strokeDasharray="4 2" name={t("page.roi.legend_optimistic")} />
                       <Area type="monotone" dataKey="median" stroke="#3b82f6" strokeWidth={2.5}
-                        fillOpacity={1} fill="url(#roiMedian)" name="Median" />
+                        fillOpacity={1} fill="url(#roiMedian)" name={t("page.roi.legend_median")} />
                       <Area type="monotone" dataKey="pessimistic" stroke="#f87171" strokeWidth={1.5}
-                        fill="none" strokeDasharray="4 2" name="Pessimistic" />
+                        fill="none" strokeDasharray="4 2" name={t("page.roi.legend_pessimistic")} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -475,9 +478,9 @@ export default function ROICalculatorPage() {
               {/* Histogram */}
               <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                 <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Final ROI Distribution</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("page.roi.histogram_title")}</h3>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    Distribution of ROI% at year {form.horizon_years} across {result.n_simulations.toLocaleString()} simulations
+                    {t("page.roi.histogram_description", { year: form.horizon_years, count: result.n_simulations.toLocaleString() })}
                   </p>
                 </div>
                 <div className="h-48">
@@ -491,10 +494,10 @@ export default function ROICalculatorPage() {
                         tick={{ fontSize: 9, fill: "#9ca3af" }} interval={3} dy={6} />
                       <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#6b7280" }} />
                       <Tooltip
-                        formatter={(v) => [String(v ?? 0), "Simulations"]}
+                        formatter={(v) => [String(v ?? 0), t("page.roi.simulations")]}
                         contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", fontSize: "12px" }}
                       />
-                      <Bar dataKey="count" fill="#6366f1" radius={[3, 3, 0, 0]} name="Count" />
+                      <Bar dataKey="count" fill="#6366f1" radius={[3, 3, 0, 0]} name={t("page.roi.count")} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -502,7 +505,7 @@ export default function ROICalculatorPage() {
 
               {/* Percentile table */}
               <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">Percentile Breakdown</h3>
+                <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{t("page.roi.percentile_breakdown")}</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
