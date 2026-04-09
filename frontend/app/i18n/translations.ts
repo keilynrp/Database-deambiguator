@@ -1457,6 +1457,10 @@ export const translations = {
         'page.entity_table.bulk_export_success': '{count} entities exported as CSV',
         'page.entity_table.delete_single_confirm': 'Delete entity #{id} "{label}"?',
         'page.entity_table.unnamed_entity': 'Unnamed entity',
+        'page.facets.filter_by': 'Filter by',
+        'page.facets.clear_all': 'Clear all ({count})',
+        'page.facets.loading': 'Loading facets…',
+        'page.facets.read_more': '+{count} more',
 
         // ── Onboarding checklist ──────────────────────────────────────────────
         'onboarding.getting_started': 'Getting started',
@@ -2958,6 +2962,10 @@ export const translations = {
         'page.entity_table.bulk_export_success': '{count} entidades exportadas como CSV',
         'page.entity_table.delete_single_confirm': '¿Eliminar la entidad #{id} "{label}"?',
         'page.entity_table.unnamed_entity': 'Entidad sin nombre',
+        'page.facets.filter_by': 'Filtrar por',
+        'page.facets.clear_all': 'Limpiar todo ({count})',
+        'page.facets.loading': 'Cargando facetas…',
+        'page.facets.read_more': '+{count} más',
 
         // ── Lista de inicio (onboarding) ──────────────────────────────────────
         'onboarding.getting_started': 'Primeros pasos',

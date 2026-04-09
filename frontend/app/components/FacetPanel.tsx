@@ -2,17 +2,18 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
+import { useLanguage } from "../contexts/LanguageContext";
 
 export interface FacetValue { value: string; count: number; }
 export interface FacetData { [field: string]: FacetValue[]; }
 export interface ActiveFacets { [field: string]: string | null; }
 
 const FIELD_LABELS: Record<string, string> = {
-  entity_type:       "Entity Type",
-  domain:            "Domain",
-  validation_status: "Validation",
-  enrichment_status: "Enrichment",
-  source:            "Source",
+  entity_type:       "page.import.field.entity_type",
+  domain:            "page.import.field.domain",
+  validation_status: "page.import.field.validation_status",
+  enrichment_status: "entities.enrichment_status",
+  source:            "page.exec_dashboard.source",
 };
 
 // Color chips per field for visual identity
@@ -31,6 +32,7 @@ interface FacetPanelProps {
 }
 
 export default function FacetPanel({ activeFacets, onFacetChange, refreshKey }: FacetPanelProps) {
+  const { t } = useLanguage();
   const [facets, setFacets] = useState<FacetData>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -51,28 +53,55 @@ export default function FacetPanel({ activeFacets, onFacetChange, refreshKey }: 
 
   const activeCount = Object.values(activeFacets).filter(Boolean).length;
 
+  const translateFacetLabel = (field: string) => {
+    const key = FIELD_LABELS[field];
+    return key ? t(key) : field;
+  };
+
+  const translateFacetValue = (field: string, value: string) => {
+    if (!value) return t("page.entity_table.empty_value");
+
+    if (field === "entity_type") {
+      const translated = t(`page.authority.entity_type_${value}`);
+      return translated === `page.authority.entity_type_${value}` ? value : translated;
+    }
+
+    if (field === "validation_status") {
+      const statusKey = `page.entity_table.status_${value}`;
+      const translated = t(statusKey);
+      return translated === statusKey ? value : translated;
+    }
+
+    if (field === "enrichment_status") {
+      const translated = t(`entities.filter.${value}`);
+      return translated === `entities.filter.${value}` ? value : translated;
+    }
+
+    return value;
+  };
+
   return (
     <aside className="flex flex-col gap-2">
       {/* Header */}
       <div className="flex items-center justify-between px-1 mb-1">
         <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-          Filter by
+          {t("page.facets.filter_by")}
         </span>
         {activeCount > 0 && (
           <button
             onClick={() => Object.keys(activeFacets).forEach(f => onFacetChange(f, null))}
             className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
           >
-            Clear all ({activeCount})
+            {t("page.facets.clear_all", { count: activeCount })}
           </button>
         )}
       </div>
 
       {loading && (
-        <div className="text-xs text-gray-400 px-1 animate-pulse">Loading facets…</div>
+        <div className="text-xs text-gray-400 px-1 animate-pulse">{t("page.facets.loading")}</div>
       )}
 
-      {Object.entries(FIELD_LABELS).map(([field, label]) => {
+      {Object.entries(FIELD_LABELS).map(([field]) => {
         const values = facets[field] ?? [];
         if (values.length === 0) return null;
         const isCollapsed = collapsed[field];
@@ -89,7 +118,7 @@ export default function FacetPanel({ activeFacets, onFacetChange, refreshKey }: 
               onClick={() => toggleCollapse(field)}
               className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             >
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{label}</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{translateFacetLabel(field)}</span>
               <span className="text-gray-400 text-xs">{isCollapsed ? "▸" : "▾"}</span>
             </button>
 
@@ -107,8 +136,8 @@ export default function FacetPanel({ activeFacets, onFacetChange, refreshKey }: 
                             ? "bg-indigo-600 text-white font-medium"
                             : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                         }`}
-                      >
-                        <span className="truncate max-w-[110px]">{value || "—"}</span>
+                        >
+                        <span className="truncate max-w-[110px]">{translateFacetValue(field, value)}</span>
                         <span
                           className={`ml-1 flex-shrink-0 rounded-full px-1.5 py-0 text-[10px] font-mono ${
                             isActive ? "bg-white/20 text-white" : chipColor
@@ -122,7 +151,7 @@ export default function FacetPanel({ activeFacets, onFacetChange, refreshKey }: 
                 })}
                 {values.length > 8 && (
                   <li className="text-[10px] text-gray-400 px-2 pt-0.5">
-                    +{values.length - 8} more
+                    {t("page.facets.read_more", { count: values.length - 8 })}
                   </li>
                 )}
               </ul>

@@ -32,6 +32,15 @@ function renderDisplayValue(attributeName: string, value: unknown, emptyLabel: s
     return String(value);
 }
 
+const CORE_ATTRIBUTE_LABEL_KEYS: Record<string, string> = {
+    primary_label: "entities.primary_label",
+    secondary_label: "page.import.field.secondary_label",
+    canonical_id: "page.import.field.canonical_id",
+    entity_type: "page.import.field.entity_type",
+    domain: "page.import.field.domain",
+    validation_status: "page.import.field.validation_status",
+};
+
 export interface EntityTableContentProps {
     activeDomain: EntityTableDomain;
     entities: Entity[];
@@ -133,7 +142,9 @@ export default function EntityTableContent({
                             {activeDomain ? (
                                 activeDomain.attributes.map((attribute) => (
                                     <th key={attribute.name} className={`${thClass} no-wrap`}>
-                                        {attribute.label}
+                                        {CORE_ATTRIBUTE_LABEL_KEYS[attribute.name]
+                                            ? t(CORE_ATTRIBUTE_LABEL_KEYS[attribute.name])
+                                            : attribute.label}
                                     </th>
                                 ))
                             ) : (
