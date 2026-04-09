@@ -415,6 +415,19 @@ class UserNotificationState(Base):
     last_read_at = Column(DateTime, nullable=True)     # NULL = never read anything
 
 
+class UserNotificationRead(Base):
+    """
+    Per-user read overrides for individual notifications newer than last_read_at.
+    This keeps the notification centre honest when a user marks a single entry
+    as read without clearing the whole backlog.
+    """
+    __tablename__ = "user_notification_reads"
+
+    user_id = Column(Integer, primary_key=True, index=True)
+    audit_log_id = Column(Integer, primary_key=True, index=True)
+    read_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 # ── Sprint 61: Scheduled Imports ───────────────────────────────────────────────
 
 class ScheduledImport(Base):

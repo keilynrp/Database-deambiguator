@@ -41,6 +41,10 @@ class TestNotificationCenterAuth:
         r = client.post("/notifications/center/read-all")
         assert r.status_code == 401
 
+    def test_single_read_requires_auth(self, client):
+        r = client.post("/notifications/center/read/1")
+        assert r.status_code == 401
+
     def test_viewer_can_read_center(self, client, viewer_headers):
         r = client.get("/notifications/center", headers=viewer_headers)
         assert r.status_code == 200
@@ -128,6 +132,27 @@ class TestReadUnreadState:
         r = client.get("/notifications/center/unread-count", headers=auth_headers)
         assert r.status_code == 200
         assert r.json()["unread_count"] >= 1
+
+    def test_mark_single_notification_read(self, client, auth_headers, db_session):
+        first = _make_audit(db_session, action="upload")
+        second = _make_audit(db_session, action="entity.update", entity_id=7)
+
+        r = client.post(f"/notifications/center/read/{second.id}", headers=auth_headers)
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+
+        feed = client.get("/notifications/center", headers=auth_headers)
+        assert feed.status_code == 200
+        data = feed.json()
+
+        items_by_id = {item["id"]: item for item in data["items"]}
+        assert items_by_id[second.id]["is_read"] is True
+        assert items_by_id[first.id]["is_read"] is False
+        assert data["unread_count"] >= 1
+
+    def test_mark_single_notification_read_404_when_missing(self, client, auth_headers):
+        r = client.post("/notifications/center/read/999999", headers=auth_headers)
+        assert r.status_code == 404
 
 
 # ── Action links ──────────────────────────────────────────────────────────────

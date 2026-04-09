@@ -8,23 +8,15 @@ import { useLanguage } from "../contexts/LanguageContext";
 interface FeedEntry {
   id: number;
   action: string;
+  label: string;
   icon: string;
   entity_type: string | null;
   entity_id: number | null;
+  href: string | null;
   details: Record<string, unknown> | null;
   created_at: string | null;
+  is_read: boolean;
 }
-
-const ACTION_LABEL_KEYS: Record<string, string> = {
-  "upload":              "header.notifications.action.upload",
-  "entity.update":       "header.notifications.action.entity_update",
-  "entity.delete":       "header.notifications.action.entity_delete",
-  "entity.bulk_delete":  "header.notifications.action.entity_bulk_delete",
-  "harmonization.apply": "header.notifications.action.harmonization_apply",
-  "authority.confirm":   "header.notifications.action.authority_confirm",
-  "authority.reject":    "header.notifications.action.authority_reject",
-  "entity.merge":        "header.notifications.action.entity_merge",
-};
 
 const ACTION_COLOR: Record<string, string> = {
   "upload":              "bg-blue-500",
@@ -35,8 +27,6 @@ const ACTION_COLOR: Record<string, string> = {
   "authority.confirm":   "bg-green-500",
   "authority.reject":    "bg-rose-500",
 };
-
-const LS_KEY = "ukip_notif_last_read";
 
 function timeAgo(iso: string, t: (key: string, params?: Record<string, string | number>) => string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -69,16 +59,17 @@ export default function NotificationBell() {
   const { t } = useLanguage();
   const [open, setOpen]       = useState(false);
   const [entries, setEntries] = useState<FeedEntry[]>([]);
-  const [lastRead, setLastRead] = useState<number>(() => {
-    if (typeof window === "undefined") return 0;
-    return parseInt(localStorage.getItem(LS_KEY) ?? "0", 10);
-  });
+  const [unread, setUnread] = useState(0);
+  const [markingAll, setMarkingAll] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const fetchFeed = useCallback(async () => {
     try {
-      const res = await apiFetch("/audit/feed?limit=8");
-      if (res.ok) setEntries(await res.json());
+      const res = await apiFetch("/notifications/center?limit=8");
+      if (!res.ok) return;
+      const data = await res.json();
+      setEntries(data.items ?? []);
+      setUnread(data.unread_count ?? 0);
     } catch { /* non-critical */ }
   }, []);
 
@@ -103,23 +94,35 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const unread = entries.filter(
-    (e) => e.created_at && new Date(e.created_at).getTime() > lastRead
-  ).length;
-
   function handleOpen() {
-    setOpen((v) => !v);
-    if (!open) {
-      const now = Date.now();
-      setLastRead(now);
-      localStorage.setItem(LS_KEY, String(now));
+    setOpen((v) => {
+      const next = !v;
+      if (next) {
+        void fetchFeed();
+      }
+      return next;
+    });
+  }
+
+  async function markAllRead() {
+    setMarkingAll(true);
+    try {
+      const res = await apiFetch("/notifications/center/read-all", { method: "POST" });
+      if (res.ok) {
+        await fetchFeed();
+      }
+    } finally {
+      setMarkingAll(false);
     }
   }
 
-  function markAllRead() {
-    const now = Date.now();
-    setLastRead(now);
-    localStorage.setItem(LS_KEY, String(now));
+  async function markEntryRead(entryId: number) {
+    const res = await apiFetch(`/notifications/center/read/${entryId}`, { method: "POST" });
+    if (!res.ok) return;
+    setEntries((prev) => prev.map((entry) => (
+      entry.id === entryId ? { ...entry, is_read: true } : entry
+    )));
+    setUnread((prev) => Math.max(0, prev - 1));
   }
 
   return (
@@ -156,7 +159,8 @@ export default function NotificationBell() {
             </div>
             {unread > 0 && (
               <button
-                onClick={markAllRead}
+                onClick={() => { void markAllRead(); }}
+                disabled={markingAll}
                 className="text-xs text-blue-600 hover:underline dark:text-blue-400"
               >
                 {t("header.notifications.mark_all_read")}
@@ -176,11 +180,10 @@ export default function NotificationBell() {
               </li>
             ) : (
               entries.map((entry) => {
-                const isUnread = entry.created_at
-                  ? new Date(entry.created_at).getTime() > lastRead
-                  : false;
+                const isUnread = !entry.is_read;
                 const detail = entryDetail(entry, t);
                 const dotColor = ACTION_COLOR[entry.action] ?? "bg-gray-400";
+                const label = entry.label || entry.action;
                 return (
                   <li
                     key={entry.id}
@@ -195,18 +198,40 @@ export default function NotificationBell() {
                     {/* Text */}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-900 dark:text-white leading-snug">
-                        {ACTION_LABEL_KEYS[entry.action] ? t(ACTION_LABEL_KEYS[entry.action]) : entry.action}
+                        {label}
                       </p>
                       {detail && (
                         <p className="mt-0.5 break-words text-xs leading-relaxed text-gray-500 dark:text-gray-400">{detail}</p>
                       )}
-                      <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                        {entry.created_at ? timeAgo(entry.created_at, t) : ""}
-                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-3">
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                          {entry.created_at ? timeAgo(entry.created_at, t) : ""}
+                        </p>
+                        {entry.href && (
+                          <Link
+                            href={entry.href}
+                            onClick={() => {
+                              if (!entry.is_read) void markEntryRead(entry.id);
+                              setOpen(false);
+                            }}
+                            className="text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            {t("header.notifications.view_item")}
+                          </Link>
+                        )}
+                      </div>
                     </div>
-                    {/* Unread dot */}
+                    {/* Unread controls */}
                     {isUnread && (
-                      <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                      <div className="mt-1 flex shrink-0 flex-col items-end gap-2">
+                        <span className="h-2 w-2 rounded-full bg-blue-500" />
+                        <button
+                          onClick={() => { void markEntryRead(entry.id); }}
+                          className="text-[10px] font-medium text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                        >
+                          {t("header.notifications.mark_read")}
+                        </button>
+                      </div>
                     )}
                   </li>
                 );

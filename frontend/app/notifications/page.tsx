@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { apiFetch } from "../../lib/api";
 import { EmptyState } from "../components/ui";
@@ -86,31 +86,6 @@ function entryDetail(entry: NotifEntry, t: (key: string, params?: Record<string,
   return "";
 }
 
-// ── Local per-item overrides (entries marked read beyond last_read_at) ────────
-const LS_READ_IDS = "ukip_notif_read_ids";
-
-function getLocalReadIds(): Set<number> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = localStorage.getItem(LS_READ_IDS);
-    return raw ? new Set(JSON.parse(raw) as number[]) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function addLocalReadId(id: number) {
-  const ids = getLocalReadIds();
-  ids.add(id);
-  // Keep at most 500 IDs to avoid unbounded growth
-  const arr = Array.from(ids).slice(-500);
-  localStorage.setItem(LS_READ_IDS, JSON.stringify(arr));
-}
-
-function clearLocalReadIds() {
-  localStorage.removeItem(LS_READ_IDS);
-}
-
 // ── Page component ────────────────────────────────────────────────────────────
 
 export default function NotificationsPage() {
@@ -121,14 +96,7 @@ export default function NotificationsPage() {
   const [action, setAction]         = useState("");
   const [loading, setLoading]       = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
-  const [localRead, setLocalRead]   = useState<Set<number>>(new Set());
-  const hasMounted = useRef(false);
-
-  // Load local read overrides on mount
-  useEffect(() => {
-    setLocalRead(getLocalReadIds());
-    hasMounted.current = true;
-  }, []);
+  const [markingEntryId, setMarkingEntryId] = useState<number | null>(null);
 
   const fetchPage = useCallback(async (newSkip: number, newAction: string) => {
     setLoading(true);
@@ -164,8 +132,6 @@ export default function NotificationsPage() {
     try {
       const res = await apiFetch("/notifications/center/read-all", { method: "POST" });
       if (res.ok) {
-        clearLocalReadIds();
-        setLocalRead(new Set());
         // Re-fetch from beginning to update is_read flags
         setSkip(0);
         setItems([]);
@@ -176,13 +142,24 @@ export default function NotificationsPage() {
     }
   }
 
-  function handleMarkItemRead(id: number) {
-    addLocalReadId(id);
-    setLocalRead((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
+  async function handleMarkItemRead(id: number) {
+    setMarkingEntryId(id);
+    try {
+      const res = await apiFetch(`/notifications/center/read/${id}`, { method: "POST" });
+      if (!res.ok) return;
+      let unreadDelta = 0;
+      setItems((prev) => prev.map((item) => {
+        if (item.id !== id) return item;
+        if (!item.is_read) unreadDelta = 1;
+        return { ...item, is_read: true };
+      }));
+      setPage((prev) => prev ? {
+        ...prev,
+        unread_count: Math.max(0, prev.unread_count - unreadDelta),
+      } : prev);
+    } finally {
+      setMarkingEntryId(null);
+    }
   }
 
   function handleLoadMore() {
@@ -192,9 +169,7 @@ export default function NotificationsPage() {
   }
 
   const hasMore = page ? items.length < page.total : false;
-  const unreadCount = page
-    ? Math.max(0, page.unread_count - localRead.size)
-    : 0;
+  const unreadCount = page?.unread_count ?? 0;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -273,7 +248,7 @@ export default function NotificationsPage() {
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
             {items.map((entry) => {
-              const isRead = entry.is_read || localRead.has(entry.id);
+              const isRead = entry.is_read;
               const detail = entryDetail(entry, t);
               const dotColor = ACTION_COLOR[entry.action] ?? "bg-gray-400";
 
@@ -331,7 +306,8 @@ export default function NotificationsPage() {
                       <>
                         <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
                         <button
-                          onClick={() => handleMarkItemRead(entry.id)}
+                          onClick={() => { void handleMarkItemRead(entry.id); }}
+                          disabled={markingEntryId === entry.id}
                           className="hidden text-[10px] font-medium text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 group-hover:block"
                           title={t("page.notifications.mark_read_title")}
                         >

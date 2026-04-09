@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import not_
 from sqlalchemy.orm import Session
 
 from backend import models, schemas
@@ -76,11 +77,19 @@ def _build_href(action: str, entity_id: int | None) -> str | None:
     return template.replace("{entity_id}", "") if "{entity_id}" in template else template
 
 
-def _serialize_entry(entry: models.AuditLog, last_read_at: datetime | None) -> dict:
+def _serialize_entry(
+    entry: models.AuditLog,
+    last_read_at: datetime | None,
+    individually_read_ids: set[int] | None = None,
+) -> dict:
+    individually_read_ids = individually_read_ids or set()
     is_read = (
-        last_read_at is not None
-        and entry.created_at is not None
-        and entry.created_at <= last_read_at
+        entry.id in individually_read_ids
+        or (
+            last_read_at is not None
+            and entry.created_at is not None
+            and entry.created_at <= last_read_at
+        )
     )
     details = None
     if entry.details:
@@ -187,6 +196,29 @@ def _get_user_state(db: Session, user_id: int) -> models.UserNotificationState:
     return state
 
 
+def _read_ids_subquery(db: Session, user_id: int):
+    return (
+        db.query(models.UserNotificationRead.audit_log_id)
+        .filter(models.UserNotificationRead.user_id == user_id)
+    )
+
+
+def _get_individually_read_ids(
+    db: Session,
+    user_id: int,
+    entry_ids: list[int],
+) -> set[int]:
+    if not entry_ids:
+        return set()
+    rows = (
+        db.query(models.UserNotificationRead.audit_log_id)
+        .filter(models.UserNotificationRead.user_id == user_id)
+        .filter(models.UserNotificationRead.audit_log_id.in_(entry_ids))
+        .all()
+    )
+    return {row[0] for row in rows}
+
+
 @router.get("/notifications/center", tags=["notifications"])
 def get_notification_center(
     skip:   int           = Query(default=0,   ge=0),
@@ -209,12 +241,11 @@ def get_notification_center(
 
     # Unread count: entries created after last_read_at
     unread_count: int
+    unread_q = q.filter(not_(models.AuditLog.id.in_(_read_ids_subquery(db, user.id))))
     if state.last_read_at is None:
-        unread_count = total
+        unread_count = unread_q.count()
     else:
-        unread_count = q.filter(
-            models.AuditLog.created_at > state.last_read_at
-        ).count()
+        unread_count = unread_q.filter(models.AuditLog.created_at > state.last_read_at).count()
 
     items = (
         q.order_by(models.AuditLog.created_at.desc())
@@ -222,6 +253,7 @@ def get_notification_center(
         .limit(limit)
         .all()
     )
+    individually_read_ids = _get_individually_read_ids(db, user.id, [e.id for e in items])
 
     return {
         "total":        total,
@@ -229,7 +261,7 @@ def get_notification_center(
         "skip":         skip,
         "limit":        limit,
         "last_read_at": state.last_read_at.isoformat() if state.last_read_at else None,
-        "items":        [_serialize_entry(e, state.last_read_at) for e in items],
+        "items":        [_serialize_entry(e, state.last_read_at, individually_read_ids) for e in items],
     }
 
 
@@ -240,7 +272,7 @@ def get_unread_count(
 ):
     """Fast unread count for the bell badge."""
     state = _get_user_state(db, user.id)
-    q = db.query(models.AuditLog)
+    q = db.query(models.AuditLog).filter(not_(models.AuditLog.id.in_(_read_ids_subquery(db, user.id))))
     if state.last_read_at is None:
         count = q.count()
     else:
@@ -257,8 +289,45 @@ def mark_all_read(
     state = _get_user_state(db, user.id)
     # Store as naive UTC to match the format SQLite uses for created_at columns
     state.last_read_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    (
+        db.query(models.UserNotificationRead)
+        .filter(models.UserNotificationRead.user_id == user.id)
+        .delete(synchronize_session=False)
+    )
     db.commit()
     return {
         "ok":           True,
         "last_read_at": state.last_read_at.isoformat() + "Z",
     }
+
+
+@router.post("/notifications/center/read/{entry_id}", tags=["notifications"])
+def mark_notification_read(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    """Mark a single notification as read for the current user."""
+    entry = db.get(models.AuditLog, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    state = _get_user_state(db, user.id)
+    if (
+        state.last_read_at is not None
+        and entry.created_at is not None
+        and entry.created_at <= state.last_read_at
+    ):
+        return {"ok": True, "entry_id": entry_id, "already_read": True}
+
+    existing = (
+        db.query(models.UserNotificationRead)
+        .filter(models.UserNotificationRead.user_id == user.id)
+        .filter(models.UserNotificationRead.audit_log_id == entry_id)
+        .first()
+    )
+    if not existing:
+        db.add(models.UserNotificationRead(user_id=user.id, audit_log_id=entry_id))
+        db.commit()
+
+    return {"ok": True, "entry_id": entry_id, "already_read": False}

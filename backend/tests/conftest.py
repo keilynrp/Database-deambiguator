@@ -185,6 +185,7 @@ _TABLES_TO_CLEAN = [
     "search_index",
     "link_dismissals",
     "user_notification_states",
+    "user_notification_reads",
     "webhook_deliveries",
     "webhooks",
     "scheduled_imports",
