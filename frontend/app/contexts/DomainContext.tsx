@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
 
 export interface DomainAttribute {
@@ -36,33 +36,53 @@ export function DomainProvider({ children }: { children: React.ReactNode }) {
     const [activeDomainId, setActiveDomainId] = useState<string>("default");
     const [isLoading, setIsLoading] = useState(true);
 
-    const fetchDomains = async () => {
+    const resolveDomainSelection = useCallback((availableDomains: DomainSchema[], currentActiveDomainId: string) => {
+        if (availableDomains.length === 0) {
+            return currentActiveDomainId || "default";
+        }
+
+        const savedDomain = typeof window !== "undefined" ? localStorage.getItem("ukip_active_domain") : null;
+
+        if (currentActiveDomainId && availableDomains.some((d) => d.id === currentActiveDomainId)) {
+            return currentActiveDomainId;
+        }
+
+        if (savedDomain && availableDomains.some((d) => d.id === savedDomain)) {
+            return savedDomain;
+        }
+
+        const defaultDomain = availableDomains.find((d) => d.id === "default");
+        return defaultDomain ? defaultDomain.id : availableDomains[0].id;
+    }, []);
+
+    const fetchDomains = useCallback(async () => {
         try {
             const res = await apiFetch("/domains");
             if (res.ok) {
                 const data = await res.json();
                 setDomains(data);
 
-                // Retrieve saved domain from localStorage, or use 'default', or first available
-                const savedDomain = localStorage.getItem("ukip_active_domain");
-                if (savedDomain && data.some((d: DomainSchema) => d.id === savedDomain)) {
-                    setActiveDomainId(savedDomain);
-                } else if (data.length > 0) {
-                    const defaultDomain = data.find((d: DomainSchema) => d.id === "default");
-                    setActiveDomainId(defaultDomain ? defaultDomain.id : data[0].id);
-                }
+                setActiveDomainId((prev) => {
+                    const next = resolveDomainSelection(data, prev);
+                    if (typeof window !== "undefined") {
+                        localStorage.setItem("ukip_active_domain", next);
+                    }
+                    return next;
+                });
             }
-        } catch (error) {
+        } catch {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [resolveDomainSelection]);
 
-    useEffect(() => { fetchDomains(); }, []);
+    useEffect(() => { void fetchDomains(); }, [fetchDomains]);
 
     const handleSetActiveDomain = (id: string) => {
         setActiveDomainId(id);
-        localStorage.setItem("ukip_active_domain", id);
+        if (typeof window !== "undefined") {
+            localStorage.setItem("ukip_active_domain", id);
+        }
     };
 
     const activeDomain = domains.find(d => d.id === activeDomainId) || null;
