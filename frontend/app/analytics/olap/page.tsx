@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useDomain } from "../../contexts/DomainContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { apiFetch } from "@/lib/api";
 import { Analytics } from "@/lib/analytics";
 
@@ -31,16 +32,6 @@ interface CubeResult {
   rows: CubeRow[];
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const TYPE_COLORS: Record<string, string> = {
-  string:  "text-blue-600 dark:text-blue-400",
-  integer: "text-purple-600 dark:text-purple-400",
-  float:   "text-amber-600 dark:text-amber-400",
-  boolean: "text-green-600 dark:text-green-400",
-  array:   "text-rose-600 dark:text-rose-400",
-};
-
 function PctBar({ value }: { value: number }) {
   return (
     <div className="flex items-center gap-2">
@@ -61,6 +52,7 @@ function PctBar({ value }: { value: number }) {
 
 export default function OLAPExplorerPage() {
   const { activeDomain, activeDomainId } = useDomain();
+  const { t } = useLanguage();
 
   const [dimensions, setDimensions] = useState<Dimension[]>([]);
   const [loadingDims, setLoadingDims] = useState(true);
@@ -90,9 +82,9 @@ export default function OLAPExplorerPage() {
     apiFetch(`/cube/dimensions/${activeDomainId}`)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then((data: Dimension[]) => { setDimensions(data); if (data.length > 0) setPrimaryDim(data[0].name); })
-      .catch(() => setError("Failed to load dimensions"))
+      .catch(() => setError(t("page.olap.error_load_dimensions")))
       .finally(() => setLoadingDims(false));
-  }, [activeDomainId]);
+  }, [activeDomainId, t]);
 
   const runQuery = useCallback(async () => {
     if (!primaryDim) return;
@@ -110,26 +102,26 @@ export default function OLAPExplorerPage() {
         body: JSON.stringify({ domain_id: activeDomainId, group_by, filters }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: "Query failed" }));
-        setError(err.detail ?? "Query failed");
+        const err = await res.json().catch(() => ({ detail: t("page.olap.query_failed") }));
+        setError(err.detail ?? t("page.olap.query_failed"));
       } else {
         const data: CubeResult = await res.json();
         setResult(data);
         Analytics.olapQuery(activeDomainId, group_by.length);
       }
     } catch {
-      setError("Network error");
+      setError(t("page.olap.network_error"));
     } finally {
       setQuerying(false);
     }
-  }, [primaryDim, secondaryDim, filters, activeDomainId]);
+  }, [primaryDim, secondaryDim, filters, activeDomainId, t]);
 
   const handleExport = async () => {
     if (!primaryDim) return;
     setExporting(true);
     try {
       const res = await apiFetch(`/cube/export/${activeDomainId}?dimension=${primaryDim}`);
-      if (!res.ok) { setError("Export failed"); return; }
+      if (!res.ok) { setError(t("page.olap.export_failed")); return; }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -138,7 +130,7 @@ export default function OLAPExplorerPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      setError("Export error");
+      setError(t("page.olap.export_error"));
     } finally {
       setExporting(false);
     }
@@ -171,10 +163,10 @@ export default function OLAPExplorerPage() {
             <svg className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
-            Analytics
+            {t("nav.analytics")}
           </Link>
           <span className="text-gray-300 dark:text-gray-700">/</span>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">OLAP Cube Explorer</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t("page.olap.title")}</h2>
           {activeDomain && (
             <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
               {activeDomain.name}
@@ -184,13 +176,13 @@ export default function OLAPExplorerPage() {
         <button
           onClick={handleExport}
           disabled={!result || exporting}
-          aria-label={exporting ? "Exporting to Excel…" : "Export results to Excel"}
+          aria-label={exporting ? t("page.olap.exporting_aria") : t("page.olap.export_excel_aria")}
           className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 disabled:opacity-40 transition-colors"
         >
           <svg className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
           </svg>
-          {exporting ? "Exporting…" : "Export Excel"}
+          {exporting ? t("page.olap.exporting") : t("page.olap.export_excel")}
         </button>
       </div>
 
@@ -204,7 +196,7 @@ export default function OLAPExplorerPage() {
       <div className="flex flex-wrap items-end gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
         {/* Primary dimension */}
         <div className="flex flex-col gap-1 min-w-[160px]">
-          <label htmlFor="olap-primary-dim" className="text-xs font-medium text-gray-500 dark:text-gray-400">Primary Dimension</label>
+          <label htmlFor="olap-primary-dim" className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("page.olap.primary_dimension")}</label>
           {loadingDims ? (
             <div className="h-9 w-40 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
           ) : (
@@ -226,7 +218,7 @@ export default function OLAPExplorerPage() {
         {/* Secondary dimension */}
         <div className="flex flex-col gap-1 min-w-[160px]">
           <label htmlFor="olap-secondary-dim" className="text-xs font-medium text-gray-500 dark:text-gray-400">
-            Second Dimension <span className="font-normal opacity-60">(optional)</span>
+            {t("page.olap.second_dimension")} <span className="font-normal opacity-60">({t("common.optional").toLowerCase()})</span>
           </label>
           {loadingDims ? (
             <div className="h-9 w-40 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
@@ -237,7 +229,7 @@ export default function OLAPExplorerPage() {
               onChange={e => setSecondaryDim(e.target.value)}
               className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">— none —</option>
+              <option value="">{t("page.olap.none_option")}</option>
               {dimensions.filter(d => d.name !== primaryDim).map(d => (
                 <option key={d.name} value={d.name}>
                   {d.label} ({d.distinct_count})
@@ -249,29 +241,29 @@ export default function OLAPExplorerPage() {
 
         {/* Filters */}
         <div className="flex flex-col gap-1 min-w-[280px]">
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Add Filter</label>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("page.olap.add_filter")}</label>
           <div className="flex gap-2">
             <select
               value={filterInput.field}
               onChange={e => setFilterInput(f => ({ ...f, field: e.target.value }))}
-              aria-label="Filter field"
+              aria-label={t("page.olap.filter_field")}
               className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
-              <option value="">Field…</option>
+              <option value="">{t("page.olap.field_placeholder")}</option>
               {dimensions.map(d => <option key={d.name} value={d.name}>{d.label}</option>)}
             </select>
             <input
               value={filterInput.value}
               onChange={e => setFilterInput(f => ({ ...f, value: e.target.value }))}
               onKeyDown={e => { if (e.key === "Enter") addFilter(); }}
-              placeholder="Value…"
-              aria-label="Filter value"
+              placeholder={t("page.olap.value_placeholder")}
+              aria-label={t("page.olap.filter_value")}
               className="w-28 rounded-lg border border-gray-200 px-2 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <button
               onClick={addFilter}
               disabled={!filterInput.field || !filterInput.value}
-              aria-label="Add filter"
+              aria-label={t("page.olap.add_filter")}
               className="rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 disabled:opacity-40 transition-colors"
             >
               +
@@ -286,9 +278,9 @@ export default function OLAPExplorerPage() {
           className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors self-end"
         >
           {querying ? (
-            <><svg className="w-4 h-4 animate-spin" aria-hidden="true" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Running…</>
+            <><svg className="w-4 h-4 animate-spin" aria-hidden="true" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> {t("page.olap.running")}</>
           ) : (
-            <><svg className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" /></svg> Run Query</>
+            <><svg className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" /></svg> {t("page.olap.run_query")}</>
           )}
         </button>
       </div>
@@ -299,7 +291,7 @@ export default function OLAPExplorerPage() {
           {Object.entries(filters).map(([k, v]) => (
             <span key={k} className="flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
               {dimensions.find(d => d.name === k)?.label ?? k} = {v}
-              <button onClick={() => removeFilter(k)} aria-label={`Remove filter ${dimensions.find(d => d.name === k)?.label ?? k}`} className="text-blue-400 hover:text-blue-600 dark:hover:text-blue-200">×</button>
+              <button onClick={() => removeFilter(k)} aria-label={t("page.olap.remove_filter", { label: dimensions.find(d => d.name === k)?.label ?? k })} className="text-blue-400 hover:text-blue-600 dark:hover:text-blue-200">×</button>
             </span>
           ))}
         </div>
@@ -311,18 +303,18 @@ export default function OLAPExplorerPage() {
           {/* Summary */}
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Showing{" "}
+              {t("page.olap.showing_prefix")}{" "}
               <span className="font-semibold text-gray-900 dark:text-white">
                 {Math.min(visibleCount, result.rows.length)}
               </span>{" "}
-              of{" "}
+              {t("page.olap.showing_middle")}{" "}
               <span className="font-semibold text-gray-900 dark:text-white">{result.rows.length}</span>{" "}
-              groups ·{" "}
-              <span className="font-semibold text-gray-900 dark:text-white">{result.total.toLocaleString()}</span> total records
+              {t("page.olap.showing_groups")} ·{" "}
+              <span className="font-semibold text-gray-900 dark:text-white">{result.total.toLocaleString()}</span> {t("page.olap.total_records")}
             </p>
             {isCrossTab && (
               <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                Cross-tab: {primaryDimLabel} × {secondaryDimLabel}
+                {t("page.olap.cross_tab", { primary: primaryDimLabel, secondary: secondaryDimLabel })}
               </span>
             )}
           </div>
@@ -341,13 +333,13 @@ export default function OLAPExplorerPage() {
                     </th>
                   )}
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Count
+                    {t("page.olap.count")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Distribution
+                    {t("page.olap.distribution")}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Drill-down
+                    {t("page.olap.drill_down")}
                   </th>
                 </tr>
               </thead>
@@ -355,11 +347,11 @@ export default function OLAPExplorerPage() {
                 {visibleRows.map((row, i) => (
                   <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                     <td className="px-6 py-3 font-medium text-gray-900 dark:text-white">
-                      {row.values[result.group_by[0]] ?? <span className="text-gray-400 italic">null</span>}
+                      {row.values[result.group_by[0]] ?? <span className="text-gray-400 italic">{t("page.olap.null_value")}</span>}
                     </td>
                     {isCrossTab && (
                       <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
-                        {row.values[result.group_by[1]] ?? <span className="text-gray-400 italic">null</span>}
+                        {row.values[result.group_by[1]] ?? <span className="text-gray-400 italic">{t("page.olap.null_value")}</span>}
                       </td>
                     )}
                     <td className="px-4 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">
@@ -379,10 +371,10 @@ export default function OLAPExplorerPage() {
                           setSecondaryDim("");
                           setVisibleCount(PAGE_SIZE);
                         }}
-                        aria-label={`Drill down into ${row.values[result.group_by[0]] ?? "this group"}`}
+                        aria-label={t("page.olap.drill_into", { value: row.values[result.group_by[0]] ?? t("page.olap.this_group") })}
                         className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-blue-100 hover:text-blue-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 transition-colors"
                       >
-                        ↳ Drill
+                        ↳ {t("page.olap.drill")}
                       </button>
                     </td>
                   </tr>
@@ -392,7 +384,7 @@ export default function OLAPExplorerPage() {
 
             {result.rows.length === 0 && (
               <div className="py-16 text-center text-gray-400 dark:text-gray-600">
-                No data for the selected dimensions and filters.
+                {t("page.olap.no_data")}
               </div>
             )}
           </div>
@@ -401,19 +393,19 @@ export default function OLAPExplorerPage() {
           {hasMore && (
             <div className="flex items-center justify-center gap-3 py-2">
               <span className="text-xs text-gray-400">
-                {result.rows.length - visibleCount} more rows not shown
+                {t("page.olap.more_rows_hidden", { count: result.rows.length - visibleCount })}
               </span>
               <button
                 onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
                 className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800"
               >
-                Load {Math.min(PAGE_SIZE, result.rows.length - visibleCount)} more
+                {t("page.olap.load_more", { count: Math.min(PAGE_SIZE, result.rows.length - visibleCount) })}
               </button>
               <button
                 onClick={() => setVisibleCount(result.rows.length)}
                 className="text-xs text-blue-600 hover:underline dark:text-blue-400"
               >
-                Show all
+                {t("page.olap.show_all")}
               </button>
             </div>
           )}
@@ -427,8 +419,8 @@ export default function OLAPExplorerPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={0.75} d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605" />
           </svg>
           <div className="text-center">
-            <p className="font-medium text-gray-500 dark:text-gray-400">Select dimensions and run a query</p>
-            <p className="text-sm mt-1">Group your data by any attribute to explore distributions</p>
+            <p className="font-medium text-gray-500 dark:text-gray-400">{t("page.olap.empty_title")}</p>
+            <p className="text-sm mt-1">{t("page.olap.empty_description")}</p>
           </div>
         </div>
       )}
