@@ -29,8 +29,80 @@ jobs:
           ruff check backend/ --output-format=github --exit-zero
         continue-on-error: true
 
-  # ── Frontend lint (ESLint) ─────────────────────────────────────────────────
+  # ── Frontend lint on changed files (blocking) ──────────────────────────────
   frontend-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --prefer-offline
+
+      - name: Collect changed frontend files
+        id: changed-frontend
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+          fi
+
+          if [[ -z "${BASE_SHA}" || "${BASE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
+            BASE_SHA="$(git rev-parse HEAD^)"
+          fi
+
+          mapfile -t CHANGED_FILES < <(
+            git diff --name-only --diff-filter=ACMR "${BASE_SHA}" HEAD | \
+              grep -E '^frontend/.*\.(js|jsx|ts|tsx)$' || true
+          )
+
+          if (( ${#CHANGED_FILES[@]} == 0 )); then
+            echo "count=0" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          {
+            echo "count=${#CHANGED_FILES[@]}"
+            echo "files<<EOF"
+            printf '%s\n' "${CHANGED_FILES[@]}"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Run ESLint on changed files
+        if: steps.changed-frontend.outputs.count != '0'
+        working-directory: frontend
+        shell: bash
+        run: |
+          mapfile -t FILES <<'EOF'
+          ${{ steps.changed-frontend.outputs.files }}
+          EOF
+
+          RELATIVE_FILES=()
+          for file in "${FILES[@]}"; do
+            RELATIVE_FILES+=("${file#frontend/}")
+          done
+
+          npx eslint --max-warnings=0 "${RELATIVE_FILES[@]}"
+
+      - name: Skip message when no frontend files changed
+        if: steps.changed-frontend.outputs.count == '0'
+        run: echo "No frontend source files changed; skipping blocking ESLint run."
+
+  # ── Frontend lint repo-wide (non-blocking debt radar) ─────────────────────
+  frontend-lint-repo:
     runs-on: ubuntu-latest
 
     steps:
@@ -48,7 +120,7 @@ jobs:
         working-directory: frontend
         run: npm ci --prefer-offline
 
-      - name: Run ESLint
+      - name: Run ESLint repo-wide (non-blocking)
         working-directory: frontend
         run: npm run lint -- --max-warnings=0
         continue-on-error: true
