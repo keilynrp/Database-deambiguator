@@ -143,7 +143,7 @@ export default function NotificationBell() {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+        <div className="absolute right-0 top-12 z-50 w-[26rem] max-w-[min(26rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
             <div className="flex items-center gap-2">
@@ -198,7 +198,7 @@ export default function NotificationBell() {
                         {ACTION_LABEL_KEYS[entry.action] ? t(ACTION_LABEL_KEYS[entry.action]) : entry.action}
                       </p>
                       {detail && (
-                        <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{detail}</p>
+                        <p className="mt-0.5 break-words text-xs leading-relaxed text-gray-500 dark:text-gray-400">{detail}</p>
                       )}
                       <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
                         {entry.created_at ? timeAgo(entry.created_at, t) : ""}
