@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
 
 interface Organization {
@@ -49,22 +49,51 @@ export default function OrganizationsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadOrgs() {
+  const loadOrgs = useCallback(async () => {
     setLoading(true);
     const r = await apiFetch("/organizations");
     if (r.ok) setOrgs(await r.json());
     setLoading(false);
-  }
+  }, []);
 
-  async function loadMembers(orgId: number) {
+  const loadMembers = useCallback(async (orgId: number) => {
     const r = await apiFetch(`/organizations/${orgId}/members`);
     if (r.ok) setMembers(await r.json());
-  }
-
-  useEffect(() => { loadOrgs(); }, []);
+  }, []);
 
   useEffect(() => {
-    if (selectedOrg) loadMembers(selectedOrg.id);
+    let active = true;
+    (async () => {
+      const r = await apiFetch("/organizations");
+      if (!active) {
+        return;
+      }
+      if (r.ok) {
+        setOrgs(await r.json());
+      }
+      setLoading(false);
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedOrg) {
+      return;
+    }
+
+    let active = true;
+    (async () => {
+      const r = await apiFetch(`/organizations/${selectedOrg.id}/members`);
+      if (active && r.ok) {
+        setMembers(await r.json());
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, [selectedOrg]);
 
   async function createOrg() {

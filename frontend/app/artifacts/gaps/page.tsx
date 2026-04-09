@@ -158,7 +158,7 @@ export default function GapDetectorPage() {
             <div className="flex flex-col items-center justify-center rounded-2xl border border-green-200 bg-green-50 py-16 dark:border-green-800 dark:bg-green-900/10">
               <span className="text-4xl">✅</span>
               <p className="mt-3 text-lg font-medium text-green-700 dark:text-green-400">No gaps detected</p>
-              <p className="mt-1 text-sm text-green-600 dark:text-green-500">Your data looks great for domain "{report.domain_id}"</p>
+              <p className="mt-1 text-sm text-green-600 dark:text-green-500">Your data looks great for domain &quot;{report.domain_id}&quot;</p>
             </div>
           ) : (
             <div className="space-y-3">

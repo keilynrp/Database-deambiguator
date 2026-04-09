@@ -4,6 +4,7 @@
 // Next.js renders this when a page throws during rendering.
 
 import { useEffect } from "react";
+import Link from "next/link";
 
 interface Props {
   error: Error & { digest?: string };
@@ -47,12 +48,12 @@ export default function RootError({ error, reset }: Props) {
           >
             Try again
           </button>
-          <a
+          <Link
             href="/"
             className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-transparent dark:text-gray-300 dark:hover:bg-gray-800"
           >
             Go home
-          </a>
+          </Link>
         </div>
       </div>
     </div>

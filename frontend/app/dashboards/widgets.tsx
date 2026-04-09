@@ -4,7 +4,7 @@
  */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -322,12 +322,14 @@ export function OlapSnapshotWidget({ config }: { config: WidgetConfig }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const domain = (config.config.domain_id as string) || "default";
-  const groupBy = (config.config.group_by as string[]) || [];
+  const groupBy = useMemo(() => {
+    const configured = config.config.group_by;
+    return Array.isArray(configured) ? configured as string[] : [];
+  }, [config.config.group_by]);
+  const groupByKey = groupBy.join(",");
 
   useEffect(() => {
     if (!groupBy.length) {
-      setLoading(false);
-      setError("Configure a group_by dimension in widget settings.");
       return;
     }
     apiFetch("/cube/query", {
@@ -338,13 +340,18 @@ export function OlapSnapshotWidget({ config }: { config: WidgetConfig }) {
       .then((d) => {
         setRows(d.rows ?? []);
         setCols(d.columns ?? []);
-      })
-      .catch(() => setError("Failed to load OLAP data."))
-      .finally(() => setLoading(false));
-  }, [domain, groupBy.join(",")]);
+        })
+        .catch(() => setError("Failed to load OLAP data."))
+        .finally(() => setLoading(false));
+  }, [domain, groupBy, groupByKey]);
+
+  const widgetError = !groupBy.length
+    ? "Configure a group_by dimension in widget settings."
+    : error;
+  const widgetLoading = groupBy.length ? loading : false;
 
   return (
-    <WidgetShell title={config.title || "OLAP Snapshot"} loading={loading} error={error}>
+    <WidgetShell title={config.title || "OLAP Snapshot"} loading={widgetLoading} error={widgetError}>
       <div className="overflow-auto h-full">
         <table className="w-full text-xs">
           <thead>

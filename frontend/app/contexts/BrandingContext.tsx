@@ -28,23 +28,38 @@ const BrandingContext = createContext<BrandingContextType | undefined>(undefined
 export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const [branding, setBranding] = useState<BrandingSettings>(DEFAULTS);
 
-  const refreshBranding = useCallback(async () => {
+  const fetchBranding = useCallback(async () => {
     try {
-      // Use raw fetch — this is a public endpoint, no auth needed at app load
       const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
       const res = await fetch(`${apiUrl}/branding/settings`);
       if (res.ok) {
         const data = await res.json();
-        setBranding({ ...DEFAULTS, ...data });
+        return { ...DEFAULTS, ...data };
       }
     } catch {
-      // Non-critical — keep defaults on failure
+      return null;
     }
+    return null;
   }, []);
 
+  const refreshBranding = useCallback(async () => {
+    const nextBranding = await fetchBranding();
+    if (nextBranding) {
+      setBranding(nextBranding);
+    }
+  }, [fetchBranding]);
+
   useEffect(() => {
-    refreshBranding();
-  }, [refreshBranding]);
+    let active = true;
+    void fetchBranding().then((nextBranding) => {
+      if (active && nextBranding) {
+        setBranding(nextBranding);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [fetchBranding]);
 
   return (
     <BrandingContext.Provider value={{ branding, refreshBranding }}>

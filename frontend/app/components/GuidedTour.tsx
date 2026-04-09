@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Analytics } from "@/lib/analytics";
 
 // ── Tour step definition ───────────────────────────────────────────────────────
@@ -102,18 +102,13 @@ interface GuidedTourProps {
 
 export default function GuidedTour({ autoStart = false, show, onClose }: GuidedTourProps) {
   const [step, setStep] = useState(0);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (show !== undefined) {
-      setVisible(show);
-      return;
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
     }
-    if (autoStart) {
-      const done = localStorage.getItem(STORAGE_KEY);
-      if (!done) setVisible(true);
-    }
-  }, [autoStart, show]);
+    return localStorage.getItem(STORAGE_KEY) === "1";
+  });
+  const visible = show ?? (autoStart && !dismissed);
 
   const close = (completed: boolean) => {
     if (completed) {
@@ -122,7 +117,7 @@ export default function GuidedTour({ autoStart = false, show, onClose }: GuidedT
     } else {
       Analytics.tourSkipped(step);
     }
-    setVisible(false);
+    setDismissed(true);
     onClose?.();
   };
 

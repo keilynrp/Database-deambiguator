@@ -86,18 +86,21 @@ function usePositions(nodes: GraphNode[], width: number, height: number): Record
 
 export default function EntityGraph({ entityId }: { entityId: number }) {
     const [graph, setGraph] = useState<GraphData | null>(null);
-    const [loading, setLoading] = useState(true);
     const [depth, setDepth] = useState<1 | 2>(1);
     const [hovered, setHovered] = useState<number | null>(null);
     const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
     const [metrics, setMetrics] = useState<GraphMetrics | null>(null);
+    const [resolvedKey, setResolvedKey] = useState<string | null>(null);
     const svgRef = useRef<SVGSVGElement>(null);
 
     const W = 600;
     const H = 420;
 
+    const requestKey = `${entityId}:${depth}`;
+    const loading = resolvedKey !== requestKey;
+
     useEffect(() => {
-        setLoading(true);
+        let active = true;
         Promise.all([
             apiFetch(`/entities/${entityId}/graph?depth=${depth}`)
                 .then((r) => r.ok ? r.json() : null)
@@ -106,10 +109,18 @@ export default function EntityGraph({ entityId }: { entityId: number }) {
                 .then((r) => r.ok ? r.json() : null)
                 .catch(() => null),
         ]).then(([graphData, metricsData]) => {
+            if (!active) {
+                return;
+            }
             setGraph(graphData);
             setMetrics(metricsData);
-        }).finally(() => setLoading(false));
-    }, [entityId, depth]);
+            setResolvedKey(requestKey);
+        });
+
+        return () => {
+            active = false;
+        };
+    }, [entityId, depth, requestKey]);
 
     const positions = usePositions(graph?.nodes ?? [], W, H);
 

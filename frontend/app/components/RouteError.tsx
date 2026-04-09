@@ -3,6 +3,8 @@
 // Shared component used by route-level error.tsx files.
 // Renders an inline error card with retry + home actions.
 
+import Link from "next/link";
+
 interface RouteErrorProps {
   title?: string;
   error: Error & { digest?: string };
@@ -39,12 +41,12 @@ export default function RouteError({
           >
             Try again
           </button>
-          <a
+          <Link
             href="/"
             className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors dark:border-gray-700 dark:bg-transparent dark:text-gray-300 dark:hover:bg-gray-800"
           >
             Home
-          </a>
+          </Link>
         </div>
       </div>
     </div>

@@ -27,34 +27,48 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+function getStoredToken(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return localStorage.getItem("ukip_token");
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(getStoredToken);
   const [user, setUser]   = useState<User | null>(null);
 
-  // Hydrate from localStorage on first render (client-only)
   useEffect(() => {
-    const stored = localStorage.getItem("ukip_token");
-    if (stored) {
-      setToken(stored);
-      fetch(`${API_BASE}/users/me`, {
-        headers: { Authorization: `Bearer ${stored}` },
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => { if (data) setUser(data); })
-        .catch(() => {});
+    if (!token) {
+      return;
     }
-  }, []);
+
+    let cancelled = false;
+    fetch(`${API_BASE}/users/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) {
+          setUser(data);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const refreshUser = useCallback(async () => {
-    const stored = localStorage.getItem("ukip_token");
-    if (!stored) return;
+    if (!token) return;
     try {
       const res = await fetch(`${API_BASE}/users/me`, {
-        headers: { Authorization: `Bearer ${stored}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) setUser(await res.json());
     } catch { /* non-critical */ }
-  }, []);
+  }, [token]);
 
   const updateAvatarUrl = useCallback((url: string | null) => {
     setUser(prev => prev ? { ...prev, avatar_url: url } : prev);

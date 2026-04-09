@@ -93,14 +93,14 @@ function CandidateCard({
     setResolved(true);
   }
 
-  async function handleDismiss() {
-    setDismissing(true);
-    await onDismiss(entity_a.id, entity_b.id);
-    setDismissed(true);
-    setResolved(true);
-  }
+    async function handleDismiss() {
+      setDismissing(true);
+      await onDismiss(entity_a.id, entity_b.id);
+      setDismissed();
+      setResolved(true);
+    }
 
-  function setDismissed(_v: boolean) {}   // local state already tracked by resolved
+  function setDismissed() {}   // local state already tracked by resolved
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
@@ -173,9 +173,9 @@ function CandidateCard({
       {/* Merge panel */}
       {expanded && (
         <div className="border-t border-blue-100 bg-blue-50/50 px-4 py-4 dark:border-blue-500/20 dark:bg-blue-500/5">
-          <p className="mb-3 text-xs font-semibold text-blue-800 dark:text-blue-300">
-            Choose which entity to keep (winner absorbs the other's empty fields)
-          </p>
+            <p className="mb-3 text-xs font-semibold text-blue-800 dark:text-blue-300">
+              Choose which entity to keep (winner absorbs the other&apos;s empty fields)
+            </p>
           <div className="flex gap-2">
             {(["a", "b"] as const).map((side) => {
               const entity = side === "a" ? entity_a : entity_b;

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
@@ -78,12 +79,12 @@ export default function SalesDeckPage() {
             >
               🖨 Export to PDF
             </a>
-            <a
+            <Link
               href="/"
               className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/20"
             >
               → Live Platform
-            </a>
+            </Link>
           </div>
         </div>
       </div>

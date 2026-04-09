@@ -216,26 +216,49 @@ export default function DashboardsPage() {
 
   // ── Load ──────────────────────────────────────────────────────────────────
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const applyDashboardData = useCallback((dashes: Dashboard[], cat: WidgetType[]) => {
+    setCatalogue(cat);
+    setDashboards(dashes);
+    const def = dashes.find((d) => d.is_default) ?? dashes[0] ?? null;
+    if (def) {
+      setActiveDash(def);
+      setEditLayout(def.layout);
+    } else {
+      setActiveDash(null);
+      setEditLayout([]);
+    }
+  }, []);
+
+  const fetchDashboardData = useCallback(async () => {
     const [dRes, cRes] = await Promise.all([
       apiFetch("/dashboards"),
       apiFetch("/dashboards/widget-types"),
     ]);
     const dashes: Dashboard[] = dRes.ok ? await dRes.json() : [];
     const cat: WidgetType[]   = cRes.ok ? await cRes.json() : [];
-    setCatalogue(cat);
-    setDashboards(dashes);
-    // Select default or first
-    const def = dashes.find((d) => d.is_default) ?? dashes[0] ?? null;
-    if (def) {
-      setActiveDash(def);
-      setEditLayout(def.layout);
-    }
-    setLoading(false);
+    return { dashes, cat };
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { dashes, cat } = await fetchDashboardData();
+    applyDashboardData(dashes, cat);
+    setLoading(false);
+  }, [applyDashboardData, fetchDashboardData]);
+
+  useEffect(() => {
+    let active = true;
+    void fetchDashboardData().then(({ dashes, cat }) => {
+      if (!active) {
+        return;
+      }
+      applyDashboardData(dashes, cat);
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [applyDashboardData, fetchDashboardData]);
 
   // ── Dashboard selection ───────────────────────────────────────────────────
 
