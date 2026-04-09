@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense, ReactElement } from "react"
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { useLanguage } from "../contexts/LanguageContext";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -25,12 +26,6 @@ interface SearchPage {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 20;
-
-const TYPE_LABELS: Record<string, string> = {
-  entity:     "Entity",
-  authority:  "Authority",
-  annotation: "Annotation",
-};
 
 const TYPE_STYLES: Record<string, string> = {
   entity:     "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
@@ -59,6 +54,7 @@ const TYPE_ICONS: Record<string, ReactElement> = {
 // ── Inner page (uses useSearchParams — must be wrapped in Suspense) ────────────
 
 function SearchInner() {
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -83,11 +79,11 @@ function SearchInner() {
       if (!res.ok) { setError(await res.text()); return; }
       setResults(await res.json());
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Search failed");
+      setError(e instanceof Error ? e.message : t("page.search.search_failed"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // Run on mount if ?q= is present
   useEffect(() => {
@@ -131,7 +127,7 @@ function SearchInner() {
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search entities, authority records, annotations…"
+            placeholder={t("page.search.placeholder")}
             className="w-full rounded-xl border border-gray-300 bg-white py-2.5 pl-9 pr-4 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
           />
         </div>
@@ -139,24 +135,26 @@ function SearchInner() {
           type="submit"
           className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          Search
+          {t("common.search")}
         </button>
       </form>
 
       {/* ── Type filter pills ────────────────────────────────────────────── */}
       {results && (
         <div className="flex flex-wrap gap-2">
-          {["", "entity", "authority", "annotation"].map((t) => (
+          {["", "entity", "authority", "annotation"].map((typeKey) => (
             <button
-              key={t}
-              onClick={() => handleTypeFilter(t)}
+              key={typeKey}
+              onClick={() => handleTypeFilter(typeKey)}
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                docType === t
+                docType === typeKey
                   ? "bg-blue-600 text-white"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               }`}
             >
-              {t === "" ? `All (${results.total})` : TYPE_LABELS[t]}
+              {typeKey === ""
+                ? t("page.search.filter_all", { count: results.total })
+                : t(`page.search.type.${typeKey}`)}
             </button>
           ))}
         </div>
@@ -188,9 +186,9 @@ function SearchInner() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                No results found for <strong>&ldquo;{query}&rdquo;</strong>.
+                {t("page.search.no_results_prefix")} <strong>&ldquo;{query}&rdquo;</strong>.
               </p>
-              <p className="mt-1 text-xs text-gray-400">Try a different term or rebuild the search index via Settings.</p>
+              <p className="mt-1 text-xs text-gray-400">{t("page.search.no_results_hint")}</p>
             </div>
           ) : (
             <ul className="space-y-2">
@@ -206,10 +204,10 @@ function SearchInner() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
-                          {item.title || "(no title)"}
+                          {item.title || t("page.search.no_title")}
                         </p>
                         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_STYLES[item.doc_type] ?? ""}`}>
-                          {TYPE_LABELS[item.doc_type] ?? item.doc_type}
+                          {t(`page.search.type.${item.doc_type}`)}
                         </span>
                       </div>
                       {item.snippet && (
@@ -238,17 +236,17 @@ function SearchInner() {
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-                Prev
+                {t("page.audit.prev")}
               </button>
               <span className="text-sm text-gray-500 dark:text-gray-400">
-                Page {currentPage} of {totalPages}
+                {t("common.page")} {currentPage} {t("common.of")} {totalPages}
               </span>
               <button
                 onClick={() => handlePage(skip + PAGE_SIZE)}
                 disabled={skip + PAGE_SIZE >= results.total}
                 className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:text-gray-300"
               >
-                Next
+                {t("page.audit.next")}
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
@@ -265,9 +263,9 @@ function SearchInner() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-            Search across entities, authority records, and annotations
+            {t("page.search.empty_title")}
           </p>
-          <p className="mt-1 text-xs text-gray-400">Powered by SQLite FTS5 full-text search</p>
+          <p className="mt-1 text-xs text-gray-400">{t("page.search.empty_description")}</p>
         </div>
       )}
     </div>

@@ -45,44 +45,44 @@ const ACTION_COLOR: Record<string, string> = {
 };
 
 const ACTION_FILTERS = [
-  { key: "",                    label: "All" },
-  { key: "upload",              label: "Uploads" },
-  { key: "entity.update",       label: "Updates" },
-  { key: "entity.delete",       label: "Deletes" },
-  { key: "entity.bulk_delete",  label: "Bulk Deletes" },
-  { key: "harmonization.apply", label: "Harmonization" },
-  { key: "authority.confirm",   label: "Authority ✓" },
-  { key: "authority.reject",    label: "Authority ✗" },
+  { key: "",                    labelKey: "page.notifications.filter_all" },
+  { key: "upload",              labelKey: "page.notifications.filter_uploads" },
+  { key: "entity.update",       labelKey: "page.notifications.filter_updates" },
+  { key: "entity.delete",       labelKey: "page.notifications.filter_deletes" },
+  { key: "entity.bulk_delete",  labelKey: "page.notifications.filter_bulk_deletes" },
+  { key: "harmonization.apply", labelKey: "page.notifications.filter_harmonization" },
+  { key: "authority.confirm",   labelKey: "page.notifications.filter_authority_confirm" },
+  { key: "authority.reject",    labelKey: "page.notifications.filter_authority_reject" },
 ];
 
 const PAGE_SIZE = 30;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, t: (key: string, params?: Record<string, string | number>) => string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
+  if (s < 60) return t("page.notifications.time.seconds", { count: s });
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return t("page.notifications.time.minutes", { count: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t("page.notifications.time.hours", { count: h });
   const d = Math.floor(h / 24);
-  if (d < 30) return `${d}d ago`;
+  if (d < 30) return t("page.notifications.time.days", { count: d });
   return new Date(iso).toLocaleDateString();
 }
 
-function entryDetail(entry: NotifEntry): string {
+function entryDetail(entry: NotifEntry, t: (key: string, params?: Record<string, string | number>) => string): string {
   const d = entry.details;
   if (!d) return "";
-  if (entry.action === "upload")              return `${d.filename ?? ""} · ${d.rows ?? ""} rows`;
+  if (entry.action === "upload")              return `${d.filename ?? ""} · ${t("page.notifications.rows_label", { count: Number(d.rows ?? 0) })}`;
   if (entry.action === "entity.update") {
     const fields = Array.isArray(d.fields) ? (d.fields as string[]).join(", ") : "";
-    return fields ? `Fields: ${fields}` : entry.entity_id ? `Entity #${entry.entity_id}` : "";
+    return fields ? t("page.notifications.fields_label", { fields }) : entry.entity_id ? t("page.notifications.entity_label", { id: entry.entity_id }) : "";
   }
-  if (entry.action === "entity.bulk_delete")  return `${d.deleted ?? ""} entities removed`;
-  if (entry.action === "harmonization.apply") return `${d.step_name ?? d.step_id ?? ""} · ${d.records_updated ?? ""} records`;
-  if (entry.action === "authority.confirm")   return `"${d.canonical_label}"${d.rule_created ? " + rule" : ""}`;
+  if (entry.action === "entity.bulk_delete")  return t("page.notifications.entities_removed", { count: Number(d.deleted ?? 0) });
+  if (entry.action === "harmonization.apply") return `${d.step_name ?? d.step_id ?? ""} · ${t("page.notifications.records_label", { count: Number(d.records_updated ?? 0) })}`;
+  if (entry.action === "authority.confirm")   return `"${String(d.canonical_label ?? "")}"${d.rule_created ? ` ${t("page.notifications.plus_rule")}` : ""}`;
   return "";
 }
 
@@ -206,7 +206,7 @@ export default function NotificationsPage() {
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {page
-              ? `${page.total} total · ${unreadCount} unread`
+              ? t("page.notifications.summary", { total: page.total, unread: unreadCount })
               : t('page.notifications.loading')}
           </p>
         </div>
@@ -236,11 +236,6 @@ export default function NotificationsPage() {
       {/* ── Action type filter tabs ───────────────────────────────────────── */}
       <div className="mb-5 flex flex-wrap gap-1.5">
         {ACTION_FILTERS.map((f) => {
-          const filterLabel =
-            f.key === ""             ? t('page.notifications.filter_all') :
-            f.key === "upload"       ? t('page.notifications.filter_uploads') :
-            f.key === "entity.update" ? t('page.notifications.filter_updates') :
-            f.label;
           return (
             <button
               key={f.key}
@@ -251,7 +246,7 @@ export default function NotificationsPage() {
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               }`}
             >
-              {filterLabel}
+              {t(f.labelKey)}
             </button>
           );
         })}
@@ -259,12 +254,12 @@ export default function NotificationsPage() {
 
       {/* ── List ──────────────────────────────────────────────────────────── */}
       {loading && items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
           <svg className="mb-3 h-8 w-8 animate-spin" aria-hidden="true" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-sm">Loading notifications…</p>
+          <p className="text-sm">{t("page.notifications.loading_notifications")}</p>
         </div>
       ) : items.length === 0 ? (
         <EmptyState
@@ -272,14 +267,14 @@ export default function NotificationsPage() {
           title={t('page.notifications.empty_title')}
           description={t('page.notifications.empty_description')}
           size="page"
-          cta={action ? [{ label: "Clear filter", onClick: () => setAction("") }] : undefined}
+          cta={action ? [{ label: t("page.notifications.clear_filter"), onClick: () => setAction("") }] : undefined}
         />
       ) : (
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
             {items.map((entry) => {
               const isRead = entry.is_read || localRead.has(entry.id);
-              const detail = entryDetail(entry);
+              const detail = entryDetail(entry, t);
               const dotColor = ACTION_COLOR[entry.action] ?? "bg-gray-400";
 
               return (
@@ -304,7 +299,7 @@ export default function NotificationsPage() {
                       </span>
                       {entry.username && (
                         <span className="text-xs text-gray-400 dark:text-gray-500">
-                          by {entry.username}
+                          {t("page.notifications.by_user", { username: entry.username })}
                         </span>
                       )}
                     </div>
@@ -315,7 +310,7 @@ export default function NotificationsPage() {
                     )}
                     <div className="mt-1 flex flex-wrap items-center gap-3">
                       <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                        {entry.created_at ? timeAgo(entry.created_at) : ""}
+                        {entry.created_at ? timeAgo(entry.created_at, t) : ""}
                       </span>
 
                       {/* Action link */}
@@ -324,7 +319,7 @@ export default function NotificationsPage() {
                           href={entry.href}
                           className="text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
                         >
-                          View →
+                          {t("page.notifications.view_link")} →
                         </Link>
                       )}
                     </div>
@@ -338,7 +333,7 @@ export default function NotificationsPage() {
                         <button
                           onClick={() => handleMarkItemRead(entry.id)}
                           className="hidden text-[10px] font-medium text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 group-hover:block"
-                          title="Mark as read"
+                          title={t("page.notifications.mark_read_title")}
                         >
                           {t('page.notifications.mark_read_button')}
                         </button>
@@ -370,7 +365,7 @@ export default function NotificationsPage() {
                   <>
                     {t('page.notifications.load_more_button')}
                     <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                      {page!.total - items.length} remaining
+                      {t("page.notifications.remaining", { count: page!.total - items.length })}
                     </span>
                   </>
                 )}
