@@ -61,6 +61,9 @@ export default function DomainsPage() {
   const slideOverRef = useFocusTrap<HTMLDivElement>(showForm);
 
   const selectedDomain = domains.find(d => d.id === selectedId) ?? null;
+  const activeDomainLabel = activeDomainId ?? "—";
+
+  const getIconLabel = (icon: string) => t(`page.domains.icon.${icon}`);
 
   const flash = (type: "ok" | "err", msg: string) => {
     setFeedback({ type, msg });
@@ -73,10 +76,10 @@ export default function DomainsPage() {
   };
 
   const handleCreate = async () => {
-    if (!SLUG_RE.test(formId)) { flash("err", "ID must be lowercase letters, numbers or underscores, starting with a letter"); return; }
-    if (!formName.trim() || !formDesc.trim() || !formEntity.trim()) { flash("err", "Name, description and primary entity are required"); return; }
+    if (!SLUG_RE.test(formId)) { flash("err", t("page.domains.error_invalid_id")); return; }
+    if (!formName.trim() || !formDesc.trim() || !formEntity.trim()) { flash("err", t("page.domains.error_required_fields")); return; }
     const invalid = formAttrs.find(a => !SLUG_RE.test(a.name) || !a.label.trim());
-    if (invalid) { flash("err", `Attribute "${invalid.name || "(empty)"}" has an invalid name or missing label`); return; }
+    if (invalid) { flash("err", t("page.domains.error_invalid_attribute", { name: invalid.name || t("page.domains.empty_field_fallback") })); return; }
 
     setSaving(true);
     try {
@@ -86,37 +89,37 @@ export default function DomainsPage() {
         body: JSON.stringify({ id: formId, name: formName, description: formDesc, primary_entity: formEntity, icon: formIcon, attributes: formAttrs }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: "Unknown error" }));
-        flash("err", err.detail ?? "Failed to create domain");
+        const err = await res.json().catch(() => ({ detail: t("page.domains.error_unknown") }));
+        flash("err", err.detail ?? t("page.domains.error_create_failed"));
       } else {
         await refreshDomains();
-        flash("ok", `Domain "${formName}" created successfully`);
+        flash("ok", t("page.domains.success_created", { name: formName }));
         setShowForm(false);
         resetForm();
         setSelectedId(formId);
       }
     } catch {
-      flash("err", "Network error");
+      flash("err", t("page.domains.error_network"));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (domainId: string) => {
-    if (!confirm(`Delete domain "${domainId}"? This cannot be undone.`)) return;
+    if (!confirm(t("page.domains.delete_confirm", { id: domainId }))) return;
     setDeleting(domainId);
     try {
       const res = await apiFetch(`/domains/${domainId}`, { method: "DELETE" });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: "Unknown error" }));
-        flash("err", err.detail ?? "Failed to delete domain");
+        const err = await res.json().catch(() => ({ detail: t("page.domains.error_unknown") }));
+        flash("err", err.detail ?? t("page.domains.error_delete_failed"));
       } else {
         await refreshDomains();
-        flash("ok", `Domain "${domainId}" deleted`);
+        flash("ok", t("page.domains.success_deleted", { id: domainId }));
         if (selectedId === domainId) setSelectedId(null);
       }
     } catch {
-      flash("err", "Network error");
+      flash("err", t("page.domains.error_network"));
     } finally {
       setDeleting(null);
     }
@@ -129,9 +132,9 @@ export default function DomainsPage() {
   return (
     <div className="flex h-full flex-col gap-6">
       <PageHeader
-        breadcrumbs={[{ label: "Home", href: "/" }, { label: t('page.domains.breadcrumb') }]}
+        breadcrumbs={[{ label: t("nav.home"), href: "/" }, { label: t('page.domains.breadcrumb') }]}
         title={t('page.domains.title')}
-        description={`${domains.length} domain${domains.length !== 1 ? "s" : ""} registered · Active: ${activeDomainId}`}
+        description={t("page.domains.description", { count: domains.length, active: activeDomainLabel })}
         actions={isAdmin ? (
           <button
             onClick={() => { setShowForm(true); resetForm(); }}
@@ -184,13 +187,13 @@ export default function DomainsPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm text-gray-900 dark:text-white truncate">{d.name}</span>
                       {activeDomainId === d.id && (
-                        <Badge variant="info" dot>Active</Badge>
+                        <Badge variant="info" dot>{t("page.domains.active_badge")}</Badge>
                       )}
                       {BUILTIN_IDS.has(d.id) && (
-                        <Badge variant="default">built-in</Badge>
+                        <Badge variant="default">{t("page.domains.builtin_badge")}</Badge>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{d.primary_entity} · {d.attributes.length} attributes</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{t("page.domains.domain_card_meta", { entity: d.primary_entity, count: d.attributes.length })}</p>
                   </div>
                 </div>
               </div>
@@ -229,9 +232,9 @@ export default function DomainsPage() {
                 <div>
                   <h3 className="font-semibold text-gray-900 dark:text-white">{selectedDomain.name}</h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Primary entity: <span className="font-medium">{selectedDomain.primary_entity}</span>
+                    {t("page.domains.primary_entity_label")} <span className="font-medium">{selectedDomain.primary_entity}</span>
                     <span className="mx-2">·</span>
-                    {selectedDomain.attributes.length} attributes
+                    {t("page.domains.attributes_count", { count: selectedDomain.attributes.length })}
                   </p>
                 </div>
               </div>
@@ -243,7 +246,7 @@ export default function DomainsPage() {
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('page.domains.table_label_header')}</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('page.domains.table_type_header')}</th>
                       <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t('page.domains.table_required_header')}</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Core</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("page.domains.table_core_header")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -269,7 +272,7 @@ export default function DomainsPage() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           {attr.is_core
-                            ? <Badge variant="info">core</Badge>
+                            ? <Badge variant="info">{t("page.domains.core_badge")}</Badge>
                             : <span className="text-gray-300 dark:text-gray-600">–</span>}
                         </td>
                       </tr>
@@ -301,7 +304,7 @@ export default function DomainsPage() {
             {/* Form header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-800">
               <h3 id="new-domain-title" className="font-semibold text-gray-900 dark:text-white">{t('page.domains.form_title')}</h3>
-              <button onClick={() => setShowForm(false)} aria-label="Close" className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+              <button onClick={() => setShowForm(false)} aria-label={t("page.domains.close_button_aria")} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
                 <svg className="w-5 h-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -310,54 +313,54 @@ export default function DomainsPage() {
               {/* Basic info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="domain-id" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('page.domains.form_id_label')} <span className="text-red-500" aria-label="required">*</span></label>
+                  <label htmlFor="domain-id" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('page.domains.form_id_label')} <span className="text-red-500" aria-label={t("page.domains.required_aria")}>*</span></label>
                   <input
                     id="domain-id"
                     value={formId} onChange={e => setFormId(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-                    placeholder="e.g. humanities"
+                    placeholder={t("page.domains.form_id_placeholder")}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <p className="mt-1 text-xs text-gray-400">Lowercase, no spaces</p>
+                  <p className="mt-1 text-xs text-gray-400">{t("page.domains.form_id_help")}</p>
                 </div>
                 <div>
-                  <label htmlFor="domain-name" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('page.domains.form_name_label')} <span className="text-red-500" aria-label="required">*</span></label>
+                  <label htmlFor="domain-name" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('page.domains.form_name_label')} <span className="text-red-500" aria-label={t("page.domains.required_aria")}>*</span></label>
                   <input
                     id="domain-name"
                     value={formName} onChange={e => setFormName(e.target.value)}
-                    placeholder="e.g. Humanities"
+                    placeholder={t("page.domains.form_name_placeholder")}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label htmlFor="domain-desc" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('page.domains.form_description_label')} <span className="text-red-500" aria-label="required">*</span></label>
+                <label htmlFor="domain-desc" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('page.domains.form_description_label')} <span className="text-red-500" aria-label={t("page.domains.required_aria")}>*</span></label>
                 <input
                   id="domain-desc"
                   value={formDesc} onChange={e => setFormDesc(e.target.value)}
-                  placeholder="Short description of this domain"
+                  placeholder={t("page.domains.form_description_placeholder")}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="domain-entity" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Primary Entity <span className="text-red-500" aria-label="required">*</span></label>
+                  <label htmlFor="domain-entity" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("page.domains.form_entity_label")} <span className="text-red-500" aria-label={t("page.domains.required_aria")}>*</span></label>
                   <input
                     id="domain-entity"
                     value={formEntity} onChange={e => setFormEntity(e.target.value)}
-                    placeholder="e.g. Manuscript"
+                    placeholder={t("page.domains.form_entity_placeholder")}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label htmlFor="domain-icon" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Icon</label>
+                  <label htmlFor="domain-icon" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("page.domains.form_icon_label")}</label>
                   <select
                     id="domain-icon"
                     value={formIcon} onChange={e => setFormIcon(e.target.value)}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    {ICON_OPTIONS.map(ico => <option key={ico} value={ico}>{ico}</option>)}
+                    {ICON_OPTIONS.map(ico => <option key={ico} value={ico}>{getIconLabel(ico)}</option>)}
                   </select>
                 </div>
               </div>
@@ -365,7 +368,7 @@ export default function DomainsPage() {
               {/* Attributes */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Attributes <span className="text-red-500" aria-label="required">*</span></span>
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{t("page.domains.form_attributes_label")} <span className="text-red-500" aria-label={t("page.domains.required_aria")}>*</span></span>
                   <button
                     onClick={() => setFormAttrs(p => [...p, emptyAttr()])}
                     className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
@@ -379,31 +382,31 @@ export default function DomainsPage() {
                     <div key={i} className="grid grid-cols-12 gap-2 items-center">
                       <input
                         value={attr.name} onChange={e => updateAttr(i, "name", e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-                        placeholder="field_name"
-                        aria-label={`Attribute ${i + 1} field name`}
+                        placeholder={t("page.domains.attribute_name_placeholder")}
+                        aria-label={t("page.domains.attribute_name_aria", { index: i + 1 })}
                         className="col-span-3 rounded-lg border border-gray-300 px-2 py-1.5 text-xs font-mono dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                       <input
                         value={attr.label} onChange={e => updateAttr(i, "label", e.target.value)}
-                        placeholder="Label"
-                        aria-label={`Attribute ${i + 1} display label`}
+                        placeholder={t("page.domains.attribute_label_placeholder")}
+                        aria-label={t("page.domains.attribute_label_aria", { index: i + 1 })}
                         className="col-span-4 rounded-lg border border-gray-300 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                       <select
                         value={attr.type} onChange={e => updateAttr(i, "type", e.target.value)}
-                        aria-label={`Attribute ${i + 1} type`}
+                        aria-label={t("page.domains.attribute_type_aria", { index: i + 1 })}
                         className="col-span-2 rounded-lg border border-gray-300 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                       >
                         {["string","integer","float","boolean","array"].map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                       <label className="col-span-1 flex items-center justify-center gap-1 text-xs text-gray-500 cursor-pointer">
                         <input type="checkbox" checked={attr.required} onChange={e => updateAttr(i, "required", e.target.checked)} className="rounded" />
-                        <span>Req</span>
+                        <span>{t("page.domains.required_checkbox_label")}</span>
                       </label>
                       <button
                         onClick={() => setFormAttrs(p => p.filter((_, idx) => idx !== i))}
                         disabled={formAttrs.length === 1}
-                        aria-label={`Delete attribute ${i + 1}`}
+                        aria-label={t("page.domains.delete_attribute_aria", { index: i + 1 })}
                         className="col-span-2 flex justify-center text-gray-400 hover:text-red-500 disabled:opacity-30 transition-colors"
                       >
                         <svg className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

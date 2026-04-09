@@ -43,6 +43,10 @@ const COLORS = [
 
 const DOMAIN_PRESETS = ["default", "science", "healthcare", "all"];
 
+function getDomainPresetLabel(t: (key: string, params?: Record<string, string | number>) => string, domainId: string) {
+  return t(`page.compare.domain_preset.${domainId}`);
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function KPICard({ label, values, formatter = String }: {
@@ -96,7 +100,7 @@ export default function DomainComparePage() {
     setError(null);
     try {
       const res = await apiFetch(`/dashboard/compare?domains=${ids.join(",")}`);
-      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+      if (!res.ok) throw new Error(t("page.compare.error_status", { status: res.status }));
       setResult(await res.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : t("page.compare.error_load"));
@@ -150,7 +154,7 @@ export default function DomainComparePage() {
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               }`}
             >
-              {d}
+              {getDomainPresetLabel(t, d)}
             </button>
           ))}
         </div>
@@ -300,7 +304,7 @@ export default function DomainComparePage() {
                         {snap.top_entities.slice(0, 4).map(e => (
                           <a key={e.id} href={`/entities/${e.id}`}
                             className="block truncate text-xs text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400">
-                            {e.entity_name || `Entity #${e.id}`}
+                            {e.entity_name || t("page.compare.entity_fallback", { id: e.id })}
                             <span className="ml-1 text-gray-400">({e.citation_count})</span>
                           </a>
                         ))}
