@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import EntityTable from "../app/components/EntityTable";
+import { LanguageProvider } from "../app/contexts/LanguageContext";
 
 // ── Mock all external dependencies ────────────────────────────────────────
 
@@ -49,6 +50,11 @@ vi.stubGlobal("URL", {
 
 import { apiFetch } from "@/lib/api";
 const mockApiFetch = apiFetch as ReturnType<typeof vi.fn>;
+
+function renderWithLanguage(ui: React.ReactElement) {
+  window.localStorage.setItem("app_lang", "en");
+  return render(<LanguageProvider>{ui}</LanguageProvider>);
+}
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -105,7 +111,7 @@ describe("EntityTable", () => {
   it("shows skeleton loader while fetching", () => {
     // Never resolve — stays loading
     mockApiFetch.mockReturnValue(new Promise(() => {}));
-    render(<EntityTable />);
+    renderWithLanguage(<EntityTable />);
     expect(document.querySelectorAll("[aria-hidden='true']").length).toBeGreaterThan(0);
   });
 
@@ -113,7 +119,7 @@ describe("EntityTable", () => {
     mockApiFetch.mockResolvedValue(
       successResponse(MOCK_ENTITIES, { "X-Total-Count": "2" })
     );
-    render(<EntityTable />);
+    renderWithLanguage(<EntityTable />);
     await waitFor(() => {
       expect(screen.getByText("Einstein")).toBeInTheDocument();
       expect(screen.getByText("CERN")).toBeInTheDocument();
@@ -122,7 +128,7 @@ describe("EntityTable", () => {
 
   it("shows ErrorBanner on fetch failure", async () => {
     mockApiFetch.mockResolvedValue({ ok: false, headers: { get: () => null }, json: async () => ({}) });
-    render(<EntityTable />);
+    renderWithLanguage(<EntityTable />);
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
     });
@@ -132,7 +138,7 @@ describe("EntityTable", () => {
     mockApiFetch.mockResolvedValue(
       successResponse(MOCK_ENTITIES, { "X-Total-Count": "2" })
     );
-    render(<EntityTable />);
+    renderWithLanguage(<EntityTable />);
     await waitFor(() => {
       // Einstein has score 0.9 → 90%
       expect(screen.getByText("90%")).toBeInTheDocument();
@@ -141,7 +147,7 @@ describe("EntityTable", () => {
 
   it("renders search input", async () => {
     mockApiFetch.mockResolvedValue(successResponse([], { "X-Total-Count": "0" }));
-    render(<EntityTable />);
+    renderWithLanguage(<EntityTable />);
     await waitFor(() => {
       expect(screen.getByPlaceholderText("Search entities...")).toBeInTheDocument();
     });
@@ -149,7 +155,7 @@ describe("EntityTable", () => {
 
   it("typing in search triggers a new fetch", async () => {
     mockApiFetch.mockResolvedValue(successResponse(MOCK_ENTITIES, { "X-Total-Count": "2" }));
-    render(<EntityTable />);
+    renderWithLanguage(<EntityTable />);
     await waitFor(() => screen.getByPlaceholderText("Search entities..."));
 
     await act(async () => {
@@ -164,7 +170,7 @@ describe("EntityTable", () => {
 
   it("shows FacetPanel", async () => {
     mockApiFetch.mockResolvedValue(successResponse([], { "X-Total-Count": "0" }));
-    render(<EntityTable />);
+    renderWithLanguage(<EntityTable />);
     await waitFor(() => {
       expect(screen.getByTestId("facet-panel")).toBeInTheDocument();
     });
@@ -172,7 +178,7 @@ describe("EntityTable", () => {
 
   it("shows empty state message when no entities match", async () => {
     mockApiFetch.mockResolvedValue(successResponse([], { "X-Total-Count": "0" }));
-    render(<EntityTable />);
+    renderWithLanguage(<EntityTable />);
     await waitFor(() => {
       expect(screen.getByText(/no entities/i)).toBeInTheDocument();
     });

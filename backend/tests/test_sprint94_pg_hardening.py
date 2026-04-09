@@ -125,7 +125,9 @@ class TestDeploymentArtifacts:
     def test_dockerfile_references_requirements(self):
         content = pathlib.Path("Dockerfile.backend").read_text()
         assert "requirements.txt" in content
-        assert "alembic upgrade head" in content
+        assert "backend-entrypoint.sh" in content
+        entrypoint = pathlib.Path("docker/backend-entrypoint.sh").read_text()
+        assert "alembic upgrade head" in entrypoint
 
     def test_docker_compose_has_postgres_service(self):
         content = pathlib.Path("docker-compose.yml").read_text()

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 import Header from "../app/components/Header";
+import { LanguageProvider } from "../app/contexts/LanguageContext";
 
 // Subvenciones (Mocks) para los contextos y dependencias
 vi.mock("next/navigation", () => ({
@@ -41,30 +42,35 @@ vi.mock("../app/components/UserMenu", () => ({
   default: () => <div data-testid="user-menu">User Context</div>,
 }));
 
+function renderWithLanguage(ui: React.ReactElement) {
+  window.localStorage.setItem("app_lang", "en");
+  return render(<LanguageProvider>{ui}</LanguageProvider>);
+}
+
 describe("Header Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("renders the proper page title based on the pathname", () => {
-    render(<Header />);
+    renderWithLanguage(<Header />);
     expect(screen.getByText("Analytics")).toBeInTheDocument();
   });
 
   it("displays the workspace selector with available domains", () => {
-    render(<Header />);
+    renderWithLanguage(<Header />);
     expect(screen.getByRole("combobox", { name: /Active workspace domain/i })).toBeInTheDocument();
     expect(screen.getByText("Default Workspace")).toBeInTheDocument();
   });
 
   it("renders global elements: notification bell and user menu", () => {
-    render(<Header />);
+    renderWithLanguage(<Header />);
     expect(screen.getByTestId("notification-bell")).toBeInTheDocument();
     expect(screen.getByTestId("user-menu")).toBeInTheDocument();
   });
 
   it("contains the global search input", () => {
-    render(<Header />);
+    renderWithLanguage(<Header />);
     expect(screen.getByPlaceholderText(/Search/i)).toBeInTheDocument();
   });
 });
