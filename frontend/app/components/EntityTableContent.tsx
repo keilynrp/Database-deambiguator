@@ -38,7 +38,7 @@ const CORE_ATTRIBUTE_LABEL_KEYS: Record<string, string> = {
     canonical_id: "page.import.field.canonical_id",
     entity_type: "page.import.field.entity_type",
     domain: "page.import.field.domain",
-    validation_status: "page.import.field.validation_status",
+    validation_status: "page.entity_table.review_status",
 };
 
 function enrichmentBadgeMeta(
@@ -161,7 +161,15 @@ export default function EntityTableContent({
                             <th className={`${thClass} no-wrap w-16`}>{t("page.entity_table.id")}</th>
                             {activeDomain ? (
                                 activeDomain.attributes.map((attribute) => (
-                                    <th key={attribute.name} className={`${thClass} no-wrap`}>
+                                    <th
+                                        key={attribute.name}
+                                        className={`${thClass} no-wrap`}
+                                        title={
+                                            attribute.name === "validation_status"
+                                                ? t("page.entity_table.review_status_help")
+                                                : undefined
+                                        }
+                                    >
                                         {CORE_ATTRIBUTE_LABEL_KEYS[attribute.name]
                                             ? t(CORE_ATTRIBUTE_LABEL_KEYS[attribute.name])
                                             : attribute.label}
@@ -170,7 +178,12 @@ export default function EntityTableContent({
                             ) : (
                                 <th className={`${thClass} no-wrap`}>{t("entities.primary_label")}</th>
                             )}
-                            <th className={`${thClass} no-wrap`}>{t("page.entity_table.system_status")}</th>
+                            <th
+                                className={`${thClass} no-wrap`}
+                                title={t("page.entity_table.system_status_help")}
+                            >
+                                {t("page.entity_table.system_status")}
+                            </th>
                             <th
                                 className={`${thClass} no-wrap cursor-pointer select-none`}
                                 onClick={onSortQuality}
