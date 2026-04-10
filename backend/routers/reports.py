@@ -6,6 +6,8 @@ Report builder endpoints.
   POST /exports/excel
 """
 import logging
+import os
+from pathlib import Path
 from importlib import import_module
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -24,8 +26,34 @@ from backend.exporters.pptx_exporter import generate_pptx as _generate_pptx
 from backend.tenant_access import resolve_request_org_id
 
 logger = logging.getLogger(__name__)
+_WEASYPRINT_DLL_HANDLES: list[object] = []
+_WEASYPRINT_DLL_DIRS: set[str] = set()
+
+
+def _register_windows_weasyprint_runtime() -> None:
+    if os.name != "nt" or not hasattr(os, "add_dll_directory"):
+        return
+
+    candidate_dirs = []
+    env_dir = os.environ.get("WEASYPRINT_DLL_PATH")
+    if env_dir:
+        candidate_dirs.append(Path(env_dir))
+    candidate_dirs.extend([
+        Path(r"C:\msys64\ucrt64\bin"),
+        Path(r"C:\msys64\mingw64\bin"),
+    ])
+
+    for dll_dir in candidate_dirs:
+        if not dll_dir.exists():
+            continue
+        dll_dir_str = str(dll_dir)
+        if dll_dir_str.lower() not in _WEASYPRINT_DLL_DIRS:
+            handle = os.add_dll_directory(dll_dir_str)
+            _WEASYPRINT_DLL_HANDLES.append(handle)
+            _WEASYPRINT_DLL_DIRS.add(dll_dir_str.lower())
 
 def _load_weasyprint_html():
+    _register_windows_weasyprint_runtime()
     module = import_module("weasyprint")
     return module.HTML
 
