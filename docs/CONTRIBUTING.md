@@ -25,6 +25,10 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r requirements.lock
 
+# Optional for PDF export on Windows:
+# install the GTK runtime required by WeasyPrint
+# (or run PDF export from Docker / Linux)
+
 # Start local PostgreSQL
 docker compose -f docker-compose.dev.yml up -d postgres
 
@@ -44,6 +48,10 @@ npm run dev
 ```
 
 The frontend runs at `http://localhost:3004` and the backend at `http://localhost:8000`.
+
+PDF export note:
+- `weasyprint` is included in `requirements.lock`, but on Windows it also needs native GTK libraries.
+- If `/exports/pdf` reports missing runtime libraries, install the GTK runtime and restart the backend, or use Docker/Linux for PDF generation.
 
 ## Project Structure
 

@@ -176,6 +176,11 @@ Para backend:
 
 Usa `requirements.lock` para entornos repetibles, CI y despliegues.
 
+Nota de PDF en Windows:
+- `weasyprint` ya viene en `requirements.lock`, pero la exportacion PDF tambien necesita librerias nativas GTK.
+- Si `/exports/pdf` devuelve que faltan runtime libraries, instala el GTK runtime para Windows y reinicia el backend.
+- Alternativa simple: ejecutar la exportacion PDF desde Docker o Linux.
+
 ## 8. Que tocar segun el tipo de cambio
 
 ### Si cambias persistencia o datos

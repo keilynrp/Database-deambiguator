@@ -264,6 +264,32 @@ def _section_decision_recommendations(db: Session, domain_id: str, org_id: int |
     <p style="color:#9ca3af;padding:12px 0">No recommendation signals yet — import or enrich more records to generate a prioritized action list.</p>
 </section>"""
 
+    def _priority_badge(priority: str) -> str:
+        if priority == "high":
+            return '<span class="badge badge-red">High priority</span>'
+        if priority == "medium":
+            return '<span class="badge badge-amber">Medium priority</span>'
+        return '<span class="badge badge-gray">Low priority</span>'
+
+    cards = "".join(
+        f"""
+        <div class="stat-card">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+                <div class="label">{action["category"].replace("_", " ")}</div>
+                {_priority_badge(action["priority"])}
+            </div>
+            <div style="font-size:16px;font-weight:700;color:#111827;margin-top:8px">{action["title"]}</div>
+            <div class="sub" style="margin-top:8px;color:#4b5563">{action["detail"]}</div>
+            <div style="margin-top:10px;font-size:12px;color:#6b7280">{action["evidence"]}</div>
+        </div>"""
+        for action in actions
+    )
+
+    return f"""<section>
+    <h2>Suggested Next Actions</h2>
+    <div class="grid">{cards}</div>
+</section>"""
+
 
 def _section_institutional_benchmark(
     db: Session,
@@ -326,33 +352,6 @@ def _section_institutional_benchmark(
         <tbody>{rows if rows else '<tr><td colspan="3" style="color:#9ca3af;text-align:center;padding:20px">No major benchmark gaps detected.</td></tr>'}</tbody>
     </table>
 </section>"""
-
-    def _priority_badge(priority: str) -> str:
-        if priority == "high":
-            return '<span class="badge badge-red">High priority</span>'
-        if priority == "medium":
-            return '<span class="badge badge-amber">Medium priority</span>'
-        return '<span class="badge badge-gray">Low priority</span>'
-
-    cards = "".join(
-        f"""
-        <div class="stat-card">
-            <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
-                <div class="label">{action["category"].replace("_", " ")}</div>
-                {_priority_badge(action["priority"])}
-            </div>
-            <div style="font-size:16px;font-weight:700;color:#111827;margin-top:8px">{action["title"]}</div>
-            <div class="sub" style="margin-top:8px;color:#4b5563">{action["detail"]}</div>
-            <div style="margin-top:10px;font-size:12px;color:#6b7280">{action["evidence"]}</div>
-        </div>"""
-        for action in actions
-    )
-
-    return f"""<section>
-    <h2>Suggested Next Actions</h2>
-    <div class="grid">{cards}</div>
-</section>"""
-
 
 # ── Public API ────────────────────────────────────────────────────────────────
 

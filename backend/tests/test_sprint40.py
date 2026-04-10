@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import openpyxl
 
 from backend import models
+from backend.routers import reports as reports_router
 
 
 _REPORT_PAYLOAD = {
@@ -72,6 +73,37 @@ def test_html_report_accepts_decision_recommendations_section(client, auth_heade
     resp = client.post("/reports/generate", json=payload, headers=auth_headers)
     assert resp.status_code == 200
     assert "Suggested Next Actions" in resp.text
+
+
+def test_pdf_accepts_full_pilot_sections(client, auth_headers):
+    payload = {
+        "domain_id": "default",
+        "sections": [
+            "entity_stats",
+            "enrichment_coverage",
+            "decision_recommendations",
+            "institutional_benchmark",
+            "top_brands",
+            "topic_clusters",
+        ],
+        "title": "Pilot PDF",
+    }
+    fake_pdf = b"%PDF-1.4 fake"
+    with patch(_MOCK_WEASY, return_value=fake_pdf):
+        resp = client.post("/exports/pdf", json=payload, headers=auth_headers)
+
+    assert resp.status_code == 200
+    assert "application/pdf" in resp.headers["content-type"]
+
+
+def test_make_pdf_returns_501_when_weasyprint_runtime_is_missing():
+    with patch.object(reports_router, "_load_weasyprint_html", side_effect=OSError("missing libgobject")):
+        with pytest.raises(Exception) as exc_info:
+            reports_router._make_pdf("<html></html>")
+
+    exc = exc_info.value
+    assert getattr(exc, "status_code", None) == 501
+    assert "GTK runtime" in getattr(exc, "detail", "")
 
 
 def test_html_report_accepts_institutional_benchmark_section(client, auth_headers):

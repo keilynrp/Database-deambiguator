@@ -306,7 +306,18 @@ export default function ExecutiveDashboardPage() {
           title: tr("page.exec_dashboard.export_title", "Executive Dashboard Report"),
         }),
       });
-      if (!res.ok) { setError(tr("page.exec_dashboard.pdf_export_failed", "PDF export failed (WeasyPrint may not be installed)")); return; }
+      if (!res.ok) {
+        let detail = tr("page.exec_dashboard.pdf_export_failed", "PDF export failed.");
+        try {
+          const payload = await res.json();
+          detail = payload.detail || detail;
+        } catch {
+          const text = await res.text();
+          if (text) detail = text;
+        }
+        setError(detail);
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -314,8 +325,8 @@ export default function ExecutiveDashboardPage() {
       a.download = `dashboard_${activeDomainId}_${new Date().toISOString().slice(0, 10)}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setError(tr("page.exec_dashboard.pdf_export_error", "PDF export error"));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : tr("page.exec_dashboard.pdf_export_error", "PDF export error"));
     } finally {
       setExporting(false);
     }

@@ -6,6 +6,7 @@ Report builder endpoints.
   POST /exports/excel
 """
 import logging
+from importlib import import_module
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -24,16 +25,29 @@ from backend.tenant_access import resolve_request_org_id
 
 logger = logging.getLogger(__name__)
 
+def _load_weasyprint_html():
+    module = import_module("weasyprint")
+    return module.HTML
+
+
 # WeasyPrint is imported lazily so the app starts even without it installed.
 def _make_pdf(html: str) -> bytes:
     try:
-        from weasyprint import HTML as _WPHTML  # type: ignore
+        _WPHTML = _load_weasyprint_html()
         return _WPHTML(string=html).write_pdf()
-    except ImportError:
+    except ImportError as exc:
         raise HTTPException(
             status_code=501,
             detail="PDF export requires weasyprint. Install it with: pip install weasyprint",
-        )
+        ) from exc
+    except OSError as exc:
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "PDF export requires native WeasyPrint runtime libraries. "
+                "On Windows, install the GTK runtime (or run PDF export from Docker/Linux) and restart the backend."
+            ),
+        ) from exc
 
 router = APIRouter(tags=["reports"])
 
