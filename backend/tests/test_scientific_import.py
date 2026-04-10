@@ -300,3 +300,137 @@ def test_arxiv_registered():
     from backend.adapters.scientific import list_sources
     ids = [s["id"] for s in list_sources()]
     assert "arxiv" in ids
+
+
+# ---- Router tests ----
+# These use the conftest fixtures: client, auth_headers, editor_headers, db_session
+
+def test_get_scientific_sources(client, auth_headers):
+    resp = client.get("/scientific/sources", headers=auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    ids = [s["id"] for s in data]
+    assert "crossref" in ids
+    assert "pubmed" in ids
+    assert "arxiv" in ids
+
+def test_scientific_search_crossref(client, auth_headers):
+    with patch("backend.adapters.scientific.crossref.CrossRefAdapter.search") as mock_search:
+        mock_search.return_value = [
+            ScientificRecord(source_api="crossref", title="Test paper", doi="10.1234/test", year=2023)
+        ]
+        resp = client.post(
+            "/scientific/search",
+            json={"source": "crossref", "query": "CRISPR", "max_results": 5},
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    results = resp.json()
+    assert len(results) == 1
+    assert results[0]["title"] == "Test paper"
+
+def test_scientific_import_creates_entities(client, auth_headers, db_session):
+    with patch("backend.adapters.scientific.crossref.CrossRefAdapter.search") as mock_search:
+        mock_search.return_value = [
+            ScientificRecord(
+                source_api="crossref",
+                title="Importable paper",
+                doi="10.1234/importme-unique-xyz",
+                authors=["Smith, J."],
+                year=2022,
+                concepts=["biology"],
+            )
+        ]
+        resp = client.post(
+            "/scientific/import",
+            json={"source": "crossref", "query": "biology", "max_results": 5},
+            headers=auth_headers,
+        )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["imported"] == 1
+    assert body["skipped"] == 0
+
+def test_scientific_import_skips_duplicate_doi(client, auth_headers):
+    """Import the same DOI twice via the router; second call must skip it."""
+    doi = "10.1234/dup-skip-test-doi-unique"
+    record = ScientificRecord(source_api="crossref", title="Dup paper", doi=doi, year=2022)
+
+    with patch("backend.adapters.scientific.crossref.CrossRefAdapter.search") as mock_search:
+        mock_search.return_value = [record]
+        first = client.post(
+            "/scientific/import",
+            json={"source": "crossref", "query": "biology", "max_results": 5},
+            headers=auth_headers,
+        )
+    assert first.status_code == 201
+    assert first.json()["imported"] == 1
+
+    with patch("backend.adapters.scientific.crossref.CrossRefAdapter.search") as mock_search:
+        mock_search.return_value = [record]
+        second = client.post(
+            "/scientific/import",
+            json={"source": "crossref", "query": "biology", "max_results": 5},
+            headers=auth_headers,
+        )
+    assert second.status_code == 201
+    body = second.json()
+    assert body["imported"] == 0
+    assert body["skipped"] == 1
+
+def test_scientific_doi_batch(client, auth_headers):
+    with patch("backend.adapters.scientific.crossref.CrossRefAdapter.fetch_batch_dois") as mock_batch:
+        mock_batch.return_value = [
+            ScientificRecord(source_api="crossref", title="Batched paper", doi="10.1234/batch-unique-abc", year=2021)
+        ]
+        resp = client.post(
+            "/scientific/dois",
+            json={"dois": ["10.1234/batch-unique-abc"], "source": "crossref"},
+            headers=auth_headers,
+        )
+    assert resp.status_code == 201
+    assert resp.json()["imported"] == 1
+
+def test_scientific_search_empty_results(client, auth_headers):
+    with patch("backend.adapters.scientific.crossref.CrossRefAdapter.search") as mock_search:
+        mock_search.return_value = []
+        resp = client.post(
+            "/scientific/search",
+            json={"source": "crossref", "query": "xyznothing"},
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+def test_scientific_import_empty_returns_201(client, auth_headers):
+    with patch("backend.adapters.scientific.crossref.CrossRefAdapter.search") as mock_search:
+        mock_search.return_value = []
+        resp = client.post(
+            "/scientific/import",
+            json={"source": "crossref", "query": "xyznothing"},
+            headers=auth_headers,
+        )
+    assert resp.status_code == 201
+    assert resp.json() == {"imported": 0, "skipped": 0}
+
+def test_scientific_search_unknown_source(client, auth_headers):
+    resp = client.post(
+        "/scientific/search",
+        json={"source": "doesnotexist", "query": "anything"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400
+
+def test_scientific_search_requires_auth(client):
+    resp = client.post("/scientific/search", json={"source": "crossref", "query": "test"})
+    assert resp.status_code == 401
+
+def test_scientific_import_requires_editor(client, viewer_headers):
+    with patch("backend.adapters.scientific.crossref.CrossRefAdapter.search") as mock_search:
+        mock_search.return_value = []
+        resp = client.post(
+            "/scientific/import",
+            json={"source": "crossref", "query": "test"},
+            headers=viewer_headers,
+        )
+    assert resp.status_code == 403

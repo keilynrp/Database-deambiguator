@@ -54,6 +54,7 @@ from backend.routers import (
     reports,
     sales_deck,
     scheduled_imports,
+    scientific_import,
     scrapers,
     search,
     stores,
@@ -342,6 +343,7 @@ app.include_router(api_keys.router)
 app.include_router(sales_deck.router)
 app.include_router(organizations.router)
 app.include_router(transformations.router)
+app.include_router(scientific_import.router)
 app.include_router(scrapers.router)
 app.include_router(onboarding.router)
 app.include_router(widgets.router)
