@@ -17,7 +17,7 @@ from backend import models
 from backend.adapters.scientific import get_scientific_adapter, list_sources
 from backend.adapters.scientific.base import ScientificRecord
 from backend.parsers.science_mapper import science_record_to_entity
-from backend.tenant_access import resolve_request_org_id
+from backend.tenant_access import resolve_request_org_id, persisted_org_id
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/scientific", tags=["scientific-import"])
@@ -31,7 +31,7 @@ class SearchRequest(BaseModel):
 
 
 class DoiBatchRequest(BaseModel):
-    dois: list = Field(min_length=1, max_length=200)
+    dois: list[str] = Field(min_length=1, max_length=200)
     source: str = Field(default="crossref")
     config: dict = Field(default_factory=dict)
 
@@ -78,8 +78,9 @@ def _save_records(records: list, db: Session, org_id: Optional[int]) -> dict:
         entity_kwargs["enrichment_citation_count"] = rec.citation_count or 0
         entity_kwargs["enrichment_source"] = rec.source_api
         entity_kwargs["source"] = "scientific_import"
-        if org_id:
-            entity_kwargs["org_id"] = org_id
+        stored_org = persisted_org_id(org_id)
+        if stored_org is not None:
+            entity_kwargs["org_id"] = stored_org
         db.add(models.RawEntity(**entity_kwargs))
         imported += 1
     db.commit()
