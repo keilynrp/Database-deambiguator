@@ -162,3 +162,18 @@ def test_trigger_bulk_marks_none_and_failed_as_pending(db_session):
     assert e_fail.enrichment_status == "pending"
     assert e_done.enrichment_status == "completed"  # untouched
     assert e_proc.enrichment_status == "processing"  # untouched
+
+
+def test_trigger_bulk_can_scope_to_domain(db_session):
+    target = models.RawEntity(primary_label="Domain Target", domain="science", enrichment_status="none")
+    other = models.RawEntity(primary_label="Other Domain", domain="business", enrichment_status="none")
+    db_session.add_all([target, other])
+    db_session.commit()
+
+    count = trigger_enrichment_bulk(db_session, domain_id="science")
+
+    assert count == 1
+    db_session.refresh(target)
+    db_session.refresh(other)
+    assert target.enrichment_status == "pending"
+    assert other.enrichment_status == "none"

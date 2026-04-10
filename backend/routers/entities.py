@@ -430,12 +430,19 @@ def enrich_bulk_queue(
     request: Request,
     skip: int = 0,
     limit: int = 100,
+    domain_id: str | None = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
 ):
     """Queues missing records for background enrichment."""
     org_id = resolve_request_org_id(db, current_user)
-    count = enrichment_worker.trigger_enrichment_bulk(db, skip=skip, limit=limit, org_id=org_id)
+    count = enrichment_worker.trigger_enrichment_bulk(
+        db,
+        skip=skip,
+        limit=limit,
+        org_id=org_id,
+        domain_id=domain_id,
+    )
     return {"message": "Bulk queue triggered", "queued_records": count}
 
 

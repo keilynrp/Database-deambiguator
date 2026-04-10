@@ -41,6 +41,10 @@ class TestEnrichEndpointsRequireAuth:
         response = client.post("/enrich/bulk")
         assert response.status_code == 401
 
+    def test_enrich_bulk_for_domain_without_token(self, client):
+        response = client.post("/enrich/bulk?domain_id=default")
+        assert response.status_code == 401
+
 
 class TestHarmonizationMutationsRequireAuth:
     def test_apply_step_without_token(self, client):

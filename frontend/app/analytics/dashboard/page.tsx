@@ -12,7 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { PageHeader, StatCard, ErrorBanner, SkeletonCard } from "../../components/ui";
+import { PageHeader, StatCard, ErrorBanner, SkeletonCard, useToast } from "../../components/ui";
 import ConceptCloud from "../../components/ConceptCloud";
 import { useDomain } from "../../contexts/DomainContext";
 import { useLanguage } from "../../contexts/LanguageContext";
@@ -159,6 +159,7 @@ function SourceBadge({ source }: { source: string | null }) {
 export default function ExecutiveDashboardPage() {
   const { activeDomainId, setActiveDomainId } = useDomain();
   const { t } = useLanguage();
+  const { toast } = useToast();
   const searchParams = useSearchParams();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -166,6 +167,7 @@ export default function ExecutiveDashboardPage() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL_SEC);
   const [exporting, setExporting] = useState(false);
+  const [queueingBulkEnrichment, setQueueingBulkEnrichment] = useState(false);
   const [benchmarkProfiles, setBenchmarkProfiles] = useState<BenchmarkProfile[]>([]);
   const [selectedBenchmarkProfile, setSelectedBenchmarkProfile] = useState(
     searchParams.get("benchmark_profile") || "research_portfolio_baseline",
@@ -318,6 +320,32 @@ export default function ExecutiveDashboardPage() {
       setExporting(false);
     }
   };
+
+  const handleBulkEnrichment = useCallback(async () => {
+    setQueueingBulkEnrichment(true);
+    try {
+      const params = new URLSearchParams({ limit: "250" });
+      if (activeDomainId) {
+        params.set("domain_id", activeDomainId);
+      }
+      const response = await apiFetch(`/enrich/bulk?${params.toString()}`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = await response.json();
+      toast(
+        t("page.exec_dashboard.bulk_enrich_success", { count: payload.queued_records ?? 0 }),
+        "success",
+      );
+      await fetchDashboard();
+    } catch {
+      toast(tr("page.exec_dashboard.bulk_enrich_failed", "Bulk enrichment could not be queued."), "error");
+    } finally {
+      setQueueingBulkEnrichment(false);
+    }
+  }, [activeDomainId, fetchDashboard, t, toast, tr]);
 
   // Compute heatmap max for scaling
   const heatMax = data
@@ -575,6 +603,17 @@ export default function ExecutiveDashboardPage() {
               <p className="text-sm font-semibold">{highlight.title}</p>
               <p className="mt-2 text-sm opacity-90">{highlight.detail}</p>
               <p className="mt-3 text-xs font-medium opacity-75">{highlight.evidence}</p>
+              {highlight.id === "bulk_enrichment" && (
+                <button
+                  onClick={handleBulkEnrichment}
+                  disabled={queueingBulkEnrichment}
+                  className="mt-4 inline-flex items-center rounded-lg bg-white/80 px-3 py-2 text-xs font-semibold text-gray-900 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-gray-900/70 dark:text-white dark:hover:bg-gray-900"
+                >
+                  {queueingBulkEnrichment
+                    ? tr("page.exec_dashboard.bulk_enrich_queueing", "Queueing enrichment…")
+                    : tr("page.exec_dashboard.bulk_enrich_cta", "Queue bulk enrichment")}
+                </button>
+              )}
             </div>
           ))}
         </div>

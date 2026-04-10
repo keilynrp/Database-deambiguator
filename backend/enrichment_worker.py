@@ -257,6 +257,7 @@ def trigger_enrichment_bulk(
     skip: int = 0,
     limit: int = 100,
     org_id: int | None = None,
+    domain_id: str | None = None,
 ) -> int:
     """
     Marks a batch of 'none' or 'failed' entities as 'pending' so the background
@@ -265,10 +266,16 @@ def trigger_enrichment_bulk(
     entities = (
         scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
         .filter(models.RawEntity.enrichment_status.in_(["none", "failed"]))
-        .offset(skip)
-        .limit(limit)
-        .all()
     )
+    if domain_id and domain_id != "all":
+        if domain_id == "default":
+            entities = entities.filter(
+                (models.RawEntity.domain == domain_id)
+                | (models.RawEntity.domain == None)  # noqa: E711
+            )
+        else:
+            entities = entities.filter(models.RawEntity.domain == domain_id)
+    entities = entities.offset(skip).limit(limit).all()
     for entity in entities:
         entity.enrichment_status = "pending"
     db.commit()
