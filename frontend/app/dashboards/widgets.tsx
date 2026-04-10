@@ -19,6 +19,11 @@ export interface WidgetConfig {
   config: Record<string, unknown>;
 }
 
+function resolveWidgetDomain(config: Record<string, unknown>): string {
+  const configured = config.domain_id ?? config.domain;
+  return typeof configured === "string" && configured.trim() ? configured : "default";
+}
+
 // ── Shared shell ──────────────────────────────────────────────────────────────
 
 function WidgetShell({
@@ -55,7 +60,7 @@ function WidgetShell({
 export function EntityKpiWidget({ config }: { config: WidgetConfig }) {
   const [data, setData] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
-  const domain = (config.config.domain_id as string) || "default";
+  const domain = resolveWidgetDomain(config.config);
 
   useEffect(() => {
     apiFetch(`/stats?domain_id=${domain}`)
@@ -94,7 +99,7 @@ const PIE_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444"];
 export function EnrichmentCoverageWidget({ config }: { config: WidgetConfig }) {
   const [data, setData] = useState<{ name: string; value: number }[]>([]);
   const [loading, setLoading] = useState(true);
-  const domain = (config.config.domain_id as string) || "default";
+  const domain = resolveWidgetDomain(config.config);
 
   useEffect(() => {
     apiFetch(`/stats?domain_id=${domain}`)
@@ -130,7 +135,7 @@ export function EnrichmentCoverageWidget({ config }: { config: WidgetConfig }) {
 export function TopEntitiesWidget({ config }: { config: WidgetConfig }) {
   const [rows, setRows] = useState<{ id: number; name: string; quality_score: number | null; enrichment_status: string }[]>([]);
   const [loading, setLoading] = useState(true);
-  const domain = (config.config.domain_id as string) || "default";
+  const domain = resolveWidgetDomain(config.config);
 
   useEffect(() => {
     apiFetch(`/entities?domain_id=${domain}&limit=8&sort=quality_score&order=desc`)
@@ -199,7 +204,7 @@ export function TopBrandsWidget({ config }: { config: WidgetConfig }) {
 export function ConceptCloudWidget({ config }: { config: WidgetConfig }) {
   const [concepts, setConcepts] = useState<{ concept: string; count: number }[]>([]);
   const [loading, setLoading] = useState(true);
-  const domain = (config.config.domain_id as string) || "default";
+  const domain = resolveWidgetDomain(config.config);
 
   useEffect(() => {
     apiFetch(`/analyzers/topics/${domain}?limit=20`)
@@ -275,7 +280,7 @@ export function RecentActivityWidget({ config }: { config: WidgetConfig }) {
 export function QualityHistogramWidget({ config }: { config: WidgetConfig }) {
   const [data, setData] = useState<{ range: string; count: number }[]>([]);
   const [loading, setLoading] = useState(true);
-  const domain = (config.config.domain_id as string) || "default";
+  const domain = resolveWidgetDomain(config.config);
 
   useEffect(() => {
     apiFetch(`/entities?domain_id=${domain}&limit=500`)
@@ -321,7 +326,7 @@ export function OlapSnapshotWidget({ config }: { config: WidgetConfig }) {
   const [cols, setCols] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const domain = (config.config.domain_id as string) || "default";
+  const domain = resolveWidgetDomain(config.config);
   const groupBy = useMemo(() => {
     const configured = config.config.group_by;
     return Array.isArray(configured) ? configured as string[] : [];

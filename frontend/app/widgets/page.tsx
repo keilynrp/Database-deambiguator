@@ -66,7 +66,8 @@ function WidgetForm({
   const { t } = useLanguage();
   const [name, setName] = useState(initial?.name ?? "");
   const [type, setType] = useState<WidgetType>(initial?.widget_type ?? "entity_stats");
-  const [domain, setDomain] = useState((initial?.config as Record<string, string>)?.domain ?? "");
+  const initialConfig = (initial?.config as Record<string, string>) ?? {};
+  const [domain, setDomain] = useState(initialConfig.domain_id ?? initialConfig.domain ?? "");
   const [limit, setLimit] = useState((initial?.config as Record<string, number>)?.limit ?? 10);
   const [origins, setOrigins] = useState(initial?.allowed_origins ?? "*");
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
@@ -75,7 +76,7 @@ function WidgetForm({
   const handleSave = () => {
     if (!name.trim()) return;
     const config: Record<string, unknown> = {};
-    if (domain) config.domain = domain;
+    if (domain) config.domain_id = domain;
     if (type === "top_concepts" || type === "recent_entities") config.limit = limit;
     onSave({ name, widget_type: type, config, allowed_origins: origins, is_active: isActive });
   };
