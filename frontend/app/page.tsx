@@ -15,10 +15,10 @@ import { useLanguage } from "./contexts/LanguageContext";
 import { Analytics } from "../lib/analytics";
 
 interface DashboardStats {
-  total: number;
-  labels: number;
-  models: number;
-  enriched: number;
+  total_entities: number;
+  unique_secondary_labels: number;
+  unique_entity_types: number;
+  domain_distribution?: { domain: string | null; count: number }[];
 }
 
 interface DemoStatus {
@@ -45,20 +45,20 @@ export default function Home() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const [statsRes, enrichRes, domainsRes] = await Promise.all([
+      const [statsRes, enrichRes] = await Promise.all([
         apiFetch("/stats"),
         apiFetch("/enrich/stats").catch(() => null),
-        apiFetch("/domains").catch(() => null),
       ]);
       const s = await statsRes.json();
       setStats(s);
+      setDomainCount(
+        Array.isArray(s.domain_distribution)
+          ? s.domain_distribution.filter((item: { count: number }) => item.count > 0).length
+          : 0,
+      );
       if (enrichRes && enrichRes.ok) {
         const e = await enrichRes.json();
-        setEnrichPct(e.coverage_percent ?? 0);
-      }
-      if (domainsRes && domainsRes.ok) {
-        const d = await domainsRes.json();
-        setDomainCount(Array.isArray(d) ? d.length : 0);
+        setEnrichPct(e.enrichment_coverage_pct ?? 0);
       }
     } catch {
       // stats are non-critical
@@ -146,7 +146,7 @@ export default function Home() {
           }
           iconColor="blue"
           label={t('page.home.metric_total_entities')}
-          value={stats?.total?.toLocaleString() ?? "—"}
+          value={stats?.total_entities?.toLocaleString() ?? "—"}
         />
         <StatCard
           icon={
@@ -168,7 +168,7 @@ export default function Home() {
           }
           iconColor="amber"
           label={t('page.home.metric_primary_labels')}
-          value={stats?.labels?.toLocaleString() ?? "—"}
+          value={stats?.unique_secondary_labels?.toLocaleString() ?? "—"}
         />
         <StatCard
           icon={
@@ -273,7 +273,7 @@ export default function Home() {
       {/* Activity feed + Entity browser */}
       <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[1fr_280px]">
         <div>
-          {stats?.total === 0 ? (
+          {stats?.total_entities === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 py-16 dark:border-gray-700 dark:bg-gray-900/20">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
                 <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
