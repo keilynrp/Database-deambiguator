@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
 
 
 DEFAULT_BENCHMARK_PROFILE_ID = "research_portfolio_baseline"
@@ -115,30 +116,69 @@ _BUILTIN_PROFILES = [
 ]
 
 
-def list_benchmark_profiles() -> list[dict]:
+def _org_default_profile_id(org) -> str:
+    return getattr(org, "benchmark_profile_id", None) or DEFAULT_BENCHMARK_PROFILE_ID
+
+
+def _org_profile_overrides(org) -> dict:
+    raw = getattr(org, "benchmark_profile_overrides", None)
+    if not raw:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else {}
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+
+
+def _apply_org_profile_overrides(profile: dict, org) -> dict:
+    overrides = _org_profile_overrides(org)
+    profile_override = (overrides.get("profiles") or {}).get(profile["id"]) or {}
+    if not profile_override:
+        return profile
+
+    merged = deepcopy(profile)
+    for field in ("name", "description", "region"):
+        if profile_override.get(field):
+            merged[field] = profile_override[field]
+
+    rule_overrides = profile_override.get("rules") or {}
+    for rule in merged["rules"]:
+        override = rule_overrides.get(rule["id"]) or {}
+        for field in ("label", "threshold", "priority", "pass_text", "fail_text"):
+            if field in override and override[field] is not None:
+                rule[field] = override[field]
+    return merged
+
+
+def list_benchmark_profiles(org=None) -> list[dict]:
+    default_profile_id = _org_default_profile_id(org)
     return [
         {
-            "id": profile["id"],
-            "name": profile["name"],
-            "description": profile["description"],
-            "region": profile["region"],
-            "rules_count": len(profile["rules"]),
-            "is_default": profile["id"] == DEFAULT_BENCHMARK_PROFILE_ID,
+            "id": merged_profile["id"],
+            "name": merged_profile["name"],
+            "description": merged_profile["description"],
+            "region": merged_profile["region"],
+            "rules_count": len(merged_profile["rules"]),
+            "is_default": merged_profile["id"] == default_profile_id,
         }
         for profile in _BUILTIN_PROFILES
+        for merged_profile in [_apply_org_profile_overrides(deepcopy(profile), org)]
     ]
 
 
-def get_benchmark_profile(profile_id: str | None) -> dict | None:
-    wanted = profile_id or DEFAULT_BENCHMARK_PROFILE_ID
+def get_benchmark_profile(profile_id: str | None, org=None) -> dict | None:
+    wanted = profile_id or _org_default_profile_id(org)
     for profile in _BUILTIN_PROFILES:
         if profile["id"] == wanted:
-            return deepcopy(profile)
+            return _apply_org_profile_overrides(deepcopy(profile), org)
     return None
 
 
-def evaluate_benchmark(snapshot: dict, profile_id: str | None = None) -> dict:
-    profile = get_benchmark_profile(profile_id)
+def evaluate_benchmark(snapshot: dict, profile_id: str | None = None, org=None) -> dict:
+    profile = get_benchmark_profile(profile_id, org=org)
     if profile is None:
         raise ValueError(f"Unknown benchmark profile: {profile_id}")
 

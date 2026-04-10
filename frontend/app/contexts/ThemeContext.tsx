@@ -43,7 +43,11 @@ function getThemeSnapshot(): Theme {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-    const theme = useSyncExternalStore(subscribeTheme, getThemeSnapshot, () => "light");
+    const theme: Theme = useSyncExternalStore<Theme>(
+        subscribeTheme,
+        getThemeSnapshot,
+        () => "light",
+    );
 
     useEffect(() => {
         applyTheme(theme);

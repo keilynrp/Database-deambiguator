@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from backend import models
 from backend.auth import get_current_user
 from backend.database import get_db
+from backend.institutional_benchmarks import get_benchmark_profile
 from backend.tenant_quotas import assert_org_quota_available, build_org_quota_snapshot
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,8 @@ class OrgUpdate(BaseModel):
     name:        Optional[str]  = Field(None, min_length=2, max_length=200)
     description: Optional[str]  = Field(None, max_length=1000)
     plan:        Optional[str]   = Field(None, pattern="^(free|pro|enterprise)$")
+    benchmark_profile_id: Optional[str] = Field(None, max_length=80)
+    benchmark_profile_overrides: Optional[dict] = None
 
 
 class InviteRequest(BaseModel):
@@ -63,6 +66,7 @@ def _serialize_org(org: models.Organization, member_count: int = 0) -> dict:
         "slug": org.slug,
         "description": org.description,
         "plan": org.plan,
+        "benchmark_profile_id": org.benchmark_profile_id,
         "owner_id": org.owner_id,
         "is_active": org.is_active,
         "member_count": member_count,
@@ -221,6 +225,13 @@ def update_organization(
         org.description = payload.description
     if payload.plan is not None:
         org.plan = payload.plan
+    if payload.benchmark_profile_id is not None:
+        if payload.benchmark_profile_id and not get_benchmark_profile(payload.benchmark_profile_id):
+            raise HTTPException(status_code=422, detail="Unknown benchmark profile")
+        org.benchmark_profile_id = payload.benchmark_profile_id or None
+    if payload.benchmark_profile_overrides is not None:
+        import json
+        org.benchmark_profile_overrides = json.dumps(payload.benchmark_profile_overrides)
     db.commit()
     db.refresh(org)
     return _serialize_org(org)

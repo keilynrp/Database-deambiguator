@@ -576,6 +576,8 @@ class Organization(Base):
     slug        = Column(String(100), nullable=False, unique=True, index=True)  # URL-safe identifier
     description = Column(Text, nullable=True)
     plan        = Column(String(20), default="free")  # free | pro | enterprise
+    benchmark_profile_id = Column(String(80), nullable=True)
+    benchmark_profile_overrides = Column(Text, default="{}")
     owner_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
     is_active   = Column(Boolean, default=True)
     created_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))

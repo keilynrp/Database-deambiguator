@@ -170,7 +170,7 @@ export default function ExecutiveDashboardPage() {
   const [queueingBulkEnrichment, setQueueingBulkEnrichment] = useState(false);
   const [benchmarkProfiles, setBenchmarkProfiles] = useState<BenchmarkProfile[]>([]);
   const [selectedBenchmarkProfile, setSelectedBenchmarkProfile] = useState(
-    searchParams.get("benchmark_profile") || "research_portfolio_baseline",
+    searchParams.get("benchmark_profile") || "",
   );
   const importedFlag = searchParams.get("imported") === "1";
   const importedDomain = searchParams.get("domain");

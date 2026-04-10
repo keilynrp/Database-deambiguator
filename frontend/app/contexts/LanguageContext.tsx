@@ -35,7 +35,12 @@ function getLanguageSnapshot(): Language {
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-    const language = useSyncExternalStore(subscribeLanguage, getLanguageSnapshot, () => "es");
+    const language: Language = useSyncExternalStore<Language>(
+        subscribeLanguage,
+        getLanguageSnapshot,
+        () => "es",
+    );
+    const translationMap = translations as Record<Language, Record<string, string>>;
 
     const changeLanguage = useCallback((lang: Language) => {
         localStorage.setItem("app_lang", lang);
@@ -43,7 +48,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const t = (key: string, params?: Record<string, string | number>): string => {
-        const dict = translations[language] as Record<string, string>;
+        const dict = translationMap[language];
         const template = dict[key] || key;
         if (!params) return template;
 

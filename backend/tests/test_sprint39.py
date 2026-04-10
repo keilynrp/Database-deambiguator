@@ -388,6 +388,36 @@ def test_benchmark_profiles_endpoint_lists_builtins(client, auth_headers):
     assert "sni_readiness_baseline" in ids
 
 
+def test_dashboard_uses_org_default_benchmark_profile_when_not_explicit(client, auth_headers):
+    import time
+
+    slug = f"benchmark-org-{int(time.time() * 1000) % 100000}"
+    created = client.post(
+        "/organizations",
+        json={"name": "Benchmark Org", "slug": slug, "plan": "free"},
+        headers=auth_headers,
+    )
+    assert created.status_code == 201
+    org_id = created.json()["id"]
+
+    updated = client.put(
+        f"/organizations/{org_id}",
+        json={"benchmark_profile_id": "sni_readiness_baseline"},
+        headers=auth_headers,
+    )
+    assert updated.status_code == 200
+
+    summary = client.get("/dashboard/summary?domain_id=default", headers=auth_headers)
+    assert summary.status_code == 200
+    assert summary.json()["institutional_benchmark"]["profile_id"] == "sni_readiness_baseline"
+
+    profiles = client.get("/analytics/benchmarks/profiles", headers=auth_headers)
+    assert profiles.status_code == 200
+    defaults = [profile for profile in profiles.json() if profile["is_default"]]
+    assert len(defaults) == 1
+    assert defaults[0]["id"] == "sni_readiness_baseline"
+
+
 def test_benchmark_evaluate_endpoint_accepts_known_profile(client, auth_headers):
     response = client.get(
         "/analytics/benchmarks/evaluate?domain_id=default&profile_id=sni_readiness_baseline",

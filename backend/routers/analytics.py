@@ -241,6 +241,7 @@ def dashboard_summary(
 ):
     """Aggregated KPIs + timeline + heatmap + concepts for the Executive Dashboard."""
     org_id = resolve_request_org_id(db, current_user)
+    benchmark_org = db.get(models.Organization, org_id) if org_id else None
     profile_key = profile_id or "default_profile"
     _key = f"dashboard_{domain_id}_{profile_key}_{scope_tag(org_id)}"
     cached = _dashboard_cache.get(_key)
@@ -251,6 +252,7 @@ def dashboard_summary(
         _topic_analyzer,
         domain_id,
         org_id=org_id,
+        benchmark_org=benchmark_org,
         benchmark_profile_id=profile_id or None,
         top_n_concepts=30,
         top_n_entities=10,
@@ -292,9 +294,12 @@ def dashboard_compare(
 
 @router.get("/analytics/benchmarks/profiles", tags=["analytics"])
 def list_institutional_benchmark_profiles(
-    _: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
-    return list_benchmark_profiles()
+    org_id = resolve_request_org_id(db, current_user)
+    benchmark_org = db.get(models.Organization, org_id) if org_id else None
+    return list_benchmark_profiles(org=benchmark_org)
 
 
 @router.get("/analytics/benchmarks/evaluate", tags=["analytics"])
@@ -305,17 +310,19 @@ def evaluate_institutional_benchmark(
     current_user: models.User = Depends(get_current_user),
 ):
     org_id = resolve_request_org_id(db, current_user)
+    benchmark_org = db.get(models.Organization, org_id) if org_id else None
     try:
         snapshot = AnalyticsService.get_domain_snapshot(
             db,
             _topic_analyzer,
             domain_id,
             org_id=org_id,
+            benchmark_org=benchmark_org,
             benchmark_profile_id=profile_id or None,
             top_n_concepts=30,
             top_n_entities=10,
         )
-        return evaluate_benchmark(snapshot, profile_id or None)
+        return evaluate_benchmark(snapshot, profile_id or None, org=benchmark_org)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 

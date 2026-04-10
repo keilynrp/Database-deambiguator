@@ -9,10 +9,20 @@ interface Organization {
   slug: string;
   description: string | null;
   plan: string;
+  benchmark_profile_id: string | null;
   owner_id: number;
   is_active: boolean;
   member_count: number;
   created_at: string;
+}
+
+interface BenchmarkProfile {
+  id: string;
+  name: string;
+  description: string;
+  region: string;
+  rules_count: number;
+  is_default: boolean;
 }
 
 interface Member {
@@ -46,6 +56,8 @@ export default function OrganizationsPage() {
   const [showInvite, setShowInvite] = useState(false);
   const [form, setForm] = useState({ name: "", slug: "", description: "", plan: "free" });
   const [inviteForm, setInviteForm] = useState({ username: "", role: "member" });
+  const [benchmarkProfiles, setBenchmarkProfiles] = useState<BenchmarkProfile[]>([]);
+  const [savingBenchmark, setSavingBenchmark] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,6 +84,19 @@ export default function OrganizationsPage() {
         setOrgs(await r.json());
       }
       setLoading(false);
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const r = await apiFetch("/analytics/benchmarks/profiles");
+      if (active && r.ok) {
+        setBenchmarkProfiles(await r.json());
+      }
     })();
     return () => {
       active = false;
@@ -151,6 +176,30 @@ export default function OrganizationsPage() {
     await apiFetch(`/organizations/${orgId}`, { method: "DELETE" });
     setSelectedOrg(null);
     loadOrgs();
+  }
+
+  async function saveBenchmarkProfile(benchmarkProfileId: string) {
+    if (!selectedOrg) return;
+    setSavingBenchmark(true);
+    setError(null);
+    const r = await apiFetch(`/organizations/${selectedOrg.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ benchmark_profile_id: benchmarkProfileId }),
+    });
+    if (r.ok) {
+      const updated = await r.json();
+      setSelectedOrg(updated);
+      setOrgs((prev) => prev.map((org) => (org.id === updated.id ? updated : org)));
+      const profilesResponse = await apiFetch("/analytics/benchmarks/profiles");
+      if (profilesResponse.ok) {
+        setBenchmarkProfiles(await profilesResponse.json());
+      }
+    } else {
+      const d = await r.json().catch(() => ({}));
+      setError(d.detail ?? "Failed to save benchmark profile");
+    }
+    setSavingBenchmark(false);
   }
 
   const inputClass = "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
@@ -248,6 +297,37 @@ export default function OrganizationsPage() {
                   >
                     Delete
                   </button>
+                </div>
+              </div>
+
+              {/* Members */}
+              <div className="rounded-xl border border-gray-100 p-4 dark:border-gray-800">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Benchmark Profile</h4>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Choose the default institutional benchmark profile for this tenant.
+                    </p>
+                  </div>
+                  <div className="min-w-[260px]">
+                    <select
+                      value={selectedOrg.benchmark_profile_id ?? ""}
+                      onChange={(e) => saveBenchmarkProfile(e.target.value)}
+                      disabled={savingBenchmark}
+                      className={inputClass}
+                    >
+                      {benchmarkProfiles.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.name}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedOrg.benchmark_profile_id && (
+                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        {benchmarkProfiles.find((profile) => profile.id === selectedOrg.benchmark_profile_id)?.description}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 

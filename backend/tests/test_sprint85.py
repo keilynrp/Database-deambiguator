@@ -95,6 +95,16 @@ class TestOrgUpdate:
         assert r.status_code == 200
         assert r.json()["plan"] == "pro"
 
+    def test_update_benchmark_profile(self, client, auth_headers):
+        created = _create_org(client, auth_headers, name="Benchmark Test").json()
+        r = client.put(
+            f"/organizations/{created['id']}",
+            json={"benchmark_profile_id": "sni_readiness_baseline"},
+            headers=auth_headers,
+        )
+        assert r.status_code == 200
+        assert r.json()["benchmark_profile_id"] == "sni_readiness_baseline"
+
 
 class TestOrgDelete:
     def test_delete_org(self, client, auth_headers):

@@ -51,8 +51,12 @@ function getTokenSnapshot(): string | null {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const token = useSyncExternalStore(subscribeAuth, getTokenSnapshot, () => null);
-  const hydrated = useSyncExternalStore(
+  const token: string | null = useSyncExternalStore<string | null>(
+    subscribeAuth,
+    getTokenSnapshot,
+    () => null,
+  );
+  const hydrated = useSyncExternalStore<boolean>(
     () => () => {},
     () => true,
     () => false,

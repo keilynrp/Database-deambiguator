@@ -205,6 +205,7 @@ class AnalyticsService:
         topic_analyzer: TopicAnalyzer,
         domain_id: str,
         org_id: int | None = None,
+        benchmark_org: models.Organization | None = None,
         benchmark_profile_id: str | None = None,
         top_n_concepts: int = 10,
         top_n_entities: int = 5
@@ -375,7 +376,11 @@ class AnalyticsService:
             "quality": {"average": avg_quality, "distribution": quality_dist},
         }
         snapshot["recommended_actions"] = cls.build_recommended_actions(snapshot)
-        snapshot["institutional_benchmark"] = evaluate_benchmark(snapshot, benchmark_profile_id)
+        snapshot["institutional_benchmark"] = evaluate_benchmark(
+            snapshot,
+            benchmark_profile_id,
+            org=benchmark_org,
+        )
         return snapshot
 
     @staticmethod
