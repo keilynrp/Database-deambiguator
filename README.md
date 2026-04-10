@@ -185,10 +185,14 @@ Four-phase cascading enrichment worker:
 | Phase | Source | Access |
 |-------|--------|--------|
 | 1 | [OpenAlex](https://openalex.org/) | Free (polite `mailto:` mode) |
-| 2 | Google Scholar | Scraping via rotating proxies |
+| 2 | Google Scholar | Optional fallback only (`SCHOLAR_ENABLED=1`) |
 | 3 | [Web of Science](https://clarivate.com/) | BYOK (institutional API key) |
 | 4 | [Scopus](https://www.elsevier.com/products/scopus) | BYOK (Elsevier institutional key) |
 | 5 | Web Scraper | Custom CSS/XPath per-site configs with rate limiting |
+
+Operational note:
+- `SCHOLAR_ENABLED=0` is the recommended default. This prevents automatic Google Scholar scraping during bulk enrichment and minimizes IP-ban risk.
+- Enable Scholar only for controlled/manual scenarios where the risk is acceptable.
 
 ### Semantic RAG Assistant
 - **6 LLM providers** with BYOK support:

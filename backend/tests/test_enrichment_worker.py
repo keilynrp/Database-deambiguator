@@ -108,6 +108,22 @@ def test_enrich_marks_failed_when_all_adapters_return_nothing(db_session):
     assert result.enrichment_status == "failed"
 
 
+def test_enrich_skips_scholar_when_disabled(db_session):
+    entity = make_entity(db_session, "No Scholar Fallback", status="processing")
+
+    with (
+        patch("backend.enrichment_worker.adapter_wos") as mock_wos,
+        patch("backend.enrichment_worker.adapter_openalex") as mock_openalex,
+        patch("backend.enrichment_worker.adapter_scholar", None),
+    ):
+        mock_wos.is_active = False
+        mock_openalex.search_by_title.return_value = []
+
+        result = enrich_single_record(db_session, entity)
+
+    assert result.enrichment_status == "failed"
+
+
 def test_enrich_marks_completed_on_openalex_success(db_session):
     entity = make_entity(db_session, "Good Paper Title", status="processing")
 

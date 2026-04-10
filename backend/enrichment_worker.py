@@ -16,6 +16,10 @@ from backend.tenant_access import LEGACY_GLOBAL_ORG_ID, scope_query_to_org
 logger = logging.getLogger(__name__)
 
 
+def _scholar_enabled() -> bool:
+    return os.environ.get("SCHOLAR_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _scholar_use_free_proxies() -> bool:
     return os.environ.get("SCHOLAR_USE_FREE_PROXIES", "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -23,7 +27,7 @@ def _scholar_use_free_proxies() -> bool:
 adapter_wos = WebOfScienceAdapter(api_key=os.environ.get("WOS_API_KEY"))
 adapter_scopus = ScopusAdapter(api_key=os.environ.get("SCOPUS_API_KEY"))
 adapter_openalex = OpenAlexAdapter()
-adapter_scholar = ScholarAdapter(use_free_proxies=_scholar_use_free_proxies())
+adapter_scholar = ScholarAdapter(use_free_proxies=_scholar_use_free_proxies()) if _scholar_enabled() else None
 
 # Circuit breakers — trip after 3 consecutive failures; recover after 60 s
 _cb_wos = CircuitBreaker(name="wos", failure_threshold=3, recovery_timeout=60)
@@ -135,14 +139,20 @@ def enrich_single_record(db: Session, entity: models.RawEntity) -> models.RawEnt
                     source = "OpenAlex"
                 else:
                     # Phase 2: Scraping Fallback
-                    logger.info(f"OpenAlex found nothing for '{query}'. Falling back to Google Scholar.")
-                    try:
-                        results_scholar = _cb_scholar.call(adapter_scholar.search_by_title, query, limit=1)
-                        if results_scholar:
-                            enriched_data = results_scholar[0]
-                            source = "Google Scholar"
-                    except CircuitOpenError as e:
-                        logger.warning(str(e))
+                    if adapter_scholar is not None:
+                        logger.info(f"OpenAlex found nothing for '{query}'. Falling back to Google Scholar.")
+                        try:
+                            results_scholar = _cb_scholar.call(adapter_scholar.search_by_title, query, limit=1)
+                            if results_scholar:
+                                enriched_data = results_scholar[0]
+                                source = "Google Scholar"
+                        except CircuitOpenError as e:
+                            logger.warning(str(e))
+                    else:
+                        logger.info(
+                            "OpenAlex found nothing for '%s'. Scholar fallback skipped because SCHOLAR_ENABLED is disabled.",
+                            query,
+                        )
             except CircuitOpenError as e:
                 logger.warning(str(e))
 

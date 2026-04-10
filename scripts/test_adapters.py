@@ -14,6 +14,10 @@ from backend.adapters.enrichment.wos import WebOfScienceAdapter
 def _scholar_use_free_proxies() -> bool:
     return os.environ.get("SCHOLAR_USE_FREE_PROXIES", "").strip().lower() in {"1", "true", "yes", "on"}
 
+
+def _scholar_enabled() -> bool:
+    return os.environ.get("SCHOLAR_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
+
 def run_performance_test():
     """
     Runs a performance test isolating the 3 phases of data enrichment APIs.
@@ -47,24 +51,25 @@ def run_performance_test():
     # Phase 2: Google Scholar (Restricted Scraping)
     # ----------------------------------------------------
     print("\n🟡 [PHASE 2] Google Scholar Wrapper")
-    print("  * Initializing proxy strategy (if enabled)...")
-    
-    # Let's initialize it and measure
-    t_proxy_start = time.time()
-    scholar = ScholarAdapter(use_free_proxies=_scholar_use_free_proxies())
-    t_proxy_end = time.time()
-    print(f"  * Proxy Setup Time: {t_proxy_end - t_proxy_start:.3f} seconds")
-    
-    t0 = time.time()
-    res2 = scholar.search_by_title(query, limit=1)
-    t1 = time.time()
-    
-    if res2:
-        print(f"  ✅ Result Found: '{res2[0].title}'")
-        print(f"  ✅ Citations: {res2[0].citation_count}")
-        print(f"  ⏱️ Search Time: {t1 - t0:.3f} seconds")
+    if not _scholar_enabled():
+        print("  ⚠️ Skipped: SCHOLAR_ENABLED is not enabled.")
     else:
-        print(f"  ❌ No results or IP banned. Time taken: {t1 - t0:.3f} seconds")
+        print("  * Initializing proxy strategy (if enabled)...")
+        t_proxy_start = time.time()
+        scholar = ScholarAdapter(use_free_proxies=_scholar_use_free_proxies())
+        t_proxy_end = time.time()
+        print(f"  * Proxy Setup Time: {t_proxy_end - t_proxy_start:.3f} seconds")
+
+        t0 = time.time()
+        res2 = scholar.search_by_title(query, limit=1)
+        t1 = time.time()
+
+        if res2:
+            print(f"  ✅ Result Found: '{res2[0].title}'")
+            print(f"  ✅ Citations: {res2[0].citation_count}")
+            print(f"  ⏱️ Search Time: {t1 - t0:.3f} seconds")
+        else:
+            print(f"  ❌ No results or IP banned. Time taken: {t1 - t0:.3f} seconds")
         
     # ----------------------------------------------------
     # Phase 3: Web of Science (Premium BYOK)
