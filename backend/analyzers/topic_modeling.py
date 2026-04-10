@@ -17,13 +17,12 @@ from typing import Any
 import pandas as pd
 
 from backend.database import engine
-from backend.schema_registry import registry
 from backend.tenant_access import add_org_sql_filter
 
 logger = logging.getLogger(__name__)
 
 # Concepts stored as "A, B, C" — split on ", " then strip each
-_SEP = ","
+_SEPARATORS_RE = re.compile(r"[;,|]")
 _YEAR_RE = re.compile(r"\b(19\d{2}|20\d{2})\b")
 
 
@@ -31,7 +30,39 @@ def _parse_concepts(raw: str | None) -> list[str]:
     """Split comma-separated concept string into clean list."""
     if not raw:
         return []
-    return [c.strip() for c in raw.split(_SEP) if c.strip()]
+    return [c.strip() for c in _SEPARATORS_RE.split(raw) if c.strip()]
+
+
+def _parse_concepts_from_value(value: Any) -> list[str]:
+    """Normalize strings/lists/dicts commonly used to store concepts."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return _parse_concepts(value)
+    if isinstance(value, list):
+        concepts: list[str] = []
+        for item in value:
+            if isinstance(item, str):
+                concepts.extend(_parse_concepts(item))
+            elif isinstance(item, dict):
+                label = (
+                    item.get("display_name")
+                    or item.get("name")
+                    or item.get("label")
+                    or item.get("concept")
+                )
+                if label:
+                    concepts.extend(_parse_concepts(str(label)))
+        return concepts
+    if isinstance(value, dict):
+        label = (
+            value.get("display_name")
+            or value.get("name")
+            or value.get("label")
+            or value.get("concept")
+        )
+        return _parse_concepts(str(label)) if label else []
+    return _parse_concepts(str(value))
 
 
 def _extract_year(value: Any) -> int | None:
@@ -73,17 +104,52 @@ def _extract_record_year(
     return None
 
 
+def _parse_record_concepts(raw: str | None, attributes_json: str | None = None) -> list[str]:
+    """Resolve concepts from the normalized enrichment field first, then attrs fallback."""
+    direct = _parse_concepts(raw)
+    if direct:
+        return direct
+
+    attrs: dict[str, Any] = {}
+    if attributes_json:
+        try:
+            attrs = json.loads(attributes_json) or {}
+        except (ValueError, TypeError):
+            attrs = {}
+
+    concepts: list[str] = []
+    for key in ("concepts", "keywords", "topics", "topic", "subjects"):
+        concepts.extend(_parse_concepts_from_value(attrs.get(key)))
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for concept in concepts:
+        normalized = concept.strip()
+        if not normalized:
+            continue
+        key = normalized.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(normalized)
+    return deduped
+
+
 def _load_concepts_df(domain_id: str, org_id: int | None = None) -> pd.DataFrame:
     """
     Load rows that have enrichment_concepts for the given domain.
     Returns a DataFrame with columns: id, enrichment_concepts, and domain
     categorical fields.
     """
-    domain = registry.get_domain(domain_id)
-    if domain is None:
-        raise ValueError(f"Domain '{domain_id}' not found")
-
-    where_clauses = ["enrichment_concepts IS NOT NULL", "enrichment_concepts != ''"]
+    where_clauses = [
+        "("
+        "((enrichment_concepts IS NOT NULL) AND (enrichment_concepts != '')) "
+        "OR (attributes_json LIKE '%\"keywords\"%') "
+        "OR (attributes_json LIKE '%\"concepts\"%') "
+        "OR (attributes_json LIKE '%\"topics\"%') "
+        "OR (attributes_json LIKE '%\"subjects\"%')"
+        ")"
+    ]
     params: dict[str, object] = {}
     if domain_id != "all":
         if domain_id == "default":
@@ -95,7 +161,10 @@ def _load_concepts_df(domain_id: str, org_id: int | None = None) -> pd.DataFrame
 
     with engine.connect() as conn:
         df = pd.read_sql(
-            f"SELECT id, enrichment_concepts FROM raw_entities WHERE {' AND '.join(where_clauses)}",
+            (
+                "SELECT id, enrichment_concepts, attributes_json "
+                f"FROM raw_entities WHERE {' AND '.join(where_clauses)}"
+            ),
             conn,
             params=params,
         )
@@ -107,11 +176,15 @@ def _load_concepts_timeseries_df(domain_id: str, org_id: int | None = None) -> p
     Load concept-bearing rows with enough metadata to derive temporal signals.
     Returns: id, enrichment_concepts, attributes_json, primary_label, secondary_label.
     """
-    domain = registry.get_domain(domain_id)
-    if domain is None:
-        raise ValueError(f"Domain '{domain_id}' not found")
-
-    where_clauses = ["enrichment_concepts IS NOT NULL", "enrichment_concepts != ''"]
+    where_clauses = [
+        "("
+        "((enrichment_concepts IS NOT NULL) AND (enrichment_concepts != '')) "
+        "OR (attributes_json LIKE '%\"keywords\"%') "
+        "OR (attributes_json LIKE '%\"concepts\"%') "
+        "OR (attributes_json LIKE '%\"topics\"%') "
+        "OR (attributes_json LIKE '%\"subjects\"%')"
+        ")"
+    ]
     params: dict[str, object] = {}
     if domain_id != "all":
         if domain_id == "default":
@@ -153,8 +226,13 @@ class TopicAnalyzer:
         total_enriched = len(df)
 
         counter: Counter = Counter()
-        for raw in df["enrichment_concepts"]:
-            counter.update(_parse_concepts(raw))
+        for row in df.itertuples(index=False):
+            counter.update(
+                _parse_record_concepts(
+                    getattr(row, "enrichment_concepts", None),
+                    getattr(row, "attributes_json", None),
+                )
+            )
 
         topics = [
             {
@@ -168,6 +246,7 @@ class TopicAnalyzer:
         return {
             "domain_id": domain_id,
             "total_enriched": total_enriched,
+            "total_distinct_concepts": len(counter),
             "topics": topics,
         }
 
@@ -190,8 +269,11 @@ class TopicAnalyzer:
         pair_counter: Counter = Counter()
         concept_counter: Counter = Counter()
 
-        for raw in df["enrichment_concepts"]:
-            concepts = _parse_concepts(raw)
+        for row in df.itertuples(index=False):
+            concepts = _parse_record_concepts(
+                getattr(row, "enrichment_concepts", None),
+                getattr(row, "attributes_json", None),
+            )
             concept_counter.update(concepts)
             # Each pair counted once per entity (sorted to canonicalize)
             for a, b in combinations(sorted(set(concepts)), 2):
@@ -260,8 +342,11 @@ class TopicAnalyzer:
         pair_counter: Counter = Counter()
         concept_counter: Counter = Counter()
 
-        for raw in df["enrichment_concepts"]:
-            concepts = _parse_concepts(raw)
+        for row in df.itertuples(index=False):
+            concepts = _parse_record_concepts(
+                getattr(row, "enrichment_concepts", None),
+                getattr(row, "attributes_json", None),
+            )
             concept_counter.update(concepts)
             for a, b in combinations(sorted(set(concepts)), 2):
                 pair_counter[(a, b)] += 1
@@ -339,7 +424,10 @@ class TopicAnalyzer:
             if year is None:
                 continue
 
-            concepts = sorted(set(_parse_concepts(getattr(row, "enrichment_concepts", None))))
+            concepts = sorted(set(_parse_record_concepts(
+                getattr(row, "enrichment_concepts", None),
+                getattr(row, "attributes_json", None),
+            )))
             if not concepts:
                 continue
 

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from backend import models
 from backend.analyzers.topic_modeling import TopicAnalyzer
 from backend.institutional_benchmarks import evaluate_benchmark
+from backend.quality_scorer import _fetch_lookups, score_entity
 from backend.tenant_access import scope_query_to_org
 
 
@@ -20,6 +21,7 @@ class AnalyticsService:
     _YEAR_RE = re.compile(r"\b(20\d{2}|19\d{2})\b")
     _TOP_BRANDS_N = 5
     _TOP_YEARS_N  = 6
+    _LONG_LABEL_LIMIT = 72
 
     @classmethod
     def _extract_temporal_year(
@@ -53,6 +55,21 @@ class AnalyticsService:
 
         return None
 
+    @classmethod
+    def _dashboard_label(
+        cls,
+        primary_label: str | None,
+        secondary_label: str | None,
+    ) -> str | None:
+        """Prefer primary labels for executive reads and trim noisy overlong labels."""
+        candidate = primary_label or secondary_label
+        if not candidate:
+            return None
+        candidate = re.sub(r"\s+", " ", candidate).strip()
+        if len(candidate) <= cls._LONG_LABEL_LIMIT:
+            return candidate
+        return f"{candidate[: cls._LONG_LABEL_LIMIT - 1].rstrip()}…"
+
     @staticmethod
     def build_recommended_actions(snapshot: dict) -> list[dict]:
         """Return a short, deterministic list of explainable next actions."""
@@ -79,6 +96,11 @@ class AnalyticsService:
                 ),
                 "priority": "high",
                 "category": "coverage",
+                "meta": {
+                    "enriched_count": enriched_count,
+                    "total_entities": total_entities,
+                    "enrichment_pct": round(enrichment_pct, 1),
+                },
             })
 
         if avg_quality is not None and avg_quality < 0.6:
@@ -89,6 +111,9 @@ class AnalyticsService:
                 "evidence": f"Average quality is {round(avg_quality * 100)}%.",
                 "priority": "high" if avg_quality < 0.45 else "medium",
                 "category": "quality",
+                "meta": {
+                    "quality_pct": round(avg_quality * 100),
+                },
             })
 
         if top_entities:
@@ -102,6 +127,10 @@ class AnalyticsService:
                 "evidence": f"{label} currently leads with {citations:,} citations.",
                 "priority": "medium",
                 "category": "impact",
+                "meta": {
+                    "label": label,
+                    "citations": citations,
+                },
             })
 
         if top_concepts and enrichment_pct >= 40:
@@ -116,6 +145,10 @@ class AnalyticsService:
                 ),
                 "priority": "medium",
                 "category": "semantic",
+                "meta": {
+                    "concept": lead_concept.get("concept", "Top concept"),
+                    "count": int(lead_concept.get("count") or 0),
+                },
             })
 
         return actions[:4]
@@ -188,9 +221,10 @@ class AnalyticsService:
                 continue
 
             entities_by_year_counter[year] += 1
-            if secondary_label:
-                label_totals[secondary_label] += 1
-                label_year_raw[secondary_label][year] += 1
+            dashboard_label = cls._dashboard_label(primary_label, secondary_label)
+            if dashboard_label:
+                label_totals[dashboard_label] += 1
+                label_year_raw[dashboard_label][year] += 1
                 all_years_set.add(year)
 
         entities_by_year = [
@@ -200,9 +234,11 @@ class AnalyticsService:
 
         # Top concepts via TopicAnalyzer
         top_concepts = []
+        total_concepts = 0
         try:
             result = topic_analyzer.top_topics(domain_id, top_n=top_n_concepts, org_id=org_id)
             top_concepts = result.get("topics", [])
+            total_concepts = int(result.get("total_distinct_concepts") or len(top_concepts))
         except Exception:
             pass
 
@@ -222,8 +258,6 @@ class AnalyticsService:
             )
         except Exception:
             pass
-
-        total_concepts = len(top_concepts)
 
         # Top entities by citation count
         top_entity_rows = (
@@ -251,13 +285,15 @@ class AnalyticsService:
         }
 
         # Quality KPI
-        quality_rows = (
-            _q()
-            .with_entities(models.RawEntity.quality_score)
-            .filter(models.RawEntity.quality_score != None)
-            .all()
-        )
-        quality_values = [r[0] for r in quality_rows if r[0] is not None]
+        entities_for_quality = _q().all()
+        confirmed_labels, entities_with_rels = _fetch_lookups(db)
+        quality_values: list[float] = []
+        for entity in entities_for_quality:
+            score = entity.quality_score
+            if score is None:
+                score, _ = score_entity(entity, confirmed_labels, entities_with_rels)
+            if score is not None:
+                quality_values.append(float(score))
         avg_quality = round(sum(quality_values) / len(quality_values), 3) if quality_values else None
         quality_dist = {
             "high":   sum(1 for v in quality_values if v >= 0.7),

@@ -74,6 +74,7 @@ interface DashboardData {
     evidence: string;
     priority: "high" | "medium" | "low";
     category: string;
+    meta?: Record<string, string | number>;
   }[];
   institutional_benchmark: {
     profile_id: string;
@@ -221,6 +222,14 @@ export default function ExecutiveDashboardPage() {
   const translateConfidence = (confidence: "high" | "medium" | "low") => (
     tr(`page.exec_dashboard.confidence.${confidence}`, confidence)
   );
+  const translateActionText = useCallback((
+    action: DashboardData["recommended_actions"][number],
+    field: "title" | "detail" | "evidence",
+  ) => {
+    const key = `page.exec_dashboard.action.${action.id}.${field}`;
+    const raw = t(key, action.meta ?? {});
+    return raw === key ? action[field] : raw;
+  }, [t]);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -328,10 +337,13 @@ export default function ExecutiveDashboardPage() {
 
       return {
         ...action,
+        title: translateActionText(action, "title"),
+        detail: translateActionText(action, "detail"),
+        evidence: translateActionText(action, "evidence"),
         tone,
       };
     });
-  }, [data]);
+  }, [data, translateActionText]);
 
   const toneStyles: Record<"violet" | "amber" | "emerald", string> = {
     violet: "border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-500/20 dark:bg-violet-500/5 dark:text-violet-200",

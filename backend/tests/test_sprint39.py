@@ -156,6 +156,7 @@ def test_dashboard_recommended_actions_are_explainable(client, auth_headers, db_
         assert action["detail"]
         assert action["evidence"]
         assert action["priority"] in {"high", "medium", "low"}
+        assert isinstance(action.get("meta") or {}, dict)
 
 
 def test_dashboard_includes_institutional_benchmark_summary(client, auth_headers, db_session):
@@ -198,6 +199,50 @@ def test_dashboard_includes_emerging_topic_signals(client, auth_headers, db_sess
     assert max(signals["recent_years"]) >= 2024
     assert signals["baseline_years"]
     assert isinstance(signals["signals"], list)
+
+
+def test_dashboard_uses_concept_fallbacks_from_attributes_json(client, auth_headers, db_session):
+    db_session.add(models.RawEntity(
+        primary_label="Fallback Concept Paper",
+        domain="concept_fallback_test",
+        attributes_json=json.dumps({
+            "year": 2024,
+            "keywords": ["Knowledge Graphs", "OpenAlex"],
+        }),
+        enrichment_status="completed",
+        enrichment_concepts=None,
+    ))
+    db_session.commit()
+
+    response = client.get("/dashboard/summary?domain_id=concept_fallback_test", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["kpis"]["total_concepts"] == 2
+    concepts = {topic["concept"] for topic in data["top_concepts"]}
+    assert "Knowledge Graphs" in concepts
+    assert "OpenAlex" in concepts
+
+
+def test_dashboard_derives_quality_when_scores_are_not_persisted(client, auth_headers, db_session):
+    db_session.add(models.RawEntity(
+        primary_label="Derived Quality Entity",
+        secondary_label="Knowledge Graph",
+        canonical_id="kg-1",
+        entity_type="work",
+        domain="derived_quality_test",
+        enrichment_status="completed",
+        enrichment_doi="10.1234/example",
+        quality_score=None,
+    ))
+    db_session.commit()
+
+    response = client.get("/dashboard/summary?domain_id=derived_quality_test", headers=auth_headers)
+    assert response.status_code == 200
+    quality = response.json()["quality"]
+
+    assert quality["average"] is not None
+    assert quality["average"] > 0.0
 
 
 def test_topic_analyzer_emerging_signals_detects_acceleration():
