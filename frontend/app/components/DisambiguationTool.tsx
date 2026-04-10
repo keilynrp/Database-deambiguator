@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useDomain } from "../contexts/DomainContext";
+import { useAuth } from "../contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { useToast } from "./ui";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -68,6 +69,7 @@ const ENTITY_TYPES = [
 export default function DisambiguationTool() {
     const { t } = useLanguage();
     const { activeDomain } = useDomain();
+    const { user } = useAuth();
     const { toast } = useToast();
     const [field, setField] = useState("");
     const [threshold, setThreshold] = useState<number>(80);
@@ -94,6 +96,36 @@ export default function DisambiguationTool() {
     const [authorityLoading, setAuthorityLoading] = useState<Record<number, boolean>>({});
     const [authorityCandidates, setAuthorityCandidates] = useState<Record<number, AuthorityRecord[]>>({});
     const [authorityAction, setAuthorityAction] = useState<Record<number, number | null>>({});
+    const canManageAuthority = ["super_admin", "admin", "editor"].includes(user?.role ?? "");
+
+    async function readErrorMessage(res: Response, fallback: string) {
+        try {
+            const payload = await res.clone().json();
+            if (typeof payload?.detail === "string" && payload.detail.trim()) {
+                return payload.detail;
+            }
+            if (Array.isArray(payload?.detail) && payload.detail.length > 0) {
+                return payload.detail
+                    .map((item: { msg?: string; loc?: Array<string | number> }) => {
+                        const path = Array.isArray(item?.loc) ? item.loc.join(" > ") : "";
+                        return [path, item?.msg].filter(Boolean).join(": ");
+                    })
+                    .join(" | ");
+            }
+            if (typeof payload?.message === "string" && payload.message.trim()) {
+                return payload.message;
+            }
+        } catch {
+            // Fall back to text if the body is not JSON.
+        }
+
+        try {
+            const text = (await res.text()).trim();
+            return text || fallback;
+        } catch {
+            return fallback;
+        }
+    }
 
     async function analyze() {
         setLoading(true);
@@ -112,6 +144,10 @@ export default function DisambiguationTool() {
     }
 
     async function resolveWithAI(idx: number, variations: string[]) {
+        if (!canManageAuthority) {
+            toast("Esta accion requiere permisos de editor o superiores", "warning");
+            return;
+        }
         setResolvingIdx(idx);
         try {
             const res = await apiFetch(`/disambiguate/ai-resolve`, {
@@ -119,17 +155,21 @@ export default function DisambiguationTool() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ field_name: field, variations })
             });
-            if (!res.ok) throw new Error("AI resolve failed");
+            if (!res.ok) throw new Error(await readErrorMessage(res, "AI resolve failed"));
             const data = await res.json();
             setResolutions(prev => ({ ...prev, [idx]: data }));
-        } catch {
-            toast("Error from AI resolution endpoint", "error");
+        } catch (error) {
+            toast(error instanceof Error ? error.message : "Error from AI resolution endpoint", "error");
         } finally {
             setResolvingIdx(null);
         }
     }
 
     async function acceptResolution(idx: number, canonical_value: string, variations: string[]) {
+        if (!canManageAuthority) {
+            toast("Esta accion requiere permisos de editor o superiores", "warning");
+            return;
+        }
         setProcessingRule(idx);
         try {
             const res = await apiFetch(`/rules/bulk`, {
@@ -137,17 +177,22 @@ export default function DisambiguationTool() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ field_name: field, canonical_value, variations })
             });
-            if (!res.ok) throw new Error("Failed to save rules");
-            await apiFetch(`/rules/apply?field_name=${field}`, { method: "POST" });
+            if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to save rules"));
+            const applyRes = await apiFetch(`/rules/apply?field_name=${field}`, { method: "POST" });
+            if (!applyRes.ok) throw new Error(await readErrorMessage(applyRes, "Failed to apply rules"));
             analyze();
-        } catch {
-            toast("Error applying rules", "error");
+        } catch (error) {
+            toast(error instanceof Error ? error.message : "Error applying rules", "error");
         } finally {
             setProcessingRule(null);
         }
     }
 
     async function resolveWithAuthority(idx: number, mainValue: string) {
+        if (!canManageAuthority) {
+            toast("Resolve with authority requiere permisos de editor o superiores", "warning");
+            return;
+        }
         setAuthorityLoading(prev => ({ ...prev, [idx]: true }));
         try {
             const res = await apiFetch(`/authority/resolve`, {
@@ -159,17 +204,21 @@ export default function DisambiguationTool() {
                     entity_type: entityType,
                 }),
             });
-            if (!res.ok) throw new Error("Authority resolve failed");
+            if (!res.ok) throw new Error(await readErrorMessage(res, "Authority resolve failed"));
             const records: AuthorityRecord[] = await res.json();
             setAuthorityCandidates(prev => ({ ...prev, [idx]: records }));
-        } catch {
-            toast("Error querying authority sources", "error");
+        } catch (error) {
+            toast(error instanceof Error ? error.message : "Error querying authority sources", "error");
         } finally {
             setAuthorityLoading(prev => ({ ...prev, [idx]: false }));
         }
     }
 
     async function confirmCandidate(groupIdx: number, recordId: number) {
+        if (!canManageAuthority) {
+            toast("Esta accion requiere permisos de editor o superiores", "warning");
+            return;
+        }
         setAuthorityAction(prev => ({ ...prev, [groupIdx]: recordId }));
         try {
             const res = await apiFetch(`/authority/records/${recordId}/confirm`, {
@@ -177,34 +226,38 @@ export default function DisambiguationTool() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ also_create_rule: true }),
             });
-            if (!res.ok) throw new Error("Confirm failed");
+            if (!res.ok) throw new Error(await readErrorMessage(res, "Confirm failed"));
             const updated: AuthorityRecord = await res.json();
             setAuthorityCandidates(prev => ({
                 ...prev,
                 [groupIdx]: (prev[groupIdx] || []).map(r => r.id === recordId ? { ...r, status: updated.status } : r),
             }));
             toast("Candidate confirmed", "success");
-        } catch {
-            toast("Error confirming candidate", "error");
+        } catch (error) {
+            toast(error instanceof Error ? error.message : "Error confirming candidate", "error");
         } finally {
             setAuthorityAction(prev => ({ ...prev, [groupIdx]: null }));
         }
     }
 
     async function rejectCandidate(groupIdx: number, recordId: number) {
+        if (!canManageAuthority) {
+            toast("Esta accion requiere permisos de editor o superiores", "warning");
+            return;
+        }
         setAuthorityAction(prev => ({ ...prev, [groupIdx]: recordId }));
         try {
             const res = await apiFetch(`/authority/records/${recordId}/reject`, {
                 method: "POST",
             });
-            if (!res.ok) throw new Error("Reject failed");
+            if (!res.ok) throw new Error(await readErrorMessage(res, "Reject failed"));
             setAuthorityCandidates(prev => ({
                 ...prev,
                 [groupIdx]: (prev[groupIdx] || []).map(r => r.id === recordId ? { ...r, status: "rejected" } : r),
             }));
             toast("Candidate rejected", "warning");
-        } catch {
-            toast("Error rejecting candidate", "error");
+        } catch (error) {
+            toast(error instanceof Error ? error.message : "Error rejecting candidate", "error");
         } finally {
             setAuthorityAction(prev => ({ ...prev, [groupIdx]: null }));
         }
@@ -355,6 +408,7 @@ export default function DisambiguationTool() {
                         resolution={resolutions[idx]}
                         resolvingIdx={resolvingIdx}
                         processingRule={processingRule}
+                        canManageAuthority={canManageAuthority}
                         authorityCandidates={authorityCandidates}
                         authorityLoading={authorityLoading}
                         authorityAction={authorityAction}

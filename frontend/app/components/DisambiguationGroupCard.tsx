@@ -18,6 +18,7 @@ interface DisambiguationGroupCardProps {
     resolution: ResolutionState | undefined;
     resolvingIdx: number | null;
     processingRule: number | null;
+    canManageAuthority: boolean;
     authorityCandidates: Record<number, AuthorityRecord[]>;
     authorityLoading: Record<number, boolean>;
     authorityAction: Record<number, number | null>;
@@ -35,6 +36,7 @@ export default function DisambiguationGroupCard({
     resolution,
     resolvingIdx,
     processingRule,
+    canManageAuthority,
     authorityCandidates,
     authorityLoading,
     authorityAction,
@@ -93,11 +95,12 @@ export default function DisambiguationGroupCard({
                             </p>
                         </div>
                         <button
-                            onClick={() => onAcceptResolution(idx, resolution.canonical_value, group.variations)}
-                            disabled={processingRule === idx}
-                            className="ml-4 inline-flex shrink-0 items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-                        >
-                            {processingRule === idx ? "Applying..." : "Approve & Merge"}
+                        onClick={() => onAcceptResolution(idx, resolution.canonical_value, group.variations)}
+                        disabled={processingRule === idx || !canManageAuthority}
+                        title={!canManageAuthority ? "Requires editor permissions" : undefined}
+                        className="ml-4 inline-flex shrink-0 items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                        {processingRule === idx ? "Applying..." : "Approve & Merge"}
                         </button>
                     </div>
                 </div>
@@ -105,7 +108,8 @@ export default function DisambiguationGroupCard({
                 <div className="mt-4 flex justify-end gap-2">
                     <button
                         onClick={() => onResolveWithAI(idx, group.variations)}
-                        disabled={resolvingIdx === idx}
+                        disabled={resolvingIdx === idx || !canManageAuthority}
+                        title={!canManageAuthority ? "Requires editor permissions" : undefined}
                         className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-800 dark:bg-gray-900 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
                     >
                         {resolvingIdx === idx ? (
@@ -127,7 +131,8 @@ export default function DisambiguationGroupCard({
                     </button>
                     <button
                         onClick={() => onResolveWithAuthority(idx, group.main)}
-                        disabled={!!authorityLoading[idx]}
+                        disabled={!!authorityLoading[idx] || !canManageAuthority}
+                        title={!canManageAuthority ? "Requires editor permissions" : undefined}
                         className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:bg-gray-900 dark:text-amber-400 dark:hover:bg-amber-900/30"
                     >
                         {authorityLoading[idx] ? (
@@ -220,14 +225,16 @@ export default function DisambiguationGroupCard({
                                         <div className="shrink-0 flex gap-1.5">
                                             <button
                                                 onClick={() => onConfirmCandidate(idx, rec.id)}
-                                                disabled={isActing}
+                                                disabled={isActing || !canManageAuthority}
+                                                title={!canManageAuthority ? "Requires editor permissions" : undefined}
                                                 className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
                                             >
                                                 {isActing ? "..." : "Confirm"}
                                             </button>
                                             <button
                                                 onClick={() => onRejectCandidate(idx, rec.id)}
-                                                disabled={isActing}
+                                                disabled={isActing || !canManageAuthority}
+                                                title={!canManageAuthority ? "Requires editor permissions" : undefined}
                                                 className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                                             >
                                                 {isActing ? "..." : "Reject"}
