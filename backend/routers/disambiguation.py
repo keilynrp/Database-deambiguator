@@ -126,7 +126,8 @@ def create_rules_bulk(
                 org_id=rule_org_id,
                 field_name=payload.field_name,
                 original_value=var,
-                normalized_value=payload.canonical_value,
+                canonical_value=payload.canonical_value,
+                rule_type="exact",
             ))
     db.commit()
     return {

@@ -60,8 +60,26 @@ class NormalizationRule(Base):
     org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     field_name = Column(String, index=True) # e.g., "brand_lower"
     original_value = Column(String, index=True) # e.g., "mikrosoft"
-    normalized_value = Column(String) # e.g., "Microsoft"
-    is_regex = Column(Boolean, default=False)
+    canonical_value = Column(String) # e.g., "Microsoft"
+    rule_type = Column(String, default="exact")
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    @property
+    def normalized_value(self):
+        return self.canonical_value
+
+    @normalized_value.setter
+    def normalized_value(self, value):
+        self.canonical_value = value
+
+    @property
+    def is_regex(self):
+        return self.rule_type == "regex"
+
+    @is_regex.setter
+    def is_regex(self, value):
+        self.rule_type = "regex" if value else "exact"
 
 
 class HarmonizationLog(Base):

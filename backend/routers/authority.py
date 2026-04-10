@@ -634,8 +634,8 @@ def bulk_confirm_authority_records(
                     org_id=rec.org_id,
                     field_name=rec.field_name,
                     original_value=rec.original_value,
-                    normalized_value=rec.canonical_label,
-                    is_regex=False,
+                    canonical_value=rec.canonical_label,
+                    rule_type="exact",
                 ))
                 rules_created += 1
 
@@ -717,8 +717,8 @@ def confirm_authority_record(
                 org_id=rec.org_id,
                 field_name=rec.field_name,
                 original_value=rec.original_value,
-                normalized_value=rec.canonical_label,
-                is_regex=False,
+                canonical_value=rec.canonical_label,
+                rule_type="exact",
             ))
             rule_created = True
 
