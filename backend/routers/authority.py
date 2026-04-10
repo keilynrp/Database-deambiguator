@@ -612,7 +612,7 @@ def bulk_confirm_authority_records(
     org_id = resolve_request_org_id(db, current_user)
     confirmed = 0
     rules_created = 0
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
 
     for record_id in payload.ids:
         rec = get_scoped_record(db, models.AuthorityRecord, record_id, org_id)
@@ -702,7 +702,7 @@ def confirm_authority_record(
         raise HTTPException(status_code=404, detail="AuthorityRecord not found")
 
     rec.status = "confirmed"
-    rec.confirmed_at = datetime.now(timezone.utc).isoformat()
+    rec.confirmed_at = datetime.now(timezone.utc)
 
     rule_created = False
     if payload.also_create_rule:

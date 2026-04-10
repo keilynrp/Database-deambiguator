@@ -297,6 +297,8 @@ def _get_active_integration(db: Session):
 
 def _serialize_authority_record(r: models.AuthorityRecord) -> dict:
     """Convert ORM record to dict, deserializing all JSON fields."""
+    created_at = r.created_at.isoformat() if hasattr(r.created_at, "isoformat") else r.created_at
+    confirmed_at = r.confirmed_at.isoformat() if hasattr(r.confirmed_at, "isoformat") else r.confirmed_at
     return {
         "id":               r.id,
         "field_name":       r.field_name,
@@ -309,8 +311,8 @@ def _serialize_authority_record(r: models.AuthorityRecord) -> dict:
         "confidence":       r.confidence,
         "uri":              r.uri,
         "status":           r.status,
-        "created_at":       r.created_at,
-        "confirmed_at":     r.confirmed_at,
+        "created_at":       created_at,
+        "confirmed_at":     confirmed_at,
         "resolution_status": r.resolution_status or "unresolved",
         "score_breakdown":   json.loads(r.score_breakdown or "{}"),
         "evidence":          json.loads(r.evidence or "[]"),

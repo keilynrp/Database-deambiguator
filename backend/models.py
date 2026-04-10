@@ -219,8 +219,8 @@ class AuthorityRecord(Base):
     confidence       = Column(Float, default=0.0)         # 0.0–1.0 fuzzy similarity score
     uri              = Column(String, nullable=True)       # URL of the authority record
     status           = Column(String, default="pending", index=True)
-    created_at       = Column(String, default=lambda: datetime.now(timezone.utc).isoformat())
-    confirmed_at     = Column(String, nullable=True)
+    created_at       = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    confirmed_at     = Column(DateTime, nullable=True)
     # Sprint 16 — scoring engine
     resolution_status = Column(String, default="unresolved", index=True)  # exact_match | probable_match | ambiguous | unresolved
     score_breakdown   = Column(Text, nullable=True)   # JSON: {identifiers, name, affiliation, coauthorship, topic}
