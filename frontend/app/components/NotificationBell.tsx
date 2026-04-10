@@ -120,8 +120,11 @@ function localizedNotificationLabel(
 
   const genericActionKey = GENERIC_ACTION_TRANSLATION_KEYS[entry.action];
   if (genericActionKey && entry.entity_type) {
+    const resourceKey = `header.notifications.resource.${entry.entity_type}`;
+    const translatedResource = t(resourceKey);
+    const fallbackResource = entry.entity_type.replaceAll("_", " ").replaceAll(".", " ");
     return t(genericActionKey, {
-      resource: t(`header.notifications.resource.${entry.entity_type}`),
+      resource: translatedResource === resourceKey ? fallbackResource : translatedResource,
     });
   }
 
@@ -219,7 +222,7 @@ export default function NotificationBell() {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-12 z-50 w-[26rem] max-w-[min(26rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+        <div className="absolute right-0 top-12 z-50 w-[30rem] max-w-[min(30rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
             <div className="flex items-center gap-2">

@@ -151,8 +151,11 @@ function localizedNotificationLabel(
 
   const genericActionKey = GENERIC_ACTION_TRANSLATION_KEYS[entry.action];
   if (genericActionKey && entry.entity_type) {
+    const resourceKey = `page.notifications.resource.${entry.entity_type}`;
+    const translatedResource = t(resourceKey);
+    const fallbackResource = entry.entity_type.replaceAll("_", " ").replaceAll(".", " ");
     return t(genericActionKey, {
-      resource: t(`page.notifications.resource.${entry.entity_type}`),
+      resource: translatedResource === resourceKey ? fallbackResource : translatedResource,
     });
   }
 
