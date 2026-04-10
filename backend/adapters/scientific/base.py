@@ -37,10 +37,15 @@ class BaseScientificAdapter(ABC):
         """Fetch a single record by DOI. Returns None if not found."""
 
     def fetch_batch_dois(self, dois: list) -> list:
-        """Fetch multiple DOIs. Default: sequential calls to fetch_by_doi."""
+        """Fetch multiple DOIs. Skips not-found (None) and logs errors but continues."""
+        import logging
+        logger = logging.getLogger(__name__)
         results = []
         for doi in dois:
-            rec = self.fetch_by_doi(doi.strip())
-            if rec:
-                results.append(rec)
+            try:
+                rec = self.fetch_by_doi(doi.strip())
+                if rec:
+                    results.append(rec)
+            except Exception:
+                logger.exception("fetch_by_doi failed for DOI %r — skipping", doi)
         return results

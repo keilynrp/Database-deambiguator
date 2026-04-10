@@ -21,8 +21,11 @@ def test_scientific_record_has_required_fields():
 
 
 def test_base_adapter_is_abstract():
-    with pytest.raises(TypeError):
-        BaseScientificAdapter()
+    class IncompleteAdapter(BaseScientificAdapter):
+        pass  # does not implement abstract methods
+
+    with pytest.raises(TypeError, match="abstract"):
+        IncompleteAdapter(config={})
 
 
 def test_factory_raises_for_unknown_source():
