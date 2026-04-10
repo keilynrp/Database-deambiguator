@@ -15,6 +15,7 @@ from itertools import combinations
 from typing import Any
 
 import pandas as pd
+from sqlalchemy import text
 
 from backend.database import engine
 from backend.tenant_access import add_org_sql_filter
@@ -161,7 +162,7 @@ def _load_concepts_df(domain_id: str, org_id: int | None = None) -> pd.DataFrame
 
     with engine.connect() as conn:
         df = pd.read_sql(
-            (
+            text(
                 "SELECT id, enrichment_concepts, attributes_json "
                 f"FROM raw_entities WHERE {' AND '.join(where_clauses)}"
             ),
@@ -196,7 +197,7 @@ def _load_concepts_timeseries_df(domain_id: str, org_id: int | None = None) -> p
 
     with engine.connect() as conn:
         df = pd.read_sql(
-            (
+            text(
                 "SELECT id, enrichment_concepts, attributes_json, primary_label, secondary_label "
                 f"FROM raw_entities WHERE {' AND '.join(where_clauses)}"
             ),
