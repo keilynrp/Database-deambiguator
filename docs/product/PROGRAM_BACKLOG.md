@@ -72,6 +72,15 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
 4. `US-069` - Emerging Topic Trend Signals
 5. seguir endureciendo operacion solo en respuesta a hallazgos reales del despliegue
 
+## Hallazgo piloto reciente
+
+- piloto real UDG ejecutado y documentado en
+  `docs/product/PILOT_UDG_EXECUTIVE_DASHBOARD_REVIEW_2026-04-10.md`
+- conclusion: `US-060` y `US-061` ya quedaron validadas como flujo util de
+  demo interna seria
+- siguiente prioridad recomendada: siguiente corte de `US-067` para benchmark
+  configurable por tenant/institucion
+
 ## Arquitectura futura de visualizacion
 
 - `US-062` - Graph Visualization Read-Path Baseline
