@@ -262,6 +262,59 @@ def test_dashboard_skips_noisy_author_list_labels_in_year_matrix(client, auth_he
     assert "Institutional collaboration note" in brands
 
 
+def test_dashboard_deduplicates_top_entities_by_label_and_source(client, auth_headers, db_session):
+    db_session.add_all([
+        models.RawEntity(
+            primary_label="Editorial",
+            domain="top_entities_dedupe_test",
+            enrichment_status="completed",
+            enrichment_citation_count=500,
+            enrichment_source="openalex",
+        ),
+        models.RawEntity(
+            primary_label="Editorial",
+            domain="top_entities_dedupe_test",
+            enrichment_status="completed",
+            enrichment_citation_count=450,
+            enrichment_source="openalex",
+        ),
+        models.RawEntity(
+            primary_label="Signal Paper",
+            domain="top_entities_dedupe_test",
+            enrichment_status="completed",
+            enrichment_citation_count=400,
+            enrichment_source="openalex",
+        ),
+    ])
+    db_session.commit()
+
+    response = client.get("/dashboard/summary?domain_id=top_entities_dedupe_test", headers=auth_headers)
+    assert response.status_code == 200
+    labels = [entity["primary_label"] for entity in response.json()["top_entities"]]
+
+    assert labels.count("Editorial") == 1
+    assert "Signal Paper" in labels
+
+
+def test_dashboard_normalizes_noisy_parenthetical_concepts(client, auth_headers, db_session):
+    db_session.add(models.RawEntity(
+        primary_label="Concept Noise",
+        domain="concept_noise_test",
+        enrichment_status="completed",
+        enrichment_concepts="Context (archaeology), Work (physics), Artificial intelligence, Computer science",
+    ))
+    db_session.commit()
+
+    response = client.get("/dashboard/summary?domain_id=concept_noise_test", headers=auth_headers)
+    assert response.status_code == 200
+    concepts = {topic["concept"] for topic in response.json()["top_concepts"]}
+
+    assert "Artificial intelligence" in concepts
+    assert "Computer science" in concepts
+    assert "Context" not in concepts
+    assert "Work" not in concepts
+
+
 def test_topic_analyzer_emerging_signals_detects_acceleration():
     df = pd.DataFrame([
         {

@@ -23,6 +23,16 @@ class AnalyticsService:
     _TOP_BRANDS_N = 5
     _TOP_YEARS_N  = 6
     _LONG_LABEL_LIMIT = 72
+    _GENERIC_CONCEPT_LABELS = {
+        "context",
+        "field",
+        "identity",
+        "measure",
+        "order",
+        "persona",
+        "production",
+        "work",
+    }
 
     @classmethod
     def _extract_temporal_year(
@@ -77,6 +87,33 @@ class AnalyticsService:
                 return candidate
             return f"{candidate[: cls._LONG_LABEL_LIMIT - 1].rstrip()}…"
         return None
+
+    @classmethod
+    def _dashboard_concepts(cls, topics: list[dict], top_n: int) -> list[dict]:
+        """Normalize obvious concept noise for executive-facing concept clouds."""
+        concept_totals: dict[str, int] = defaultdict(int)
+        for topic in topics:
+            raw = str(topic.get("concept") or "").strip()
+            if not raw:
+                continue
+            cleaned = re.sub(r"\s*\([^)]*\)\s*$", "", raw).strip()
+            if cleaned.casefold() in cls._GENERIC_CONCEPT_LABELS:
+                continue
+            concept_totals[cleaned] += int(topic.get("count") or 0)
+
+        total_mentions = sum(concept_totals.values()) or 1
+        normalized = [
+            {
+                "concept": concept,
+                "count": count,
+                "pct": round(count / total_mentions * 100, 2),
+            }
+            for concept, count in sorted(
+                concept_totals.items(),
+                key=lambda item: (-item[1], item[0].lower()),
+            )[:top_n]
+        ]
+        return normalized
 
     @staticmethod
     def build_recommended_actions(snapshot: dict) -> list[dict]:
@@ -245,7 +282,7 @@ class AnalyticsService:
         total_concepts = 0
         try:
             result = topic_analyzer.top_topics(domain_id, top_n=top_n_concepts, org_id=org_id)
-            top_concepts = result.get("topics", [])
+            top_concepts = cls._dashboard_concepts(result.get("topics", []), top_n_concepts)
             total_concepts = int(result.get("total_distinct_concepts") or len(top_concepts))
         except Exception:
             pass
@@ -275,14 +312,25 @@ class AnalyticsService:
                            models.RawEntity.enrichment_source)
             .filter(models.RawEntity.enrichment_status == "completed")
             .order_by(models.RawEntity.enrichment_citation_count.desc())
-            .limit(top_n_entities)
+            .limit(top_n_entities * 5)
             .all()
         )
-        top_entities = [
-            {"id": r.id, "primary_label": r.primary_label,
-             "citation_count": r.enrichment_citation_count or 0, "source": r.enrichment_source}
-            for r in top_entity_rows
-        ]
+        top_entities: list[dict] = []
+        seen_entity_keys: set[tuple[str, str]] = set()
+        for r in top_entity_rows:
+            label = (r.primary_label or f"Entity #{r.id}").strip()
+            key = (label.casefold(), (r.enrichment_source or "").casefold())
+            if key in seen_entity_keys:
+                continue
+            seen_entity_keys.add(key)
+            top_entities.append({
+                "id": r.id,
+                "primary_label": r.primary_label,
+                "citation_count": r.enrichment_citation_count or 0,
+                "source": r.enrichment_source,
+            })
+            if len(top_entities) >= top_n_entities:
+                break
 
         # Heatmap: secondary_label x year
         top_labels = sorted(label_totals, key=lambda b: label_totals[b], reverse=True)[:cls._TOP_BRANDS_N]
