@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export type ToastVariant = "success" | "error" | "warning" | "info";
 
@@ -46,6 +47,11 @@ const DURATION = 4500;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
     const [toasts, setToasts] = useState<ToastItem[]>([]);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const toast = useCallback((message: string, variant: ToastVariant = "info") => {
         const id = ++nextId;
@@ -57,36 +63,40 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         setToasts(prev => prev.filter(t => t.id !== id));
     }, []);
 
+    const toastContainer = (
+        <div
+            aria-live="polite"
+            aria-label="Notifications"
+            className="fixed bottom-5 right-5 z-[200] flex flex-col gap-2 pointer-events-none"
+        >
+            {toasts.map(t => (
+                <div
+                    key={t.id}
+                    className={`flex items-start gap-3 rounded-xl border px-4 py-3 shadow-lg pointer-events-auto toast-enter ${STYLES[t.variant]}`}
+                    style={{ minWidth: 280, maxWidth: 420 }}
+                >
+                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${ICON_STYLES[t.variant]}`}>
+                        {ICONS[t.variant]}
+                    </span>
+                    <p className="flex-1 text-sm font-medium leading-snug">{t.message}</p>
+                    <button
+                        onClick={() => dismiss(t.id)}
+                        className="shrink-0 rounded p-0.5 opacity-50 hover:opacity-100 transition-opacity"
+                        aria-label="Dismiss"
+                    >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            ))}
+        </div>
+    );
+
     return (
         <ToastContext.Provider value={{ toast }}>
             {children}
-            <div
-                aria-live="polite"
-                aria-label="Notifications"
-                className="fixed bottom-5 right-5 z-[200] flex flex-col gap-2 pointer-events-none"
-            >
-                {toasts.map(t => (
-                    <div
-                        key={t.id}
-                        className={`flex items-start gap-3 rounded-xl border px-4 py-3 shadow-lg pointer-events-auto toast-enter ${STYLES[t.variant]}`}
-                        style={{ minWidth: 280, maxWidth: 420 }}
-                    >
-                        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${ICON_STYLES[t.variant]}`}>
-                            {ICONS[t.variant]}
-                        </span>
-                        <p className="flex-1 text-sm font-medium leading-snug">{t.message}</p>
-                        <button
-                            onClick={() => dismiss(t.id)}
-                            className="shrink-0 rounded p-0.5 opacity-50 hover:opacity-100 transition-opacity"
-                            aria-label="Dismiss"
-                        >
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                ))}
-            </div>
+            {mounted && createPortal(toastContainer, document.body)}
         </ToastContext.Provider>
     );
 }

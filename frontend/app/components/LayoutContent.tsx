@@ -9,17 +9,25 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
   const { collapsed } = useSidebar();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, hydrated } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
   const isLoginPage = pathname === "/login";
 
   useEffect(() => {
+    if (!hydrated) return;
     if (!isAuthenticated && !isLoginPage) {
       router.replace("/login");
     }
-  }, [isAuthenticated, isLoginPage, router]);
+  }, [hydrated, isAuthenticated, isLoginPage, router]);
+
+  // Block ALL rendering until auth state is resolved from localStorage.
+  // Server renders null, client hydration also renders null (hydrated starts false),
+  // so the DOM matches — zero hydration mismatch possible.
+  if (!hydrated) {
+    return null;
+  }
 
   // Login page renders without the shell (no sidebar / header)
   if (isLoginPage) {

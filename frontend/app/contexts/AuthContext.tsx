@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import { API_BASE } from "@/lib/api";
 
 interface User {
@@ -19,6 +19,7 @@ interface AuthContextType {
   token: string | null;
   user: User | null;
   isAuthenticated: boolean;
+  hydrated: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -27,7 +28,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-function getStoredToken(): string | null {
+const AUTH_EVENT = "ukip-auth-change";
+
+function subscribeAuth(onStoreChange: () => void): () => void {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+  const handleChange = () => onStoreChange();
+  window.addEventListener("storage", handleChange);
+  window.addEventListener(AUTH_EVENT, handleChange);
+  return () => {
+    window.removeEventListener("storage", handleChange);
+    window.removeEventListener(AUTH_EVENT, handleChange);
+  };
+}
+
+function getTokenSnapshot(): string | null {
   if (typeof window === "undefined") {
     return null;
   }
@@ -35,7 +51,12 @@ function getStoredToken(): string | null {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(getStoredToken);
+  const token = useSyncExternalStore(subscribeAuth, getTokenSnapshot, () => null);
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const [user, setUser]   = useState<User | null>(null);
 
   useEffect(() => {
@@ -86,17 +107,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const data = await res.json();
     localStorage.setItem("ukip_token", data.access_token);
-    setToken(data.access_token);
+    window.dispatchEvent(new Event(AUTH_EVENT));
   }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem("ukip_token");
-    setToken(null);
     setUser(null);
+    window.dispatchEvent(new Event(AUTH_EVENT));
   }, []);
 
+  const resolvedUser = token ? user : null;
+
   return (
-    <AuthContext.Provider value={{ token, user, isAuthenticated: !!token, login, logout, refreshUser, updateAvatarUrl }}>
+    <AuthContext.Provider value={{ token, user: resolvedUser, isAuthenticated: !!token, hydrated, login, logout, refreshUser, updateAvatarUrl }}>
       {children}
     </AuthContext.Provider>
   );

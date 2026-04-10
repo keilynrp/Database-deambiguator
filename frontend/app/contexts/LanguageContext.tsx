@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useCallback, useSyncExternalStore, ReactNode } from "react";
 import { translations, Language } from "../i18n/translations";
 
 interface LanguageContextType {
@@ -11,20 +11,36 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-    const [language, setLanguage] = useState<Language>(() => {
-        if (typeof window !== "undefined") {
-            const saved = localStorage.getItem("app_lang");
-            if (saved === "en" || saved === "es") {
-                return saved;
-            }
-        }
-        return "es";
-    });
-    const changeLanguage = (lang: Language) => {
-        setLanguage(lang);
-        localStorage.setItem("app_lang", lang);
+const LANGUAGE_EVENT = "ukip-language-change";
+
+function subscribeLanguage(onStoreChange: () => void): () => void {
+    if (typeof window === "undefined") {
+        return () => {};
+    }
+    const handleChange = () => onStoreChange();
+    window.addEventListener("storage", handleChange);
+    window.addEventListener(LANGUAGE_EVENT, handleChange);
+    return () => {
+        window.removeEventListener("storage", handleChange);
+        window.removeEventListener(LANGUAGE_EVENT, handleChange);
     };
+}
+
+function getLanguageSnapshot(): Language {
+    if (typeof window === "undefined") {
+        return "es";
+    }
+    const saved = localStorage.getItem("app_lang");
+    return saved === "en" || saved === "es" ? saved : "es";
+}
+
+export function LanguageProvider({ children }: { children: ReactNode }) {
+    const language = useSyncExternalStore(subscribeLanguage, getLanguageSnapshot, () => "es");
+
+    const changeLanguage = useCallback((lang: Language) => {
+        localStorage.setItem("app_lang", lang);
+        window.dispatchEvent(new Event(LANGUAGE_EVENT));
+    }, []);
 
     const t = (key: string, params?: Record<string, string | number>): string => {
         const dict = translations[language] as Record<string, string>;
