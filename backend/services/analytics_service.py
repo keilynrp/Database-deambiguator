@@ -19,6 +19,7 @@ class AnalyticsService:
     """
 
     _YEAR_RE = re.compile(r"\b(20\d{2}|19\d{2})\b")
+    _AUTHOR_LIST_RE = re.compile(r"(;|,).*(;|,)")
     _TOP_BRANDS_N = 5
     _TOP_YEARS_N  = 6
     _LONG_LABEL_LIMIT = 72
@@ -62,13 +63,20 @@ class AnalyticsService:
         secondary_label: str | None,
     ) -> str | None:
         """Prefer primary labels for executive reads and trim noisy overlong labels."""
-        candidate = primary_label or secondary_label
-        if not candidate:
-            return None
-        candidate = re.sub(r"\s+", " ", candidate).strip()
-        if len(candidate) <= cls._LONG_LABEL_LIMIT:
-            return candidate
-        return f"{candidate[: cls._LONG_LABEL_LIMIT - 1].rstrip()}…"
+        for raw in (primary_label, secondary_label):
+            if not raw:
+                continue
+            candidate = re.sub(r"\s+", " ", raw).strip()
+            if not candidate:
+                continue
+            if candidate.count(";") >= 2 or candidate.count(",") >= 5:
+                continue
+            if cls._AUTHOR_LIST_RE.search(candidate) and len(candidate.split()) > 8:
+                continue
+            if len(candidate) <= cls._LONG_LABEL_LIMIT:
+                return candidate
+            return f"{candidate[: cls._LONG_LABEL_LIMIT - 1].rstrip()}…"
+        return None
 
     @staticmethod
     def build_recommended_actions(snapshot: dict) -> list[dict]:

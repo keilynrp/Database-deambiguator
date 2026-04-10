@@ -245,6 +245,23 @@ def test_dashboard_derives_quality_when_scores_are_not_persisted(client, auth_he
     assert quality["average"] > 0.0
 
 
+def test_dashboard_skips_noisy_author_list_labels_in_year_matrix(client, auth_headers, db_session):
+    db_session.add(models.RawEntity(
+        primary_label="Ana Perez; Luis Soto; Marta Ruiz; Diego Leon",
+        secondary_label="Institutional collaboration note",
+        domain="label_matrix_test",
+        attributes_json=json.dumps({"year": 2025}),
+    ))
+    db_session.commit()
+
+    response = client.get("/dashboard/summary?domain_id=label_matrix_test", headers=auth_headers)
+    assert response.status_code == 200
+    brands = response.json()["brand_year_matrix"]["brands"]
+
+    assert "Ana Perez; Luis Soto; Marta Ruiz; Diego Leon" not in brands
+    assert "Institutional collaboration note" in brands
+
+
 def test_topic_analyzer_emerging_signals_detects_acceleration():
     df = pd.DataFrame([
         {

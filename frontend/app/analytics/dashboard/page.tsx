@@ -730,8 +730,13 @@ export default function ExecutiveDashboardPage() {
         {loading ? (
           <SkeletonCard lines={3} />
         ) : !data ? null : data.emerging_topic_signals.signals.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-400">
-            {tr("page.exec_dashboard.no_signals", "No reliable early signals yet. UKIP needs concept coverage across multiple years before surfacing acceleration.")}
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-5 dark:border-gray-800 dark:bg-gray-950/30">
+            <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+              {tr("page.exec_dashboard.experimental_note_title", "Experimental module waiting for stronger signal")}
+            </p>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              {tr("page.exec_dashboard.no_signals", "No reliable early signals yet. UKIP needs concept coverage across multiple years before surfacing acceleration.")}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
