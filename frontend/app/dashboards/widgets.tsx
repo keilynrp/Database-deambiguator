@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatDateTime } from "../lib/dateFormat";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -264,7 +265,7 @@ export function RecentActivityWidget({ config }: { config: WidgetConfig }) {
             <div className="min-w-0">
               <p className="truncate text-[11px] text-gray-700 dark:text-gray-300">{item.action}</p>
               <p className="text-[10px] text-gray-400">
-                {item.username} · {new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                {item.username} · {formatDateTime(item.created_at, undefined, { hour: "2-digit", minute: "2-digit" })}
               </p>
             </div>
           </div>

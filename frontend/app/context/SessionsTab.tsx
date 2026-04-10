@@ -2,6 +2,7 @@
 
 import { SnapshotCards } from "./ContextPanels";
 import type { Session, SessionDetail } from "./contextTypes";
+import { formatDateTime } from "../lib/dateFormat";
 
 export function SessionsTab({
   loadingSessions,
@@ -80,9 +81,9 @@ export function SessionsTab({
                     {session.label || `Snapshot #${session.id}`}
                   </p>
                 </div>
-                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                  <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
                   Domain: <span className="font-medium">{session.domain_id}</span> ·{" "}
-                  {new Date(session.created_at).toLocaleString()}
+                  {formatDateTime(session.created_at)}
                 </p>
               </div>
               <div className="flex shrink-0 gap-2">
@@ -154,7 +155,7 @@ export function SessionsTab({
                   {selectedSession.domain_id}
                 </span>
               </div>
-              <p className="text-xs text-gray-400">{new Date(selectedSession.created_at).toLocaleString()}</p>
+              <p className="text-xs text-gray-400">{formatDateTime(selectedSession.created_at)}</p>
               {selectedSession.notes && (
                 <p className="text-xs italic text-gray-500 dark:text-gray-400">{selectedSession.notes}</p>
               )}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "../../lib/api";
+import { formatRelativeTime } from "../lib/dateFormat";
 
 interface FeedEntry {
   id: number;
@@ -24,18 +25,6 @@ const ACTION_LABELS: Record<string, string> = {
   "authority.reject":  "Authority record rejected",
   "entity.merge":      "Entities merged",
 };
-
-function timeAgo(isoString: string): string {
-  const diff = Date.now() - new Date(isoString).getTime();
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
-}
 
 function entryDetail(entry: FeedEntry): string {
   const d = entry.details;
@@ -111,8 +100,8 @@ export default function ActivityFeed() {
                       <p className="truncate text-xs text-gray-500 dark:text-gray-400">{detail}</p>
                     )}
                   </div>
-                  <time className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                    {entry.created_at ? timeAgo(entry.created_at) : ""}
+                    <time className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                    {formatRelativeTime(entry.created_at, "en", "")}
                   </time>
                 </div>
               </li>

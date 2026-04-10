@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api";
 import { WIDGET_REGISTRY, type WidgetConfig } from "./widgets";
 import PresenceAvatars from "../components/PresenceAvatars";
 import { useWebSocket } from "@/lib/useWebSocket";
+import { formatDate } from "../lib/dateFormat";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -481,7 +482,7 @@ export default function DashboardsPage() {
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{activeDash.name}</h2>
                 <p className="text-xs text-gray-400">
                   {displayWidgets.length} widget{displayWidgets.length !== 1 ? "s" : ""}
-                  {activeDash.updated_at && ` · saved ${new Date(activeDash.updated_at).toLocaleDateString()}`}
+                  {activeDash.updated_at && ` · saved ${formatDate(activeDash.updated_at)}`}
                 </p>
               </div>
               <div className="flex items-center gap-3">

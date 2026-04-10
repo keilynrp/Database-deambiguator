@@ -6,6 +6,7 @@ import {
   TRIGGER_LABELS,
   type Workflow,
 } from "./workflowTypes";
+import { formatDate } from "../lib/dateFormat";
 
 function Badge({ label, className }: { label: string; className: string }) {
   return (
@@ -58,7 +59,7 @@ function WorkflowCard({
             <span>{workflow.actions.length} action{workflow.actions.length !== 1 ? "s" : ""}</span>
             <span>{workflow.run_count} run{workflow.run_count !== 1 ? "s" : ""}</span>
             {workflow.last_run_at && (
-              <span>Last run {new Date(workflow.last_run_at).toLocaleDateString()}</span>
+              <span>Last run {formatDate(workflow.last_run_at)}</span>
             )}
           </div>
         </div>

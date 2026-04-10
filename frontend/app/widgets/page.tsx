@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
+import { formatDate } from "../lib/dateFormat";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -387,7 +388,7 @@ export default function WidgetsPage() {
                       <div className="flex items-center gap-3 text-xs text-slate-400">
                         <span>{t("page.widgets.views", { count: w.view_count })}</span>
                         {w.last_viewed_at && (
-                          <span>{t("page.widgets.last_viewed", { date: new Date(w.last_viewed_at).toLocaleDateString() })}</span>
+                          <span>{t("page.widgets.last_viewed", { date: formatDate(w.last_viewed_at) })}</span>
                         )}
                         {w.allowed_origins !== "*" && (
                           <span className="truncate max-w-[120px]" title={w.allowed_origins}>

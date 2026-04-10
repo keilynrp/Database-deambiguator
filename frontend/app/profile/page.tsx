@@ -7,6 +7,7 @@ import UserAvatar from "../components/UserAvatar";
 import AvatarUpload from "../components/AvatarUpload";
 import { apiFetch } from "@/lib/api";
 import PasswordStrength from "../components/PasswordStrength";
+import { formatDate } from "../lib/dateFormat";
 
 const ROLE_META: Record<string, { label: string; pill: string }> = {
     super_admin: { label: "Super Admin", pill: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400" },
@@ -19,8 +20,7 @@ const inputCls =
     "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
 
 function formatJoined(iso: string | null | undefined) {
-    if (!iso) return "—";
-    return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+    return formatDate(iso, undefined, { year: "numeric", month: "long", day: "2-digit" });
 }
 
 function getErrorMessage(error: unknown, fallback: string) {

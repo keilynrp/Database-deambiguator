@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { apiFetch } from "../../lib/api";
 import { STATUS_COLORS, type WorkflowRun } from "./workflowTypes";
+import { formatDateTime } from "../lib/dateFormat";
 
 export function RunHistoryPanel({ workflowId, onClose }: { workflowId: number; onClose: () => void }) {
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
@@ -44,7 +45,7 @@ export function RunHistoryPanel({ workflowId, onClose }: { workflowId: number; o
                         {run.status}
                       </span>
                       <span className="text-xs text-slate-500 dark:text-slate-400">
-                        {run.started_at ? new Date(run.started_at).toLocaleString() : "-"}
+                        {formatDateTime(run.started_at)}
                       </span>
                     </div>
                     {run.completed_at && run.started_at && (

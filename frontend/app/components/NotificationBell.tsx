@@ -28,15 +28,50 @@ const ACTION_COLOR: Record<string, string> = {
   "authority.reject":    "bg-rose-500",
 };
 
-function timeAgo(iso: string, t: (key: string, params?: Record<string, string | number>) => string): string {
-  const diff = Date.now() - new Date(iso).getTime();
+function localeForLanguage(language: string): string {
+  return language === "es" ? "es-MX" : "en-US";
+}
+
+function relativeTimeFormatter(language: string): Intl.RelativeTimeFormat {
+  return new Intl.RelativeTimeFormat(localeForLanguage(language), { numeric: "auto" });
+}
+
+function parseNotificationDate(iso: string): Date | null {
+  const normalized = /([zZ]|[+-]\d{2}:\d{2})$/.test(iso) ? iso : `${iso}Z`;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function timeAgo(
+  iso: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+  language: string,
+): string {
+  const date = parseNotificationDate(iso);
+  if (!date) return "";
+  const diff = Math.max(0, Date.now() - date.getTime());
   const s = Math.floor(diff / 1000);
-  if (s < 60) return t("header.notifications.time.seconds", { count: s });
+  if (s <= 0) return t("header.notifications.time.now");
+  const rtf = relativeTimeFormatter(language);
+  if (s < 60) return rtf.format(-s, "second");
   const m = Math.floor(s / 60);
-  if (m < 60) return t("header.notifications.time.minutes", { count: m });
+  if (m < 60) return rtf.format(-m, "minute");
   const h = Math.floor(m / 60);
-  if (h < 24) return t("header.notifications.time.hours", { count: h });
-  return t("header.notifications.time.days", { count: Math.floor(h / 24) });
+  if (h < 24) return rtf.format(-h, "hour");
+  return rtf.format(-Math.floor(h / 24), "day");
+}
+
+function formatNotificationDateTime(iso: string, language: string): string {
+  const date = parseNotificationDate(iso);
+  if (!date) return "";
+  return new Intl.DateTimeFormat(localeForLanguage(language), {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: language !== "es",
+  }).format(date);
 }
 
 function entryDetail(entry: FeedEntry, t: (key: string, params?: Record<string, string | number>) => string): string {
@@ -56,7 +91,7 @@ function entryDetail(entry: FeedEntry, t: (key: string, params?: Record<string, 
 }
 
 export default function NotificationBell() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [open, setOpen]       = useState(false);
   const [entries, setEntries] = useState<FeedEntry[]>([]);
   const [unread, setUnread] = useState(0);
@@ -205,7 +240,11 @@ export default function NotificationBell() {
                       )}
                       <div className="mt-1 flex flex-wrap items-center gap-3">
                         <p className="text-[11px] text-gray-400 dark:text-gray-500">
-                          {entry.created_at ? timeAgo(entry.created_at, t) : ""}
+                          {entry.created_at ? (
+                            <span title={formatNotificationDateTime(entry.created_at, language)}>
+                              {timeAgo(entry.created_at, t, language)}
+                            </span>
+                          ) : ""}
                         </p>
                         {entry.href && (
                           <Link

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "../components/ui";
 import { apiFetch } from "@/lib/api";
+import { formatDateTime } from "../lib/dateFormat";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -435,7 +436,7 @@ export default function ScrapersPage() {
                       <span>Rate: {s.rate_limit_secs}s</span>
                       <span>Runs: {s.total_runs}</span>
                       <span>Enriched: {s.total_enriched}</span>
-                      {s.last_run_at && <span>Last: {new Date(s.last_run_at).toLocaleString()}</span>}
+                      {s.last_run_at && <span>Last: {formatDateTime(s.last_run_at)}</span>}
                     </div>
                     {runResult[s.id] && (
                       <p className="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400">

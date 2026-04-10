@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatDate } from "../../lib/dateFormat";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -32,8 +33,7 @@ const SCOPE_COLORS: Record<string, string> = {
 };
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return "Never";
-  return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
+  return formatDate(iso, undefined, { dateStyle: "medium" }, "Never");
 }
 
 // ── Copy helper ───────────────────────────────────────────────────────────────

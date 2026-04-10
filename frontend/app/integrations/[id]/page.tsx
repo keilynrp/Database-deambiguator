@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { PageHeader, TabNav, Badge } from "../../components/ui";
+import { formatDate, formatDateTime } from "../../lib/dateFormat";
 
 interface StoreDetail {
     id: number; name: string; platform: string; base_url: string; is_active: boolean;
@@ -202,7 +203,7 @@ export default function StoreDetailPage() {
                     { label: "Mapped Products", value: store.entity_count || mappingsTotal, icon: "📦" },
                     { label: "Pending Review", value: queueFilter === "pending" ? queueTotal : "...", icon: "⏳" },
                     { label: "Sync Direction", value: store.sync_direction === "bidirectional" ? "↔ Both" : store.sync_direction === "pull" ? "← Pull" : "Push →", icon: "🔄" },
-                    { label: "Last Sync", value: store.last_sync_at ? new Date(store.last_sync_at).toLocaleDateString() : "Never", icon: "🕐" },
+                    { label: "Last Sync", value: store.last_sync_at ? formatDate(store.last_sync_at) : "Never", icon: "🕐" },
                 ].map((s) => (
                     <div key={s.label} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <p className="text-xs text-gray-500 dark:text-gray-400">{s.icon} {s.label}</p>
@@ -349,7 +350,7 @@ export default function StoreDetailPage() {
                                     </div>
                                     <div className="flex-1">
                                         <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">{l.action}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">{l.records_affected} records · {l.executed_at ? new Date(l.executed_at).toLocaleString() : ""}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">{l.records_affected} records · {l.executed_at ? formatDateTime(l.executed_at) : ""}</p>
                                     </div>
                                     <Badge variant={statusBadgeVariant(l.status)}>{l.status}</Badge>
                                 </div>

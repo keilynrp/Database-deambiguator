@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatDateTime } from "../../lib/dateFormat";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -54,10 +55,7 @@ function intervalLabel(minutes: number): string {
 }
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString(undefined, {
-    dateStyle: "medium", timeStyle: "short",
-  });
+  return formatDateTime(iso, undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
 // ── Empty form state ──────────────────────────────────────────────────────────

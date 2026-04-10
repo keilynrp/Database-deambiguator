@@ -2,6 +2,7 @@
 
 import { DeltaTable } from "./ContextPanels";
 import type { DiffResult, Session } from "./contextTypes";
+import { formatDateTime } from "../lib/dateFormat";
 
 export function DiffTab({
   sortedSessions,
@@ -114,12 +115,12 @@ export function DiffTab({
           <div className="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400">
             <span>
               A: <strong>{diffResult.snapshot_a_domain}</strong> ·{" "}
-              {new Date(diffResult.snapshot_a_generated).toLocaleString()}
+              {formatDateTime(diffResult.snapshot_a_generated)}
             </span>
             <span className="mx-2">-&gt;</span>
             <span>
               B: <strong>{diffResult.snapshot_b_domain}</strong> ·{" "}
-              {new Date(diffResult.snapshot_b_generated).toLocaleString()}
+              {formatDateTime(diffResult.snapshot_b_generated)}
             </span>
           </div>
 

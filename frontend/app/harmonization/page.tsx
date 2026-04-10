@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PageHeader, Badge, useToast, EmptyState } from "../components/ui";
 import { apiFetch } from "@/lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
+import { formatDateTime } from "../lib/dateFormat";
 
 interface HarmonizationChange {
     record_id: number;
@@ -356,8 +357,8 @@ export default function HarmonizationPage() {
                                                 </div>
                                                 <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{step.description}</p>
                                                 {step.last_run && (
-                                                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                                                        Last run: {new Date(step.last_run).toLocaleString()} ({step.last_records_updated} records)
+                                                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                                                        Last run: {formatDateTime(step.last_run)} ({step.last_records_updated} records)
                                                     </p>
                                                 )}
                                             </div>
@@ -524,7 +525,7 @@ export default function HarmonizationPage() {
                                                     </div>
                                                     <p className="text-xs text-gray-500 dark:text-gray-400">
                                                         {log.records_updated} records &middot; {log.fields_modified.join(", ")}
-                                                        {log.executed_at && <> &middot; {new Date(log.executed_at).toLocaleString()}</>}
+                                                        {log.executed_at && <> &middot; {formatDateTime(log.executed_at)}</>}
                                                     </p>
                                                 </div>
                                             </div>

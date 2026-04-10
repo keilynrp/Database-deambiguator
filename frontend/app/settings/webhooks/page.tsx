@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { PageHeader, StatCard, Badge, useToast } from "../../components/ui";
 import { apiFetch } from "@/lib/api";
+import { formatRelativeTime } from "../../lib/dateFormat";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -77,19 +78,6 @@ function statusBadge(code: number | null) {
     if (code >= 200 && code < 300) return <Badge variant="success">{code}</Badge>;
     if (code >= 400 && code < 500) return <Badge variant="warning">{code}</Badge>;
     return <Badge variant="error">{code || "ERR"}</Badge>;
-}
-
-function timeAgo(iso: string | null): string {
-    if (!iso) return "Never";
-    const diff = Date.now() - new Date(iso).getTime();
-    const sec = Math.floor(diff / 1000);
-    if (sec < 60) return `${sec}s ago`;
-    const min = Math.floor(sec / 60);
-    if (min < 60) return `${min}m ago`;
-    const hr = Math.floor(min / 60);
-    if (hr < 24) return `${hr}h ago`;
-    const days = Math.floor(hr / 24);
-    return `${days}d ago`;
 }
 
 const inputClass = "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition-colors focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-indigo-400";
@@ -530,7 +518,7 @@ function WebhookCard({
                     <div className="hidden text-right sm:block">
                         <div className="text-xs text-gray-400 dark:text-gray-500">Last triggered</div>
                         <div className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                            {timeAgo(hook.last_triggered_at)}
+                            {formatRelativeTime(hook.last_triggered_at, "en", "Never")}
                         </div>
                     </div>
 
@@ -768,7 +756,7 @@ function DeliveryHistory({ webhookId }: { webhookId: number }) {
 
                                 {/* Time */}
                                 <span className="ml-auto text-[10px] text-gray-400">
-                                    {timeAgo(d.created_at)}
+                                    {formatRelativeTime(d.created_at, "en", "—")}
                                 </span>
                             </div>
                         ))}

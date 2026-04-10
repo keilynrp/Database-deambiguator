@@ -2,6 +2,7 @@
 
 import { SnapshotCards } from "./ContextPanels";
 import type { Snapshot } from "./contextTypes";
+import { formatDateTime } from "../lib/dateFormat";
 
 export function SnapshotTab({
   snapshot,
@@ -65,7 +66,7 @@ export function SnapshotTab({
             </button>
           </div>
           <p className="text-right text-xs text-gray-400 dark:text-gray-600">
-            Generated {new Date(snapshot.generated_at).toLocaleString()}
+            Generated {formatDateTime(snapshot.generated_at)}
           </p>
         </>
       )}

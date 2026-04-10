@@ -8,6 +8,7 @@ import { apiFetch } from "../../../lib/api";
 import UserAvatar from "../../components/UserAvatar";
 import PasswordStrength from "../../components/PasswordStrength";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { formatDate as formatAppDate } from "../../lib/dateFormat";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -49,8 +50,7 @@ const ROLE_COLORS: Record<UserRole, string> = {
 const inputCls = "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
 
 function formatDate(iso: string | null) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  return formatAppDate(iso);
 }
 
 function getErrorMessage(error: unknown, fallback: string) {

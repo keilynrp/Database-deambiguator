@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatDate } from "../../lib/dateFormat";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -235,7 +236,7 @@ export default function AlertsPage() {
                   </div>
                   <p className="mt-1 text-xs text-gray-400">
                     {c.total_fired} alerts fired
-                    {c.last_fired_at && ` · last ${new Date(c.last_fired_at).toLocaleDateString()}`}
+                    {c.last_fired_at && ` · last ${formatDate(c.last_fired_at)}`}
                   </p>
                 </div>
 
