@@ -73,7 +73,13 @@ export default function EntityTable() {
 
     return (
         <div className="grid items-start gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
-            <FacetPanel activeFacets={activeFacets} onFacetChange={handleFacetChange} refreshKey={facetRefreshKey} />
+            <FacetPanel
+                activeFacets={activeFacets}
+                onFacetChange={handleFacetChange}
+                search={search}
+                minQuality={minQuality}
+                refreshKey={facetRefreshKey}
+            />
             <div className="min-w-0">
                 <div className="space-y-6">
                     <EntityTableToolbar

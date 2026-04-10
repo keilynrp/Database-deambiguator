@@ -43,6 +43,13 @@ router = APIRouter(tags=["entities"])
 @router.get("/entities/facets")
 def get_entity_facets(
     fields: str = Query(default="entity_type,domain,validation_status,enrichment_status,source"),
+    search: str | None = Query(default=None),
+    min_quality: float | None = Query(default=None, ge=0.0, le=1.0),
+    ft_entity_type: Optional[str] = Query(default=None),
+    ft_domain: Optional[str] = Query(default=None),
+    ft_validation_status: Optional[str] = Query(default=None),
+    ft_enrichment_status: Optional[str] = Query(default=None),
+    ft_source: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -52,7 +59,18 @@ def get_entity_facets(
     Unknown fields are silently ignored.
     """
     org_id = resolve_request_org_id(db, current_user)
-    return EntityService.get_facets(db, fields, org_id=org_id)
+    return EntityService.get_facets(
+        db,
+        fields,
+        search=search,
+        min_quality=min_quality,
+        ft_entity_type=ft_entity_type,
+        ft_domain=ft_domain,
+        ft_validation_status=ft_validation_status,
+        ft_enrichment_status=ft_enrichment_status,
+        ft_source=ft_source,
+        org_id=org_id,
+    )
 
 
 @router.get("/entities", response_model=List[schemas.Entity])

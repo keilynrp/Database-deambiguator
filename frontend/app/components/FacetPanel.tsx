@@ -11,8 +11,8 @@ export interface ActiveFacets { [field: string]: string | null; }
 const FIELD_LABELS: Record<string, string> = {
   entity_type:       "page.import.field.entity_type",
   domain:            "page.import.field.domain",
-  validation_status: "page.import.field.validation_status",
-  enrichment_status: "entities.enrichment_status",
+  validation_status: "page.entity_table.review_status",
+  enrichment_status: "page.entity_table.system_status",
   source:            "page.exec_dashboard.source",
 };
 
@@ -28,10 +28,12 @@ const FIELD_COLORS: Record<string, string> = {
 interface FacetPanelProps {
   activeFacets: ActiveFacets;
   onFacetChange: (field: string, value: string | null) => void;
+  search?: string;
+  minQuality?: string;
   refreshKey?: number; // increment to trigger re-fetch
 }
 
-export default function FacetPanel({ activeFacets, onFacetChange, refreshKey }: FacetPanelProps) {
+export default function FacetPanel({ activeFacets, onFacetChange, search, minQuality, refreshKey }: FacetPanelProps) {
   const { t } = useLanguage();
   const [facets, setFacets] = useState<FacetData>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -39,14 +41,25 @@ export default function FacetPanel({ activeFacets, onFacetChange, refreshKey }: 
 
   const fetchFacets = useCallback(async () => {
     try {
-      const res = await apiFetch("/entities/facets");
+      const queryParams = new URLSearchParams();
+      if (search) queryParams.append("search", search);
+      if (minQuality) queryParams.append("min_quality", minQuality);
+      if (activeFacets.entity_type) queryParams.append("ft_entity_type", activeFacets.entity_type);
+      if (activeFacets.domain) queryParams.append("ft_domain", activeFacets.domain);
+      if (activeFacets.validation_status) queryParams.append("ft_validation_status", activeFacets.validation_status);
+      if (activeFacets.enrichment_status) queryParams.append("ft_enrichment_status", activeFacets.enrichment_status);
+      if (activeFacets.source) queryParams.append("ft_source", activeFacets.source);
+      const res = await apiFetch(`/entities/facets${queryParams.size > 0 ? `?${queryParams}` : ""}`);
       if (res.ok) setFacets(await res.json());
     } catch { /* non-critical */ } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeFacets.domain, activeFacets.enrichment_status, activeFacets.entity_type, activeFacets.source, activeFacets.validation_status, minQuality, search]);
 
-  useEffect(() => { fetchFacets(); }, [fetchFacets, refreshKey]);
+  useEffect(() => {
+    setLoading(true);
+    fetchFacets();
+  }, [fetchFacets, refreshKey]);
 
   const toggleCollapse = (field: string) =>
     setCollapsed(prev => ({ ...prev, [field]: !prev[field] }));
@@ -73,8 +86,15 @@ export default function FacetPanel({ activeFacets, onFacetChange, refreshKey }: 
     }
 
     if (field === "enrichment_status") {
-      const translated = t(`entities.filter.${value}`);
-      return translated === `entities.filter.${value}` ? value : translated;
+      const enrichmentKeyMap: Record<string, string> = {
+        completed: "entities.filter.enriched",
+        pending: "entities.filter.pending",
+        processing: "page.entity_table.status_processing",
+        failed: "entities.filter.failed",
+        none: "page.entity_table.status_not_started",
+      };
+      const translated = t(enrichmentKeyMap[value] ?? `entities.filter.${value}`);
+      return translated === (enrichmentKeyMap[value] ?? `entities.filter.${value}`) ? value : translated;
     }
 
     return value;

@@ -24,19 +24,58 @@ class EntityService:
     }
 
     @classmethod
-    def get_facets(cls, db: Session, fields_raw: str, org_id: int | None = None) -> dict:
+    def get_facets(
+        cls,
+        db: Session,
+        fields_raw: str,
+        search: Optional[str] = None,
+        min_quality: Optional[float] = None,
+        ft_entity_type: Optional[str] = None,
+        ft_domain: Optional[str] = None,
+        ft_validation_status: Optional[str] = None,
+        ft_enrichment_status: Optional[str] = None,
+        ft_source: Optional[str] = None,
+        org_id: int | None = None,
+    ) -> dict:
         requested = [f.strip() for f in fields_raw.split(",") if f.strip()]
         result = {}
         for field in requested:
             col = cls._FACET_FIELDS.get(field)
             if col is None:
                 continue
-            rows = (
-                scope_query_to_org(
-                    db.query(col, func.count(models.RawEntity.id).label("cnt")),
-                    models.RawEntity,
-                    org_id,
+            query = scope_query_to_org(
+                db.query(col, func.count(models.RawEntity.id).label("cnt")),
+                models.RawEntity,
+                org_id,
+            )
+
+            if search:
+                search_filter = f"%{search}%"
+                query = query.filter(
+                    or_(
+                        models.RawEntity.primary_label.ilike(search_filter),
+                        models.RawEntity.canonical_id.ilike(search_filter),
+                        models.RawEntity.secondary_label.ilike(search_filter),
+                        models.RawEntity.entity_type.ilike(search_filter),
+                    )
                 )
+
+            if min_quality is not None:
+                query = query.filter(models.RawEntity.quality_score >= min_quality)
+
+            if ft_entity_type and field != "entity_type":
+                query = query.filter(models.RawEntity.entity_type == ft_entity_type)
+            if ft_domain and field != "domain":
+                query = query.filter(models.RawEntity.domain == ft_domain)
+            if ft_validation_status and field != "validation_status":
+                query = query.filter(models.RawEntity.validation_status == ft_validation_status)
+            if ft_enrichment_status and field != "enrichment_status":
+                query = query.filter(models.RawEntity.enrichment_status == ft_enrichment_status)
+            if ft_source and field != "source":
+                query = query.filter(models.RawEntity.source == ft_source)
+
+            rows = (
+                query
                 .filter(col != None, col != "")
                 .group_by(col)
                 .order_by(func.count(models.RawEntity.id).desc())

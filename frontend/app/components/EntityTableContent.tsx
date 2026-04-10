@@ -32,6 +32,35 @@ function renderDisplayValue(attributeName: string, value: unknown, emptyLabel: s
     return String(value);
 }
 
+function renderLocalizedValue(
+    attributeName: string,
+    value: unknown,
+    emptyLabel: string,
+    t: (key: string, params?: Record<string, string | number>) => string,
+) {
+    if (attributeName === "validation_status" && typeof value === "string" && value) {
+        const statusKey = `page.entity_table.status_${value}`;
+        const translated = t(statusKey);
+        return translated === statusKey ? value : translated;
+    }
+
+    if (attributeName === "enrichment_status" && typeof value === "string" && value) {
+        const enrichmentKeyMap: Record<string, string> = {
+            completed: "entities.filter.enriched",
+            pending: "entities.filter.pending",
+            processing: "page.entity_table.status_processing",
+            failed: "entities.filter.failed",
+            none: "page.entity_table.status_not_started",
+        };
+        const translationKey = enrichmentKeyMap[value];
+        if (!translationKey) return value;
+        const translated = t(translationKey);
+        return translated === translationKey ? value : translated;
+    }
+
+    return renderDisplayValue(attributeName, value, emptyLabel);
+}
+
 const CORE_ATTRIBUTE_LABEL_KEYS: Record<string, string> = {
     primary_label: "entities.primary_label",
     secondary_label: "page.import.field.secondary_label",
@@ -346,7 +375,7 @@ export default function EntityTableContent({
 
                                                     return (
                                                         <td key={attribute.name} className="px-5 py-3.5 text-gray-600 dark:text-gray-300">
-                                                            {renderDisplayValue(attribute.name, value, t("page.entity_table.empty_value"))}
+                                                            {renderLocalizedValue(attribute.name, value, t("page.entity_table.empty_value"), t)}
                                                         </td>
                                                     );
                                                 })
