@@ -31,6 +31,25 @@ interface FeedPage {
   items: NotifEntry[];
 }
 
+const KNOWN_ACTION_TRANSLATION_KEYS: Record<string, string> = {
+  upload: "page.notifications.action.upload",
+  "entity.update": "page.notifications.action.entity_update",
+  "entity.delete": "page.notifications.action.entity_delete",
+  "entity.bulk_delete": "page.notifications.action.entity_bulk_delete",
+  "harmonization.apply": "page.notifications.action.harmonization_apply",
+  "authority.confirm": "page.notifications.action.authority_confirm",
+  "authority.reject": "page.notifications.action.authority_reject",
+  "entity.merge": "page.notifications.action.entity_merge",
+  pull: "page.notifications.action.pull",
+  scheduled_pull: "page.notifications.action.scheduled_pull",
+};
+
+const GENERIC_ACTION_TRANSLATION_KEYS: Record<string, string> = {
+  CREATE: "page.notifications.generic.create",
+  UPDATE: "page.notifications.generic.update",
+  DELETE: "page.notifications.generic.delete",
+};
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const ACTION_COLOR: Record<string, string> = {
@@ -119,6 +138,25 @@ function entryDetail(entry: NotifEntry, t: (key: string, params?: Record<string,
   if (entry.action === "harmonization.apply") return `${d.step_name ?? d.step_id ?? ""} · ${t("page.notifications.records_label", { count: Number(d.records_updated ?? 0) })}`;
   if (entry.action === "authority.confirm")   return `"${String(d.canonical_label ?? "")}"${d.rule_created ? ` ${t("page.notifications.plus_rule")}` : ""}`;
   return "";
+}
+
+function localizedNotificationLabel(
+  entry: NotifEntry,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  const knownActionKey = KNOWN_ACTION_TRANSLATION_KEYS[entry.action];
+  if (knownActionKey) {
+    return t(knownActionKey);
+  }
+
+  const genericActionKey = GENERIC_ACTION_TRANSLATION_KEYS[entry.action];
+  if (genericActionKey && entry.entity_type) {
+    return t(genericActionKey, {
+      resource: t(`page.notifications.resource.${entry.entity_type}`),
+    });
+  }
+
+  return entry.label || entry.action;
 }
 
 // ── Page component ────────────────────────────────────────────────────────────
@@ -286,6 +324,7 @@ export default function NotificationsPage() {
               const isRead = entry.is_read;
               const detail = entryDetail(entry, t);
               const dotColor = ACTION_COLOR[entry.action] ?? "bg-gray-400";
+              const label = localizedNotificationLabel(entry, t);
 
               return (
                 <li
@@ -305,7 +344,7 @@ export default function NotificationsPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-2">
                       <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {entry.label}
+                        {label}
                       </span>
                       {entry.username && (
                         <span className="text-xs text-gray-400 dark:text-gray-500">

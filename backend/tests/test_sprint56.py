@@ -95,6 +95,22 @@ class TestNotificationCenterShape:
         for item in r.json()["items"]:
             assert item["action"] == "upload"
 
+    def test_generic_create_action_is_humanized(self, client, auth_headers, db_session):
+        _make_audit(db_session, action="CREATE", entity_type="webhook")
+        r = client.get("/notifications/center", headers=auth_headers)
+        assert r.status_code == 200
+        item = r.json()["items"][0]
+        assert item["label"] == "Webhook created"
+        assert item["icon"] == "🆕"
+
+    def test_unknown_action_falls_back_to_title_case(self, client, auth_headers, db_session):
+        _make_audit(db_session, action="scheduled_pull", entity_type="store")
+        r = client.get("/notifications/center", headers=auth_headers)
+        assert r.status_code == 200
+        item = r.json()["items"][0]
+        assert item["label"] == "Scheduled import completed"
+        assert item["icon"] == "🗓️"
+
 
 # ── Read/unread state ─────────────────────────────────────────────────────────
 

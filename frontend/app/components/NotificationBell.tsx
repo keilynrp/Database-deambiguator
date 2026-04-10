@@ -18,6 +18,25 @@ interface FeedEntry {
   is_read: boolean;
 }
 
+const KNOWN_ACTION_TRANSLATION_KEYS: Record<string, string> = {
+  upload: "header.notifications.action.upload",
+  "entity.update": "header.notifications.action.entity_update",
+  "entity.delete": "header.notifications.action.entity_delete",
+  "entity.bulk_delete": "header.notifications.action.entity_bulk_delete",
+  "harmonization.apply": "header.notifications.action.harmonization_apply",
+  "authority.confirm": "header.notifications.action.authority_confirm",
+  "authority.reject": "header.notifications.action.authority_reject",
+  "entity.merge": "header.notifications.action.entity_merge",
+  pull: "header.notifications.action.pull",
+  scheduled_pull: "header.notifications.action.scheduled_pull",
+};
+
+const GENERIC_ACTION_TRANSLATION_KEYS: Record<string, string> = {
+  CREATE: "header.notifications.generic.create",
+  UPDATE: "header.notifications.generic.update",
+  DELETE: "header.notifications.generic.delete",
+};
+
 const ACTION_COLOR: Record<string, string> = {
   "upload":              "bg-blue-500",
   "entity.update":       "bg-amber-500",
@@ -88,6 +107,25 @@ function entryDetail(entry: FeedEntry, t: (key: string, params?: Record<string, 
   if (entry.action === "harmonization.apply") return t("header.notifications.detail.harmonization_apply", { step: String(d.step_name ?? d.step_id ?? ""), count: Number(d.records_updated ?? 0) });
   if (entry.action === "authority.confirm")   return t("header.notifications.detail.authority_confirm", { label: String(d.canonical_label ?? ""), suffix: d.rule_created ? t("header.notifications.detail.rule_suffix") : "" });
   return "";
+}
+
+function localizedNotificationLabel(
+  entry: FeedEntry,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  const knownActionKey = KNOWN_ACTION_TRANSLATION_KEYS[entry.action];
+  if (knownActionKey) {
+    return t(knownActionKey);
+  }
+
+  const genericActionKey = GENERIC_ACTION_TRANSLATION_KEYS[entry.action];
+  if (genericActionKey && entry.entity_type) {
+    return t(genericActionKey, {
+      resource: t(`header.notifications.resource.${entry.entity_type}`),
+    });
+  }
+
+  return entry.label || entry.action;
 }
 
 export default function NotificationBell() {
@@ -218,7 +256,7 @@ export default function NotificationBell() {
                 const isUnread = !entry.is_read;
                 const detail = entryDetail(entry, t);
                 const dotColor = ACTION_COLOR[entry.action] ?? "bg-gray-400";
-                const label = entry.label || entry.action;
+                const label = localizedNotificationLabel(entry, t);
                 return (
                   <li
                     key={entry.id}

@@ -42,6 +42,8 @@ _ACTION_ICONS: dict[str, str] = {
     "authority.confirm":   "✅",
     "authority.reject":    "❌",
     "entity.merge":        "🔗",
+    "pull":                "📥",
+    "scheduled_pull":      "🗓️",
 }
 
 _ACTION_LABELS: dict[str, str] = {
@@ -53,6 +55,46 @@ _ACTION_LABELS: dict[str, str] = {
     "authority.confirm":   "Authority record confirmed",
     "authority.reject":    "Authority record rejected",
     "entity.merge":        "Entities merged",
+    "pull":                "Store pull completed",
+    "scheduled_pull":      "Scheduled import completed",
+}
+
+_RESOURCE_LABELS: dict[str, str] = {
+    "entity": "Entity",
+    "rule": "Rule",
+    "report": "Report",
+    "export": "Export",
+    "artifact": "Artifact",
+    "context": "Context snapshot",
+    "store": "Store connection",
+    "ai_integration": "AI integration",
+    "authority": "Authority record",
+    "harmonization": "Harmonization workflow",
+    "disambiguation": "Disambiguation record",
+    "domain": "Domain",
+    "user": "User",
+    "annotation": "Annotation",
+    "rag": "RAG configuration",
+    "demo": "Demo asset",
+    "branding": "Branding setting",
+    "olap": "OLAP view",
+    "analyzer": "Analyzer result",
+    "webhook": "Webhook",
+    "notification": "Notification setting",
+    "enrichment": "Enrichment job",
+    "ingest": "Import job",
+}
+
+_GENERIC_ACTION_LABELS: dict[str, str] = {
+    "CREATE": "created",
+    "UPDATE": "updated",
+    "DELETE": "deleted",
+}
+
+_GENERIC_ACTION_ICONS: dict[str, str] = {
+    "CREATE": "🆕",
+    "UPDATE": "✏️",
+    "DELETE": "🗑️",
 }
 
 # Map action → frontend href template (None = no link)
@@ -75,6 +117,25 @@ def _build_href(action: str, entity_id: int | None) -> str | None:
     if "{entity_id}" in template and entity_id:
         return template.replace("{entity_id}", str(entity_id))
     return template.replace("{entity_id}", "") if "{entity_id}" in template else template
+
+
+def _humanize_action_label(action: str | None, entity_type: str | None) -> str:
+    if not action:
+        return ""
+    known = _ACTION_LABELS.get(action)
+    if known:
+        return known
+    generic_verb = _GENERIC_ACTION_LABELS.get(action.upper())
+    if generic_verb:
+        resource = _RESOURCE_LABELS.get(entity_type or "", "Record")
+        return f"{resource} {generic_verb}"
+    return action.replace("_", " ").replace(".", " ").strip().title()
+
+
+def _icon_for_action(action: str | None) -> str:
+    if not action:
+        return "📋"
+    return _ACTION_ICONS.get(action, _GENERIC_ACTION_ICONS.get(action.upper(), "📋"))
 
 
 def _serialize_entry(
@@ -100,8 +161,8 @@ def _serialize_entry(
     return {
         "id":           entry.id,
         "action":       entry.action,
-        "label":        _ACTION_LABELS.get(entry.action, entry.action or ""),
-        "icon":         _ACTION_ICONS.get(entry.action, "📋"),
+        "label":        _humanize_action_label(entry.action, entry.entity_type),
+        "icon":         _icon_for_action(entry.action),
         "entity_type":  entry.entity_type,
         "entity_id":    entry.entity_id,
         "username":     entry.username,
