@@ -78,6 +78,11 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
   `docs/product/PILOT_UDG_EXECUTIVE_DASHBOARD_REVIEW_2026-04-10.md`
 - conclusion: `US-060` y `US-061` ya quedaron validadas como flujo util de
   demo interna seria
+- lectura mas reciente del piloto:
+  - `470/1000` entidades enriquecidas (`47%`)
+  - `54%` de calidad promedio
+  - benchmark SNI baseline se mantiene en `33.3%`, frenado aun por cobertura y
+    calidad
 - siguiente prioridad recomendada: siguiente corte de `US-067` para benchmark
   configurable por tenant/institucion
 

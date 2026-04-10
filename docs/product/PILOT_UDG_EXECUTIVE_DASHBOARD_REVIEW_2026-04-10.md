@@ -30,12 +30,15 @@ valor analitico visible y accionable.
 
 ## 3. Current pilot readout
 
+Lectura mas reciente despues de nuevas rondas de enrichment y ajustes de
+consistencia en datatable/facets:
+
 - `total_entities`: `1000`
-- `enriched_count`: `329`
-- `enrichment_pct`: `32.9%`
-- `avg_citations`: `322.5`
-- `total_concepts`: `1777`
-- `avg_quality_pct`: `49.8%`
+- `enriched_count`: `470`
+- `enrichment_pct`: `47.0%`
+- `avg_citations`: `318.9`
+- `total_concepts`: `1566`
+- `avg_quality_pct`: `54.0%`
 - benchmark `sni_readiness_baseline`: `33.3%`
 
 ## 4. Main findings
@@ -50,6 +53,9 @@ valor analitico visible y accionable.
 
 - el mayor cuello de botella actual es cobertura/calidad, no UI
 - los conceptos ya emergen con fuerza suficiente para una lectura inicial
+- ya existe una tercera accion sugerida util basada en cluster conceptual lider
+- el datatable y los filtros quedaron mas armonizados con la realidad del
+  backend, reduciendo desalineaciones operativas durante la lectura del piloto
 - `Emerging Topic Signals` todavia no agrega valor real en este dataset y debe
   seguir tratado como modulo experimental secundario
 
@@ -60,12 +66,18 @@ valor analitico visible y accionable.
   - que hacer despues
   - donde estan las entidades mas fuertes
 - la narrativa del benchmark y las acciones sugeridas ya es util para briefings
+- el dashboard ya puede sostener una conversacion ejecutiva basada en:
+  - cobertura
+  - calidad
+  - entidad top-impact
+  - cluster semantico dominante
 
 ## 5. Remaining gaps
 
 - la cobertura de enrichment sigue siendo demasiado baja para una lectura
   institucional fuerte
-- la calidad promedio todavia queda por debajo del umbral objetivo del benchmark
+- la calidad promedio sigue mejorando, pero todavia queda por debajo del umbral
+  objetivo del benchmark
 - el vocabulario semantico sigue reflejando parte del ruido natural de OpenAlex
 - las señales emergentes necesitan mas profundidad temporal o mayor cobertura
   para ser realmente convincentes
@@ -89,13 +101,20 @@ cosmetica:
 - benchmark mas configurable por institucion/tenant
 - mayor operabilidad alrededor de enrichment y calidad
 
+### Decision 4
+
+Dar por validado que el flujo actual ya soporta una demo seria basada en un
+dataset real, aunque todavia no alcance readiness institucional alta.
+
 ## 7. Recommended next steps
 
 1. abrir el siguiente corte de `US-067` para perfiles configurables por tenant
-2. revisar si conviene una accion complementaria desde dashboard para
-   `quality_score` compute cuando aplique
-3. ejecutar un segundo piloto con mayor cobertura o una institucion diferente
-4. mantener `US-069` como capa experimental conservadora, sin sobreprometer
+2. llevar cobertura de enrichment por encima de `60-65%` antes de una lectura
+   institucional mas exigente
+3. elevar calidad promedio por encima de `60` para acercarse al umbral de
+   benchmark
+4. ejecutar un segundo piloto con mayor cobertura o una institucion diferente
+5. mantener `US-069` como capa experimental conservadora, sin sobreprometer
 
 ## 8. Roadmap implication
 
@@ -106,4 +125,3 @@ debe moverse hacia:
 - benchmark institucional mas configurable
 - mejora de cobertura/calidad operativa
 - nuevos pilotos con datasets reales
-
