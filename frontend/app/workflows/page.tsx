@@ -110,12 +110,12 @@ export default function WorkflowsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-violet-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-violet-50 p-6 dark:from-slate-950 dark:to-slate-900">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Workflow Automation</h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Workflow Automation</h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Build no-code trigger - condition - action chains to automate data operations.
             </p>
           </div>
@@ -132,14 +132,14 @@ export default function WorkflowsPage() {
         </div>
 
         {error && (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
             {error}
           </div>
         )}
 
         {(showCreate || editing) && (
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-5 text-lg font-semibold text-slate-900">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="mb-5 text-lg font-semibold text-slate-900 dark:text-white">
               {editing ? "Edit Workflow" : "New Workflow"}
             </h2>
             <WorkflowForm
