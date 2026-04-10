@@ -1,9 +1,11 @@
 "use client";
 
 import React from "react";
+import { useLanguage } from "../contexts/LanguageContext";
 
 export interface EntityTableBulkActionsProps {
     selectedCount: number;
+    pageSelectionOnly?: boolean;
     bulkEnriching: boolean;
     bulkDeleting: boolean;
     onBulkEnrich: () => void;
@@ -14,6 +16,7 @@ export interface EntityTableBulkActionsProps {
 
 export function EntityTableBulkActions({
     selectedCount,
+    pageSelectionOnly = true,
     bulkEnriching,
     bulkDeleting,
     onBulkEnrich,
@@ -21,6 +24,7 @@ export function EntityTableBulkActions({
     onBulkDelete,
     onClearSelection,
 }: EntityTableBulkActionsProps) {
+    const { t } = useLanguage();
     if (selectedCount === 0) return null;
 
     return (
@@ -30,8 +34,15 @@ export function EntityTableBulkActions({
                     {selectedCount}
                 </span>
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300 pr-1">
-                    {selectedCount === 1 ? "entity" : "entities"} selected
+                    {pageSelectionOnly
+                        ? t("page.entity_table.bulk_selected_page", { count: selectedCount })
+                        : t("page.entity_table.bulk_selected", { count: selectedCount })}
                 </span>
+                {pageSelectionOnly && (
+                    <span className="hidden text-xs text-gray-400 lg:inline">
+                        {t("page.entity_table.bulk_page_scope_hint")}
+                    </span>
+                )}
                 <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
                 <button
                     onClick={onBulkEnrich}
@@ -48,7 +59,7 @@ export function EntityTableBulkActions({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
                         </svg>
                     )}
-                    Enrich
+                    {t("page.entity_table.bulk_enrich_action")}
                 </button>
                 <button
                     onClick={onBulkExport}
@@ -57,7 +68,7 @@ export function EntityTableBulkActions({
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                     </svg>
-                    Export CSV
+                    {t("page.entity_table.bulk_export_action")}
                 </button>
                 <button
                     onClick={onBulkDelete}
@@ -74,13 +85,13 @@ export function EntityTableBulkActions({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                         </svg>
                     )}
-                    Delete
+                    {t("common.delete")}
                 </button>
                 <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
                 <button
                     onClick={onClearSelection}
                     className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
-                    title="Clear selection"
+                    title={t("page.entity_table.clear_selection")}
                 >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

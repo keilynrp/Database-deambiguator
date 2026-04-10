@@ -17,9 +17,9 @@ export default function EntityTable() {
     const { activeDomain } = useDomain();
     const { t } = useLanguage();
     const { toast } = useToast();
-    const facetRefreshKey = 0;
     const {
         entities,
+        totalCount,
         loading,
         search,
         setSearch,
@@ -47,6 +47,7 @@ export default function EntityTable() {
         bulkEnriching,
         fetchError,
         activeFacets,
+        facetRefreshKey,
         handleFacetChange,
         fetchEntities,
         startEdit,
@@ -137,10 +138,14 @@ export default function EntityTable() {
                         onEnrichEntity={enrichEntity}
                     />
 
-                    <EntityTableDetailsModal entity={selectedEntity} onClose={() => setSelectedEntity(null)} />
+                    <EntityTableDetailsModal
+                        entity={selectedEntity}
+                        activeDomain={activeDomain}
+                        onClose={() => setSelectedEntity(null)}
+                    />
 
                     <EntityTablePagination
-                        totalEntitiesVisible={entities.length}
+                        totalCount={totalCount}
                         limit={limit}
                         page={page}
                         loading={loading}
@@ -150,6 +155,7 @@ export default function EntityTable() {
 
                     <EntityTableBulkActions
                         selectedCount={selectedIds.size}
+                        pageSelectionOnly
                         bulkEnriching={bulkEnriching}
                         bulkDeleting={bulkDeleting}
                         onBulkEnrich={handleBulkEnrich}

@@ -14,6 +14,7 @@ interface UseEntityTableControllerOptions {
 export function useEntityTableController({ toast }: UseEntityTableControllerOptions) {
     const { t } = useLanguage();
     const [entities, setEntities] = useState<Entity[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -40,6 +41,7 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
     const [bulkEnriching, setBulkEnriching] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [activeFacets, setActiveFacets] = useState<ActiveFacets>({});
+    const [facetRefreshKey, setFacetRefreshKey] = useState(0);
     const [scrollTop, setScrollTop] = useState(0);
 
     useEffect(() => {
@@ -74,6 +76,8 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
 
             const res = await apiFetch(`/entities?${queryParams}`);
             if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+            const headerTotal = Number(res.headers.get("X-Total-Count") ?? "0");
+            setTotalCount(Number.isFinite(headerTotal) ? headerTotal : 0);
             setEntities(await res.json());
         } catch (error) {
             const message = error instanceof Error ? error.message : t("page.entity_table.unknown_error");
@@ -90,6 +94,10 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
     function handleFacetChange(field: string, value: string | null) {
         setActiveFacets((prev) => ({ ...prev, [field]: value }));
         setPage(0);
+    }
+
+    function refreshFacets() {
+        setFacetRefreshKey((current) => current + 1);
     }
 
     function startEdit(entity: Entity) {
@@ -122,6 +130,7 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
             const updated = await res.json();
             setEntities((prev) => prev.map((entity) => (entity.id === editingId ? updated : entity)));
             setEditingId(null);
+            refreshFacets();
         } catch {
             toast(t("page.entity_table.update_error"), "error");
         } finally {
@@ -135,6 +144,8 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
             const res = await apiFetch(`/entities/${id}`, { method: "DELETE" });
             if (!res.ok) throw new Error(t("page.entity_table.delete_failed"));
             setEntities((prev) => prev.filter((entity) => entity.id !== id));
+            setTotalCount((prev) => Math.max(0, prev - 1));
+            refreshFacets();
             toast(t("page.entity_table.delete_success"), "success");
         } catch {
             toast(t("page.entity_table.delete_error"), "error");
@@ -150,6 +161,7 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
             if (!res.ok) throw new Error(t("page.entity_table.enrich_failed"));
             const enriched = await res.json();
             setEntities((prev) => prev.map((entity) => (entity.id === id ? { ...entity, ...enriched } : entity)));
+            refreshFacets();
             toast(t("page.entity_table.enrich_success"), "success");
         } catch {
             toast(t("page.entity_table.enrich_error"), "error");
@@ -176,7 +188,7 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
     }
 
     async function handleBulkDelete() {
-        if (!confirm(t("page.entity_table.bulk_delete_confirm", { count: selectedIds.size }))) return;
+        if (!confirm(t("page.entity_table.bulk_delete_confirm_page", { count: selectedIds.size }))) return;
         setBulkDeleting(true);
         try {
             const res = await apiFetch("/entities/bulk", {
@@ -187,7 +199,9 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
             if (!res.ok) throw new Error(t("page.entity_table.bulk_delete_failed"));
             const data = await res.json();
             setEntities((prev) => prev.filter((entity) => !selectedIds.has(entity.id)));
+            setTotalCount((prev) => Math.max(0, prev - data.deleted));
             setSelectedIds(new Set());
+            refreshFacets();
             toast(t("page.entity_table.bulk_delete_success", { count: data.deleted }), "success");
         } catch {
             toast(t("page.entity_table.bulk_delete_failed"), "error");
@@ -206,6 +220,7 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
             });
             if (!res.ok) throw new Error(t("page.entity_table.bulk_enrich_failed"));
             const data = await res.json();
+            refreshFacets();
             toast(t("page.entity_table.bulk_enrich_success", { count: data.queued }), "success");
             setSelectedIds(new Set());
         } catch {
@@ -261,6 +276,7 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
 
     return {
         entities,
+        totalCount,
         loading,
         search,
         setSearch,
@@ -288,6 +304,7 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
         bulkEnriching,
         fetchError,
         activeFacets,
+        facetRefreshKey,
         handleFacetChange,
         fetchEntities,
         startEdit,
