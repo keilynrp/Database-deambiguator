@@ -5,6 +5,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from backend import models
+from backend.quality_scorer import _fetch_lookups, score_entity
 from backend.tenant_access import scope_query_to_org
 
 
@@ -98,6 +99,12 @@ class EntityService:
 
         total = query.count()
         entities = query.offset(skip).limit(limit).all()
+        if any(entity.quality_score is None for entity in entities):
+            confirmed_labels, entities_with_rels = _fetch_lookups(db)
+            for entity in entities:
+                if entity.quality_score is None:
+                    derived_score, _ = score_entity(entity, confirmed_labels, entities_with_rels)
+                    entity.quality_score = derived_score
         return total, entities
 
     @staticmethod

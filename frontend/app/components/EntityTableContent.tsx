@@ -41,6 +41,26 @@ const CORE_ATTRIBUTE_LABEL_KEYS: Record<string, string> = {
     validation_status: "page.import.field.validation_status",
 };
 
+function enrichmentBadgeMeta(
+    status: string | null,
+    t: (key: string, params?: Record<string, string | number>) => string,
+): { label: string; variant: "success" | "warning" | "error" | "default" } {
+    switch (status) {
+        case "completed":
+            return { label: t("entities.filter.enriched"), variant: "success" };
+        case "pending":
+            return { label: t("entities.filter.pending"), variant: "warning" };
+        case "processing":
+            return { label: t("page.entity_table.status_processing"), variant: "warning" };
+        case "failed":
+            return { label: t("entities.filter.failed"), variant: "error" };
+        case "none":
+        case null:
+        default:
+            return { label: t("page.entity_table.status_not_started"), variant: "default" };
+    }
+}
+
 export interface EntityTableContentProps {
     activeDomain: EntityTableDomain;
     entities: Entity[];
@@ -321,29 +341,14 @@ export default function EntityTableContent({
                                                 <td className="px-5 py-3.5 font-medium text-gray-900 dark:text-white">{entity.primary_label}</td>
                                             )}
                                             <td className="px-5 py-3.5">
-                                                <Badge
-                                                    variant={
-                                                        entity.validation_status === "valid" || entity.validation_status === "active"
-                                                            ? "success"
-                                                            : entity.validation_status === "invalid"
-                                                              ? "error"
-                                                              : entity.validation_status === "inactive"
-                                                                ? "default"
-                                                                : "warning"
-                                                    }
-                                                >
-                                                    {entity.validation_status === "pending"
-                                                        ? t("page.entity_table.status_pending")
-                                                        : entity.validation_status === "valid"
-                                                          ? t("page.entity_table.status_valid")
-                                                          : entity.validation_status === "invalid"
-                                                            ? t("page.entity_table.status_invalid")
-                                                            : entity.validation_status === "active"
-                                                              ? t("common.active")
-                                                              : entity.validation_status === "inactive"
-                                                                ? t("common.inactive")
-                                                                : entity.validation_status}
-                                                </Badge>
+                                                {(() => {
+                                                    const statusMeta = enrichmentBadgeMeta(entity.enrichment_status, t);
+                                                    return (
+                                                        <Badge variant={statusMeta.variant}>
+                                                            {statusMeta.label}
+                                                        </Badge>
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="px-5 py-3.5">
                                                 <QualityBadge score={entity.quality_score} />
