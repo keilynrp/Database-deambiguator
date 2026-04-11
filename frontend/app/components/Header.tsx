@@ -7,6 +7,7 @@ import { useTheme } from "../contexts/ThemeContext";
 import { useDomain } from "../contexts/DomainContext";
 import { useBranding } from "../contexts/BrandingContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { usePilotMode } from "../contexts/PilotModeContext";
 import { useSidebar } from "./SidebarProvider";
 import NotificationBell from "./NotificationBell";
 import UserMenu from "./UserMenu";
@@ -215,6 +216,7 @@ export default function Header() {
   const { theme, toggleTheme } = useTheme();
   const { domains, activeDomainId, setActiveDomainId, isLoading } = useDomain();
   const { branding } = useBranding();
+  const { pilotMode, togglePilotMode } = usePilotMode();
   const { toggleMobile } = useSidebar();
 
   const page = pageTitles[pathname] || {
@@ -248,6 +250,18 @@ export default function Header() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={togglePilotMode}
+            className={`hidden rounded-full px-3 py-1 text-xs font-semibold transition-colors md:inline-flex ${
+              pilotMode
+                ? "bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:hover:bg-violet-900/50"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            }`}
+            title={pilotMode ? t("header.pilot_mode.on_help") : t("header.pilot_mode.off_help")}
+          >
+            {pilotMode ? t("header.pilot_mode.on") : t("header.pilot_mode.off")}
+          </button>
+
           {/* Global search */}
           <GlobalSearch />
 

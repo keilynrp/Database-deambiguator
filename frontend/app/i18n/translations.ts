@@ -254,6 +254,10 @@ export const translations = {
         'sidebar.expand': 'Expand sidebar',
         'sidebar.collapse': 'Collapse sidebar',
         'sidebar.close_navigation': 'Close navigation',
+        'sidebar.pilot_mode.on': 'Pilot mode on',
+        'sidebar.pilot_mode.off': 'Full workspace',
+        'sidebar.pilot_mode.on_help': 'Showing the shortest path for imports, enrichment, review, and briefing.',
+        'sidebar.pilot_mode.off_help': 'Showing the full UKIP workspace, including advanced tools.',
 
         // Entities page
         'entities.title': 'Entities',
@@ -624,6 +628,10 @@ export const translations = {
         'header.search.no_results': 'No results for “{query}”',
         'header.search.no_title': '(no title)',
         'header.search.view_all': 'See all results →',
+        'header.pilot_mode.on': 'Pilot mode',
+        'header.pilot_mode.off': 'Full mode',
+        'header.pilot_mode.on_help': 'Pilot mode keeps the shell focused on the shortest path for first-time users.',
+        'header.pilot_mode.off_help': 'Full mode reveals the complete UKIP workspace and advanced tools.',
         'header.mobile.open_navigation': 'Open navigation',
         'header.workspace.label': 'Workspace:',
         'header.workspace.aria': 'Active workspace domain',
@@ -2355,6 +2363,10 @@ export const translations = {
         'sidebar.expand': 'Expandir barra lateral',
         'sidebar.collapse': 'Contraer barra lateral',
         'sidebar.close_navigation': 'Cerrar navegación',
+        'sidebar.pilot_mode.on': 'Modo piloto activo',
+        'sidebar.pilot_mode.off': 'Workspace completo',
+        'sidebar.pilot_mode.on_help': 'Mostrando la ruta más corta para importar, enriquecer, revisar y generar briefing.',
+        'sidebar.pilot_mode.off_help': 'Mostrando el workspace completo de UKIP, incluyendo herramientas avanzadas.',
 
         // Entities page
         'entities.title': 'Entidades',
@@ -2725,6 +2737,10 @@ export const translations = {
         'header.search.no_results': 'Sin resultados para “{query}”',
         'header.search.no_title': '(sin título)',
         'header.search.view_all': 'Ver todos los resultados →',
+        'header.pilot_mode.on': 'Modo piloto',
+        'header.pilot_mode.off': 'Modo completo',
+        'header.pilot_mode.on_help': 'El modo piloto mantiene la shell enfocada en la ruta más corta para usuarios primerizos.',
+        'header.pilot_mode.off_help': 'El modo completo muestra todo el workspace de UKIP y las herramientas avanzadas.',
         'header.mobile.open_navigation': 'Abrir navegación',
         'header.workspace.label': 'Espacio:',
         'header.workspace.aria': 'Dominio activo del espacio de trabajo',

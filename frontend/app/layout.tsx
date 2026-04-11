@@ -8,6 +8,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { DomainProvider } from "./contexts/DomainContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { BrandingProvider } from "./contexts/BrandingContext";
+import { PilotModeProvider } from "./contexts/PilotModeContext";
 import FaviconInjector from "./components/FaviconInjector";
 import { ToastProvider } from "./components/ui/Toast";
 
@@ -70,11 +71,13 @@ export default function RootLayout({
               <FaviconInjector />
               <LanguageProvider>
                 <DomainProvider>
-                  <SidebarProvider>
-                    <ToastProvider>
-                      <LayoutContent>{children}</LayoutContent>
-                    </ToastProvider>
-                  </SidebarProvider>
+                  <PilotModeProvider>
+                    <SidebarProvider>
+                      <ToastProvider>
+                        <LayoutContent>{children}</LayoutContent>
+                      </ToastProvider>
+                    </SidebarProvider>
+                  </PilotModeProvider>
                 </DomainProvider>
               </LanguageProvider>
             </BrandingProvider>

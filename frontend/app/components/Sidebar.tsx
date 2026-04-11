@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSidebar } from "./SidebarProvider";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useBranding, type BrandingSettings } from "../contexts/BrandingContext";
+import { usePilotMode } from "../contexts/PilotModeContext";
 import { navSections } from "./sidebarNav";
 
 // ── Logo icon — shows uploaded image or default DB icon ───────────────────────
@@ -44,10 +45,29 @@ export default function Sidebar() {
   const { collapsed, toggle, mobileOpen, closeMobile } = useSidebar();
   const { t } = useLanguage();
   const { branding } = useBranding();
+  const { pilotMode, togglePilotMode } = usePilotMode();
   const tr = (key: string, fallback: string) => {
     const value = t(key);
     return value === key ? fallback : value;
   };
+  const visibleSections = pilotMode
+    ? navSections
+        .map((section) => ({
+          ...section,
+          items: section.items.filter((item) =>
+            [
+              "/",
+              "/import",
+              "/import/scientific",
+              "/import-export",
+              "/authority",
+              "/analytics/dashboard",
+              "/reports",
+            ].includes(item.href),
+          ),
+        }))
+        .filter((section) => section.items.length > 0)
+    : navSections;
 
   // On desktop: fixed sidebar, collapsed or expanded
   // On mobile: full-width drawer, hidden until mobileOpen
@@ -104,7 +124,7 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-4 py-4">
-          {navSections.map((section, sectionIdx) => (
+          {visibleSections.map((section, sectionIdx) => (
             <div key={section.header} className={sectionIdx > 0 ? "mt-6" : ""}>
               {collapsed && !mobileOpen ? (
                 sectionIdx > 0 && <div className="mx-3 mb-3 h-px bg-gray-200 dark:bg-gray-800" />
@@ -149,8 +169,44 @@ export default function Sidebar() {
         {/* Footer */}
         <div className="border-t border-gray-200 px-4 py-4 dark:border-gray-800">
           {(!collapsed || mobileOpen) ? (
-            <div className="rounded-lg bg-gray-50 px-3 py-3 dark:bg-gray-800">
-              <p className="text-xs font-semibold text-gray-900 dark:text-white">UKIP</p>
+            <div className="space-y-3">
+              <button
+                onClick={togglePilotMode}
+                className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
+                  pilotMode
+                    ? "border-violet-200 bg-violet-50 dark:border-violet-900/40 dark:bg-violet-950/30"
+                    : "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-900 dark:text-white">
+                      {pilotMode
+                        ? tr("sidebar.pilot_mode.on", "Pilot mode on")
+                        : tr("sidebar.pilot_mode.off", "Full workspace")}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-4 text-gray-500 dark:text-gray-400">
+                      {pilotMode
+                        ? tr("sidebar.pilot_mode.on_help", "Showing the shortest path for imports, enrichment, review, and briefing.")
+                        : tr("sidebar.pilot_mode.off_help", "Showing the full UKIP workspace, including advanced tools.")}
+                    </p>
+                  </div>
+                  <span
+                    className={`inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      pilotMode ? "bg-violet-600" : "bg-gray-300 dark:bg-gray-600"
+                    }`}
+                  >
+                    <span
+                      className={`h-5 w-5 rounded-full bg-white transition-transform ${
+                        pilotMode ? "translate-x-5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </span>
+                </div>
+              </button>
+              <div className="rounded-lg bg-gray-50 px-3 py-3 dark:bg-gray-800">
+                <p className="text-xs font-semibold text-gray-900 dark:text-white">UKIP</p>
+              </div>
             </div>
           ) : (
             <div className="flex justify-center">
