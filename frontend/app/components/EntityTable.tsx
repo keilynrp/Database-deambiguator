@@ -82,6 +82,42 @@ export default function EntityTable() {
             />
             <div className="min-w-0">
                 <div className="space-y-6">
+                    <div className="rounded-2xl border border-sky-200 bg-sky-50/80 px-4 py-4 shadow-sm dark:border-sky-900/40 dark:bg-sky-950/20">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="max-w-3xl">
+                                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700 dark:text-sky-400">
+                                    {t("page.entity_table.guide.eyebrow")}
+                                </p>
+                                <h2 className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                    {t("page.entity_table.guide.title")}
+                                </h2>
+                                <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
+                                    {t("page.entity_table.guide.description")}
+                                </p>
+                            </div>
+                            <div className="grid gap-3 text-xs text-slate-600 dark:text-slate-400 sm:grid-cols-3 lg:max-w-xl">
+                                <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/70">
+                                    <p className="font-semibold text-slate-800 dark:text-slate-200">
+                                        {t("page.entity_table.guide.system_status_title")}
+                                    </p>
+                                    <p className="mt-1">{t("page.entity_table.guide.system_status_body")}</p>
+                                </div>
+                                <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/70">
+                                    <p className="font-semibold text-slate-800 dark:text-slate-200">
+                                        {t("page.entity_table.guide.review_status_title")}
+                                    </p>
+                                    <p className="mt-1">{t("page.entity_table.guide.review_status_body")}</p>
+                                </div>
+                                <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/70">
+                                    <p className="font-semibold text-slate-800 dark:text-slate-200">
+                                        {t("page.entity_table.guide.quality_title")}
+                                    </p>
+                                    <p className="mt-1">{t("page.entity_table.guide.quality_body")}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <EntityTableToolbar
                         activeFacets={activeFacets}
                         search={search}

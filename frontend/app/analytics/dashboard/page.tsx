@@ -630,6 +630,48 @@ export default function ExecutiveDashboardPage() {
         </div>
       )}
 
+      <div className="rounded-2xl border border-sky-200 bg-sky-50/80 p-5 shadow-sm dark:border-sky-900/40 dark:bg-sky-950/20">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700 dark:text-sky-400">
+              {tr("page.exec_dashboard.reading_guide.eyebrow", "How to read this dashboard")}
+            </p>
+            <h2 className="mt-2 text-base font-semibold text-slate-900 dark:text-slate-100">
+              {tr("page.exec_dashboard.reading_guide.title", "Start with coverage and quality before trusting the story")}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
+              {tr("page.exec_dashboard.reading_guide.description", "Coverage tells you how much of the dataset has been enriched. Quality tells you how safe the first interpretation is. The benchmark turns those signals into a readiness readout for stakeholder review.")}
+            </p>
+          </div>
+          <div className="grid gap-3 text-xs text-slate-600 dark:text-slate-400 sm:grid-cols-3 lg:max-w-xl">
+            <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/70">
+              <p className="font-semibold text-slate-800 dark:text-slate-200">
+                {tr("page.exec_dashboard.reading_guide.coverage_title", "Coverage")}
+              </p>
+              <p className="mt-1">
+                {tr("page.exec_dashboard.reading_guide.coverage_body", "Higher coverage means more records already carry identifiers, citations, or concepts.")}
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/70">
+              <p className="font-semibold text-slate-800 dark:text-slate-200">
+                {tr("page.exec_dashboard.reading_guide.quality_title", "Quality")}
+              </p>
+              <p className="mt-1">
+                {tr("page.exec_dashboard.reading_guide.quality_body", "Quality reflects confidence in the records you are summarizing or sharing.")}
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/70">
+              <p className="font-semibold text-slate-800 dark:text-slate-200">
+                {tr("page.exec_dashboard.reading_guide.benchmark_title", "Benchmark")}
+              </p>
+              <p className="mt-1">
+                {tr("page.exec_dashboard.reading_guide.benchmark_body", "Benchmark readiness is a policy lens, not just a volume metric.")}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── Section 1: Hero KPIs ── */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         {loading ? (
@@ -645,6 +687,7 @@ export default function ExecutiveDashboardPage() {
               }
               label={tr("page.exec_dashboard.kpi.total_entities", "Total Entities")}
               value={data.kpis.total_entities.toLocaleString()}
+              subtitle={tr("page.exec_dashboard.kpi_help.total_entities", "How many records are currently in this domain")}
             />
             <StatCard
               iconColor="emerald"
@@ -660,6 +703,7 @@ export default function ExecutiveDashboardPage() {
                 direction: "up",
                 positive: true,
               }}
+              subtitle={tr("page.exec_dashboard.kpi_help.enrichment_coverage", "Share of records that already carry enrichment signals")}
             />
             <StatCard
               iconColor="violet"
@@ -670,6 +714,7 @@ export default function ExecutiveDashboardPage() {
               }
               label={tr("page.exec_dashboard.kpi.avg_citations", "Avg Citations")}
               value={data.kpis.avg_citations}
+              subtitle={tr("page.exec_dashboard.kpi_help.avg_citations", "Average citation count among enriched records")}
             />
             <StatCard
               iconColor="amber"
@@ -680,6 +725,7 @@ export default function ExecutiveDashboardPage() {
               }
               label={tr("page.exec_dashboard.kpi.distinct_concepts", "Distinct Concepts")}
               value={data.kpis.total_concepts.toLocaleString()}
+              subtitle={tr("page.exec_dashboard.kpi_help.distinct_concepts", "Unique concepts extracted from enriched records")}
             />
             {/* Quality KPI */}
             <div className="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm dark:border-indigo-500/20 dark:bg-gray-900">
@@ -693,6 +739,9 @@ export default function ExecutiveDashboardPage() {
                   <p className="text-xs text-gray-500 dark:text-gray-400">{tr("page.exec_dashboard.kpi.avg_quality", "Avg Quality")}</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
                     {data.quality?.average != null ? `${Math.round(data.quality.average * 100)}%` : "—"}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                    {tr("page.exec_dashboard.kpi_help.avg_quality", "Confidence score for the records you are most likely to summarize or review")}
                   </p>
                 </div>
               </div>
