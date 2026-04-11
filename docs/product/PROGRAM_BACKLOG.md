@@ -86,6 +86,30 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
 - siguiente prioridad recomendada: siguiente corte de `US-067` para benchmark
   configurable por tenant/institucion
 
+## Hallazgo modulo scientific import
+
+- smoke test funcional ejecutado sobre `Scientific Import`
+- validado con casos reales en:
+  - `CrossRef` por busqueda libre
+  - `CrossRef` por DOI batch
+  - `PubMed` por busqueda libre
+- flujo validado:
+  - preview
+  - import
+  - persistencia en `RawEntity`
+  - apertura del registro desde el explorer
+- integracion endurecida despues del smoke test:
+  - dedupe por DOI ahora scoped por tenant
+  - preview DOI usa la misma ruta real de resolucion que el import
+  - CTA final del frontend vuelve al explorer correcto
+- conclusion:
+  - el bloque de adapters + factory + router + frontend scientific import queda
+    funcionalmente validado para cierre de integracion base
+  - siguientes mejoras ya no son bloqueo base, sino expansiones:
+    - prueba complementaria con `arXiv`
+    - i18n/copy de la pagina
+    - decidir si el import cientifico debe disparar enrichment automaticamente
+
 ## Arquitectura futura de visualizacion
 
 - `US-062` - Graph Visualization Read-Path Baseline
