@@ -329,6 +329,22 @@ def test_scientific_search_crossref(client, auth_headers):
     assert len(results) == 1
     assert results[0]["title"] == "Test paper"
 
+
+def test_scientific_search_arxiv(client, auth_headers):
+    with patch("backend.adapters.scientific.arxiv.ArXivAdapter.search") as mock_search:
+        mock_search.return_value = [
+            ScientificRecord(source_api="arxiv", title="Transformer preprint", doi="10.48550/arXiv.2301.00001", year=2023)
+        ]
+        resp = client.post(
+            "/scientific/search",
+            json={"source": "arxiv", "query": "transformers attention", "max_results": 5},
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    results = resp.json()
+    assert len(results) == 1
+    assert results[0]["source_api"] == "arxiv"
+
 def test_scientific_import_creates_entities(client, auth_headers, db_session):
     with patch("backend.adapters.scientific.crossref.CrossRefAdapter.search") as mock_search:
         mock_search.return_value = [

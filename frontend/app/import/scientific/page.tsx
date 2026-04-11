@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { useLanguage } from "@/app/contexts/LanguageContext";
 
 type Source = { id: string; name: string; requires_key: boolean };
 type PreviewRecord = {
@@ -29,6 +30,7 @@ async function readJsonOrThrow<T>(response: Response): Promise<T> {
 }
 
 export default function ScientificImportPage() {
+  const { t } = useLanguage();
   const [sources, setSources] = useState<Source[]>([]);
   const [sourcesLoaded, setSourcesLoaded] = useState(false);
   const [source, setSource] = useState("crossref");
@@ -87,7 +89,7 @@ export default function ScientificImportPage() {
       setPreview(data);
       setStep("preview");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Search failed");
+      setError(e instanceof Error ? e.message : t("page.import.scientific.error.search"));
     } finally {
       setLoading(false);
     }
@@ -115,7 +117,7 @@ export default function ScientificImportPage() {
       setResult(data);
       setStep("done");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Import failed");
+      setError(e instanceof Error ? e.message : t("page.import.scientific.error.import"));
     } finally {
       setLoading(false);
     }
@@ -124,9 +126,9 @@ export default function ScientificImportPage() {
   return (
     <div className="max-w-3xl mx-auto py-8 px-4 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Scientific Import</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("page.import.scientific.title")}</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Search and import literature directly from PubMed, CrossRef, arXiv, DataCite, Zotero, or ORCID.
+          {t("page.import.scientific.description")}
         </p>
       </div>
 
@@ -141,7 +143,7 @@ export default function ScientificImportPage() {
                 : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
             }`}
           >
-            {i + 1}. {s.charAt(0).toUpperCase() + s.slice(1)}
+            {i + 1}. {t(`page.import.scientific.step.${s}`)}
           </span>
         ))}
       </div>
@@ -160,7 +162,7 @@ export default function ScientificImportPage() {
         >
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Source</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{t("page.import.scientific.source")}</label>
               <select
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
@@ -176,14 +178,14 @@ export default function ScientificImportPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Mode</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{t("page.import.scientific.mode")}</label>
               <select
                 value={mode}
                 onChange={(e) => setMode(e.target.value as "search" | "dois")}
                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-3 py-2"
               >
-                <option value="search">Free-text search</option>
-                <option value="dois">DOI batch import</option>
+                <option value="search">{t("page.import.scientific.mode.search")}</option>
+                <option value="dois">{t("page.import.scientific.mode.dois")}</option>
               </select>
             </div>
           </div>
@@ -191,7 +193,7 @@ export default function ScientificImportPage() {
           {selectedSource?.requires_key && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">API Key</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{t("page.import.scientific.api_key")}</label>
                 <input
                   type="password"
                   value={apiKey}
@@ -203,13 +205,13 @@ export default function ScientificImportPage() {
               {source === "zotero" && (
                 <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                    Library ID
+                    {t("page.import.scientific.library_id")}
                   </label>
                   <input
                     type="text"
                     value={libraryId}
                     onChange={(e) => setLibraryId(e.target.value)}
-                    placeholder="e.g. 12345"
+                    placeholder={t("page.import.scientific.library_id_placeholder")}
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-3 py-2"
                   />
                 </div>
@@ -220,17 +222,17 @@ export default function ScientificImportPage() {
           {mode === "search" ? (
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                {source === "orcid" ? "ORCID iD (e.g. 0000-0002-1825-0097)" : "Search query"}
+                {source === "orcid" ? t("page.import.scientific.orcid_label") : t("page.import.scientific.search_label")}
               </label>
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={source === "orcid" ? "0000-0002-1825-0097" : "e.g. CRISPR gene editing 2023"}
+                placeholder={source === "orcid" ? t("page.import.scientific.orcid_placeholder") : t("page.import.scientific.search_placeholder")}
                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-3 py-2"
               />
               <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                <span>Max results:</span>
+                <span>{t("page.import.scientific.max_results")}</span>
                 <input
                   type="number"
                   min={1}
@@ -244,7 +246,7 @@ export default function ScientificImportPage() {
           ) : (
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                DOIs (one per line or comma-separated)
+                {t("page.import.scientific.dois_label")}
               </label>
               <textarea
                 value={doiText}
@@ -261,7 +263,7 @@ export default function ScientificImportPage() {
             disabled={loading || (mode === "search" && !query) || (mode === "dois" && !doiText)}
             className="w-full rounded-md bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium py-2 px-4 transition-colors"
           >
-            {loading ? "Searching…" : "Preview Results"}
+            {loading ? t("page.import.scientific.preview_loading") : t("page.import.scientific.preview_cta")}
           </button>
         </div>
       )}
@@ -270,16 +272,22 @@ export default function ScientificImportPage() {
       {step === "preview" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600 dark:text-gray-400">{preview.length} records found</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{t("page.import.scientific.results_found", { count: preview.length })}</span>
             <button onClick={() => setStep("query")} className="text-xs text-indigo-600 hover:underline">
-              ← Change query
+              {t("page.import.scientific.change_query")}
             </button>
           </div>
           <div className="overflow-auto rounded-xl border border-gray-200 dark:border-gray-700">
             <table className="min-w-full text-xs">
               <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  {["Title", "Authors", "Year", "DOI", "Source"].map((h) => (
+                  {[
+                    t("page.import.scientific.table.title"),
+                    t("page.import.scientific.table.authors"),
+                    t("page.import.scientific.table.year"),
+                    t("page.import.scientific.table.doi"),
+                    t("page.import.scientific.table.source"),
+                  ].map((h) => (
                     <th key={h} className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">
                       {h}
                     </th>
@@ -313,7 +321,7 @@ export default function ScientificImportPage() {
             disabled={loading}
             className="w-full rounded-md bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium py-2 px-4 transition-colors"
           >
-            {loading ? "Importing…" : `Import ${preview.length} records`}
+            {loading ? t("page.import.scientific.import_loading") : t("page.import.scientific.import_cta", { count: preview.length })}
           </button>
         </div>
       )}
@@ -322,13 +330,13 @@ export default function ScientificImportPage() {
       {step === "done" && result && (
         <div className="rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-6 text-center space-y-3">
           <div className="text-3xl font-bold text-green-700 dark:text-green-400">{result.imported}</div>
-          <div className="text-sm text-green-700 dark:text-green-300">records imported successfully</div>
+          <div className="text-sm text-green-700 dark:text-green-300">{t("page.import.scientific.success")}</div>
           {result.skipped > 0 && (
-            <div className="text-xs text-gray-500">{result.skipped} skipped (already exist by DOI)</div>
+            <div className="text-xs text-gray-500">{t("page.import.scientific.skipped", { count: result.skipped })}</div>
           )}
           <div className="flex gap-3 justify-center pt-2">
             <Link href="/" className="rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2">
-              View Entities
+              {t("page.import.scientific.view_entities")}
             </Link>
             <button
               onClick={() => {
@@ -338,7 +346,7 @@ export default function ScientificImportPage() {
               }}
               className="rounded-md border border-gray-300 dark:border-gray-600 text-sm px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
-              New Import
+              {t("page.import.scientific.new_import")}
             </button>
           </div>
         </div>
