@@ -2,6 +2,7 @@
 Scientific literature import endpoints.
   GET  /scientific/sources              — list available sources
   POST /scientific/search               — search without importing
+  POST /scientific/dois/preview         — batch DOI resolver without importing
   POST /scientific/import               — search + save as RawEntity (201)
   POST /scientific/dois                 — batch DOI resolver + save (201)
 """
@@ -58,9 +59,15 @@ def _save_records(records: list, db: Session, org_id: Optional[int]) -> dict:
     """Convert ScientificRecords → RawEntity rows. Skips duplicates by DOI."""
     imported = 0
     skipped = 0
+    stored_org = persisted_org_id(org_id)
     for rec in records:
         if rec.doi:
-            exists = db.query(models.RawEntity).filter_by(enrichment_doi=rec.doi).first()
+            exists_query = db.query(models.RawEntity).filter(models.RawEntity.enrichment_doi == rec.doi)
+            if stored_org is None:
+                exists_query = exists_query.filter(models.RawEntity.org_id.is_(None))
+            else:
+                exists_query = exists_query.filter(models.RawEntity.org_id == stored_org)
+            exists = exists_query.first()
             if exists:
                 skipped += 1
                 continue
@@ -78,13 +85,24 @@ def _save_records(records: list, db: Session, org_id: Optional[int]) -> dict:
         entity_kwargs["enrichment_citation_count"] = rec.citation_count or 0
         entity_kwargs["enrichment_source"] = rec.source_api
         entity_kwargs["source"] = "scientific_import"
-        stored_org = persisted_org_id(org_id)
         if stored_org is not None:
             entity_kwargs["org_id"] = stored_org
         db.add(models.RawEntity(**entity_kwargs))
         imported += 1
     db.commit()
     return {"imported": imported, "skipped": skipped}
+
+
+def _fetch_doi_records(body: DoiBatchRequest) -> list[ScientificRecord]:
+    try:
+        adapter = get_scientific_adapter(body.source, body.config)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    try:
+        return adapter.fetch_batch_dois(body.dois)
+    except Exception as e:
+        logger.exception("DOI batch failed for source=%s", body.source)
+        raise HTTPException(status_code=502, detail=f"Source unavailable: {e}")
 
 
 @router.get("/sources")
@@ -104,6 +122,11 @@ def search_scientific(body: SearchRequest, _=Depends(get_current_user)):
         logger.exception("Scientific search failed for source=%s", body.source)
         raise HTTPException(status_code=502, detail=f"Source unavailable: {e}")
     return [_record_to_dict(r) for r in records]
+
+
+@router.post("/dois/preview")
+def preview_dois(body: DoiBatchRequest, _=Depends(get_current_user)):
+    return [_record_to_dict(r) for r in _fetch_doi_records(body)]
 
 
 @router.post("/import", status_code=201)
@@ -131,14 +154,6 @@ def import_dois(
     db: Session = Depends(get_db),
     current_user=Depends(require_role("super_admin", "admin", "editor")),
 ):
-    try:
-        adapter = get_scientific_adapter(body.source, body.config)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    try:
-        records = adapter.fetch_batch_dois(body.dois)
-    except Exception as e:
-        logger.exception("DOI batch failed for source=%s", body.source)
-        raise HTTPException(status_code=502, detail=f"Source unavailable: {e}")
+    records = _fetch_doi_records(body)
     org_id = resolve_request_org_id(db, current_user)
     return _save_records(records, db, org_id)

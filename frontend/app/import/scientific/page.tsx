@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 
 type Source = { id: string; name: string; requires_key: boolean };
@@ -14,6 +15,18 @@ type PreviewRecord = {
 };
 type ImportResult = { imported: number; skipped: number };
 type Step = "query" | "preview" | "done";
+
+async function readJsonOrThrow<T>(response: Response): Promise<T> {
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail =
+      payload && typeof payload === "object" && "detail" in payload
+        ? String(payload.detail)
+        : "Request failed";
+    throw new Error(detail);
+  }
+  return payload as T;
+}
 
 export default function ScientificImportPage() {
   const [sources, setSources] = useState<Source[]>([]);
@@ -59,17 +72,17 @@ export default function ScientificImportPage() {
       let data: PreviewRecord[];
       if (mode === "dois") {
         const dois = doiText.split(/[\n,]+/).map((d) => d.trim()).filter(Boolean);
-        const resp = await apiFetch("/scientific/search", {
+        const resp = await apiFetch("/scientific/dois/preview", {
           method: "POST",
-          body: JSON.stringify({ source, query: dois.join(" "), max_results: dois.length, config: buildConfig() }),
+          body: JSON.stringify({ dois, source, config: buildConfig() }),
         });
-        data = await resp.json();
+        data = await readJsonOrThrow<PreviewRecord[]>(resp);
       } else {
         const resp = await apiFetch("/scientific/search", {
           method: "POST",
           body: JSON.stringify({ source, query, max_results: maxResults, config: buildConfig() }),
         });
-        data = await resp.json();
+        data = await readJsonOrThrow<PreviewRecord[]>(resp);
       }
       setPreview(data);
       setStep("preview");
@@ -91,13 +104,13 @@ export default function ScientificImportPage() {
           method: "POST",
           body: JSON.stringify({ dois, source, config: buildConfig() }),
         });
-        data = await resp.json();
+        data = await readJsonOrThrow<ImportResult>(resp);
       } else {
         const resp = await apiFetch("/scientific/import", {
           method: "POST",
           body: JSON.stringify({ source, query, max_results: maxResults, config: buildConfig() }),
         });
-        data = await resp.json();
+        data = await readJsonOrThrow<ImportResult>(resp);
       }
       setResult(data);
       setStep("done");
@@ -314,9 +327,9 @@ export default function ScientificImportPage() {
             <div className="text-xs text-gray-500">{result.skipped} skipped (already exist by DOI)</div>
           )}
           <div className="flex gap-3 justify-center pt-2">
-            <a href="/entities" className="rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2">
+            <Link href="/" className="rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2">
               View Entities
-            </a>
+            </Link>
             <button
               onClick={() => {
                 setStep("query");

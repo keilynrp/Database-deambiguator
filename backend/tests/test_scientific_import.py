@@ -391,6 +391,66 @@ def test_scientific_doi_batch(client, auth_headers):
     assert resp.status_code == 201
     assert resp.json()["imported"] == 1
 
+
+def test_scientific_doi_preview_uses_batch_resolution(client, auth_headers):
+    with patch("backend.adapters.scientific.crossref.CrossRefAdapter.fetch_batch_dois") as mock_batch:
+        mock_batch.return_value = [
+            ScientificRecord(source_api="crossref", title="Preview DOI paper", doi="10.1234/preview-doi", year=2024)
+        ]
+        resp = client.post(
+            "/scientific/dois/preview",
+            json={"dois": ["10.1234/preview-doi"], "source": "crossref"},
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    assert resp.json()[0]["title"] == "Preview DOI paper"
+
+
+def test_scientific_import_dedupe_is_tenant_scoped(client, auth_headers):
+    first_org = client.post(
+        "/organizations",
+        json={"name": "Scientific Org A", "slug": "scientific-org-a", "plan": "free"},
+        headers=auth_headers,
+    )
+    assert first_org.status_code == 201
+    first_org_id = first_org.json()["id"]
+
+    second_org = client.post(
+        "/organizations",
+        json={"name": "Scientific Org B", "slug": "scientific-org-b", "plan": "free"},
+        headers=auth_headers,
+    )
+    assert second_org.status_code == 201
+    second_org_id = second_org.json()["id"]
+
+    doi = "10.1234/tenant-scope-doi"
+    record = ScientificRecord(source_api="crossref", title="Tenant scoped DOI", doi=doi, year=2024)
+
+    switched = client.post(f"/organizations/{first_org_id}/switch", headers=auth_headers)
+    assert switched.status_code == 200
+    with patch("backend.adapters.scientific.crossref.CrossRefAdapter.search") as mock_search:
+        mock_search.return_value = [record]
+        first_import = client.post(
+            "/scientific/import",
+            json={"source": "crossref", "query": "tenant doi", "max_results": 5},
+            headers=auth_headers,
+        )
+    assert first_import.status_code == 201
+    assert first_import.json()["imported"] == 1
+
+    switched = client.post(f"/organizations/{second_org_id}/switch", headers=auth_headers)
+    assert switched.status_code == 200
+    with patch("backend.adapters.scientific.crossref.CrossRefAdapter.search") as mock_search:
+        mock_search.return_value = [record]
+        second_import = client.post(
+            "/scientific/import",
+            json={"source": "crossref", "query": "tenant doi", "max_results": 5},
+            headers=auth_headers,
+        )
+    assert second_import.status_code == 201
+    assert second_import.json()["imported"] == 1
+    assert second_import.json()["skipped"] == 0
+
 def test_scientific_search_empty_results(client, auth_headers):
     with patch("backend.adapters.scientific.crossref.CrossRefAdapter.search") as mock_search:
         mock_search.return_value = []
