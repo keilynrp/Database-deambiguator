@@ -10,6 +10,7 @@ Sprint 85 — Multi-tenancy: Organization management.
   DELETE /organizations/{id}/members/{user_id} — remove member (owner/admin or self)
   POST   /organizations/{id}/switch  — switch current user's active org
 """
+import json
 import logging
 import re
 from typing import Optional
@@ -60,6 +61,11 @@ class InviteRequest(BaseModel):
 
 
 def _serialize_org(org: models.Organization, member_count: int = 0) -> dict:
+    try:
+        benchmark_profile_overrides = json.loads(org.benchmark_profile_overrides) if org.benchmark_profile_overrides else {}
+    except (TypeError, ValueError, json.JSONDecodeError):
+        benchmark_profile_overrides = {}
+
     return {
         "id": org.id,
         "name": org.name,
@@ -67,6 +73,7 @@ def _serialize_org(org: models.Organization, member_count: int = 0) -> dict:
         "description": org.description,
         "plan": org.plan,
         "benchmark_profile_id": org.benchmark_profile_id,
+        "benchmark_profile_overrides": benchmark_profile_overrides,
         "owner_id": org.owner_id,
         "is_active": org.is_active,
         "member_count": member_count,
@@ -230,7 +237,6 @@ def update_organization(
             raise HTTPException(status_code=422, detail="Unknown benchmark profile")
         org.benchmark_profile_id = payload.benchmark_profile_id or None
     if payload.benchmark_profile_overrides is not None:
-        import json
         org.benchmark_profile_overrides = json.dumps(payload.benchmark_profile_overrides)
     db.commit()
     db.refresh(org)

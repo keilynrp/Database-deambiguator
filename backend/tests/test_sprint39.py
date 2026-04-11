@@ -386,6 +386,7 @@ def test_benchmark_profiles_endpoint_lists_builtins(client, auth_headers):
     assert "research_portfolio_baseline" in ids
     assert "ref_readiness_baseline" in ids
     assert "sni_readiness_baseline" in ids
+    assert all("rules" in profile for profile in response.json())
 
 
 def test_dashboard_uses_org_default_benchmark_profile_when_not_explicit(client, auth_headers):
@@ -416,6 +417,53 @@ def test_dashboard_uses_org_default_benchmark_profile_when_not_explicit(client, 
     defaults = [profile for profile in profiles.json() if profile["is_default"]]
     assert len(defaults) == 1
     assert defaults[0]["id"] == "sni_readiness_baseline"
+
+
+def test_reports_use_org_benchmark_profile_overrides_when_not_explicit(client, auth_headers):
+    import time
+
+    slug = f"benchmark-report-org-{int(time.time() * 1000) % 100000}"
+    created = client.post(
+        "/organizations",
+        json={"name": "Benchmark Report Org", "slug": slug, "plan": "free"},
+        headers=auth_headers,
+    )
+    assert created.status_code == 201
+    org_id = created.json()["id"]
+
+    updated = client.put(
+        f"/organizations/{org_id}",
+        json={
+            "benchmark_profile_id": "sni_readiness_baseline",
+            "benchmark_profile_overrides": {
+                "profiles": {
+                    "sni_readiness_baseline": {
+                        "name": "Custom SNI Baseline",
+                        "rules": {
+                            "quality_min": {
+                                "threshold": 72,
+                                "fail_text": "Custom quality gap message.",
+                            }
+                        },
+                    }
+                }
+            },
+        },
+        headers=auth_headers,
+    )
+    assert updated.status_code == 200
+
+    switched = client.post(f"/organizations/{org_id}/switch", headers=auth_headers)
+    assert switched.status_code == 200
+
+    report = client.post(
+        "/reports/generate",
+        json={"domain_id": "default", "sections": ["institutional_benchmark"], "title": "Custom Benchmark Report"},
+        headers=auth_headers,
+    )
+    assert report.status_code == 200
+    assert "Custom SNI Baseline" in report.text
+    assert "Custom quality gap message." in report.text
 
 
 def test_benchmark_evaluate_endpoint_accepts_known_profile(client, auth_headers):

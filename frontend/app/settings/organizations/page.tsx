@@ -10,10 +10,34 @@ interface Organization {
   description: string | null;
   plan: string;
   benchmark_profile_id: string | null;
+  benchmark_profile_overrides: {
+    profiles?: Record<string, {
+      name?: string;
+      description?: string;
+      region?: string;
+      rules?: Record<string, {
+        label?: string;
+        threshold?: number;
+        priority?: string;
+        pass_text?: string;
+        fail_text?: string;
+      }>;
+    }>;
+  };
   owner_id: number;
   is_active: boolean;
   member_count: number;
   created_at: string;
+}
+
+interface BenchmarkRule {
+  id: string;
+  label: string;
+  metric: string;
+  threshold: number;
+  priority: string;
+  pass_text: string;
+  fail_text: string;
 }
 
 interface BenchmarkProfile {
@@ -22,6 +46,7 @@ interface BenchmarkProfile {
   description: string;
   region: string;
   rules_count: number;
+  rules: BenchmarkRule[];
   is_default: boolean;
 }
 
@@ -58,6 +83,7 @@ export default function OrganizationsPage() {
   const [inviteForm, setInviteForm] = useState({ username: "", role: "member" });
   const [benchmarkProfiles, setBenchmarkProfiles] = useState<BenchmarkProfile[]>([]);
   const [savingBenchmark, setSavingBenchmark] = useState(false);
+  const [editingRules, setEditingRules] = useState<Record<string, BenchmarkRule>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,19 +117,6 @@ export default function OrganizationsPage() {
   }, []);
 
   useEffect(() => {
-    let active = true;
-    (async () => {
-      const r = await apiFetch("/analytics/benchmarks/profiles");
-      if (active && r.ok) {
-        setBenchmarkProfiles(await r.json());
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
     if (!selectedOrg) {
       return;
     }
@@ -120,6 +133,49 @@ export default function OrganizationsPage() {
       active = false;
     };
   }, [selectedOrg]);
+
+  useEffect(() => {
+    if (!selectedOrg) {
+      setBenchmarkProfiles([]);
+      return;
+    }
+
+    let active = true;
+    (async () => {
+      const r = await apiFetch(`/analytics/benchmarks/profiles?org_id=${selectedOrg.id}`);
+      if (active && r.ok) {
+        setBenchmarkProfiles(await r.json());
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [selectedOrg]);
+
+  useEffect(() => {
+    if (!selectedOrg) {
+      setEditingRules({});
+      return;
+    }
+
+    const selectedProfile = benchmarkProfiles.find((profile) => profile.id === (selectedOrg.benchmark_profile_id ?? ""));
+    if (!selectedProfile) {
+      setEditingRules({});
+      return;
+    }
+
+    const ruleOverrides = selectedOrg.benchmark_profile_overrides?.profiles?.[selectedProfile.id]?.rules ?? {};
+    const mergedRules = Object.fromEntries(
+      selectedProfile.rules.map((rule) => [
+        rule.id,
+        {
+          ...rule,
+          ...(ruleOverrides[rule.id] ?? {}),
+        },
+      ]),
+    );
+    setEditingRules(mergedRules);
+  }, [benchmarkProfiles, selectedOrg]);
 
   async function createOrg() {
     setSaving(true);
@@ -191,7 +247,7 @@ export default function OrganizationsPage() {
       const updated = await r.json();
       setSelectedOrg(updated);
       setOrgs((prev) => prev.map((org) => (org.id === updated.id ? updated : org)));
-      const profilesResponse = await apiFetch("/analytics/benchmarks/profiles");
+      const profilesResponse = await apiFetch(`/analytics/benchmarks/profiles?org_id=${selectedOrg.id}`);
       if (profilesResponse.ok) {
         setBenchmarkProfiles(await profilesResponse.json());
       }
@@ -200,6 +256,64 @@ export default function OrganizationsPage() {
       setError(d.detail ?? "Failed to save benchmark profile");
     }
     setSavingBenchmark(false);
+  }
+
+  async function saveBenchmarkOverrides() {
+    if (!selectedOrg || !selectedOrg.benchmark_profile_id) return;
+    setSavingBenchmark(true);
+    setError(null);
+
+    const benchmarkProfileOverrides = {
+      ...(selectedOrg.benchmark_profile_overrides ?? {}),
+      profiles: {
+        ...(selectedOrg.benchmark_profile_overrides?.profiles ?? {}),
+        [selectedOrg.benchmark_profile_id]: {
+          ...((selectedOrg.benchmark_profile_overrides?.profiles ?? {})[selectedOrg.benchmark_profile_id] ?? {}),
+          rules: Object.fromEntries(
+            Object.values(editingRules).map((rule) => [
+              rule.id,
+              {
+                label: rule.label,
+                threshold: Number(rule.threshold),
+                priority: rule.priority,
+                pass_text: rule.pass_text,
+                fail_text: rule.fail_text,
+              },
+            ]),
+          ),
+        },
+      },
+    };
+
+    const r = await apiFetch(`/organizations/${selectedOrg.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ benchmark_profile_overrides: benchmarkProfileOverrides }),
+    });
+
+    if (r.ok) {
+      const updated = await r.json();
+      setSelectedOrg(updated);
+      setOrgs((prev) => prev.map((org) => (org.id === updated.id ? updated : org)));
+      const profilesResponse = await apiFetch(`/analytics/benchmarks/profiles?org_id=${selectedOrg.id}`);
+      if (profilesResponse.ok) {
+        setBenchmarkProfiles(await profilesResponse.json());
+      }
+    } else {
+      const d = await r.json().catch(() => ({}));
+      setError(d.detail ?? "Failed to save benchmark profile overrides");
+    }
+    setSavingBenchmark(false);
+  }
+
+  function updateEditingRule(ruleId: string, field: keyof BenchmarkRule, value: string | number) {
+    setEditingRules((prev) => ({
+      ...prev,
+      [ruleId]: {
+        ...prev[ruleId],
+        [field]: field === "threshold" ? Number(value) : value,
+      },
+    }));
   }
 
   const inputClass = "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
@@ -301,7 +415,7 @@ export default function OrganizationsPage() {
               </div>
 
               {/* Members */}
-              <div className="rounded-xl border border-gray-100 p-4 dark:border-gray-800">
+              <div className="space-y-4 rounded-xl border border-gray-100 p-4 dark:border-gray-800">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Benchmark Profile</h4>
@@ -329,6 +443,83 @@ export default function OrganizationsPage() {
                     )}
                   </div>
                 </div>
+                {selectedOrg.benchmark_profile_id && Object.values(editingRules).length > 0 && (
+                  <div className="space-y-3 rounded-xl bg-gray-50 p-4 dark:bg-gray-950/40">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h5 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Rule overrides</h5>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Adjust thresholds and copy for this tenant. The dashboard and briefs will inherit these values.
+                        </p>
+                      </div>
+                      <button
+                        onClick={saveBenchmarkOverrides}
+                        disabled={savingBenchmark}
+                        className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {savingBenchmark ? "Saving..." : "Save overrides"}
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {Object.values(editingRules).map((rule) => (
+                        <div key={rule.id} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                          <div className="grid gap-3 lg:grid-cols-[1.2fr,120px,140px]">
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Rule label</label>
+                              <input
+                                value={rule.label}
+                                onChange={(e) => updateEditingRule(rule.id, "label", e.target.value)}
+                                className={inputClass}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Threshold</label>
+                              <input
+                                type="number"
+                                value={rule.threshold}
+                                onChange={(e) => updateEditingRule(rule.id, "threshold", e.target.value)}
+                                className={inputClass}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Priority</label>
+                              <select
+                                value={rule.priority}
+                                onChange={(e) => updateEditingRule(rule.id, "priority", e.target.value)}
+                                className={inputClass}
+                              >
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Pass message</label>
+                              <textarea
+                                value={rule.pass_text}
+                                onChange={(e) => updateEditingRule(rule.id, "pass_text", e.target.value)}
+                                rows={2}
+                                className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Fail message</label>
+                              <textarea
+                                value={rule.fail_text}
+                                onChange={(e) => updateEditingRule(rule.id, "fail_text", e.target.value)}
+                                rows={2}
+                                className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                              />
+                            </div>
+                          </div>
+                          <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">Metric: {rule.metric}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Members */}

@@ -162,6 +162,7 @@ def list_benchmark_profiles(org=None) -> list[dict]:
             "description": merged_profile["description"],
             "region": merged_profile["region"],
             "rules_count": len(merged_profile["rules"]),
+            "rules": merged_profile["rules"],
             "is_default": merged_profile["id"] == default_profile_id,
         }
         for profile in _BUILTIN_PROFILES

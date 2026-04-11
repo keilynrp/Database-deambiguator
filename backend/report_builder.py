@@ -247,12 +247,18 @@ def _section_harmonization_log(db: Session, domain_id: str, org_id: int | None) 
 </section>"""
 
 
-def _section_decision_recommendations(db: Session, domain_id: str, org_id: int | None) -> str:
+def _section_decision_recommendations(
+    db: Session,
+    domain_id: str,
+    org_id: int | None,
+    benchmark_org: models.Organization | None = None,
+) -> str:
     snapshot = AnalyticsService.get_domain_snapshot(
         db,
         TopicAnalyzer(),
         domain_id,
         org_id=org_id,
+        benchmark_org=benchmark_org,
         top_n_concepts=10,
         top_n_entities=5,
     )
@@ -296,12 +302,14 @@ def _section_institutional_benchmark(
     domain_id: str,
     org_id: int | None,
     benchmark_profile_id: str | None = None,
+    benchmark_org: models.Organization | None = None,
 ) -> str:
     snapshot = AnalyticsService.get_domain_snapshot(
         db,
         TopicAnalyzer(),
         domain_id,
         org_id=org_id,
+        benchmark_org=benchmark_org,
         benchmark_profile_id=benchmark_profile_id,
         top_n_concepts=10,
         top_n_entities=5,
@@ -383,6 +391,7 @@ def build(
     title: str | None = None,
     org_id: int | None = None,
     benchmark_profile_id: str | None = None,
+    benchmark_org: models.Organization | None = None,
 ) -> str:
     """Return a complete, self-contained HTML report string."""
     domain_name = domain_id
@@ -414,7 +423,9 @@ def build(
         if builder:
             try:
                 if sec == "institutional_benchmark":
-                    body_sections.append(builder(db, domain_id, org_id, benchmark_profile_id))
+                    body_sections.append(builder(db, domain_id, org_id, benchmark_profile_id, benchmark_org))
+                elif sec == "decision_recommendations":
+                    body_sections.append(builder(db, domain_id, org_id, benchmark_org))
                 else:
                     body_sections.append(builder(db, domain_id, org_id))
             except Exception as exc:

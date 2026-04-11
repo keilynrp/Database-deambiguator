@@ -97,6 +97,7 @@ def generate_report(
 ):
     """Generate a self-contained HTML report and return it as a downloadable file."""
     org_id = resolve_request_org_id(db, current_user)
+    benchmark_org = db.get(models.Organization, org_id) if org_id else None
     invalid = [s for s in payload.sections if s not in _report_builder.SECTION_BUILDERS]
     if invalid:
         raise HTTPException(
@@ -110,6 +111,7 @@ def generate_report(
         payload.title,
         org_id=org_id,
         benchmark_profile_id=payload.benchmark_profile_id,
+        benchmark_org=benchmark_org,
     )
     filename = (
         f"ukip_report_{payload.domain_id}_"
@@ -138,6 +140,7 @@ def export_pdf(
 ):
     """Generate a professional PDF report via WeasyPrint."""
     org_id = resolve_request_org_id(db, current_user)
+    benchmark_org = db.get(models.Organization, org_id) if org_id else None
     invalid = [s for s in payload.sections if s not in _report_builder.SECTION_BUILDERS]
     if invalid:
         raise HTTPException(
@@ -151,6 +154,7 @@ def export_pdf(
         payload.title,
         org_id=org_id,
         benchmark_profile_id=payload.benchmark_profile_id,
+        benchmark_org=benchmark_org,
     )
     pdf_bytes = _make_pdf(html)
     filename = (

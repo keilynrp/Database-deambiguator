@@ -80,6 +80,30 @@ _analytics_cache = _SimpleCache(ttl_seconds=300)   # 5 min — topic / correlati
 _dashboard_cache = _SimpleCache(ttl_seconds=120)   # 2 min — dashboard snapshots
 
 
+def _resolve_benchmark_org(
+    db: Session,
+    current_user: models.User,
+    requested_org_id: int | None = None,
+) -> models.Organization | None:
+    effective_org_id = requested_org_id or resolve_request_org_id(db, current_user)
+    if not effective_org_id:
+        return None
+
+    if current_user.role != "super_admin":
+        membership = (
+            db.query(models.OrganizationMember)
+            .filter(
+                models.OrganizationMember.org_id == effective_org_id,
+                models.OrganizationMember.user_id == current_user.id,
+            )
+            .first()
+        )
+        if membership is None:
+            raise HTTPException(status_code=403, detail="Not authorized for this organization")
+
+    return db.get(models.Organization, effective_org_id)
+
+
 # ── ROI Calculator ────────────────────────────────────────────────────────────
 
 class _ROIRequest(BaseModel):
@@ -294,11 +318,11 @@ def dashboard_compare(
 
 @router.get("/analytics/benchmarks/profiles", tags=["analytics"])
 def list_institutional_benchmark_profiles(
+    org_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    org_id = resolve_request_org_id(db, current_user)
-    benchmark_org = db.get(models.Organization, org_id) if org_id else None
+    benchmark_org = _resolve_benchmark_org(db, current_user, org_id)
     return list_benchmark_profiles(org=benchmark_org)
 
 

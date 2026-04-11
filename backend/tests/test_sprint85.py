@@ -105,6 +105,31 @@ class TestOrgUpdate:
         assert r.status_code == 200
         assert r.json()["benchmark_profile_id"] == "sni_readiness_baseline"
 
+    def test_update_benchmark_profile_overrides(self, client, auth_headers):
+        created = _create_org(client, auth_headers, name="Benchmark Override Test").json()
+        overrides = {
+            "profiles": {
+                "sni_readiness_baseline": {
+                    "rules": {
+                        "quality_min": {
+                            "threshold": 72,
+                            "fail_text": "Custom quality gap message.",
+                        }
+                    }
+                }
+            }
+        }
+        r = client.put(
+            f"/organizations/{created['id']}",
+            json={
+                "benchmark_profile_id": "sni_readiness_baseline",
+                "benchmark_profile_overrides": overrides,
+            },
+            headers=auth_headers,
+        )
+        assert r.status_code == 200
+        assert r.json()["benchmark_profile_overrides"]["profiles"]["sni_readiness_baseline"]["rules"]["quality_min"]["threshold"] == 72
+
 
 class TestOrgDelete:
     def test_delete_org(self, client, auth_headers):
