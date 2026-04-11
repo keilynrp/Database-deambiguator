@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import EntityTable from "./components/EntityTable";
 import EntityVariantView from "./components/EntityVariantView";
@@ -26,6 +26,12 @@ interface DemoStatus {
   demo_entity_count: number;
 }
 
+type GuidedStage = {
+  id: "import" | "enrich" | "review" | "brief";
+  href: string;
+  status: "done" | "current" | "upcoming";
+};
+
 export default function Home() {
   const [viewMode, setViewMode] = useState<"table" | "variants">("table");
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -35,6 +41,75 @@ export default function Home() {
   const [demoLoading, setDemoLoading] = useState(false);
   const { token } = useAuth();
   const { t } = useLanguage();
+  const hasEntities = (stats?.total_entities ?? 0) > 0;
+
+  const guidedStages = useMemo<GuidedStage[]>(() => {
+    const reviewReady = enrichPct >= 30;
+    const briefReady = enrichPct >= 60;
+
+    return [
+      {
+        id: "import",
+        href: "/import-export",
+        status: hasEntities ? "done" : "current",
+      },
+      {
+        id: "enrich",
+        href: "/analytics/dashboard",
+        status: !hasEntities ? "upcoming" : briefReady ? "done" : "current",
+      },
+      {
+        id: "review",
+        href: "/authority",
+        status: !hasEntities ? "upcoming" : reviewReady ? (briefReady ? "done" : "current") : "upcoming",
+      },
+      {
+        id: "brief",
+        href: "/reports",
+        status: !hasEntities ? "upcoming" : briefReady ? "current" : "upcoming",
+      },
+    ];
+  }, [enrichPct, hasEntities]);
+
+  const nextGuidedAction = useMemo(() => {
+    if (!hasEntities) {
+      return {
+        title: t("page.home.guided.next.import.title"),
+        description: t("page.home.guided.next.import.description"),
+        href: "/import-export",
+        cta: t("page.home.guided.next.import.cta"),
+        hint: t("page.home.guided.next.import.hint"),
+      };
+    }
+
+    if (enrichPct < 30) {
+      return {
+        title: t("page.home.guided.next.enrich.title"),
+        description: t("page.home.guided.next.enrich.description"),
+        href: "/analytics/dashboard",
+        cta: t("page.home.guided.next.enrich.cta"),
+        hint: t("page.home.guided.next.enrich.hint", { percent: Math.round(enrichPct) }),
+      };
+    }
+
+    if (enrichPct < 60) {
+      return {
+        title: t("page.home.guided.next.review.title"),
+        description: t("page.home.guided.next.review.description"),
+        href: "/authority",
+        cta: t("page.home.guided.next.review.cta"),
+        hint: t("page.home.guided.next.review.hint", { percent: Math.round(enrichPct) }),
+      };
+    }
+
+    return {
+      title: t("page.home.guided.next.brief.title"),
+      description: t("page.home.guided.next.brief.description"),
+      href: "/reports",
+      cta: t("page.home.guided.next.brief.cta"),
+      hint: t("page.home.guided.next.brief.hint"),
+    };
+  }, [enrichPct, hasEntities, t]);
 
   const fetchDemoStatus = useCallback(async () => {
     try {
@@ -232,6 +307,102 @@ export default function Home() {
 
       {/* Onboarding checklist */}
       <OnboardingChecklist token={token} />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-600 dark:text-sky-400">
+                {t("page.home.guided.eyebrow")}
+              </p>
+              <h2 className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {t("page.home.guided.title")}
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+                {t("page.home.guided.description")}
+              </p>
+            </div>
+            <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+              {t("page.home.guided.workspace_stage")}
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {guidedStages.map((stage, index) => {
+              const statusTone =
+                stage.status === "done"
+                  ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+                  : stage.status === "current"
+                    ? "border-violet-200 bg-violet-50 dark:border-violet-900/40 dark:bg-violet-950/20"
+                    : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60";
+              const badgeTone =
+                stage.status === "done"
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                  : stage.status === "current"
+                    ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
+                    : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300";
+
+              return (
+                <Link
+                  key={stage.id}
+                  href={stage.href}
+                  className={`rounded-xl border p-4 transition-colors hover:border-sky-300 hover:bg-white dark:hover:border-sky-700 dark:hover:bg-slate-900 ${statusTone}`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      {t("page.home.guided.step_number", { count: index + 1 })}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${badgeTone}`}>
+                      {t(`page.home.guided.status.${stage.status}`)}
+                    </span>
+                  </div>
+                  <h3 className="mt-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {t(`page.home.guided.step.${stage.id}.title`)}
+                  </h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-400">
+                    {t(`page.home.guided.step.${stage.id}.description`)}
+                  </p>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 shadow-sm dark:border-violet-900/50 dark:from-violet-950/40 dark:to-slate-900">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-violet-600 dark:text-violet-400">
+            {t("page.home.guided.next_eyebrow")}
+          </p>
+          <h2 className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {nextGuidedAction.title}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+            {nextGuidedAction.description}
+          </p>
+          <div className="mt-4 rounded-xl border border-violet-200 bg-white/80 px-4 py-3 dark:border-violet-900/40 dark:bg-slate-900/70">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              {t("page.home.guided.why_now")}
+            </p>
+            <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
+              {nextGuidedAction.hint}
+            </p>
+          </div>
+          <Link
+            href={nextGuidedAction.href}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700"
+          >
+            {nextGuidedAction.cta}
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 4.5l6 7.5-6 7.5M19.5 12h-15" />
+            </svg>
+          </Link>
+          <div className="mt-5 rounded-xl bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500 dark:bg-slate-800/70 dark:text-slate-400">
+            <p className="font-semibold text-slate-700 dark:text-slate-300">
+              {t("page.home.guided.glossary_title")}
+            </p>
+            <p className="mt-1">{t("page.home.guided.glossary_body")}</p>
+          </div>
+        </div>
+      </div>
 
       {/* Quick action cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
