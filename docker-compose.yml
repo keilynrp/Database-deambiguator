@@ -43,11 +43,17 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL:       postgresql+psycopg2://${POSTGRES_USER:-ukip}:${POSTGRES_PASSWORD:-ukip_secret}@postgres:5432/${POSTGRES_DB:-ukip}
+      DATABASE_URL:       ${DATABASE_URL:-}
+      POSTGRES_HOST:      ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT:      ${POSTGRES_PORT:-5432}
+      POSTGRES_DB:        ${POSTGRES_DB:-ukip}
+      POSTGRES_USER:      ${POSTGRES_USER:-ukip}
+      POSTGRES_PASSWORD:  ${POSTGRES_PASSWORD:-ukip_secret}
       DB_POOL_SIZE:       ${DB_POOL_SIZE:-20}
       DB_MAX_OVERFLOW:    ${DB_MAX_OVERFLOW:-10}
       ADMIN_USERNAME:     ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD:     ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
       JWT_SECRET_KEY:     ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
       ENCRYPTION_KEY:     ${ENCRYPTION_KEY:-}
       ALLOWED_ORIGINS:    ${ALLOWED_ORIGINS:-http://localhost:3004}

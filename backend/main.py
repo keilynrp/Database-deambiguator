@@ -19,6 +19,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from backend import database, enrichment_worker, models
+from backend.bootstrap import ensure_bootstrap_super_admin
 from backend.logging_utils import RequestLoggingMiddleware, configure_logging
 from backend.telemetry import initialize_telemetry
 from backend.routers.limiter import limiter
@@ -114,11 +115,14 @@ async def lifespan(app: FastAPI):
         "JWT_SECRET_KEY",
         "ENCRYPTION_KEY",
         "ADMIN_USERNAME",
-        "ADMIN_PASSWORD",
     ]
     for var in _required_vars:
         if not os.environ.get(var):
             logger.warning("⚠ %s is not set. Set it in .env before deploying to production.", var)
+    if not os.environ.get("ADMIN_PASSWORD") and not os.environ.get("ADMIN_PASSWORD_HASH"):
+        logger.warning(
+            "⚠ Neither ADMIN_PASSWORD nor ADMIN_PASSWORD_HASH is set. Bootstrap super_admin provisioning may fail."
+        )
 
     # Vars that must not keep their insecure defaults
     _insecure_defaults = {
@@ -144,17 +148,7 @@ async def lifespan(app: FastAPI):
     with database.SessionLocal() as db:
         enrichment_worker.reset_stale_processing_records(db)
 
-        if db.query(models.User).count() == 0:
-            from backend.auth import hash_password as _hash_pw
-            bootstrap_user = models.User(
-                username=os.environ.get("ADMIN_USERNAME", "admin"),
-                password_hash=_hash_pw(os.environ.get("ADMIN_PASSWORD", "changeit")),
-                role="super_admin",
-                is_active=True,
-            )
-            db.add(bootstrap_user)
-            db.commit()
-            logger.info("Bootstrap: super_admin '%s' created", bootstrap_user.username)
+        ensure_bootstrap_super_admin(db)
 
         # Seed built-in artifact templates (only on first run)
         if db.query(models.ArtifactTemplate).count() == 0:
