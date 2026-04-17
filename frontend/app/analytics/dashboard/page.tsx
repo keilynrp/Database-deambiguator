@@ -399,6 +399,19 @@ export default function ExecutiveDashboardPage() {
     medium: "border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-500/20 dark:bg-violet-500/5 dark:text-violet-200",
     low: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-200",
   };
+  const nextPilotStep = data?.kpis.enrichment_pct && data.kpis.enrichment_pct >= 60
+    ? {
+        href: briefBuilderHref,
+        title: tr("page.exec_dashboard.next.brief.title", "Move from analysis to a brief"),
+        body: tr("page.exec_dashboard.next.brief.body", "Coverage is strong enough to turn this workspace into a stakeholder-facing summary."),
+        cta: tr("page.exec_dashboard.next.brief.cta", "Open brief builder"),
+      }
+    : {
+        href: "/authority",
+        title: tr("page.exec_dashboard.next.review.title", "Review the records that still need human attention"),
+        body: tr("page.exec_dashboard.next.review.body", "Use authority and review queues to clean the weakest records before sharing conclusions."),
+        cta: tr("page.exec_dashboard.next.review.cta", "Open review"),
+      };
 
   return (
     <div className="flex flex-col gap-6 pb-10">
@@ -461,6 +474,30 @@ export default function ExecutiveDashboardPage() {
       />
 
       {error && <ErrorBanner message={error} onRetry={fetchDashboard} variant="card" />}
+
+      {data && (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5 shadow-sm dark:border-sky-900/40 dark:bg-sky-950/20">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
+                {tr("page.exec_dashboard.next.eyebrow", "Next guided move")}
+              </p>
+              <h2 className="mt-2 text-lg font-semibold text-sky-950 dark:text-sky-100">
+                {nextPilotStep.title}
+              </h2>
+              <p className="mt-1 text-sm text-sky-800 dark:text-sky-200">
+                {nextPilotStep.body}
+              </p>
+            </div>
+            <Link
+              href={nextPilotStep.href}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-700"
+            >
+              {nextPilotStep.cta}
+            </Link>
+          </div>
+        </div>
+      )}
 
       {importedFlag && (
         <div className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 p-5 shadow-sm dark:border-violet-500/20 dark:from-violet-500/5 dark:to-indigo-500/5">

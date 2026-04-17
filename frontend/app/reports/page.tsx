@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { PageHeader, Badge } from "../components/ui";
 import { apiFetch } from "../../lib/api";
 import { useDomain } from "../contexts/DomainContext";
@@ -109,6 +110,36 @@ export default function ReportsPage() {
     { value: "excel", label: "Excel",      desc: tr("page.reports.format.excel", "Multi-sheet workbook with KPIs, entities & concepts"), icon: "📊" },
     { value: "pptx",  label: "PowerPoint", desc: tr("page.reports.format.pptx", "Branded slide deck for presentations"), icon: "📑" },
   ]), [tr]);
+  const briefChecklist = useMemo(() => {
+    const hasEnoughSections = selected.size >= 4;
+    const usingBriefPreset = preset === "pilot-brief";
+    const hasTitle = title.trim().length > 0;
+
+    return [
+      {
+        key: "preset",
+        done: usingBriefPreset,
+        label: t("page.reports.brief_checklist.preset"),
+      },
+      {
+        key: "sections",
+        done: hasEnoughSections,
+        label: t("page.reports.brief_checklist.sections", { count: selected.size }),
+      },
+      {
+        key: "title",
+        done: hasTitle,
+        label: t("page.reports.brief_checklist.title", { title: hasTitle ? title.trim() : t("page.reports.brief_checklist.title_missing") }),
+      },
+      {
+        key: "format",
+        done: format === "pdf" || format === "pptx" || format === "html",
+        label: t("page.reports.brief_checklist.format", { format: format.toUpperCase() }),
+      },
+    ];
+  }, [format, preset, selected.size, t, title]);
+  const briefReady = briefChecklist.filter((item) => item.done).length >= 3;
+  const presetHref = `/reports?preset=pilot-brief&domain=${encodeURIComponent(activeDomainId)}&format=pdf&benchmark_profile=${encodeURIComponent(selectedBenchmarkProfile)}`;
 
   // Fetch available sections from backend
   const loadSections = useCallback(async () => {
@@ -363,6 +394,80 @@ export default function ReportsPage() {
           </div>
         </div>
       )}
+
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/20">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+              {t("page.reports.guided.eyebrow")}
+            </p>
+            <h2 className="mt-2 text-lg font-semibold text-emerald-950 dark:text-emerald-100">
+              {t("page.reports.guided.title")}
+            </h2>
+            <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">
+              {preset === "pilot-brief"
+                ? t("page.reports.guided.brief")
+                : t("page.reports.guided.default")}
+            </p>
+            {!preset && (
+              <Link
+                href={presetHref}
+                className="mt-3 inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700 dark:bg-gray-900 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+              >
+                {t("page.reports.guided.cta_preset")}
+              </Link>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/analytics/dashboard"
+              className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700 dark:bg-gray-900 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+            >
+              {t("page.reports.guided.cta_dashboard")}
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+            >
+              {t("page.reports.guided.cta_explorer")}
+            </Link>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {briefChecklist.map((item) => (
+              <div
+                key={item.key}
+                className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-sm text-emerald-900 shadow-sm dark:bg-gray-900/80 dark:text-emerald-100"
+              >
+                <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${
+                  item.done
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                }`}>
+                  {item.done ? "✓" : "!"}
+                </span>
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-xl bg-white/80 px-4 py-3 text-sm text-emerald-900 shadow-sm dark:bg-gray-900/80 dark:text-emerald-100">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
+              {t("page.reports.brief_ready.eyebrow")}
+            </p>
+            <p className="mt-1 font-semibold">
+              {briefReady
+                ? t("page.reports.brief_ready.yes")
+                : t("page.reports.brief_ready.no")}
+            </p>
+            <p className="mt-1 text-xs text-emerald-800 dark:text-emerald-200">
+              {briefReady
+                ? t("page.reports.brief_ready.yes_hint")
+                : t("page.reports.brief_ready.no_hint")}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Templates panel */}
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">

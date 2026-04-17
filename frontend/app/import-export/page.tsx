@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { PageHeader, useToast, ErrorBanner } from "../components/ui";
 import DataSourceSchemaAnalyzer from "../components/DataSourceSchemaAnalyzer";
 import { useDomain } from "../contexts/DomainContext";
@@ -254,6 +255,23 @@ export default function ImportExportPage() {
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                            <div className="mt-4 flex flex-wrap gap-2 border-t border-green-200 pt-3 dark:border-green-800">
+                                <Link
+                                    href={`/analytics/dashboard?imported=1&domain=${encodeURIComponent(uploadResult.domain ?? activeDomain?.id ?? "default")}&rows=${encodeURIComponent(String(uploadResult.total_rows))}`}
+                                    className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+                                >
+                                    {t("page.import_export.next.dashboard")}
+                                </Link>
+                                <Link
+                                    href="/"
+                                    className="inline-flex items-center gap-2 rounded-lg border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-100 dark:border-green-700 dark:bg-gray-900 dark:text-green-300 dark:hover:bg-green-950/30"
+                                >
+                                    {t("page.import_export.next.explorer")}
+                                </Link>
+                                <p className="w-full text-xs text-green-700 dark:text-green-400">
+                                    {t("page.import_export.next.hint")}
+                                </p>
                             </div>
                         </div>
                     )}
