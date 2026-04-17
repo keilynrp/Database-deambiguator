@@ -76,12 +76,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_API_URL: ${DOCKER_FRONTEND_API_URL:-http://ukip-backend:8000}
     restart: unless-stopped
     depends_on:
       - ukip-backend
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      NEXT_PUBLIC_API_URL: ${DOCKER_FRONTEND_API_URL:-http://ukip-backend:8000}
     ports:
       - "3004:3004"
 
