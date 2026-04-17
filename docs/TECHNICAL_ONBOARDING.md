@@ -94,10 +94,23 @@ Piensa el sistema en 5 capas:
 
 ## 6. Primer arranque local
 
+Ruta recomendada de trabajo local:
+
+- en Windows, usa `start.bat` como camino principal para desarrollo diario
+- usa Docker Compose sobre todo para PostgreSQL local, validacion de staging y despliegue
+
 ### Windows rapido
 
 ```bat
 start.bat
+```
+
+Tambien puedes reiniciar servicios puntuales:
+
+```bat
+start.bat restart-backend
+start.bat restart-frontend
+start.bat restart-all
 ```
 
 ### Manual
@@ -122,7 +135,7 @@ docker compose -f docker-compose.dev.yml up -d postgres
 
 ### Arranque full Docker
 
-Si quieres correr todo dentro de Docker:
+Si quieres correr todo dentro de Docker para staging, validacion de despliegue o produccion:
 
 ```bash
 cp .env.example .env

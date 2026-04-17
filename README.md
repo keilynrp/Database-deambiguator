@@ -252,9 +252,29 @@ Operational note:
 
 ## Quick Start
 
+### Recommended local development path
+
+For day-to-day development on Windows, the recommended path is the local launcher:
+
+```bat
+start.bat
+```
+
+Useful variants:
+
+```bat
+start.bat restart-backend
+start.bat restart-frontend
+start.bat restart-all
+```
+
+This gives the fastest feedback loop for product work and avoids local Docker networking friction while you iterate on the backend and frontend.
+
+If you prefer the manual path, see [docs/TECHNICAL_ONBOARDING.md](docs/TECHNICAL_ONBOARDING.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
+
 ### Docker stack
 
-Use Docker when you want the full stack wired together with container-safe defaults.
+Use Docker when you want the full stack wired together with container-safe defaults for staging, deployment validation, or production-oriented runs.
 
 ```bash
 cp .env.example .env

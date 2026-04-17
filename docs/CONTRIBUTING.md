@@ -4,6 +4,11 @@ Thank you for your interest in contributing to **UKIP — Universal Knowledge In
 
 ## Development Setup
 
+Recommended local workflow:
+
+- use `start.bat` for day-to-day Windows development
+- use Docker Compose primarily for PostgreSQL, staging validation, and deployment-oriented testing
+
 ### Prerequisites
 
 - Python 3.10+
@@ -49,9 +54,25 @@ npm run dev
 
 The frontend runs at `http://localhost:3004` and the backend at `http://localhost:8000`.
 
+### Windows fast path
+
+For the usual local development loop on Windows, prefer:
+
+```bat
+start.bat
+```
+
+Useful restart modes:
+
+```bat
+start.bat restart-backend
+start.bat restart-frontend
+start.bat restart-all
+```
+
 ### Docker workflow
 
-When you want the full stack in containers:
+When you want the full stack in containers for staging, deployment validation, or production-like runs:
 
 ```bash
 cp .env.example .env
