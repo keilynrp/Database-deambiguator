@@ -228,8 +228,8 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center border-b border-gray-200 bg-white/80 shadow-sm backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/80">
-      <div className="flex w-full items-center justify-between px-4 lg:px-6">
-        <div className="flex items-center gap-3">
+      <div className="flex w-full min-w-0 items-center justify-between gap-3 px-4 lg:px-6">
+        <div className="flex min-w-0 items-center gap-3">
           {/* Mobile hamburger — hidden on desktop */}
           <button
             onClick={toggleMobile}
@@ -240,16 +240,16 @@ export default function Header() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
           </button>
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-semibold text-gray-900 dark:text-white">
               {t(page.titleKey) === page.titleKey ? page.titleFallback : t(page.titleKey)}
             </h1>
-            <p className="hidden text-xs text-gray-500 dark:text-gray-400 sm:block">
+            <p className="hidden truncate text-xs text-gray-500 dark:text-gray-400 sm:block">
               {(t(page.subtitleKey) === page.subtitleKey ? page.subtitleFallback : t(page.subtitleKey)) || branding.platform_name}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 shrink-0 items-center gap-2 lg:gap-3">
           <button
             onClick={togglePilotMode}
             className={`hidden rounded-full px-3 py-1 text-xs font-semibold transition-colors md:inline-flex ${
@@ -265,20 +265,20 @@ export default function Header() {
           {/* Global search */}
           <GlobalSearch />
 
-          <div className="h-6 w-px bg-gray-200 dark:bg-gray-800" />
+          <div className="hidden h-6 w-px bg-gray-200 dark:bg-gray-800 lg:block" />
 
           {/* Domain Selector */}
-          <div className="flex items-center gap-2">
-            <span className="hidden text-sm font-medium text-gray-500 dark:text-gray-400 lg:inline">{t("header.workspace.label")}</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="hidden text-sm font-medium text-gray-500 dark:text-gray-400 xl:inline">{t("header.workspace.label")}</span>
             {isLoading ? (
-              <div className="h-9 w-40 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800"></div>
+              <div className="h-9 w-28 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800 xl:w-40"></div>
             ) : (
               <select
                 id="workspace-select"
                 value={activeDomainId}
                 onChange={(e) => setActiveDomainId(e.target.value)}
                 aria-label={t("header.workspace.aria")}
-                className="h-9 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-50 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+                className="h-9 max-w-[8rem] cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-50 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 sm:max-w-[10rem] xl:max-w-none"
               >
                 {domains.map((domain) => (
                   <option key={domain.id} value={domain.id}>
@@ -289,7 +289,7 @@ export default function Header() {
             )}
           </div>
 
-          <div className="h-6 w-px bg-gray-200 dark:bg-gray-800" />
+          <div className="hidden h-6 w-px bg-gray-200 dark:bg-gray-800 lg:block" />
 
           {/* Theme toggle */}
           <button

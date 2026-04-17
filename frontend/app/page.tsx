@@ -32,6 +32,8 @@ type GuidedStage = {
   status: "done" | "current" | "upcoming";
 };
 
+type GuidedReadiness = "starting" | "building" | "review" | "briefing";
+
 export default function Home() {
   const [viewMode, setViewMode] = useState<"table" | "variants">("table");
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -110,6 +112,34 @@ export default function Home() {
       hint: t("page.home.guided.next.brief.hint"),
     };
   }, [enrichPct, hasEntities, t]);
+
+  const guidedProgress = useMemo(() => {
+    const completed = guidedStages.filter((stage) => stage.status === "done").length;
+    const currentStage = guidedStages.find((stage) => stage.status === "current") ?? guidedStages[guidedStages.length - 1];
+
+    let percent = 5;
+    let readiness: GuidedReadiness = "starting";
+
+    if (hasEntities) {
+      if (enrichPct < 30) {
+        percent = 25 + Math.round((Math.max(enrichPct, 0) / 30) * 25);
+        readiness = "building";
+      } else if (enrichPct < 60) {
+        percent = 50 + Math.round(((enrichPct - 30) / 30) * 25);
+        readiness = "review";
+      } else {
+        percent = 75 + Math.round(Math.min((enrichPct - 60) / 40, 1) * 15);
+        readiness = "briefing";
+      }
+    }
+
+    return {
+      percent: Math.max(0, Math.min(percent, 90)),
+      completed,
+      currentStage,
+      readiness,
+    };
+  }, [enrichPct, guidedStages, hasEntities]);
 
   const fetchDemoStatus = useCallback(async () => {
     try {
@@ -310,8 +340,8 @@ export default function Home() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div className="max-w-2xl">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-600 dark:text-sky-400">
                 {t("page.home.guided.eyebrow")}
               </p>
@@ -322,9 +352,47 @@ export default function Home() {
                 {t("page.home.guided.description")}
               </p>
             </div>
-            <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
-              {t("page.home.guided.workspace_stage")}
-            </span>
+            <div className="min-w-[280px] rounded-2xl border border-sky-200 bg-sky-50/80 p-4 dark:border-sky-900/40 dark:bg-sky-950/20 xl:max-w-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                    {t("page.home.guided.progress.title")}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                    {t(`page.home.guided.readiness.${guidedProgress.readiness}`)}
+                  </p>
+                </div>
+                <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-sky-700 shadow-sm dark:bg-slate-900 dark:text-sky-300">
+                  {guidedProgress.percent}%
+                </span>
+              </div>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-sky-100 dark:bg-slate-800">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-sky-500 to-violet-500 transition-all"
+                  style={{ width: `${guidedProgress.percent}%` }}
+                />
+              </div>
+              <div className="mt-3 grid gap-2 text-xs text-slate-600 dark:text-slate-400 sm:grid-cols-3 xl:grid-cols-1">
+                <div className="rounded-xl bg-white px-3 py-2 dark:bg-slate-900/80">
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">
+                    {t("page.home.guided.progress.stage_count", { completed: guidedProgress.completed, total: guidedStages.length })}
+                  </p>
+                  <p>{t("page.home.guided.progress.stage_count_hint")}</p>
+                </div>
+                <div className="rounded-xl bg-white px-3 py-2 dark:bg-slate-900/80">
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">
+                    {t(`page.home.guided.step.${guidedProgress.currentStage.id}.title`)}
+                  </p>
+                  <p>{t("page.home.guided.progress.current_stage")}</p>
+                </div>
+                <div className="rounded-xl bg-white px-3 py-2 dark:bg-slate-900/80">
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">
+                    {Math.round(enrichPct)}% · {(stats?.total_entities ?? 0).toLocaleString()}
+                  </p>
+                  <p>{t("page.home.guided.progress.coverage_hint")}</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
