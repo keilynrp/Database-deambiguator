@@ -73,6 +73,7 @@ export default function Sidebar() {
   // On mobile: full-width drawer, hidden until mobileOpen
   const desktopWidth = collapsed ? "lg:w-20" : "lg:w-64";
   const mobileTranslate = mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0";
+  const compactDesktop = collapsed && !mobileOpen;
 
   return (
     <>
@@ -86,21 +87,34 @@ export default function Sidebar() {
       )}
 
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-screen w-72 flex-col border-r border-gray-200 bg-white transition-transform duration-300 dark:border-gray-800 dark:bg-gray-900 lg:w-auto ${desktopWidth} ${mobileTranslate}`}
+        className={`fixed left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width,transform] duration-300 ease-out dark:border-gray-800 dark:bg-gray-900 lg:w-64 ${desktopWidth} ${mobileTranslate}`}
       >
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between border-b border-gray-200 px-6 dark:border-gray-800">
-          {(!collapsed || mobileOpen) && (
-            <Link href="/" className="flex items-center gap-2" onClick={closeMobile}>
-              <LogoIcon branding={branding} size={8} />
-              <span className="text-base font-semibold text-gray-900 dark:text-white">{branding.platform_name}</span>
-            </Link>
-          )}
+        <div
+          className={`relative flex h-16 items-center border-b border-gray-200 dark:border-gray-800 ${
+            compactDesktop ? "justify-center px-3" : "justify-between px-6"
+          }`}
+        >
+          <Link
+            href="/"
+            className={`flex min-w-0 items-center ${compactDesktop ? "justify-center" : "gap-2"}`}
+            onClick={closeMobile}
+            aria-label={branding.platform_name}
+          >
+            <LogoIcon branding={branding} size={8} />
+            {!compactDesktop && (
+              <span className="truncate text-base font-semibold text-gray-900 transition-opacity duration-200 dark:text-white">
+                {branding.platform_name}
+              </span>
+            )}
+          </Link>
           {/* Desktop collapse toggle — hidden on mobile */}
           <button
             onClick={toggle}
             aria-label={collapsed ? tr("sidebar.expand", "Expand sidebar") : tr("sidebar.collapse", "Collapse sidebar")}
-            className="hidden rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:block"
+            className={`hidden rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:block ${
+              compactDesktop ? "absolute right-2 top-1/2 -translate-y-1/2" : ""
+            }`}
           >
             <svg className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {collapsed ? (
@@ -123,10 +137,10 @@ export default function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-4 py-4">
+        <nav className={`flex-1 overflow-y-auto py-4 ${compactDesktop ? "px-3" : "px-4"}`}>
           {visibleSections.map((section, sectionIdx) => (
             <div key={section.header} className={sectionIdx > 0 ? "mt-6" : ""}>
-              {collapsed && !mobileOpen ? (
+              {compactDesktop ? (
                 sectionIdx > 0 && <div className="mx-3 mb-3 h-px bg-gray-200 dark:bg-gray-800" />
               ) : (
                 <div className="mb-2 px-3">
@@ -146,17 +160,21 @@ export default function Sidebar() {
                       <Link
                         href={item.href}
                         onClick={closeMobile}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                        className={`flex items-center rounded-lg py-2.5 text-sm font-medium transition-[background-color,color,padding] duration-200 ${
+                          compactDesktop ? "justify-center px-2" : "gap-3 px-3"
+                        } ${
                           isActive
                             ? "bg-blue-50 text-blue-600 dark:bg-blue-600/10 dark:text-blue-400"
                             : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                         }`}
                         title={collapsed && !mobileOpen ? t(item.translationKey) : undefined}
                       >
-                        <span className={isActive ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}>
+                        <span
+                          className={`shrink-0 ${isActive ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`}
+                        >
                           {item.icon}
                         </span>
-                        {(!collapsed || mobileOpen) && t(item.translationKey)}
+                        {!compactDesktop && <span className="truncate">{t(item.translationKey)}</span>}
                       </Link>
                     </li>
                   );
@@ -167,8 +185,8 @@ export default function Sidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-4 py-4 dark:border-gray-800">
-          {(!collapsed || mobileOpen) ? (
+        <div className={`border-t border-gray-200 py-4 dark:border-gray-800 ${compactDesktop ? "px-3" : "px-4"}`}>
+          {!compactDesktop ? (
             <div className="space-y-3">
               <button
                 onClick={togglePilotMode}
@@ -210,7 +228,9 @@ export default function Sidebar() {
             </div>
           ) : (
             <div className="flex justify-center">
-              <span className="text-xs font-bold text-gray-400">U</span>
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                U
+              </span>
             </div>
           )}
         </div>

@@ -43,14 +43,14 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     <div className="flex min-h-screen">
       <Sidebar />
       <div
-        className={`flex flex-1 flex-col transition-all duration-300 ${
+        className={`flex min-w-0 flex-1 flex-col transition-[margin] duration-300 ease-out ${
           collapsed ? "lg:ml-20" : "lg:ml-64"
         }`}
       >
         <Header />
-        <main className="flex-1 bg-gray-50 p-4 transition-all duration-300 dark:bg-gray-950 lg:p-6">
+        <main className="flex-1 bg-gray-50 p-4 dark:bg-gray-950 lg:p-6">
           <div
-            className={`mx-auto transition-all duration-300 ${
+            className={`mx-auto transition-[max-width] duration-300 ease-out ${
               collapsed ? "max-w-none" : "max-w-7xl"
             }`}
           >
