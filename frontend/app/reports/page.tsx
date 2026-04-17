@@ -110,6 +110,20 @@ export default function ReportsPage() {
     { value: "excel", label: "Excel",      desc: tr("page.reports.format.excel", "Multi-sheet workbook with KPIs, entities & concepts"), icon: "📊" },
     { value: "pptx",  label: "PowerPoint", desc: tr("page.reports.format.pptx", "Branded slide deck for presentations"), icon: "📑" },
   ]), [tr]);
+  const activeBenchmarkProfile = useMemo(
+    () => benchmarkProfiles.find((profile) => profile.id === selectedBenchmarkProfile) ?? null,
+    [benchmarkProfiles, selectedBenchmarkProfile],
+  );
+  const benchmarkProfileNarrative = useMemo(() => {
+    if (!activeBenchmarkProfile) {
+      return t("page.reports.benchmark_profile_pending");
+    }
+    return t("page.reports.benchmark_profile_summary", {
+      name: activeBenchmarkProfile.name,
+      rules: activeBenchmarkProfile.rules_count,
+      region: activeBenchmarkProfile.region,
+    });
+  }, [activeBenchmarkProfile, t]);
   const briefChecklist = useMemo(() => {
     const hasEnoughSections = selected.size >= 4;
     const usingBriefPreset = preset === "pilot-brief";
@@ -661,6 +675,12 @@ export default function ReportsPage() {
                 <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
                   Used when the institutional benchmark section is part of the brief.
                 </p>
+                <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-3 text-xs text-violet-900 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-100">
+                  <p className="font-semibold">
+                    {t("page.reports.benchmark_profile_active")}
+                  </p>
+                  <p className="mt-1">{benchmarkProfileNarrative}</p>
+                </div>
               </div>
             </div>
           </div>

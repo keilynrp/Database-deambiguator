@@ -55,6 +55,9 @@ tr:last-child td { border-bottom: none; }
 .badge-red    { background: #fee2e2; color: #991b1b; }
 .chip { display: inline-block; margin: 2px; padding: 3px 10px; border-radius: 9999px;
         font-size: 12px; background: #eff6ff; color: #1d4ed8; }
+.callout { border-radius: 12px; padding: 16px; margin: 16px 0; border: 1px solid #e5e7eb; background: #f9fafb; }
+.callout h3 { font-size: 13px; font-weight: 700; color: #111827; margin-bottom: 6px; }
+.callout p { font-size: 13px; color: #4b5563; line-height: 1.6; }
 footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e5e7eb;
          font-size: 12px; color: #9ca3af; text-align: center; }
 @media print {
@@ -316,6 +319,7 @@ def _section_institutional_benchmark(
     )
     benchmark = snapshot.get("institutional_benchmark") or {}
     top_gaps = benchmark.get("top_gaps") or []
+    rules = benchmark.get("rules") or []
 
     status = benchmark.get("status", "watch")
     status_badge = {
@@ -323,6 +327,33 @@ def _section_institutional_benchmark(
         "watch": '<span class="badge badge-blue">Watch</span>',
         "gap": '<span class="badge badge-amber">Gap</span>',
     }.get(status, '<span class="badge badge-gray">Unknown</span>')
+    readiness_pct = round(float(benchmark.get("readiness_pct") or 0))
+    passed_rules = benchmark.get("passed_rules", 0)
+    total_rules = benchmark.get("total_rules", 0)
+
+    if status == "ready":
+        benchmark_summary = (
+            "This benchmark profile is currently in a ready state. "
+            "The dataset is strong enough for a first stakeholder-facing interpretation with relatively limited benchmark risk."
+        )
+    elif status == "watch":
+        benchmark_summary = (
+            "This benchmark profile is in a watch state. "
+            "The dataset already supports early interpretation, but important gaps still make the benchmark better suited for internal review than final external positioning."
+        )
+    else:
+        benchmark_summary = (
+            "This benchmark profile is currently showing a material gap. "
+            "The benchmark is still useful as a directional baseline, but the current dataset should not be treated as fully decision-ready without additional enrichment or cleanup."
+        )
+
+    top_gap_text = ""
+    if top_gaps:
+        lead_gap = top_gaps[0]
+        top_gap_text = (
+            f"The main constraint right now is {lead_gap['label'].lower()}, "
+            f"with evidence: {lead_gap['evidence']}"
+        )
 
     cards = f"""
         <div class="stat-card">
@@ -332,8 +363,8 @@ def _section_institutional_benchmark(
         </div>
         <div class="stat-card">
             <div class="label">Readiness</div>
-            <div class="value">{round(float(benchmark.get("readiness_pct") or 0))}%</div>
-            <div class="sub">{benchmark.get("passed_rules", 0)} of {benchmark.get("total_rules", 0)} rules satisfied</div>
+            <div class="value">{readiness_pct}%</div>
+            <div class="sub">{passed_rules} of {total_rules} rules satisfied</div>
         </div>
         <div class="stat-card">
             <div class="label">Status</div>
@@ -342,22 +373,48 @@ def _section_institutional_benchmark(
         </div>
     """
 
+    callout = f"""
+        <div class="callout">
+            <h3>Executive reading</h3>
+            <p>{benchmark_summary}</p>
+            {'<p style="margin-top:8px">' + top_gap_text + '</p>' if top_gap_text else ''}
+        </div>
+    """
+
     rows = "".join(
         f"""
         <tr>
             <td>{gap["label"]}</td>
-            <td>{gap["priority"]}</td>
+            <td><span class="badge {'badge-red' if gap['priority'] == 'high' else 'badge-amber' if gap['priority'] == 'medium' else 'badge-gray'}">{gap["priority"]}</span></td>
             <td>{gap["evidence"]}</td>
         </tr>"""
         for gap in top_gaps
     )
 
+    rule_rows = "".join(
+        f"""
+        <tr>
+            <td>{rule["label"]}</td>
+            <td>{rule["observed"]}</td>
+            <td>{rule["threshold"]}</td>
+            <td>{'<span class="badge badge-green">Passed</span>' if rule["passed"] else '<span class="badge badge-amber">Below threshold</span>'}</td>
+            <td>{rule["message"]}</td>
+        </tr>"""
+        for rule in rules
+    )
+
     return f"""<section>
     <h2>Institutional Benchmark</h2>
     <div class="grid">{cards}</div>
+    {callout}
     <table>
         <thead><tr><th>Gap</th><th>Priority</th><th>Evidence</th></tr></thead>
         <tbody>{rows if rows else '<tr><td colspan="3" style="color:#9ca3af;text-align:center;padding:20px">No major benchmark gaps detected.</td></tr>'}</tbody>
+    </table>
+    <div style="height:16px"></div>
+    <table>
+        <thead><tr><th>Rule</th><th>Observed</th><th>Threshold</th><th>Status</th><th>Interpretation</th></tr></thead>
+        <tbody>{rule_rows if rule_rows else '<tr><td colspan="5" style="color:#9ca3af;text-align:center;padding:20px">No benchmark rules available.</td></tr>'}</tbody>
     </table>
 </section>"""
 

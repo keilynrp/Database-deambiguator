@@ -394,6 +394,14 @@ export default function ExecutiveDashboardPage() {
     data.institutional_benchmark.status === "ready" ? toneStyles.emerald :
     data.institutional_benchmark.status === "watch" ? toneStyles.violet :
     toneStyles.amber;
+  const benchmarkNarrative =
+    !data ? "" :
+    data.institutional_benchmark.status === "ready"
+      ? tr("page.exec_dashboard.benchmark_narrative.ready", "This benchmark is in a ready state. The current dataset is strong enough for a first stakeholder-facing interpretation.")
+      : data.institutional_benchmark.status === "watch"
+        ? tr("page.exec_dashboard.benchmark_narrative.watch", "This benchmark is in a watch state. The signal is already useful, but there are still gaps that make the reading better suited for internal review than final external positioning.")
+        : tr("page.exec_dashboard.benchmark_narrative.gap", "This benchmark is currently showing a material gap. It still helps as a directional baseline, but the dataset should not yet be treated as fully decision-ready.");
+  const leadingGap = data?.institutional_benchmark?.top_gaps?.[0] ?? null;
   const signalToneStyles: Record<"high" | "medium" | "low", string> = {
     high: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-200",
     medium: "border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-500/20 dark:bg-violet-500/5 dark:text-violet-200",
@@ -602,6 +610,24 @@ export default function ExecutiveDashboardPage() {
                   total: data.institutional_benchmark.total_rules,
                 })}
               </p>
+              <div className="mt-4 rounded-2xl bg-white/80 p-4 shadow-sm dark:bg-gray-900/70">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                  {tr("page.exec_dashboard.benchmark_reading_title", "Executive reading")}
+                </p>
+                <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                  {benchmarkNarrative}
+                </p>
+                {leadingGap && (
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    {tr("page.exec_dashboard.benchmark_leading_gap", "Main current constraint")}:{" "}
+                    <span className="font-semibold text-gray-700 dark:text-gray-300">
+                      {translateRuleLabel(leadingGap.id, leadingGap.label)}
+                    </span>
+                    {" — "}
+                    {translateRuleMessage(data.institutional_benchmark.profile_id, leadingGap.id, leadingGap.passed, leadingGap.message)}
+                  </p>
+                )}
+              </div>
             </div>
             <div className="min-w-[180px] rounded-2xl bg-white/80 p-4 text-center shadow-sm dark:bg-gray-900/70">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
