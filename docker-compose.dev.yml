@@ -1,5 +1,3 @@
-version: "3.9"
-
 # ── UKIP — Development docker-compose ───────────────────────────────────────
 # Development-focused compose file aligned with the production PostgreSQL path.
 #

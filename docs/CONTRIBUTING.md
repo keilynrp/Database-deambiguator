@@ -49,6 +49,36 @@ npm run dev
 
 The frontend runs at `http://localhost:3004` and the backend at `http://localhost:8000`.
 
+### Docker workflow
+
+When you want the full stack in containers:
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+Use the Docker-specific variables for container networking:
+
+- `DOCKER_DATABASE_URL`
+- `DOCKER_POSTGRES_HOST`
+- `DOCKER_POSTGRES_PORT`
+- `DOCKER_POSTGRES_DB`
+- `DOCKER_POSTGRES_USER`
+- `DOCKER_POSTGRES_PASSWORD`
+- `DOCKER_FRONTEND_API_URL`
+
+Do not point container services at `127.0.0.1` unless you intentionally mean the container itself.
+
+Rebuild guidance:
+
+- backend code or backend image inputs changed:
+  - `docker compose up -d --build ukip-backend`
+- frontend code or `NEXT_PUBLIC_*` build args changed:
+  - `docker compose up -d --build ukip-frontend`
+- runtime env only changed:
+  - `docker compose up -d --force-recreate <service>`
+
 PDF export note:
 - `weasyprint` is included in `requirements.lock`, but on Windows it also needs native GTK libraries.
 - If `/exports/pdf` reports missing runtime libraries, install the GTK runtime and restart the backend, or use Docker/Linux for PDF generation.

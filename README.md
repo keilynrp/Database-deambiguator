@@ -252,6 +252,41 @@ Operational note:
 
 ## Quick Start
 
+### Docker stack
+
+Use Docker when you want the full stack wired together with container-safe defaults.
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+Services:
+
+- Frontend: `http://localhost:3004`
+- Backend API: `http://localhost:8000`
+- API docs: `http://localhost:8000/docs`
+
+Important environment split:
+
+- `DATABASE_URL` / `POSTGRES_*` are for host-local development.
+- `DOCKER_DATABASE_URL` / `DOCKER_POSTGRES_*` are for container networking.
+- `DOCKER_FRONTEND_API_URL` is the internal backend URL used by the frontend container and should normally stay `http://ukip-backend:8000`.
+
+### Docker rebuild vs recreate
+
+Use these rules to avoid stale containers:
+
+- Backend env or Python code changed:
+  - `docker compose up -d --build ukip-backend`
+- Frontend source or `NEXT_PUBLIC_*` changed:
+  - `docker compose up -d --build ukip-frontend`
+- Only runtime env changed and the image itself is still correct:
+  - `docker compose up -d --force-recreate ukip-backend`
+  - `docker compose up -d --force-recreate ukip-frontend`
+
+If a bcrypt hash is stored in `ADMIN_PASSWORD_HASH` inside `.env`, escape `$` as `$$` so Docker Compose does not try to interpolate it.
+
 ### Prerequisites
 - [Python 3.10+](https://www.python.org/downloads/)
 - [Node.js 18+](https://nodejs.org/)

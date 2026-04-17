@@ -1,5 +1,3 @@
-version: "3.9"
-
 # ── UKIP — Universal Knowledge Intelligence Platform ─────────────────────────
 # Production-ready docker-compose with PostgreSQL 16.
 #

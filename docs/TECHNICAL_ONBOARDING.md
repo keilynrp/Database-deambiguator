@@ -90,7 +90,7 @@ Piensa el sistema en 5 capas:
 - React 19
 - Tailwind 4
 - Browser -> llama via `/api/backend/*`
-- SSR -> usa `NEXT_PUBLIC_API_URL`
+- SSR -> usa `NEXT_PUBLIC_API_URL` en host-local y `DOCKER_FRONTEND_API_URL` dentro del contenedor
 
 ## 6. Primer arranque local
 
@@ -119,6 +119,48 @@ Si Docker vive solo en WSL Ubuntu, levanta PostgreSQL desde el repo montado en W
 cd /mnt/d/universal-knowledge-intelligence-platform
 docker compose -f docker-compose.dev.yml up -d postgres
 ```
+
+### Arranque full Docker
+
+Si quieres correr todo dentro de Docker:
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+Variables importantes:
+
+- host-local:
+  - `DATABASE_URL`
+  - `POSTGRES_HOST`
+  - `POSTGRES_PORT`
+  - `POSTGRES_DB`
+  - `POSTGRES_USER`
+  - `POSTGRES_PASSWORD`
+- Docker:
+  - `DOCKER_DATABASE_URL`
+  - `DOCKER_POSTGRES_HOST`
+  - `DOCKER_POSTGRES_PORT`
+  - `DOCKER_POSTGRES_DB`
+  - `DOCKER_POSTGRES_USER`
+  - `DOCKER_POSTGRES_PASSWORD`
+  - `DOCKER_FRONTEND_API_URL`
+
+Regla simple:
+
+- si el proceso corre en tu host, usa variables normales
+- si corre dentro de Compose, usa variables `DOCKER_*`
+
+### Cuándo rebuild vs recreate
+
+- cambios de Python o imagen backend:
+  - `docker compose up -d --build ukip-backend`
+- cambios de frontend o `NEXT_PUBLIC_*`:
+  - `docker compose up -d --build ukip-frontend`
+- solo cambió entorno/runtime:
+  - `docker compose up -d --force-recreate ukip-backend`
+  - `docker compose up -d --force-recreate ukip-frontend`
 
 Las migraciones ya no corren al importar `backend.main`; el upgrade de schema es un paso explicito de arranque.
 
@@ -153,6 +195,17 @@ URLs habituales:
 Del backend:
 
 - `DATABASE_URL`
+- `DOCKER_DATABASE_URL`
+- `POSTGRES_HOST`
+- `POSTGRES_PORT`
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `DOCKER_POSTGRES_HOST`
+- `DOCKER_POSTGRES_PORT`
+- `DOCKER_POSTGRES_DB`
+- `DOCKER_POSTGRES_USER`
+- `DOCKER_POSTGRES_PASSWORD`
 - `JWT_SECRET_KEY`
 - `ENCRYPTION_KEY`
 - `ADMIN_USERNAME`
@@ -166,6 +219,7 @@ Del backend:
 Del frontend:
 
 - `NEXT_PUBLIC_API_URL`
+- `DOCKER_FRONTEND_API_URL`
 
 ## 7.1 Dependencias reproducibles
 
