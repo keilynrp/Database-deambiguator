@@ -17,6 +17,88 @@ from backend.schema_registry import registry
 from backend.services.analytics_service import AnalyticsService
 from backend.tenant_access import scope_query_to_org
 
+_STAKEHOLDER_PROFILES = {
+    "leadership": {
+        "label": "Leadership / Strategy",
+        "focus": "decision readiness, strategic risk, and institutional positioning",
+        "brief_hint": "Use this lens when the audience needs a concise readout of readiness, confidence, and next executive moves.",
+    },
+    "research_office": {
+        "label": "Research Office",
+        "focus": "portfolio quality, benchmark progress, and operational follow-through",
+        "brief_hint": "Use this lens when the audience needs to understand what to improve in the dataset and which actions strengthen research reporting.",
+    },
+    "library": {
+        "label": "Library / Metadata",
+        "focus": "metadata quality, authority control, and catalog reliability",
+        "brief_hint": "Use this lens when the audience cares most about normalization quality, authority review, and trust in the underlying records.",
+    },
+    "innovation": {
+        "label": "Innovation / Transfer",
+        "focus": "high-impact entities, signals worth following, and portfolio narratives that support opportunity scanning",
+        "brief_hint": "Use this lens when the audience wants a faster read on standout outputs, concentration areas, and next exploratory opportunities.",
+    },
+}
+
+
+def _stakeholder_profile(profile_id: str | None) -> dict[str, str]:
+    return _STAKEHOLDER_PROFILES.get(profile_id or "leadership", _STAKEHOLDER_PROFILES["leadership"])
+
+
+def _section_stakeholder_reading(
+    db: Session,
+    domain_id: str,
+    org_id: int | None,
+    benchmark_profile_id: str | None = None,
+    benchmark_org: models.Organization | None = None,
+    stakeholder_profile: str | None = None,
+) -> str:
+    snapshot = AnalyticsService.get_domain_snapshot(
+        db,
+        TopicAnalyzer(),
+        domain_id,
+        org_id=org_id,
+        benchmark_org=benchmark_org,
+        benchmark_profile_id=benchmark_profile_id,
+        top_n_concepts=5,
+        top_n_entities=3,
+    )
+    stakeholder = _stakeholder_profile(stakeholder_profile)
+    benchmark = snapshot.get("institutional_benchmark") or {}
+    quality = snapshot.get("quality") or {}
+    kpis = snapshot.get("kpis") or {}
+    actions = snapshot.get("recommended_actions") or []
+    top_entity = (snapshot.get("top_entities") or [None])[0]
+
+    benchmark_status = benchmark.get("status", "watch")
+    readiness_pct = round(float(benchmark.get("readiness_pct") or 0))
+    quality_avg = round(float(quality.get("average") or 0))
+    coverage_pct = round(float(kpis.get("enrichment_pct") or 0))
+
+    if benchmark_status == "ready":
+        stance = "The dataset is already in a comparatively strong position for a first stakeholder-facing conversation."
+    elif benchmark_status == "watch":
+        stance = "The dataset already supports directional interpretation, but it still carries enough uncertainty that the audience should treat this brief as an informed internal read rather than a final position."
+    else:
+        stance = "The dataset is best treated as an early baseline. It already surfaces useful directional patterns, but it is not yet robust enough for a high-confidence external narrative."
+
+    action_text = actions[0]["title"] if actions else "Continue strengthening enrichment coverage and record quality before broad circulation."
+    top_entity_text = ""
+    if top_entity:
+        top_entity_text = f"The highest-impact visible entity right now is {top_entity.get('entity_name') or top_entity.get('primary_label') or 'the current lead record'}, which can anchor a concrete stakeholder discussion."
+
+    return f"""<section>
+    <h2>Stakeholder Reading</h2>
+    <div class="callout">
+        <h3>{stakeholder["label"]}</h3>
+        <p>This brief is being framed for {stakeholder["focus"]}. {stakeholder["brief_hint"]}</p>
+        <p style="margin-top:8px">{stance}</p>
+        <p style="margin-top:8px">Current benchmark readiness is <b>{readiness_pct}%</b>, average quality is <b>{quality_avg}%</b>, and enrichment coverage is <b>{coverage_pct}%</b>.</p>
+        {'<p style="margin-top:8px">' + top_entity_text + '</p>' if top_entity_text else ''}
+        <p style="margin-top:8px"><b>Recommended emphasis:</b> {action_text}</p>
+    </div>
+</section>"""
+
 # ── CSS (inline, print-friendly) ─────────────────────────────────────────────
 
 _CSS = """
@@ -449,6 +531,7 @@ def build(
     org_id: int | None = None,
     benchmark_profile_id: str | None = None,
     benchmark_org: models.Organization | None = None,
+    stakeholder_profile: str | None = None,
 ) -> str:
     """Return a complete, self-contained HTML report string."""
     domain_name = domain_id
@@ -460,6 +543,7 @@ def build(
 
     report_title = title or f"UKIP Report — {domain_name}"
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    stakeholder = _stakeholder_profile(stakeholder_profile)
 
     logo_svg = """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
@@ -472,9 +556,19 @@ def build(
         </div>
         <h1>{report_title}</h1>
         <p class="meta">Domain: <b>{domain_name}</b> &nbsp;·&nbsp; Generated: <b>{generated_at}</b></p>
+        <p class="meta" style="margin-top:8px">Stakeholder lens: <b>{stakeholder["label"]}</b></p>
     </div>"""
 
-    body_sections = []
+    body_sections = [
+        _section_stakeholder_reading(
+            db,
+            domain_id,
+            org_id,
+            benchmark_profile_id=benchmark_profile_id,
+            benchmark_org=benchmark_org,
+            stakeholder_profile=stakeholder_profile,
+        )
+    ]
     for sec in sections:
         builder = SECTION_BUILDERS.get(sec)
         if builder:

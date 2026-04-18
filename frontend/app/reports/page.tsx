@@ -37,6 +37,8 @@ interface BenchmarkProfile {
   is_default: boolean;
 }
 
+type StakeholderProfile = "leadership" | "research_office" | "library" | "innovation";
+
 const SECTION_ICONS: Record<string, string> = {
   institutional_benchmark: "🏛️",
   entity_stats:         "📊",
@@ -79,6 +81,7 @@ export default function ReportsPage() {
   const [presetApplied, setPresetApplied] = useState(false);
   const [benchmarkProfiles, setBenchmarkProfiles] = useState<BenchmarkProfile[]>([]);
   const [selectedBenchmarkProfile, setSelectedBenchmarkProfile] = useState("research_portfolio_baseline");
+  const [selectedStakeholderProfile, setSelectedStakeholderProfile] = useState<StakeholderProfile>("leadership");
 
   const preset = searchParams.get("preset");
   const presetDomain = searchParams.get("domain");
@@ -86,6 +89,7 @@ export default function ReportsPage() {
   const presetTitle = searchParams.get("title");
   const presetFormat = searchParams.get("format");
   const presetBenchmarkProfile = searchParams.get("benchmark_profile");
+  const presetStakeholderProfile = searchParams.get("stakeholder");
   const presetSections = useMemo(() => {
     const explicit = searchParams.get("sections");
     if (explicit) {
@@ -111,6 +115,29 @@ export default function ReportsPage() {
     { value: "excel", label: "Excel",      desc: tr("page.reports.format.excel", "Multi-sheet workbook with KPIs, entities & concepts"), icon: "📊" },
     { value: "pptx",  label: "PowerPoint", desc: tr("page.reports.format.pptx", "Branded slide deck for presentations"), icon: "📑" },
   ]), [tr]);
+  const stakeholderOptions: { value: StakeholderProfile; label: string; desc: string }[] = useMemo(() => ([
+    {
+      value: "leadership",
+      label: t("page.reports.stakeholder.leadership.label"),
+      desc: t("page.reports.stakeholder.leadership.desc"),
+    },
+    {
+      value: "research_office",
+      label: t("page.reports.stakeholder.research_office.label"),
+      desc: t("page.reports.stakeholder.research_office.desc"),
+    },
+    {
+      value: "library",
+      label: t("page.reports.stakeholder.library.label"),
+      desc: t("page.reports.stakeholder.library.desc"),
+    },
+    {
+      value: "innovation",
+      label: t("page.reports.stakeholder.innovation.label"),
+      desc: t("page.reports.stakeholder.innovation.desc"),
+    },
+  ]), [t]);
+  const activeStakeholder = stakeholderOptions.find((option) => option.value === selectedStakeholderProfile) ?? stakeholderOptions[0];
   const activeBenchmarkProfile = useMemo(
     () => benchmarkProfiles.find((profile) => profile.id === selectedBenchmarkProfile) ?? null,
     [benchmarkProfiles, selectedBenchmarkProfile],
@@ -154,7 +181,7 @@ export default function ReportsPage() {
     ];
   }, [format, preset, selected.size, t, title]);
   const briefReady = briefChecklist.filter((item) => item.done).length >= 3;
-  const presetHref = `/reports?preset=pilot-brief&domain=${encodeURIComponent(activeDomainId)}&format=pdf&benchmark_profile=${encodeURIComponent(selectedBenchmarkProfile)}`;
+  const presetHref = `/reports?preset=pilot-brief&domain=${encodeURIComponent(activeDomainId)}&format=pdf&benchmark_profile=${encodeURIComponent(selectedBenchmarkProfile)}&stakeholder=${encodeURIComponent(selectedStakeholderProfile)}`;
 
   // Fetch available sections from backend
   const loadSections = useCallback(async () => {
@@ -215,8 +242,16 @@ export default function ReportsPage() {
     if (presetBenchmarkProfile) {
       setSelectedBenchmarkProfile(presetBenchmarkProfile);
     }
+    if (
+      presetStakeholderProfile === "leadership"
+      || presetStakeholderProfile === "research_office"
+      || presetStakeholderProfile === "library"
+      || presetStakeholderProfile === "innovation"
+    ) {
+      setSelectedStakeholderProfile(presetStakeholderProfile);
+    }
     setPresetApplied(true);
-  }, [loadingSections, presetApplied, preset, presetBenchmarkProfile, presetFormat, presetSections, presetTitle, sections]);
+  }, [loadingSections, presetApplied, preset, presetBenchmarkProfile, presetFormat, presetSections, presetStakeholderProfile, presetTitle, sections]);
 
   const loadTemplates = useCallback(async () => {
     if (templates.length > 0) return; // already loaded
@@ -302,6 +337,7 @@ export default function ReportsPage() {
           sections: Array.from(selected),
           title: title.trim() || null,
           benchmark_profile_id: selectedBenchmarkProfile,
+          stakeholder_profile: selectedStakeholderProfile,
         }),
       });
       if (!res.ok) {
@@ -666,6 +702,31 @@ export default function ReportsPage() {
                     {t("page.reports.benchmark_profile_active")}
                   </p>
                   <p className="mt-1">{benchmarkProfileNarrative}</p>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                  {t("page.reports.stakeholder.label")}
+                </label>
+                <select
+                  value={selectedStakeholderProfile}
+                  onChange={(e) => setSelectedStakeholderProfile(e.target.value as StakeholderProfile)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                >
+                  {stakeholderOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                  {t("page.reports.stakeholder.help")}
+                </p>
+                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100">
+                  <p className="font-semibold">
+                    {activeStakeholder.label}
+                  </p>
+                  <p className="mt-1">{activeStakeholder.desc}</p>
                 </div>
               </div>
             </div>

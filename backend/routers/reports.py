@@ -87,6 +87,7 @@ class _ReportRequest(BaseModel):
     sections:  List[str]    = Field(default=_ALL_REPORT_SECTIONS, min_length=1, max_length=10)
     title:     Optional[str] = Field(default=None, max_length=200)
     benchmark_profile_id: Optional[str] = Field(default=None, max_length=80)
+    stakeholder_profile: Optional[str] = Field(default="leadership", max_length=80)
 
 
 @router.post("/reports/generate", tags=["reports"])
@@ -112,6 +113,7 @@ def generate_report(
         org_id=org_id,
         benchmark_profile_id=payload.benchmark_profile_id,
         benchmark_org=benchmark_org,
+        stakeholder_profile=payload.stakeholder_profile,
     )
     filename = (
         f"ukip_report_{payload.domain_id}_"
@@ -155,6 +157,7 @@ def export_pdf(
         org_id=org_id,
         benchmark_profile_id=payload.benchmark_profile_id,
         benchmark_org=benchmark_org,
+        stakeholder_profile=payload.stakeholder_profile,
     )
     pdf_bytes = _make_pdf(html)
     filename = (
