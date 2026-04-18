@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { PageHeader, StatCard, ErrorBanner, SkeletonCard, useToast } from "../../components/ui";
 import ConceptCloud from "../../components/ConceptCloud";
+import PilotFlowCard, { type PilotFlowStepId } from "../../components/PilotFlowCard";
 import { useDomain } from "../../contexts/DomainContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { apiFetch } from "@/lib/api";
@@ -420,6 +421,11 @@ export default function ExecutiveDashboardPage() {
         body: tr("page.exec_dashboard.next.review.body", "Use authority and review queues to clean the weakest records before sharing conclusions."),
         cta: tr("page.exec_dashboard.next.review.cta", "Open review"),
       };
+  const dashboardFlowStep: PilotFlowStepId =
+    !data ? "enrich" :
+    data.kpis.enrichment_pct >= 60 ? "brief" :
+    data.kpis.enrichment_pct >= 30 ? "review" :
+    "enrich";
 
   return (
     <div className="flex flex-col gap-6 pb-10">
@@ -484,27 +490,20 @@ export default function ExecutiveDashboardPage() {
       {error && <ErrorBanner message={error} onRetry={fetchDashboard} variant="card" />}
 
       {data && (
-        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5 shadow-sm dark:border-sky-900/40 dark:bg-sky-950/20">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-2xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
-                {tr("page.exec_dashboard.next.eyebrow", "Next guided move")}
-              </p>
-              <h2 className="mt-2 text-lg font-semibold text-sky-950 dark:text-sky-100">
-                {nextPilotStep.title}
-              </h2>
-              <p className="mt-1 text-sm text-sky-800 dark:text-sky-200">
-                {nextPilotStep.body}
-              </p>
-            </div>
-            <Link
-              href={nextPilotStep.href}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-700"
-            >
-              {nextPilotStep.cta}
-            </Link>
-          </div>
-        </div>
+        <PilotFlowCard
+          currentStep={dashboardFlowStep}
+          tone="sky"
+          title={nextPilotStep.title}
+          body={nextPilotStep.body}
+          primaryCta={{
+            href: nextPilotStep.href,
+            label: nextPilotStep.cta,
+          }}
+          secondaryCta={{
+            href: "/import-export",
+            label: tr("page.exec_dashboard.next.import.cta", "Open import"),
+          }}
+        />
       )}
 
       {importedFlag && (

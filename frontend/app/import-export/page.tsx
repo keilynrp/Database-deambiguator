@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { PageHeader, useToast, ErrorBanner } from "../components/ui";
 import DataSourceSchemaAnalyzer from "../components/DataSourceSchemaAnalyzer";
+import PilotFlowCard from "../components/PilotFlowCard";
 import { useDomain } from "../contexts/DomainContext";
 import { apiFetch } from "@/lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -151,6 +152,16 @@ export default function ImportExportPage() {
                 breadcrumbs={[{ label: "Home", href: "/" }, { label: t('page.import_export.title') }]}
                 title={t('page.import_export.title')}
                 description="Upload and download dataset in Excel, CSV, JSON-LD, Parquet, and RDF formats"
+            />
+            <PilotFlowCard
+                currentStep="import"
+                tone="blue"
+                title={t("page.import_export.guided.title")}
+                body={t("page.import_export.guided.body")}
+                secondaryCta={{
+                    href: "/import/scientific",
+                    label: t("page.import_export.guided.cta_scientific"),
+                }}
             />
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 {/* Import section */}

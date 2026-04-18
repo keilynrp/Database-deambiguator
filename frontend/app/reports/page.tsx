@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { PageHeader, Badge } from "../components/ui";
+import PilotFlowCard from "../components/PilotFlowCard";
 import { apiFetch } from "../../lib/api";
 import { useDomain } from "../contexts/DomainContext";
 import { useToast } from "../components/ui";
@@ -373,6 +374,28 @@ export default function ReportsPage() {
         }
       />
 
+      <PilotFlowCard
+        currentStep="brief"
+        tone="emerald"
+        title={t("page.reports.guided.title")}
+        body={preset === "pilot-brief"
+          ? t("page.reports.guided.brief")
+          : t("page.reports.guided.default")}
+        primaryCta={preset === "pilot-brief"
+          ? {
+              href: "/analytics/dashboard",
+              label: t("page.reports.guided.cta_dashboard"),
+            }
+          : {
+              href: presetHref,
+              label: t("page.reports.guided.cta_preset"),
+            }}
+        secondaryCta={{
+          href: "/",
+          label: t("page.reports.guided.cta_explorer"),
+        }}
+      />
+
       {preset === "pilot-brief" && (
         <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-5 shadow-sm dark:border-blue-500/20 dark:from-blue-500/5 dark:to-indigo-500/5">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -410,43 +433,6 @@ export default function ReportsPage() {
       )}
 
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/20">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-              {t("page.reports.guided.eyebrow")}
-            </p>
-            <h2 className="mt-2 text-lg font-semibold text-emerald-950 dark:text-emerald-100">
-              {t("page.reports.guided.title")}
-            </h2>
-            <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">
-              {preset === "pilot-brief"
-                ? t("page.reports.guided.brief")
-                : t("page.reports.guided.default")}
-            </p>
-            {!preset && (
-              <Link
-                href={presetHref}
-                className="mt-3 inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700 dark:bg-gray-900 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
-              >
-                {t("page.reports.guided.cta_preset")}
-              </Link>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/analytics/dashboard"
-              className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700 dark:bg-gray-900 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
-            >
-              {t("page.reports.guided.cta_dashboard")}
-            </Link>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
-            >
-              {t("page.reports.guided.cta_explorer")}
-            </Link>
-          </div>
-        </div>
         <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
           <div className="grid gap-2 sm:grid-cols-2">
             {briefChecklist.map((item) => (
