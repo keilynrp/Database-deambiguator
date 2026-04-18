@@ -4,7 +4,7 @@ import os
 from sqlalchemy.orm import Session
 
 from backend import models
-from backend.auth import hash_password
+from backend.auth import hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 def resolve_bootstrap_password_hash() -> str | None:
     password_hash = os.environ.get("ADMIN_PASSWORD_HASH", "").strip()
     if password_hash:
-        return password_hash
+        # Allow docker-compose escaped bcrypt hashes (`$$2b$$...`) to work in local
+        # Python processes as well as in Compose-expanded environments.
+        return password_hash.replace("$$", "$")
 
     password = os.environ.get("ADMIN_PASSWORD", "").strip()
     if password:
@@ -55,6 +57,15 @@ def ensure_bootstrap_super_admin(db: Session) -> None:
             bootstrap_user.password_hash = bootstrap_hash
             db.commit()
             logger.info("Bootstrap repair: super_admin '%s' re-activated", bootstrap_username)
+        elif (
+            bootstrap_user.role == "super_admin"
+            and bootstrap_user.is_active
+            and not verify_password(os.environ.get("ADMIN_PASSWORD", "").strip(), bootstrap_user.password_hash)
+            and bootstrap_user.password_hash != bootstrap_hash
+        ):
+            bootstrap_user.password_hash = bootstrap_hash
+            db.commit()
+            logger.info("Bootstrap repair: password hash refreshed for super_admin '%s'", bootstrap_username)
         return
 
     if existing_super_admin is None:
