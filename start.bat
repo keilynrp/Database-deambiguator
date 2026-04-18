@@ -31,10 +31,29 @@ if not exist "frontend\.env.local" (
     copy "frontend\.env.local.example" "frontend\.env.local" >nul
 )
 
+set "DOCKER_READY=0"
+set "REQUIRES_LOCAL_PG=0"
+
+findstr /I /C:"127.0.0.1:5432" ".env" >nul 2>&1
+if %errorlevel%==0 set "REQUIRES_LOCAL_PG=1"
+findstr /I /C:"localhost:5432" ".env" >nul 2>&1
+if %errorlevel%==0 set "REQUIRES_LOCAL_PG=1"
+findstr /I /C:"POSTGRES_HOST=127.0.0.1" ".env" >nul 2>&1
+if %errorlevel%==0 set "REQUIRES_LOCAL_PG=1"
+findstr /I /C:"POSTGRES_HOST=localhost" ".env" >nul 2>&1
+if %errorlevel%==0 set "REQUIRES_LOCAL_PG=1"
+
 where docker >nul 2>&1
 if %errorlevel%==0 (
-    echo  [INFO] Ensuring local PostgreSQL is running via docker-compose.dev.yml...
-    docker compose -f docker-compose.dev.yml up -d postgres
+    docker info >nul 2>&1
+    if %errorlevel%==0 (
+        set "DOCKER_READY=1"
+        echo  [INFO] Ensuring local PostgreSQL is running via docker-compose.dev.yml...
+        docker compose -f docker-compose.dev.yml up -d postgres
+    ) else (
+        echo  [WARN] Docker is installed but the Docker daemon is not running.
+        echo  [WARN] Start Docker Desktop before launching backend services that depend on local PostgreSQL.
+    )
 ) else (
     echo  [WARN] Docker not found in Windows PATH.
     echo  [WARN] If Docker runs inside WSL Ubuntu, start PostgreSQL there before starting UKIP.
@@ -65,7 +84,29 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3004 " ^| findstr "LISTENIN
 )
 goto :eof
 
+:checkdb
+if not "%REQUIRES_LOCAL_PG%"=="1" goto :eof
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5432 " ^| findstr "LISTENING"') do (
+    set "PG_READY=1"
+)
+if "%PG_READY%"=="1" goto :eof
+echo.
+echo  [ERROR] Local PostgreSQL is not reachable on port 5432.
+if "%DOCKER_READY%"=="0" (
+    echo  [ERROR] Docker Desktop is not ready, so UKIP could not auto-start the local database.
+    echo  [ERROR] Start Docker Desktop and try again.
+) else (
+    echo  [ERROR] The local database did not come up as expected.
+    echo  [ERROR] Check: docker compose -f docker-compose.dev.yml ps
+)
+echo  [ERROR] Backend startup aborted to avoid a misleading login failure.
+echo.
+exit /b 1
+
 :backend
+set "PG_READY=0"
+call :checkdb
+if errorlevel 1 goto end
 call :kill8000
 echo  [INFO] Starting Backend ^(FastAPI on port 8000^)...
 start "UKIP Backend" cmd /k "title UKIP Backend && cd /d %~dp0 && .venv\Scripts\alembic upgrade head && .venv\Scripts\python -m uvicorn backend.main:app --reload --port 8000"
@@ -82,6 +123,9 @@ echo  [OK] Frontend launch requested.
 goto end
 
 :startall
+set "PG_READY=0"
+call :checkdb
+if errorlevel 1 goto end
 call :kill8000
 call :kill3004
 echo  [1/2] Launching backend...
