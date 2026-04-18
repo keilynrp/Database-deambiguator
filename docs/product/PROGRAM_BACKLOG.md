@@ -86,6 +86,20 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
 - siguiente prioridad recomendada: siguiente corte de `US-067` para benchmark
   configurable por tenant/institucion
 
+## Frente comercial por stakeholder
+
+- base estrategica inicial documentada en
+  `docs/product/STAKEHOLDER_GROWTH_AND_SALES_STRATEGY.md`
+- stakeholders prioritarios definidos:
+  - liderazgo institucional / rectoria
+  - oficina de investigacion
+  - biblioteca / metadatos
+  - innovacion / transferencia
+- conclusion:
+  - el siguiente trabajo de crecimiento ya no depende tanto de nuevas features base
+  - depende de empaquetar mejor el valor actual en motion comercial, oferta de piloto
+    y narrativa por audiencia
+
 ## Hallazgo modulo scientific import
 
 - smoke test funcional ejecutado sobre `Scientific Import`
