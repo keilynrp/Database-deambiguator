@@ -106,6 +106,8 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
   - innovacion / transferencia
 - pilot framing script base documentado en
   `docs/product/PILOT_FRAMING_SCRIPT.md`
+- demo script por stakeholder documentado en
+  `docs/product/DEMO_SCRIPT_BY_STAKEHOLDER.md`
 
 ## Hallazgo modulo scientific import
 
