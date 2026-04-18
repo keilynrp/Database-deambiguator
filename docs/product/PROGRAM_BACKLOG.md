@@ -99,6 +99,11 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
   - el siguiente trabajo de crecimiento ya no depende tanto de nuevas features base
   - depende de empaquetar mejor el valor actual en motion comercial, oferta de piloto
     y narrativa por audiencia
+- one-pagers iniciales creados para:
+  - liderazgo institucional / rectoria
+  - oficina de investigacion
+  - biblioteca / metadatos
+  - innovacion / transferencia
 
 ## Hallazgo modulo scientific import
 
