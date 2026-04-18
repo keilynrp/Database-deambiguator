@@ -9,6 +9,11 @@ import { apiFetch } from "../../lib/api";
 import { useDomain } from "../contexts/DomainContext";
 import { useToast } from "../components/ui";
 import { useLanguage } from "../contexts/LanguageContext";
+import {
+  getStoredPilotPersona,
+  pilotPersonaToStakeholder,
+  type StakeholderProfile,
+} from "../lib/pilotPersona";
 
 // ── Template types ─────────────────────────────────────────────────────────────
 
@@ -36,8 +41,6 @@ interface BenchmarkProfile {
   rules_count: number;
   is_default: boolean;
 }
-
-type StakeholderProfile = "leadership" | "research_office" | "library" | "innovation";
 
 const SECTION_ICONS: Record<string, string> = {
   institutional_benchmark: "🏛️",
@@ -82,6 +85,7 @@ export default function ReportsPage() {
   const [benchmarkProfiles, setBenchmarkProfiles] = useState<BenchmarkProfile[]>([]);
   const [selectedBenchmarkProfile, setSelectedBenchmarkProfile] = useState("research_portfolio_baseline");
   const [selectedStakeholderProfile, setSelectedStakeholderProfile] = useState<StakeholderProfile>("leadership");
+  const [rememberedPersonaLabel, setRememberedPersonaLabel] = useState<string | null>(null);
 
   const preset = searchParams.get("preset");
   const presetDomain = searchParams.get("domain");
@@ -252,6 +256,14 @@ export default function ReportsPage() {
     }
     setPresetApplied(true);
   }, [loadingSections, presetApplied, preset, presetBenchmarkProfile, presetFormat, presetSections, presetStakeholderProfile, presetTitle, sections]);
+
+  useEffect(() => {
+    if (presetStakeholderProfile) return;
+    const storedPersona = getStoredPilotPersona();
+    if (!storedPersona) return;
+    setSelectedStakeholderProfile(pilotPersonaToStakeholder(storedPersona));
+    setRememberedPersonaLabel(t(`welcome.persona.${storedPersona}.label`));
+  }, [presetStakeholderProfile, t]);
 
   const loadTemplates = useCallback(async () => {
     if (templates.length > 0) return; // already loaded
@@ -727,6 +739,11 @@ export default function ReportsPage() {
                     {activeStakeholder.label}
                   </p>
                   <p className="mt-1">{activeStakeholder.desc}</p>
+                  {!presetStakeholderProfile && rememberedPersonaLabel && (
+                    <p className="mt-2 text-[11px] text-emerald-800 dark:text-emerald-200">
+                      {t("page.reports.stakeholder.recommended_from_persona", { persona: rememberedPersonaLabel })}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

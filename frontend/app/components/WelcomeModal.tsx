@@ -3,11 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useLanguage } from "../contexts/LanguageContext";
+import {
+  getStoredPilotPersona,
+  PILOT_PERSONA_STORAGE_KEY,
+  setStoredPilotPersona,
+  type PilotPersonaId,
+} from "../lib/pilotPersona";
 
 const STORAGE_KEY = "ukip_welcomed_v1";
-const PERSONA_KEY = "ukip_persona_v1";
-
-type PersonaId = "research" | "library" | "leadership";
 
 type Slide = {
   emoji: string;
@@ -18,7 +21,7 @@ type Slide = {
 };
 
 type PersonaOption = {
-  id: PersonaId;
+  id: PilotPersonaId;
   label: string;
   summary: string;
 };
@@ -37,10 +40,9 @@ export default function WelcomeModal() {
   const { t } = useLanguage();
   const [visible, setVisible] = useState(false);
   const [slide, setSlide] = useState(0);
-  const [persona, setPersona] = useState<PersonaId>(() => {
+  const [persona, setPersona] = useState<PilotPersonaId>(() => {
     if (typeof window === "undefined") return "research";
-    const storedPersona = localStorage.getItem(PERSONA_KEY) as PersonaId | null;
-    return storedPersona ?? "research";
+    return getStoredPilotPersona() ?? "research";
   });
 
   useEffect(() => {
@@ -69,7 +71,7 @@ export default function WelcomeModal() {
     },
   ], [t]);
 
-  const slides = useMemo<Record<PersonaId, Slide[]>>(() => ({
+  const slides = useMemo<Record<PilotPersonaId, Slide[]>>(() => ({
     research: [
       {
         emoji: "📚",
@@ -170,14 +172,14 @@ export default function WelcomeModal() {
 
   const dismiss = () => {
     localStorage.setItem(STORAGE_KEY, "1");
-    localStorage.setItem(PERSONA_KEY, persona);
+    localStorage.setItem(PILOT_PERSONA_STORAGE_KEY, persona);
     setVisible(false);
   };
 
-  const selectPersona = (nextPersona: PersonaId) => {
+  const selectPersona = (nextPersona: PilotPersonaId) => {
     setPersona(nextPersona);
     setSlide(0);
-    localStorage.setItem(PERSONA_KEY, nextPersona);
+    setStoredPilotPersona(nextPersona);
   };
 
   if (!visible) return null;

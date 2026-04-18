@@ -13,6 +13,11 @@ import { apiFetch } from "../lib/api";
 import { useAuth } from "./contexts/AuthContext";
 import { useLanguage } from "./contexts/LanguageContext";
 import { Analytics } from "../lib/analytics";
+import {
+  getStoredPilotPersona,
+  pilotPersonaToStakeholder,
+  type PilotPersonaId,
+} from "./lib/pilotPersona";
 
 interface DashboardStats {
   total_entities: number;
@@ -41,9 +46,15 @@ export default function Home() {
   const [domainCount, setDomainCount] = useState<number>(0);
   const [demoStatus, setDemoStatus] = useState<DemoStatus | null>(null);
   const [demoLoading, setDemoLoading] = useState(false);
+  const [pilotPersona, setPilotPersona] = useState<PilotPersonaId>("research");
   const { token } = useAuth();
   const { t } = useLanguage();
   const hasEntities = (stats?.total_entities ?? 0) > 0;
+  const stakeholderQuery = useMemo(
+    () => `stakeholder=${encodeURIComponent(pilotPersonaToStakeholder(pilotPersona))}`,
+    [pilotPersona],
+  );
+  const personaLabel = useMemo(() => t(`welcome.persona.${pilotPersona}.label`), [pilotPersona, t]);
 
   const guidedStages = useMemo<GuidedStage[]>(() => {
     const reviewReady = enrichPct >= 30;
@@ -67,11 +78,11 @@ export default function Home() {
       },
       {
         id: "brief",
-        href: "/reports",
+        href: `/reports?preset=pilot-brief&${stakeholderQuery}`,
         status: !hasEntities ? "upcoming" : briefReady ? "current" : "upcoming",
       },
     ];
-  }, [enrichPct, hasEntities]);
+  }, [enrichPct, hasEntities, stakeholderQuery]);
 
   const nextGuidedAction = useMemo(() => {
     if (!hasEntities) {
@@ -105,13 +116,13 @@ export default function Home() {
     }
 
     return {
-      title: t("page.home.guided.next.brief.title"),
-      description: t("page.home.guided.next.brief.description"),
-      href: "/reports",
-      cta: t("page.home.guided.next.brief.cta"),
-      hint: t("page.home.guided.next.brief.hint"),
-    };
-  }, [enrichPct, hasEntities, t]);
+        title: t("page.home.guided.next.brief.title"),
+        description: t("page.home.guided.next.brief.description"),
+        href: `/reports?preset=pilot-brief&${stakeholderQuery}`,
+        cta: t("page.home.guided.next.brief.cta"),
+        hint: t("page.home.guided.next.brief.hint"),
+      };
+  }, [enrichPct, hasEntities, stakeholderQuery, t]);
 
   const guidedProgress = useMemo(() => {
     const completed = guidedStages.filter((stage) => stage.status === "done").length;
@@ -176,6 +187,13 @@ export default function Home() {
       fetchDemoStatus();
     }
   }, [token, fetchStats, fetchDemoStatus]);
+
+  useEffect(() => {
+    const storedPersona = getStoredPilotPersona();
+    if (storedPersona) {
+      setPilotPersona(storedPersona);
+    }
+  }, []);
 
   const handleLaunchDemo = async () => {
     setDemoLoading(true);
@@ -390,6 +408,12 @@ export default function Home() {
                     {Math.round(enrichPct)}% · {(stats?.total_entities ?? 0).toLocaleString()}
                   </p>
                   <p>{t("page.home.guided.progress.coverage_hint")}</p>
+                </div>
+                <div className="rounded-xl bg-white px-3 py-2 dark:bg-slate-900/80 sm:col-span-3 xl:col-span-1">
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">
+                    {personaLabel}
+                  </p>
+                  <p>{t("page.home.guided.progress.persona_hint")}</p>
                 </div>
               </div>
             </div>
