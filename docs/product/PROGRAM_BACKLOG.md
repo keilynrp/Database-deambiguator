@@ -104,6 +104,8 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
   - oficina de investigacion
   - biblioteca / metadatos
   - innovacion / transferencia
+- pilot framing script base documentado en
+  `docs/product/PILOT_FRAMING_SCRIPT.md`
 
 ## Hallazgo modulo scientific import
 
