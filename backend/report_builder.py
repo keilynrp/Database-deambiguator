@@ -22,21 +22,45 @@ _STAKEHOLDER_PROFILES = {
         "label": "Leadership / Strategy",
         "focus": "decision readiness, strategic risk, and institutional positioning",
         "brief_hint": "Use this lens when the audience needs a concise readout of readiness, confidence, and next executive moves.",
+        "attention_points": [
+            "benchmark readiness and whether the current portfolio supports a defendable executive conversation",
+            "main confidence risks that could weaken institutional positioning if shared too early",
+            "one concrete next move that improves decision readiness quickly",
+        ],
+        "narrative_goal": "Keep the story concise, directional, and anchored in readiness, confidence, and near-term institutional action.",
     },
     "research_office": {
         "label": "Research Office",
         "focus": "portfolio quality, benchmark progress, and operational follow-through",
         "brief_hint": "Use this lens when the audience needs to understand what to improve in the dataset and which actions strengthen research reporting.",
+        "attention_points": [
+            "coverage and quality gaps that most directly hold back reporting confidence",
+            "which benchmark rules already pass and which still need operational attention",
+            "the most practical next actions for strengthening the portfolio baseline",
+        ],
+        "narrative_goal": "Frame the brief as an operational readout: what is already usable, what still needs work, and where the office should focus next.",
     },
     "library": {
         "label": "Library / Metadata",
         "focus": "metadata quality, authority control, and catalog reliability",
         "brief_hint": "Use this lens when the audience cares most about normalization quality, authority review, and trust in the underlying records.",
+        "attention_points": [
+            "record quality and authority issues that still affect trust in the dataset",
+            "whether metadata consistency is strong enough for downstream analytics and reporting",
+            "where curation effort will most improve catalog reliability",
+        ],
+        "narrative_goal": "Tell the story through trust in the record layer: what is stable, what remains ambiguous, and what curation work matters most.",
     },
     "innovation": {
         "label": "Innovation / Transfer",
         "focus": "high-impact entities, signals worth following, and portfolio narratives that support opportunity scanning",
         "brief_hint": "Use this lens when the audience wants a faster read on standout outputs, concentration areas, and next exploratory opportunities.",
+        "attention_points": [
+            "high-impact outputs that can anchor opportunity scanning or partner conversations",
+            "concept clusters that point to concentration areas worth exploring further",
+            "the next exploratory move that could turn signal into action",
+        ],
+        "narrative_goal": "Keep the brief opportunity-oriented: highlight standout outputs, concentration areas, and the most promising next exploratory path.",
     },
 }
 
@@ -86,6 +110,9 @@ def _section_stakeholder_reading(
     top_entity_text = ""
     if top_entity:
         top_entity_text = f"The highest-impact visible entity right now is {top_entity.get('entity_name') or top_entity.get('primary_label') or 'the current lead record'}, which can anchor a concrete stakeholder discussion."
+    attention_points = "".join(
+        f"<li>{point}</li>" for point in stakeholder.get("attention_points", [])
+    )
 
     return f"""<section>
     <h2>Stakeholder Reading</h2>
@@ -96,6 +123,9 @@ def _section_stakeholder_reading(
         <p style="margin-top:8px">Current benchmark readiness is <b>{readiness_pct}%</b>, average quality is <b>{quality_avg}%</b>, and enrichment coverage is <b>{coverage_pct}%</b>.</p>
         {'<p style="margin-top:8px">' + top_entity_text + '</p>' if top_entity_text else ''}
         <p style="margin-top:8px"><b>Recommended emphasis:</b> {action_text}</p>
+        <p style="margin-top:10px"><b>How to read this brief for this audience:</b></p>
+        <ul style="margin:8px 0 0 18px;color:#4b5563;line-height:1.7">{attention_points}</ul>
+        <p style="margin-top:10px"><b>Narrative goal:</b> {stakeholder["narrative_goal"]}</p>
     </div>
 </section>"""
 

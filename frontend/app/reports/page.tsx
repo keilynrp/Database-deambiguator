@@ -142,6 +142,15 @@ export default function ReportsPage() {
     },
   ]), [t]);
   const activeStakeholder = stakeholderOptions.find((option) => option.value === selectedStakeholderProfile) ?? stakeholderOptions[0];
+  const stakeholderReadingPoints = useMemo(() => ([
+    t(`page.reports.stakeholder.${selectedStakeholderProfile}.point1`),
+    t(`page.reports.stakeholder.${selectedStakeholderProfile}.point2`),
+    t(`page.reports.stakeholder.${selectedStakeholderProfile}.point3`),
+  ]), [selectedStakeholderProfile, t]);
+  const stakeholderNarrativeGoal = useMemo(
+    () => t(`page.reports.stakeholder.${selectedStakeholderProfile}.goal`),
+    [selectedStakeholderProfile, t],
+  );
   const activeBenchmarkProfile = useMemo(
     () => benchmarkProfiles.find((profile) => profile.id === selectedBenchmarkProfile) ?? null,
     [benchmarkProfiles, selectedBenchmarkProfile],
@@ -744,6 +753,22 @@ export default function ReportsPage() {
                       {t("page.reports.stakeholder.recommended_from_persona", { persona: rememberedPersonaLabel })}
                     </p>
                   )}
+                </div>
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                  <p className="font-semibold text-slate-900 dark:text-slate-100">
+                    {t("page.reports.stakeholder.reading_title")}
+                  </p>
+                  <ul className="mt-2 space-y-1.5 pl-4">
+                    {stakeholderReadingPoints.map((point) => (
+                      <li key={point} className="list-disc leading-5">
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-[11px] text-slate-600 dark:text-slate-300">
+                    <span className="font-semibold">{t("page.reports.stakeholder.goal_label")}</span>{" "}
+                    {stakeholderNarrativeGoal}
+                  </p>
                 </div>
               </div>
             </div>
