@@ -2,6 +2,7 @@
 Sprint 43 regression tests — Email Notification Settings.
 """
 from unittest.mock import patch, MagicMock
+from sqlalchemy import text
 
 
 # ── GET /notifications/settings — requires admin ──────────────────────────────
@@ -95,6 +96,16 @@ def test_smtp_password_not_in_response(client, auth_headers, db_session):
     resp = client.get("/notifications/settings", headers=auth_headers)
     assert resp.status_code == 200
     assert "smtp_password" not in resp.json()
+
+
+def test_get_settings_recreates_missing_table(client, auth_headers, db_session):
+    db_session.execute(text("DROP TABLE IF EXISTS notification_settings"))
+    db_session.commit()
+
+    resp = client.get("/notifications/settings", headers=auth_headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["smtp_port"] == 587
 
 
 # ── Viewer cannot access settings ────────────────────────────────────────────

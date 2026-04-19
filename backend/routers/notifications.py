@@ -20,6 +20,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import not_
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from backend import models, schemas
@@ -174,7 +175,12 @@ def _serialize_entry(
 
 
 def _get_or_create_settings(db: Session) -> models.NotificationSettings:
-    s = db.get(models.NotificationSettings, 1)
+    try:
+        s = db.get(models.NotificationSettings, 1)
+    except (OperationalError, ProgrammingError):
+        db.rollback()
+        models.NotificationSettings.__table__.create(bind=db.get_bind(), checkfirst=True)
+        s = db.get(models.NotificationSettings, 1)
     if not s:
         s = models.NotificationSettings(id=1)
         db.add(s)
