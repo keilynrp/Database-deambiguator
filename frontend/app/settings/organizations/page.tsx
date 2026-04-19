@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { apiFetch } from "@/lib/api";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { useToast } from "../../components/ui";
 
 interface Organization {
   id: number;
@@ -75,6 +76,7 @@ function PlanBadge({ plan }: { plan: string }) {
 
 export default function OrganizationsPage() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -194,10 +196,13 @@ export default function OrganizationsPage() {
     if (r.ok) {
       setShowCreate(false);
       setForm({ name: "", slug: "", description: "", plan: "free" });
-      loadOrgs();
+      await loadOrgs();
+      toast(tr("page.settings_organizations.toast.created", "Organization created"), "success");
     } else {
       const d = await r.json().catch(() => ({}));
-      setError(d.detail ?? tr("page.settings_organizations.error.create_org", "Failed to create organization"));
+      const message = d.detail ?? tr("page.settings_organizations.error.create_org", "Failed to create organization");
+      setError(message);
+      toast(message, "error");
     }
     setSaving(false);
   }
@@ -214,30 +219,47 @@ export default function OrganizationsPage() {
     if (r.ok) {
       setShowInvite(false);
       setInviteForm({ username: "", role: "member" });
-      loadMembers(selectedOrg.id);
+      await loadMembers(selectedOrg.id);
+      toast(tr("page.settings_organizations.toast.invited", "Member invited"), "success");
     } else {
       const d = await r.json().catch(() => ({}));
-      setError(d.detail ?? tr("page.settings_organizations.error.invite_member", "Failed to invite member"));
+      const message = d.detail ?? tr("page.settings_organizations.error.invite_member", "Failed to invite member");
+      setError(message);
+      toast(message, "error");
     }
     setSaving(false);
   }
 
   async function removeMember(userId: number) {
     if (!selectedOrg || !confirm(tr("page.settings_organizations.confirm.remove_member", "Remove this member?"))) return;
-    await apiFetch(`/organizations/${selectedOrg.id}/members/${userId}`, { method: "DELETE" });
-    loadMembers(selectedOrg.id);
+    const r = await apiFetch(`/organizations/${selectedOrg.id}/members/${userId}`, { method: "DELETE" });
+    if (r.ok) {
+      await loadMembers(selectedOrg.id);
+      toast(tr("page.settings_organizations.toast.member_removed", "Member removed"), "success");
+      return;
+    }
+    toast(tr("page.settings_organizations.error.remove_member", "Failed to remove member"), "error");
   }
 
   async function switchOrg(orgId: number) {
-    await apiFetch(`/organizations/${orgId}/switch`, { method: "POST" });
+    const r = await apiFetch(`/organizations/${orgId}/switch`, { method: "POST" });
+    if (!r.ok) {
+      toast(tr("page.settings_organizations.error.switch_org", "Failed to switch organization"), "error");
+      return;
+    }
     window.location.reload();
   }
 
   async function deleteOrg(orgId: number) {
     if (!confirm(tr("page.settings_organizations.confirm.delete_org", "Delete this organization? This cannot be undone."))) return;
-    await apiFetch(`/organizations/${orgId}`, { method: "DELETE" });
-    setSelectedOrg(null);
-    loadOrgs();
+    const r = await apiFetch(`/organizations/${orgId}`, { method: "DELETE" });
+    if (r.ok) {
+      setSelectedOrg(null);
+      await loadOrgs();
+      toast(tr("page.settings_organizations.toast.deleted", "Organization deleted"), "success");
+      return;
+    }
+    toast(tr("page.settings_organizations.error.delete_org", "Failed to delete organization"), "error");
   }
 
   async function saveBenchmarkProfile(benchmarkProfileId: string) {
@@ -257,9 +279,12 @@ export default function OrganizationsPage() {
       if (profilesResponse.ok) {
         setBenchmarkProfiles(await profilesResponse.json());
       }
+      toast(tr("page.settings_organizations.toast.benchmark_saved", "Benchmark profile updated"), "success");
     } else {
       const d = await r.json().catch(() => ({}));
-      setError(d.detail ?? tr("page.settings_organizations.error.save_benchmark", "Failed to save benchmark profile"));
+      const message = d.detail ?? tr("page.settings_organizations.error.save_benchmark", "Failed to save benchmark profile");
+      setError(message);
+      toast(message, "error");
     }
     setSavingBenchmark(false);
   }
@@ -305,9 +330,12 @@ export default function OrganizationsPage() {
       if (profilesResponse.ok) {
         setBenchmarkProfiles(await profilesResponse.json());
       }
+      toast(tr("page.settings_organizations.toast.overrides_saved", "Benchmark overrides saved"), "success");
     } else {
       const d = await r.json().catch(() => ({}));
-      setError(d.detail ?? tr("page.settings_organizations.error.save_overrides", "Failed to save benchmark profile overrides"));
+      const message = d.detail ?? tr("page.settings_organizations.error.save_overrides", "Failed to save benchmark profile overrides");
+      setError(message);
+      toast(message, "error");
     }
     setSavingBenchmark(false);
   }
@@ -384,9 +412,18 @@ export default function OrganizationsPage() {
             </div>
           ) : orgs.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center dark:border-gray-700">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 {tr("page.settings_organizations.empty", "No organizations yet.")}
               </p>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                {tr("page.settings_organizations.empty_help", "Create the first workspace when you need separate benchmark rules, branding, or member access for another tenant.")}
+              </p>
+              <button
+                onClick={() => setShowCreate(true)}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                <span>+</span> {tr("page.settings_organizations.new_org", "New Organization")}
+              </button>
             </div>
           ) : (
             orgs.map(org => (
@@ -623,39 +660,50 @@ export default function OrganizationsPage() {
                     + {tr("page.settings_organizations.invite", "Invite")}
                   </button>
                 </div>
-                <div className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-100 dark:divide-gray-800 dark:border-gray-800">
-                  {members.map(m => (
-                    <div key={m.user_id} className="flex items-center justify-between px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                          {m.username.slice(0, 2).toUpperCase()}
+                {members.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center dark:border-gray-800">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {tr("page.settings_organizations.members_empty", "No members added yet")}
+                    </p>
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      {tr("page.settings_organizations.members_empty_help", "Invite an admin or collaborator when this workspace needs shared ownership or review.")}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-100 dark:divide-gray-800 dark:border-gray-800">
+                    {members.map(m => (
+                      <div key={m.user_id} className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                            {m.username.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">{m.display_name}</div>
+                            <div className="text-xs text-gray-500">@{m.username}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{m.display_name}</div>
-                          <div className="text-xs text-gray-500">@{m.username}</div>
+                        <div className="flex items-center gap-2">
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                            m.role === "owner" ? "bg-amber-100 text-amber-700" :
+                            m.role === "admin" ? "bg-blue-100 text-blue-700" :
+                            "bg-gray-100 text-gray-600"
+                          }`}>{tr(`page.settings_organizations.role.${m.role}`, m.role)}</span>
+                          {m.role !== "owner" && (
+                            <button
+                              onClick={() => removeMember(m.user_id)}
+                              className="rounded p-1 text-gray-400 hover:text-red-500"
+                              title={tr("common.remove", "Remove")}
+                            >
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                          m.role === "owner" ? "bg-amber-100 text-amber-700" :
-                          m.role === "admin" ? "bg-blue-100 text-blue-700" :
-                          "bg-gray-100 text-gray-600"
-                        }`}>{tr(`page.settings_organizations.role.${m.role}`, m.role)}</span>
-                        {m.role !== "owner" && (
-                          <button
-                            onClick={() => removeMember(m.user_id)}
-                            className="rounded p-1 text-gray-400 hover:text-red-500"
-                            title={tr("common.remove", "Remove")}
-                          >
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

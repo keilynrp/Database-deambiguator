@@ -34,6 +34,10 @@ export default function NotificationsTab({
     toast: (msg: string, v?: ToastVariant) => void;
 }) {
     const { t } = useLanguage();
+    const tr = (key: string, fallback: string) => {
+        const value = t(key);
+        return value === key ? fallback : value;
+    };
     const inputClass = "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
     const fieldConfigs: NotificationFieldConfig[] = [
         { label: t("settings.notifications.smtp_host"), key: "smtp_host", type: "text", placeholder: "smtp.gmail.com" },
@@ -63,6 +67,7 @@ export default function NotificationsTab({
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
+    const missingRequiredFields = !form.smtp_host || !form.from_email || !form.recipient_email;
 
     useEffect(() => {
         let mounted = true;
@@ -119,6 +124,10 @@ export default function NotificationsTab({
     };
 
     const handleTest = async () => {
+        if (missingRequiredFields) {
+            toast(tr("settings.notifications.toast.test_requires_fields", "Add SMTP host, sender, and recipient before sending a test."), "warning");
+            return;
+        }
         setTesting(true);
         try {
             const response = await apiFetch("/notifications/test", { method: "POST" });
@@ -141,8 +150,47 @@ export default function NotificationsTab({
 
     return (
         <div className="space-y-4">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 shadow-sm dark:border-blue-900/30 dark:bg-blue-900/10">
+                <p className="text-sm font-semibold text-blue-950 dark:text-blue-100">
+                    {tr("settings.notifications.guidance_title", "Set up email delivery before relying on alerts")}
+                </p>
+                <p className="mt-1 text-xs text-blue-900/80 dark:text-blue-200/80">
+                    {tr("settings.notifications.guidance_body", "Use SMTP settings that can send from this workspace. A test message helps confirm delivery before enabling operational alerts.")}
+                </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                        {tr("settings.notifications.summary.enabled", "Alerts")}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
+                        {form.enabled ? tr("settings.notifications.summary.enabled_on", "Enabled") : tr("settings.notifications.summary.enabled_off", "Disabled")}
+                    </p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                        {tr("settings.notifications.summary.sender", "Sender")}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
+                        {form.from_email || tr("common.none", "None")}
+                    </p>
+                </div>
+                <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                        {tr("settings.notifications.summary.recipient", "Recipient")}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
+                        {form.recipient_email || tr("common.none", "None")}
+                    </p>
+                </div>
+            </div>
+
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <h3 className="mb-4 text-base font-semibold text-gray-900 dark:text-white">{t("settings.notifications.smtp_config")}</h3>
+                <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+                    {tr("settings.notifications.smtp_help", "These values are used for test messages and notification delivery from this workspace. Leave the password blank to keep the stored secret.")}
+                </p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     {fieldConfigs.map(({ label, key, type, placeholder }) => (
                         <div key={key}>
@@ -164,6 +212,9 @@ export default function NotificationsTab({
 
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <h3 className="mb-4 text-base font-semibold text-gray-900 dark:text-white">{t("settings.notifications.alert_preferences")}</h3>
+                <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+                    {tr("settings.notifications.preferences_help", "Turn on only the alerts that should surface outside the app. These settings affect future events after you save them.")}
+                </p>
                 <div className="space-y-3">
                     {toggleConfigs.map(({ label, key }) => (
                         <label key={key} className="flex cursor-pointer items-center gap-3">
@@ -189,12 +240,17 @@ export default function NotificationsTab({
                 </button>
                 <button
                     onClick={handleTest}
-                    disabled={testing}
+                    disabled={testing || missingRequiredFields}
                     className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
                     {testing ? t("settings.notifications.sending") : t("settings.notifications.send_test")}
                 </button>
             </div>
+            {missingRequiredFields && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                    {tr("settings.notifications.test_hint", "Add SMTP host, sender, and recipient to enable the test email action.")}
+                </p>
+            )}
         </div>
     );
 }

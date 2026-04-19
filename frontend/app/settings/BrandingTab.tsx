@@ -16,6 +16,10 @@ function getErrorMessage(error: unknown, fallback: string) {
 export default function BrandingTab({ toast }: { toast: (msg: string, v?: ToastVariant) => void }) {
     const { branding, refreshBranding } = useBranding();
     const { t } = useLanguage();
+    const tr = useCallback((key: string, fallback: string) => {
+        const value = t(key);
+        return value === key ? fallback : value;
+    }, [t]);
     const inputClass = "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
 
     const [form, setForm] = useState({
@@ -93,6 +97,12 @@ export default function BrandingTab({ toast }: { toast: (msg: string, v?: ToastV
     return (
         <div className="space-y-4">
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <div className="mb-5 rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-900/30 dark:bg-indigo-900/10 dark:text-indigo-100">
+                    <p className="font-semibold">{tr("settings.branding.guidance_title", "Keep this workspace recognizable")}</p>
+                    <p className="mt-1 text-xs text-indigo-800/80 dark:text-indigo-200/80">
+                        {tr("settings.branding.guidance_body", "Name, logo, favicon, and accent color shape the identity users will see in navigation, browser tabs, and exported artifacts.")}
+                    </p>
+                </div>
                 <h3 className="mb-4 text-base font-semibold text-gray-900 dark:text-white">{t("settings.branding.identity_title")}</h3>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <div>
@@ -138,6 +148,14 @@ export default function BrandingTab({ toast }: { toast: (msg: string, v?: ToastV
 
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("common.preview")}</h3>
+                <div className="mb-4 flex flex-wrap gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${form.logo_url ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"}`}>
+                        {form.logo_url ? tr("settings.branding.status.logo_ready", "Logo ready") : tr("settings.branding.status.logo_missing", "Logo missing")}
+                    </span>
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${form.favicon_url ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"}`}>
+                        {form.favicon_url ? tr("settings.branding.status.favicon_ready", "Favicon ready") : tr("settings.branding.status.favicon_missing", "Favicon missing")}
+                    </span>
+                </div>
                 <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/50">
                     <div
                         className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg"
@@ -156,6 +174,9 @@ export default function BrandingTab({ toast }: { toast: (msg: string, v?: ToastV
                         <p className="text-xs text-gray-400">{form.footer_text}</p>
                     </div>
                 </div>
+                <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                    {tr("settings.branding.preview_help", "This preview reflects the changes currently in the form. Save when you are ready to apply them across the workspace.")}
+                </p>
             </div>
 
             <button
