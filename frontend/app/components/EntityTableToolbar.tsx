@@ -3,6 +3,14 @@
 import { useLanguage } from "../contexts/LanguageContext";
 import type { ActiveFacets } from "./FacetPanel";
 
+const FIELD_LABELS: Record<string, string> = {
+    entity_type: "page.import.field.entity_type",
+    domain: "page.import.field.domain",
+    validation_status: "page.entity_table.review_status",
+    enrichment_status: "page.entity_table.system_status",
+    source: "page.exec_dashboard.source",
+};
+
 export interface EntityTableToolbarProps {
     activeFacets: ActiveFacets;
     search: string;
@@ -24,11 +32,64 @@ export default function EntityTableToolbar({
 }: EntityTableToolbarProps) {
     const { t } = useLanguage();
     const hasActiveFacets = Object.entries(activeFacets).some(([, value]) => value);
+    const hasToolbarFilters = hasActiveFacets || Boolean(search) || Boolean(minQuality);
+    const formatFacetField = (field: string) => {
+        const key = FIELD_LABELS[field];
+        if (!key) return field.replace(/_/g, " ");
+        const translated = t(key);
+        return translated === key ? field.replace(/_/g, " ") : translated;
+    };
+    const formatFacetValue = (field: string, value: string) => {
+        if (field === "entity_type") {
+            const translated = t(`page.authority.entity_type_${value}`);
+            return translated === `page.authority.entity_type_${value}` ? value : translated;
+        }
+        if (field === "validation_status") {
+            const translated = t(`page.entity_table.status_${value}`);
+            return translated === `page.entity_table.status_${value}` ? value : translated;
+        }
+        if (field === "enrichment_status") {
+            const enrichmentKeyMap: Record<string, string> = {
+                completed: "entities.filter.enriched",
+                pending: "entities.filter.pending",
+                processing: "page.entity_table.status_processing",
+                failed: "entities.filter.failed",
+                none: "page.entity_table.status_not_started",
+            };
+            const key = enrichmentKeyMap[value] ?? `entities.filter.${value}`;
+            const translated = t(key);
+            return translated === key ? value : translated;
+        }
+        return value;
+    };
 
     return (
         <>
-            {hasActiveFacets && (
+            {hasToolbarFilters && (
                 <div className="mb-2 flex flex-wrap gap-1.5 px-1">
+                    {search && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-100 px-2 py-0.5 text-xs text-sky-800 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                            <span className="font-medium">{t("common.search")}:</span> {search}
+                            <button
+                                onClick={() => onSearchChange("")}
+                                className="ml-0.5 font-bold leading-none hover:text-sky-600"
+                            >
+                                x
+                            </button>
+                        </span>
+                    )}
+                    {minQuality && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                            <span className="font-medium">{t("page.entity_table.min_quality")}:</span>
+                            {minQuality === "0.7" ? "70%+" : minQuality === "0.3" ? "30%+" : t("page.entity_table.under_30")}
+                            <button
+                                onClick={() => onMinQualityChange("")}
+                                className="ml-0.5 font-bold leading-none hover:text-emerald-600"
+                            >
+                                x
+                            </button>
+                        </span>
+                    )}
                     {Object.entries(activeFacets)
                         .filter(([, value]) => value)
                         .map(([field, value]) => (
@@ -36,7 +97,7 @@ export default function EntityTableToolbar({
                                 key={field}
                                 className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-100 px-2 py-0.5 text-xs text-indigo-800 dark:border-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
                             >
-                                <span className="font-medium">{field.replace(/_/g, " ")}:</span> {value}
+                                <span className="font-medium">{formatFacetField(field)}:</span> {formatFacetValue(field, value)}
                                 <button
                                     onClick={() => onClearFacet(field)}
                                     className="ml-0.5 font-bold leading-none hover:text-indigo-600"

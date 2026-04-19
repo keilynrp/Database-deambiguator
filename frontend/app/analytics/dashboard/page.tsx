@@ -364,6 +364,10 @@ export default function ExecutiveDashboardPage() {
     ? Math.max(1, ...data.brand_year_matrix.matrix.flat())
     : 1;
   const briefBuilderHref = `/reports?preset=pilot-brief&domain=${encodeURIComponent(importedDomain ?? activeDomainId)}&rows=${encodeURIComponent(importedRows ?? String(data?.kpis.total_entities ?? 0))}&format=pdf&benchmark_profile=${encodeURIComponent(selectedBenchmarkProfile)}&title=${encodeURIComponent(`UKIP Pilot Brief — ${importedDomain ?? activeDomainId}`)}`;
+  const enrichedExplorerHref = "/?ft_enrichment_status=completed&min_quality=0.7";
+  const latestImportExplorerHref = importedDomain
+    ? `/?ft_domain=${encodeURIComponent(importedDomain)}`
+    : "/";
   const decisionHighlights = useMemo(() => {
     if (!data) return [];
 
@@ -545,7 +549,7 @@ export default function ExecutiveDashboardPage() {
                 {tr("page.import.success.open_brief", "Prepare Executive Brief")}
               </Link>
               <Link
-                href="/"
+                href={latestImportExplorerHref}
                 className="rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-50 dark:border-violet-500/30 dark:bg-gray-900 dark:text-violet-300 dark:hover:bg-violet-500/10"
               >
                 {tr("page.exec_dashboard.open_explorer", "Open Knowledge Explorer")}
@@ -1034,11 +1038,11 @@ export default function ExecutiveDashboardPage() {
               {tr("page.exec_dashboard.top_entities_impact_desc", "Highest citation count among enriched entities — a practical shortlist for stakeholder attention and follow-up.")}
             </p>
           </div>
-          <Link
-            href="/"
-            className="text-xs font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400"
-          >
-            {tr("page.exec_dashboard.view_all", "View all →")}
+            <Link
+              href={enrichedExplorerHref}
+              className="text-xs font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400"
+            >
+              {tr("page.exec_dashboard.view_all", "View all →")}
           </Link>
         </div>
         {loading ? (

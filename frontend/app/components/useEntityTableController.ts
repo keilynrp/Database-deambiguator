@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useLanguage } from "../contexts/LanguageContext";
 import type { ActiveFacets } from "./FacetPanel";
 import type { EditableFields, Entity } from "./EntityTable.types";
@@ -13,11 +14,19 @@ interface UseEntityTableControllerOptions {
 
 export function useEntityTableController({ toast }: UseEntityTableControllerOptions) {
     const { t } = useLanguage();
+    const searchParams = useSearchParams();
+    const readFacetParams = useCallback((): ActiveFacets => ({
+        entity_type: searchParams.get("ft_entity_type"),
+        domain: searchParams.get("ft_domain"),
+        validation_status: searchParams.get("ft_validation_status"),
+        enrichment_status: searchParams.get("ft_enrichment_status"),
+        source: searchParams.get("ft_source"),
+    }), [searchParams]);
     const [entities, setEntities] = useState<Entity[]>([]);
     const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState("");
-    const [debouncedSearch, setDebouncedSearch] = useState("");
+    const [search, setSearch] = useState(searchParams.get("q") ?? "");
+    const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get("q") ?? "");
     const [page, setPage] = useState(0);
     const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
     const [limit, setLimit] = useState(20);
@@ -32,7 +41,7 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
     });
     const [saving, setSaving] = useState(false);
     const [enrichingId, setEnrichingId] = useState<number | null>(null);
-    const [minQuality, setMinQuality] = useState<string>("");
+    const [minQuality, setMinQuality] = useState<string>(searchParams.get("min_quality") ?? "");
     const [sortBy, setSortBy] = useState<string>("id");
     const [sortOrder, setSortOrder] = useState<string>("asc");
     const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -40,9 +49,10 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
     const [bulkDeleting, setBulkDeleting] = useState(false);
     const [bulkEnriching, setBulkEnriching] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
-    const [activeFacets, setActiveFacets] = useState<ActiveFacets>({});
+    const [activeFacets, setActiveFacets] = useState<ActiveFacets>(readFacetParams);
     const [facetRefreshKey, setFacetRefreshKey] = useState(0);
     const [scrollTop, setScrollTop] = useState(0);
+    const paramSignature = searchParams.toString();
 
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -52,6 +62,16 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
 
         return () => clearTimeout(handler);
     }, [search]);
+
+    useEffect(() => {
+        const nextSearch = searchParams.get("q") ?? "";
+        const nextMinQuality = searchParams.get("min_quality") ?? "";
+        setSearch(nextSearch);
+        setDebouncedSearch(nextSearch);
+        setMinQuality(nextMinQuality);
+        setActiveFacets(readFacetParams());
+        setPage(0);
+    }, [paramSignature, readFacetParams, searchParams]);
 
     const fetchEntities = useCallback(async () => {
         setLoading(true);
