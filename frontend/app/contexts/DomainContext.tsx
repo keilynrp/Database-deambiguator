@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
 
+const DOMAIN_STORAGE_KEY = "ukip_active_domain";
+
 export interface DomainAttribute {
     name: string;
     type: string;
@@ -31,9 +33,14 @@ interface DomainContextType {
 
 const DomainContext = createContext<DomainContextType | undefined>(undefined);
 
+function readStoredDomain(): string | null {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem(DOMAIN_STORAGE_KEY);
+}
+
 export function DomainProvider({ children }: { children: React.ReactNode }) {
     const [domains, setDomains] = useState<DomainSchema[]>([]);
-    const [activeDomainId, setActiveDomainId] = useState<string>("default");
+    const [activeDomainId, setActiveDomainId] = useState<string>(() => readStoredDomain() || "default");
     const [isLoading, setIsLoading] = useState(true);
 
     const resolveDomainSelection = useCallback((availableDomains: DomainSchema[], currentActiveDomainId: string) => {
@@ -41,7 +48,7 @@ export function DomainProvider({ children }: { children: React.ReactNode }) {
             return currentActiveDomainId || "default";
         }
 
-        const savedDomain = typeof window !== "undefined" ? localStorage.getItem("ukip_active_domain") : null;
+        const savedDomain = readStoredDomain();
 
         if (currentActiveDomainId && availableDomains.some((d) => d.id === currentActiveDomainId)) {
             return currentActiveDomainId;
@@ -65,7 +72,7 @@ export function DomainProvider({ children }: { children: React.ReactNode }) {
                 setActiveDomainId((prev) => {
                     const next = resolveDomainSelection(data, prev);
                     if (typeof window !== "undefined") {
-                        localStorage.setItem("ukip_active_domain", next);
+                        window.localStorage.setItem(DOMAIN_STORAGE_KEY, next);
                     }
                     return next;
                 });
@@ -76,21 +83,34 @@ export function DomainProvider({ children }: { children: React.ReactNode }) {
         }
     }, [resolveDomainSelection]);
 
+    useEffect(() => {
+        const storedDomain = readStoredDomain();
+        if (storedDomain) {
+            setActiveDomainId((prev) => prev || storedDomain);
+        }
+    }, []);
+
     useEffect(() => { void fetchDomains(); }, [fetchDomains]);
 
     const handleSetActiveDomain = (id: string) => {
+        if (!id) return;
         setActiveDomainId(id);
         if (typeof window !== "undefined") {
-            localStorage.setItem("ukip_active_domain", id);
+            window.localStorage.setItem(DOMAIN_STORAGE_KEY, id);
         }
     };
 
-    const activeDomain = domains.find(d => d.id === activeDomainId) || null;
+    const activeDomain =
+        domains.find((d) => d.id === activeDomainId)
+        || domains.find((d) => d.id === "default")
+        || domains[0]
+        || null;
+    const resolvedActiveDomainId = activeDomain?.id || activeDomainId || "default";
 
     return (
         <DomainContext.Provider value={{
             domains,
-            activeDomainId,
+            activeDomainId: resolvedActiveDomainId,
             activeDomain,
             setActiveDomainId: handleSetActiveDomain,
             isLoading,
