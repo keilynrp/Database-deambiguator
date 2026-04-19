@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { apiFetch } from "@/lib/api";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 interface Organization {
   id: number;
