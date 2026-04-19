@@ -31,6 +31,10 @@ async function readJsonOrThrow<T>(response: Response): Promise<T> {
 
 export default function ScientificImportPage() {
   const { t } = useLanguage();
+  const tr = (key: string, fallback: string) => {
+    const value = t(key);
+    return value === key ? fallback : value;
+  };
   const [sources, setSources] = useState<Source[]>([]);
   const [sourcesLoaded, setSourcesLoaded] = useState(false);
   const [source, setSource] = useState("crossref");
@@ -59,6 +63,35 @@ export default function ScientificImportPage() {
   };
 
   const selectedSource = sources.find((s) => s.id === source);
+  const scientificSummary = [
+    {
+      label: tr("page.import.scientific.summary.source", "Source"),
+      value: selectedSource?.name ?? "CrossRef",
+      detail: selectedSource?.requires_key
+        ? tr("page.import.scientific.summary.source_key", "This connector expects an API key or source-specific credentials.")
+        : tr("page.import.scientific.summary.source_open", "This connector can usually be explored without adding credentials first."),
+    },
+    {
+      label: tr("page.import.scientific.summary.mode", "Mode"),
+      value: mode === "dois"
+        ? tr("page.import.scientific.mode.dois", "DOI batch import")
+        : tr("page.import.scientific.mode.search", "Free-text search"),
+      detail: mode === "dois"
+        ? tr("page.import.scientific.summary.mode_dois", "Best when you already know the exact records you want to bring in.")
+        : tr("page.import.scientific.summary.mode_search", "Best for exploring a topic, author, ORCID, or query before importing."),
+    },
+    {
+      label: tr("page.import.scientific.summary.outcome", "Expected outcome"),
+      value: step === "preview"
+        ? tr("page.import.scientific.summary.preview_ready", "Preview ready")
+        : step === "done"
+          ? tr("page.import.scientific.summary.import_done", "Import finished")
+          : tr("page.import.scientific.summary.query_pending", "Waiting for query"),
+      detail: step === "done"
+        ? tr("page.import.scientific.summary.import_done_detail", "The selected records were already written into the science domain.")
+        : tr("page.import.scientific.summary.query_pending_detail", "You can preview first, then decide whether the result set is worth importing."),
+    },
+  ];
 
   const buildConfig = (): Record<string, string> => {
     const cfg: Record<string, string> = {};
@@ -132,6 +165,25 @@ export default function ScientificImportPage() {
         </p>
       </div>
 
+      <div className="grid gap-3 md:grid-cols-3">
+        {scientificSummary.map((card) => (
+          <div
+            key={card.label}
+            className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900"
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
+              {card.label}
+            </p>
+            <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
+              {card.value}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+              {card.detail}
+            </p>
+          </div>
+        ))}
+      </div>
+
       {/* Progress steps */}
       <div className="flex gap-2 text-xs font-medium">
         {(["query", "preview", "done"] as Step[]).map((s, i) => (
@@ -150,7 +202,8 @@ export default function ScientificImportPage() {
 
       {error && (
         <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">
-          {error}
+          <p className="font-semibold">{tr("page.import.scientific.error.title", "Import issue")}</p>
+          <p className="mt-1">{error}</p>
         </div>
       )}
 
@@ -160,6 +213,14 @@ export default function ScientificImportPage() {
           className="space-y-4 rounded-xl border border-gray-200 dark:border-gray-700 p-5 bg-white dark:bg-gray-900"
           onClick={loadSources}
         >
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800 dark:border-indigo-500/20 dark:bg-indigo-500/5 dark:text-indigo-200">
+            <p className="font-semibold">{tr("page.import.scientific.guidance.title", "Preview first, import second")}</p>
+            <p className="mt-1 text-xs leading-5 text-indigo-700 dark:text-indigo-300">
+              {mode === "dois"
+                ? tr("page.import.scientific.guidance.dois", "Use DOI mode when you already have exact identifiers. UKIP will resolve them and show the records before importing.")
+                : tr("page.import.scientific.guidance.search", "Use search mode when you need to explore a query first. Preview helps you confirm titles, authors, and DOI coverage before importing.")}
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{t("page.import.scientific.source")}</label>
@@ -271,11 +332,21 @@ export default function ScientificImportPage() {
       {/* Step 2: Preview */}
       {step === "preview" && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-sm text-gray-600 dark:text-gray-400">{t("page.import.scientific.results_found", { count: preview.length })}</span>
-            <button onClick={() => setStep("query")} className="text-xs text-indigo-600 hover:underline">
-              {t("page.import.scientific.change_query")}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                {selectedSource?.name ?? "CrossRef"}
+              </span>
+              <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                {mode === "dois"
+                  ? tr("page.import.scientific.mode.dois", "DOI batch import")
+                  : tr("page.import.scientific.mode.search", "Free-text search")}
+              </span>
+              <button onClick={() => setStep("query")} className="text-xs text-indigo-600 hover:underline">
+                {t("page.import.scientific.change_query")}
+              </button>
+            </div>
           </div>
           <div className="overflow-auto rounded-xl border border-gray-200 dark:border-gray-700">
             <table className="min-w-full text-xs">
@@ -331,6 +402,20 @@ export default function ScientificImportPage() {
         <div className="rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-6 text-center space-y-3">
           <div className="text-3xl font-bold text-green-700 dark:text-green-400">{result.imported}</div>
           <div className="text-sm text-green-700 dark:text-green-300">{t("page.import.scientific.success")}</div>
+          <div className="mx-auto grid max-w-md gap-3 sm:grid-cols-2">
+            <div className="rounded-xl bg-white/70 px-4 py-3 text-left dark:bg-gray-900/40">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-green-700 dark:text-green-300">
+                {tr("page.import.scientific.done.imported_label", "Imported")}
+              </p>
+              <p className="mt-1 text-lg font-semibold text-green-900 dark:text-green-100">{result.imported}</p>
+            </div>
+            <div className="rounded-xl bg-white/70 px-4 py-3 text-left dark:bg-gray-900/40">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-green-700 dark:text-green-300">
+                {tr("page.import.scientific.done.skipped_label", "Skipped")}
+              </p>
+              <p className="mt-1 text-lg font-semibold text-green-900 dark:text-green-100">{result.skipped}</p>
+            </div>
+          </div>
           {result.skipped > 0 && (
             <div className="text-xs text-gray-500">{t("page.import.scientific.skipped", { count: result.skipped })}</div>
           )}

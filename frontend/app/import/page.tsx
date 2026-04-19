@@ -15,6 +15,10 @@ import useImportWizardController from "./useImportWizardController";
 
 export default function ImportWizardPage() {
     const { t } = useLanguage();
+    const tr = (key: string, fallback: string) => {
+        const value = t(key);
+        return value === key ? fallback : value;
+    };
     const {
         step,
         file,
@@ -57,6 +61,27 @@ export default function ImportWizardPage() {
             body: t("page.import.guided.import.body"),
         },
     };
+    const wizardSummary = [
+        {
+            label: tr("page.import.summary.file", "File"),
+            value: file?.name ?? tr("page.import.summary.file_empty", "Not selected"),
+            detail: file ? tr("page.import.summary.file_ready", "The import source is already loaded.") : tr("page.import.summary.file_waiting", "Choose the file that will anchor this import."),
+        },
+        {
+            label: tr("page.import.summary.mapping", "Mapping"),
+            value: preview ? `${Object.values(mapping).filter(Boolean).length}/${preview.columns.length}` : "—",
+            detail: preview
+                ? tr("page.import.summary.mapping_ready", "UKIP already knows how many columns are mapped.")
+                : tr("page.import.summary.mapping_waiting", "Preview is needed before field mapping can start."),
+        },
+        {
+            label: tr("page.import.summary.domain", "Domain"),
+            value: domain,
+            detail: step >= 3
+                ? tr("page.import.summary.domain_ready", "This is where the imported records will land.")
+                : tr("page.import.summary.domain_waiting", "You will confirm the target domain before importing."),
+        },
+    ];
 
     return (
         <div className="space-y-6">
@@ -83,6 +108,25 @@ export default function ImportWizardPage() {
                 <p className="mt-1 text-sm text-indigo-700 dark:text-indigo-300">
                     {stepGuidance[step].body}
                 </p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+                {wizardSummary.map((card) => (
+                    <div
+                        key={card.label}
+                        className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+                    >
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
+                            {card.label}
+                        </p>
+                        <p className="mt-2 truncate text-sm font-semibold text-gray-900 dark:text-white">
+                            {card.value}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                            {card.detail}
+                        </p>
+                    </div>
+                ))}
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
