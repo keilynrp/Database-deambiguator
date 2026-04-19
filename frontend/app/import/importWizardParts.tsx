@@ -257,6 +257,9 @@ export function StepMapping({
     const [aiProvider, setAiProvider] = useState<string | null>(null);
     const [aiError, setAiError] = useState<string | null>(null);
     const ukipFields = getUkipFields(t);
+    const requiredTargets = ["primary_label", "canonical_id"];
+    const mappedTargets = new Set(Object.values(mapping).filter(Boolean));
+    const missingRecommended = requiredTargets.filter((target) => !mappedTargets.has(target));
 
     async function handleAISuggest() {
         setSuggesting(true);
@@ -342,6 +345,56 @@ export function StepMapping({
 
     return (
         <div className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-950/40">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                        {tr("page.import.mapping.summary.mapped", "Mapped now")}
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">
+                        {matched} / {total}
+                    </p>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-950/40">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                        {tr("page.import.mapping.summary.recommended", "Recommended fields")}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
+                        {missingRecommended.length === 0
+                            ? tr("page.import.mapping.summary.ready", "Ready")
+                            : tr("page.import.mapping.summary.missing", "Still missing")}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {missingRecommended.length === 0
+                            ? tr("page.import.mapping.summary.ready_body", "Primary label and canonical ID are already covered.")
+                            : `${missingRecommended
+                                .map((field) => ukipFields.find((item) => item.value === field)?.label ?? field)
+                                .join(" · ")}`}
+                    </p>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-950/40">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                        {tr("page.import.mapping.summary.safe_unmatched", "Unmatched columns")}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
+                        {total - matched}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {tr("page.import.mapping.summary.safe_unmatched_body", "They will still be preserved as extended attributes unless you skip them.")}
+                    </p>
+                </div>
+            </div>
+
+            {missingRecommended.length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/20 dark:bg-amber-500/5">
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                        {tr("page.import.mapping.recommended_title", "Before you continue, cover the minimum fields that make the dataset easier to understand.")}
+                    </p>
+                    <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                        {tr("page.import.mapping.recommended_body", "Primary label gives each record a readable name, and canonical ID helps UKIP recognize stable identifiers like DOI, SKU, or barcode.")}
+                    </p>
+                </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-3">
                 <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
                     {matched} / {total} mapped
@@ -533,9 +586,43 @@ export function StepValidate({
     const skippedColumns = Object.entries(mapping).filter(([, value]) => value === "");
     const unmappedColumns = preview.columns.filter(column => !mapping[column]);
     const primaryLabelColumn = mappedColumns.find(([, value]) => value === "primary_label")?.[0];
+    const canonicalIdColumn = mappedColumns.find(([, value]) => value === "canonical_id")?.[0];
+    const isReadyForImport = preview.is_science_format || Boolean(primaryLabelColumn && canonicalIdColumn);
 
     return (
         <div className="space-y-5">
+            <div className={`rounded-2xl border p-4 ${
+                isReadyForImport
+                    ? "border-emerald-200 bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/5"
+                    : "border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/5"
+            }`}>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.18em] ${
+                    isReadyForImport
+                        ? "text-emerald-700 dark:text-emerald-300"
+                        : "text-amber-700 dark:text-amber-300"
+                }`}>
+                    {tr("page.import.validate.eyebrow", "Import readiness")}
+                </p>
+                <p className={`mt-1 text-sm font-semibold ${
+                    isReadyForImport
+                        ? "text-emerald-900 dark:text-emerald-100"
+                        : "text-amber-900 dark:text-amber-100"
+                }`}>
+                    {isReadyForImport
+                        ? tr("page.import.validate.ready_title", "This import already has enough structure for a useful first pass.")
+                        : tr("page.import.validate.needs_attention_title", "This import can continue, but one or two mapping fixes will make the result much easier to read.")}
+                </p>
+                <p className={`mt-1 text-sm ${
+                    isReadyForImport
+                        ? "text-emerald-700 dark:text-emerald-300"
+                        : "text-amber-700 dark:text-amber-300"
+                }`}>
+                    {isReadyForImport
+                        ? tr("page.import.validate.ready_body", "You can import now and move directly to dashboard, review, and briefing.")
+                        : tr("page.import.validate.needs_attention_body", "If possible, map a human-readable label and a stable identifier before importing.")}
+                </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                     { label: tr("page.import.validate.total_rows", "Total Rows"), value: preview.row_count.toLocaleString(), color: "text-indigo-600" },
@@ -568,6 +655,20 @@ export function StepValidate({
                         <p className="text-sm font-medium text-amber-800 dark:text-amber-300">{tr("page.import.validate.no_primary_title", "No Primary Label mapped")}</p>
                         <p className="text-xs text-amber-600 dark:text-amber-400">
                             {tr("page.import.validate.no_primary_hint", "Consider mapping a column to Primary Label so entities have a human-readable name.")}
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {!canonicalIdColumn && !preview.is_science_format && (
+                <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950/40">
+                    <svg className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h10m-10 5h16" />
+                    </svg>
+                    <div>
+                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{tr("page.import.validate.no_canonical_title", "No stable identifier mapped")}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                            {tr("page.import.validate.no_canonical_hint", "If your file has DOI, SKU, barcode, or another stable key, map it to Canonical ID to make dedupe and follow-up easier later.")}
                         </p>
                     </div>
                 </div>

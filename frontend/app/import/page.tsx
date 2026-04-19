@@ -35,6 +35,28 @@ export default function ImportWizardPage() {
         handleBack,
     } = useImportWizardController();
     const steps = getSteps(t);
+    const stepGuidance: Record<number, { title: string; body: string }> = {
+        1: {
+            title: t("page.import.guided.upload.title"),
+            body: t("page.import.guided.upload.body"),
+        },
+        2: {
+            title: t("page.import.guided.mapping.title"),
+            body: t("page.import.guided.mapping.body"),
+        },
+        3: {
+            title: t("page.import.guided.domain.title"),
+            body: t("page.import.guided.domain.body"),
+        },
+        4: {
+            title: t("page.import.guided.validate.title"),
+            body: t("page.import.guided.validate.body"),
+        },
+        5: {
+            title: t("page.import.guided.import.title"),
+            body: t("page.import.guided.import.body"),
+        },
+    };
 
     return (
         <div className="space-y-6">
@@ -49,6 +71,18 @@ export default function ImportWizardPage() {
 
             <div className="flex justify-center py-2">
                 <StepBar current={step} />
+            </div>
+
+            <div className="rounded-2xl border border-indigo-200 bg-indigo-50/80 p-4 shadow-sm dark:border-indigo-500/20 dark:bg-indigo-500/5">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-300">
+                    {t("page.import.guided.eyebrow")}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-indigo-900 dark:text-indigo-100">
+                    {stepGuidance[step].title}
+                </p>
+                <p className="mt-1 text-sm text-indigo-700 dark:text-indigo-300">
+                    {stepGuidance[step].body}
+                </p>
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
