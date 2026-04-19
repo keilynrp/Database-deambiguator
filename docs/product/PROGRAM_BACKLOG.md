@@ -108,6 +108,8 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
   `docs/product/PILOT_FRAMING_SCRIPT.md`
 - demo script por stakeholder documentado en
   `docs/product/DEMO_SCRIPT_BY_STAKEHOLDER.md`
+- plantilla de propuesta de piloto documentada en
+  `docs/product/PILOT_PROPOSAL_TEMPLATE.md`
 
 ## Hallazgo modulo scientific import
 
