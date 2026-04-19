@@ -71,7 +71,7 @@ export default function Sidebar() {
 
   // On desktop: fixed sidebar, collapsed or expanded
   // On mobile: full-width drawer, hidden until mobileOpen
-  const desktopWidth = collapsed ? "lg:w-20" : "lg:w-64";
+  const desktopWidth = collapsed ? "lg:w-16" : "lg:w-64";
   const mobileTranslate = mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0";
   const compactDesktop = collapsed && !mobileOpen;
 
@@ -87,7 +87,7 @@ export default function Sidebar() {
       )}
 
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width,transform] duration-300 ease-out dark:border-gray-800 dark:bg-gray-900 lg:w-64 ${desktopWidth} ${mobileTranslate}`}
+        className={`fixed left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width,transform] duration-300 ease-out dark:border-gray-800 dark:bg-gray-900 ${desktopWidth} ${mobileTranslate}`}
       >
         {/* Logo */}
         <div
@@ -113,7 +113,7 @@ export default function Sidebar() {
             onClick={toggle}
             aria-label={collapsed ? tr("sidebar.expand", "Expand sidebar") : tr("sidebar.collapse", "Collapse sidebar")}
             className={`hidden rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:block ${
-              compactDesktop ? "absolute right-2 top-1/2 -translate-y-1/2" : ""
+              compactDesktop ? "absolute right-1 top-1/2 -translate-y-1/2" : ""
             }`}
           >
             <svg className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,11 +137,11 @@ export default function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className={`flex-1 overflow-y-auto py-4 ${compactDesktop ? "px-3" : "px-4"}`}>
+        <nav className={`flex-1 overflow-y-auto py-4 ${compactDesktop ? "px-2" : "px-4"}`}>
           {visibleSections.map((section, sectionIdx) => (
             <div key={section.header} className={sectionIdx > 0 ? "mt-6" : ""}>
               {compactDesktop ? (
-                sectionIdx > 0 && <div className="mx-3 mb-3 h-px bg-gray-200 dark:bg-gray-800" />
+                sectionIdx > 0 && <div className="mx-2 mb-3 h-px bg-gray-200 dark:bg-gray-800" />
               ) : (
                 <div className="mb-2 px-3">
                   <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
@@ -161,7 +161,7 @@ export default function Sidebar() {
                         href={item.href}
                         onClick={closeMobile}
                         className={`flex items-center rounded-lg py-2.5 text-sm font-medium transition-[background-color,color,padding] duration-200 ${
-                          compactDesktop ? "justify-center px-2" : "gap-3 px-3"
+                          compactDesktop ? "justify-center px-1.5" : "gap-3 px-3"
                         } ${
                           isActive
                             ? "bg-blue-50 text-blue-600 dark:bg-blue-600/10 dark:text-blue-400"
@@ -185,7 +185,7 @@ export default function Sidebar() {
         </nav>
 
         {/* Footer */}
-        <div className={`border-t border-gray-200 py-4 dark:border-gray-800 ${compactDesktop ? "px-3" : "px-4"}`}>
+        <div className={`border-t border-gray-200 py-4 dark:border-gray-800 ${compactDesktop ? "px-2" : "px-4"}`}>
           {!compactDesktop ? (
             <div className="space-y-3">
               <button
@@ -228,7 +228,7 @@ export default function Sidebar() {
             </div>
           ) : (
             <div className="flex justify-center">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                 U
               </span>
             </div>
