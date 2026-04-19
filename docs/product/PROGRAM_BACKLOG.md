@@ -112,6 +112,8 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
   `docs/product/PILOT_PROPOSAL_TEMPLATE.md`
 - objection handling sheet documentado en
   `docs/product/OBJECTION_HANDLING_SHEET.md`
+- email follow-up template post-demo documentado en
+  `docs/product/EMAIL_FOLLOW_UP_TEMPLATE_POST_DEMO.md`
 
 ## Hallazgo modulo scientific import
 
