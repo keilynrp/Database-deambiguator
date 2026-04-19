@@ -747,7 +747,7 @@ export default function ReportsPage() {
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder={`UKIP Report — ${activeDomainId || "default"}`}
+                  placeholder={t("page.reports.title_placeholder", { domain: activeDomainId || "default" })}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
                 />
               </div>
