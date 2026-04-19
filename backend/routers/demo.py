@@ -6,8 +6,8 @@ Demo Mode endpoints.
 """
 from __future__ import annotations
 
+import json
 import logging
-import os
 from pathlib import Path
 
 import pandas as pd
@@ -27,9 +27,69 @@ _DEMO_FILE = Path("data/demo/demo_entities.xlsx")
 
 _SEED_CHUNK = 500
 
+_CURRENT_FIELD_MAP = {
+    "primary_label":             "primary_label",
+    "secondary_label":           "secondary_label",
+    "canonical_id":              "canonical_id",
+    "entity_type":               "entity_type",
+    "domain":                    "domain",
+    "validation_status":         "validation_status",
+    "enrichment_status":         "enrichment_status",
+    "enrichment_citation_count": "enrichment_citation_count",
+    "enrichment_concepts":       "enrichment_concepts",
+    "enrichment_source":         "enrichment_source",
+    "enrichment_doi":            "enrichment_doi",
+}
+
+_LEGACY_FALLBACKS = {
+    "primary_label": "entity_name",
+    "secondary_label": "brand_capitalized",
+    "canonical_id": "sku",
+}
+
+_LEGACY_ATTRIBUTE_COLUMNS = ("brand_lower", "classification", "creation_date", "status")
+
 
 def _demo_count(db: Session) -> int:
     return db.query(models.RawEntity).filter(models.RawEntity.source == "demo").count()
+
+
+def _is_present(value: object) -> bool:
+    return value is not None and not pd.isna(value)
+
+
+def _normalize_domain(raw_value: object) -> str:
+    if not _is_present(raw_value):
+        return "default"
+    return str(raw_value).strip().lower() or "default"
+
+
+def _row_to_raw_entity_kwargs(row: dict) -> dict:
+    kwargs: dict = {"source": "demo"}
+
+    for df_col, model_field in _CURRENT_FIELD_MAP.items():
+        value = row.get(df_col)
+        if _is_present(value):
+            kwargs[model_field] = value
+
+    for model_field, legacy_column in _LEGACY_FALLBACKS.items():
+        if model_field not in kwargs:
+            value = row.get(legacy_column)
+            if _is_present(value):
+                kwargs[model_field] = value
+
+    if "domain" not in kwargs:
+        kwargs["domain"] = _normalize_domain(row.get("entity_type"))
+
+    legacy_attributes = {
+        key: row.get(key)
+        for key in _LEGACY_ATTRIBUTE_COLUMNS
+        if _is_present(row.get(key))
+    }
+    if legacy_attributes:
+        kwargs["attributes_json"] = json.dumps(legacy_attributes)
+
+    return kwargs
 
 
 # ── GET /demo/status ──────────────────────────────────────────────────────────
@@ -69,31 +129,11 @@ def demo_seed(
         logger.exception("Failed to read demo Excel file")
         raise HTTPException(status_code=500, detail=f"Failed to read demo file: {exc}") from exc
 
-    # Map DataFrame columns → RawEntity fields
-    _FIELD_MAP = {
-        "primary_label":             "primary_label",
-        "secondary_label":           "secondary_label",
-        "canonical_id":              "canonical_id",
-        "entity_type":               "entity_type",
-        "domain":                    "domain",
-        "validation_status":         "validation_status",
-        "enrichment_status":         "enrichment_status",
-        "enrichment_citation_count": "enrichment_citation_count",
-        "enrichment_concepts":       "enrichment_concepts",
-        "enrichment_source":         "enrichment_source",
-        "enrichment_doi":            "enrichment_doi",
-    }
-
     rows = df.to_dict(orient="records")
     seeded = 0
     chunk: list[models.RawEntity] = []
     for row in rows:
-        kwargs: dict = {"source": "demo"}
-        for df_col, model_field in _FIELD_MAP.items():
-            val = row.get(df_col)
-            if val is not None and not (isinstance(val, float) and val != val):  # NaN check
-                kwargs[model_field] = val
-        chunk.append(models.RawEntity(**kwargs))
+        chunk.append(models.RawEntity(**_row_to_raw_entity_kwargs(row)))
         if len(chunk) >= _SEED_CHUNK:
             db.add_all(chunk)
             db.commit()

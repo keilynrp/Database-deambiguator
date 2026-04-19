@@ -4,6 +4,9 @@ Offline script to generate the UKIP demo dataset.
 Produces data/demo/demo_entities.xlsx with 1,000 synthetic entities across
 4 categories: Technology, Healthcare, Science, Engineering.
 
+The generated file uses the current RawEntity-facing demo schema while also
+including a few legacy columns that remain useful as descriptive attributes.
+
 Run once before committing the dataset:
     python scripts/generate_demo_dataset.py
 
@@ -128,12 +131,11 @@ for cat in CATEGORIES:
         day   = random.randint(1, 28)
 
         rows.append({
-            "entity_name":             f"{brand} {cat['classifications'][idx % len(cat['classifications'])]} {idx:04d}",
-            "brand_capitalized":       brand,
-            "brand_lower":             brand.lower(),
-            "classification":          cat["classifications"][idx % len(cat["classifications"])],
+            "primary_label":           f"{brand} {cat['classifications'][idx % len(cat['classifications'])]} {idx:04d}",
+            "secondary_label":         brand,
+            "canonical_id":            f"DEMO-{cat['name'][:3].upper()}-{idx:05d}",
+            "domain":                  cat["name"].lower(),
             "entity_type":             cat["name"],
-            "sku":                     f"DEMO-{cat['name'][:3].upper()}-{idx:05d}",
             "creation_date":           f"{year}-{month:02d}-{day:02d}",
             "status":                  "active",
             "validation_status":       "valid",
@@ -141,6 +143,9 @@ for cat in CATEGORIES:
             "enrichment_citation_count": log_normal_citations() if enriched else 0,
             "enrichment_concepts":     random.choice(cat["concepts"]) if enriched else None,
             "enrichment_source":       random.choice(cat["sources"]) if enriched else None,
+            "enrichment_doi":          None,
+            "brand_lower":             brand.lower(),
+            "classification":          cat["classifications"][idx % len(cat["classifications"])],
         })
 
 # Shuffle so categories are mixed

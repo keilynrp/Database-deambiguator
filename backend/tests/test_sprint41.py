@@ -28,6 +28,28 @@ def _demo_df(n: int = 5) -> pd.DataFrame:
     ])
 
 
+def _legacy_demo_df(n: int = 5) -> pd.DataFrame:
+    """Legacy demo DataFrame matching the pre-normalized spreadsheet schema."""
+    return pd.DataFrame([
+        {
+            "entity_name": f"Legacy Demo Entity {i}",
+            "brand_capitalized": f"DemoBrand{i % 3}",
+            "brand_lower": f"demobrand{i % 3}",
+            "classification": "Simulation Software",
+            "entity_type": "Science",
+            "sku": f"DEMO-SCI-{i:05d}",
+            "creation_date": "2024-05-10",
+            "status": "active",
+            "validation_status": "valid",
+            "enrichment_status": "completed",
+            "enrichment_citation_count": 10 * (i + 1),
+            "enrichment_concepts": "AI, machine learning",
+            "enrichment_source": "openalex",
+        }
+        for i in range(n)
+    ])
+
+
 import contextlib
 from unittest.mock import patch as _patch
 
@@ -88,6 +110,21 @@ def test_demo_seed_conflict_if_already_seeded(client, auth_headers, db_session):
         resp = client.post("/demo/seed", headers=auth_headers)
 
     assert resp.status_code == 409
+
+
+def test_demo_seed_maps_legacy_demo_columns(client, auth_headers, db_session):
+    df = _legacy_demo_df(3)
+    with _fake_demo_file(df):
+        resp = client.post("/demo/seed", headers=auth_headers)
+
+    assert resp.status_code == 201
+
+    rows = db_session.query(models.RawEntity).filter(models.RawEntity.source == "demo").all()
+    assert len(rows) == 3
+    assert rows[0].primary_label.startswith("Legacy Demo Entity")
+    assert rows[0].secondary_label.startswith("DemoBrand")
+    assert rows[0].canonical_id.startswith("DEMO-SCI-")
+    assert rows[0].domain == "science"
 
 
 # ── DELETE /demo/reset ────────────────────────────────────────────────────────
