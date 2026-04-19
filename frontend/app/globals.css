@@ -4,6 +4,12 @@
   from { opacity: 0; transform: translateX(1rem); }
   to   { opacity: 1; transform: translateX(0); }
 }
+
+@keyframes toast-progress {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
 .toast-enter {
   animation: toast-enter 0.2s ease-out both;
 }

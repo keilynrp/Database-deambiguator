@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 export type ToastVariant = "success" | "error" | "warning" | "info";
 
@@ -41,6 +42,12 @@ const ICONS: Record<ToastVariant, string> = {
     warning: "⚠",
     info:    "i",
 };
+const PROGRESS_STYLES: Record<ToastVariant, string> = {
+    success: "bg-green-500/70 dark:bg-green-400/70",
+    error:   "bg-red-500/70 dark:bg-red-400/70",
+    warning: "bg-yellow-500/70 dark:bg-yellow-400/70",
+    info:    "bg-blue-500/70 dark:bg-blue-400/70",
+};
 
 let nextId = 0;
 const DURATION = 4500;
@@ -48,6 +55,7 @@ const DURATION = 4500;
 export function ToastProvider({ children }: { children: ReactNode }) {
     const [toasts, setToasts] = useState<ToastItem[]>([]);
     const [mounted, setMounted] = useState(false);
+    const { t } = useLanguage();
 
     useEffect(() => {
         setMounted(true);
@@ -66,28 +74,38 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const toastContainer = (
         <div
             aria-live="polite"
-            aria-label="Notifications"
-            className="fixed bottom-5 right-5 z-[200] flex flex-col gap-2 pointer-events-none"
+            aria-label={t("common.toast.region")}
+            className="pointer-events-none fixed inset-x-4 bottom-5 z-[200] flex flex-col gap-2 sm:inset-x-auto sm:right-5 sm:w-auto"
         >
-            {toasts.map(t => (
+            {toasts.map((item) => (
                 <div
-                    key={t.id}
-                    className={`flex items-start gap-3 rounded-xl border px-4 py-3 shadow-lg pointer-events-auto toast-enter ${STYLES[t.variant]}`}
+                    key={item.id}
+                    className={`pointer-events-auto relative overflow-hidden rounded-xl border px-4 py-3 shadow-lg toast-enter ${STYLES[item.variant]}`}
                     style={{ minWidth: 280, maxWidth: 420 }}
                 >
-                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${ICON_STYLES[t.variant]}`}>
-                        {ICONS[t.variant]}
-                    </span>
-                    <p className="flex-1 text-sm font-medium leading-snug">{t.message}</p>
-                    <button
-                        onClick={() => dismiss(t.id)}
-                        className="shrink-0 rounded p-0.5 opacity-50 hover:opacity-100 transition-opacity"
-                        aria-label="Dismiss"
-                    >
-                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                    <div
+                        className={`absolute inset-x-0 bottom-0 h-1 origin-left animate-[toast-progress_4.5s_linear_forwards] ${PROGRESS_STYLES[item.variant]}`}
+                    />
+                    <div className="flex items-start gap-3">
+                        <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${ICON_STYLES[item.variant]}`}>
+                            {ICONS[item.variant]}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] opacity-80">
+                                {t(`common.toast.${item.variant}`)}
+                            </p>
+                            <p className="mt-1 text-sm font-medium leading-snug break-words">{item.message}</p>
+                        </div>
+                        <button
+                            onClick={() => dismiss(item.id)}
+                            className="shrink-0 rounded p-0.5 opacity-50 transition-opacity hover:opacity-100"
+                            aria-label={t("common.dismiss")}
+                        >
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             ))}
         </div>
