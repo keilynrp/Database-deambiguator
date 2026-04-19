@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { useToast } from "../../components/ui";
 import type { ToastVariant } from "../../components/ui";
 import { apiFetch } from "../../../lib/api";
@@ -263,7 +264,12 @@ function UserFormSlider({ initial, onClose, onSaved, toast }: UserFormProps) {
 
 export default function UsersManagementPage() {
   const { user: me } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
+  const tr = useCallback((key: string, fallback: string) => {
+    const value = t(key);
+    return value === key ? fallback : value;
+  }, [t]);
 
   const [users,   setUsers]   = useState<UserRecord[]>([]);
   const [stats,   setStats]   = useState<UserStats | null>(null);
@@ -288,11 +294,11 @@ export default function UsersManagementPage() {
       if (uRes.ok) setUsers(await uRes.json());
       if (sRes.ok) setStats(await sRes.json());
     } catch {
-      toast("Failed to load users", "error");
+      toast(tr("page.settings_users.toast.load_failed", "Failed to load users"), "error");
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, tr]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -321,17 +327,17 @@ export default function UsersManagementPage() {
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-      toast("Role updated", "success");
+      toast(tr("page.settings_users.toast.role_updated", "Role updated"), "success");
     } catch (err: unknown) {
-      toast(getErrorMessage(err, "Failed to update role"), "error");
+      toast(getErrorMessage(err, tr("page.settings_users.toast.role_update_failed", "Failed to update role")), "error");
     } finally {
       setActionId(null);
     }
   }
 
   async function handleToggleActive(u: UserRecord) {
-    if (u.id === me?.id) { toast("Cannot change your own account status", "error"); return; }
-    if (u.is_active && !confirm(`Deactivate "${u.username}"? They will lose access immediately.`)) return;
+    if (u.id === me?.id) { toast(tr("page.settings_users.toast.self_status_blocked", "Cannot change your own account status"), "error"); return; }
+    if (u.is_active && !confirm(tr("page.settings_users.confirm.deactivate", `Deactivate "${u.username}"? They will lose access immediately.`))) return;
     setActionId(u.id);
     try {
       const res = u.is_active
@@ -344,9 +350,14 @@ export default function UsersManagementPage() {
         active:   prev.active   + (u.is_active ? -1 : 1),
         inactive: prev.inactive + (u.is_active ?  1 : -1),
       } : prev);
-      toast(u.is_active ? `"${u.username}" deactivated` : `"${u.username}" reactivated`, u.is_active ? "warning" : "success");
+      toast(
+        u.is_active
+          ? tr("page.settings_users.toast.deactivated", `"${u.username}" deactivated`)
+          : tr("page.settings_users.toast.reactivated", `"${u.username}" reactivated`),
+        u.is_active ? "warning" : "success",
+      );
     } catch (err: unknown) {
-      toast(getErrorMessage(err, "Action failed"), "error");
+      toast(getErrorMessage(err, tr("page.settings_users.toast.action_failed", "Action failed")), "error");
     } finally {
       setActionId(null);
     }
@@ -360,7 +371,7 @@ export default function UsersManagementPage() {
         <svg className="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
-        <p className="mt-3 text-sm font-medium">Super Admin access required</p>
+          <p className="mt-3 text-sm font-medium">{tr("page.settings_users.guard", "Super Admin access required")}</p>
       </div>
     );
   }
@@ -372,9 +383,9 @@ export default function UsersManagementPage() {
       {/* Page header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{tr("page.settings_users.title", "User Management")}</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Manage accounts, roles, and access for your platform users
+            {tr("page.settings_users.subtitle", "Manage accounts, roles, and access for your platform users")}
           </p>
         </div>
         <button
@@ -384,7 +395,7 @@ export default function UsersManagementPage() {
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          New User
+          {tr("page.settings_users.new_user", "New User")}
         </button>
       </div>
 
@@ -414,8 +425,8 @@ export default function UsersManagementPage() {
           </svg>
           <input
             className="h-9 w-full rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-            placeholder="Search users…"
-            aria-label="Search users"
+            placeholder={tr("page.settings_users.search_placeholder", "Search users…")}
+            aria-label={tr("page.settings_users.search_aria", "Search users")}
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -428,7 +439,7 @@ export default function UsersManagementPage() {
           value={roleFilter}
           onChange={e => setRoleFilter(e.target.value as UserRole | "")}
         >
-          <option value="">All roles</option>
+          <option value="">{tr("page.settings_users.all_roles", "All roles")}</option>
           <option value="super_admin">Super Admin</option>
           <option value="admin">Admin</option>
           <option value="editor">Editor</option>
@@ -442,9 +453,9 @@ export default function UsersManagementPage() {
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value as "active" | "inactive" | "")}
         >
-          <option value="">All statuses</option>
-          <option value="active">Active only</option>
-          <option value="inactive">Inactive only</option>
+          <option value="">{tr("page.settings_users.all_statuses", "All statuses")}</option>
+          <option value="active">{tr("page.settings_users.active_only", "Active only")}</option>
+          <option value="inactive">{tr("page.settings_users.inactive_only", "Inactive only")}</option>
         </select>
 
         {/* Clear filters */}
@@ -453,11 +464,11 @@ export default function UsersManagementPage() {
             onClick={() => { setSearch(""); setRoleFilter(""); setStatusFilter(""); }}
             className="text-xs text-blue-600 hover:underline dark:text-blue-400"
           >
-            Clear filters
+            {tr("page.settings_users.clear_filters", "Clear filters")}
           </button>
         )}
 
-        <span className="ml-auto text-xs text-gray-400">{filtered.length} user{filtered.length !== 1 ? "s" : ""}</span>
+        <span className="ml-auto text-xs text-gray-400">{tr("page.settings_users.filtered_count", `${filtered.length} user${filtered.length !== 1 ? "s" : ""}`)}</span>
       </div>
 
       {/* Users table */}
@@ -468,14 +479,15 @@ export default function UsersManagementPage() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-            <span className="sr-only">Loading users…</span>
+            <span className="sr-only">{tr("page.settings_users.loading", "Loading users…")}</span>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-gray-400">
             <svg className="h-10 w-10" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <p className="mt-2 text-sm">No users match your filters</p>
+            <p className="mt-2 text-sm font-medium text-gray-600 dark:text-gray-300">{tr("page.settings_users.empty_title", "No users match your filters")}</p>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{tr("page.settings_users.empty_body", "Clear one or more filters to see the rest of your user base.")}</p>
           </div>
         ) : (
           <table className="w-full text-left text-sm">

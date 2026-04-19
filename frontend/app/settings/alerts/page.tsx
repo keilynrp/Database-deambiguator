@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
 import { formatDate } from "../../lib/dateFormat";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { useToast } from "../../components/ui";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -57,6 +59,8 @@ const EMPTY_FORM = {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AlertsPage() {
+  const { t } = useLanguage();
+  const { toast } = useToast();
   const [channels, setChannels]   = useState<AlertChannel[]>([]);
   const [events, setEvents]       = useState<AlertEvent[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -67,6 +71,10 @@ export default function AlertsPage() {
   const [error, setError]         = useState<string | null>(null);
   const [testing, setTesting]     = useState<number | null>(null);
   const [testResult, setTestResult] = useState<Record<number, boolean | null>>({});
+  const tr = useCallback((key: string, fallback: string) => {
+    const value = t(key);
+    return value === key ? fallback : value;
+  }, [t]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -124,24 +132,34 @@ export default function AlertsPage() {
       setShowForm(false);
       await load();
     } catch {
-      setError("Network error");
+      setError(tr("page.settings_alerts.error.network", "Network error"));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(id: number) {
-    if (!confirm("Delete this alert channel?")) return;
-    await apiFetch(`/alert-channels/${id}`, { method: "DELETE" });
-    await load();
+    if (!confirm(tr("page.settings_alerts.confirm.delete", "Delete this alert channel?"))) return;
+    const res = await apiFetch(`/alert-channels/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      toast(tr("page.settings_alerts.toast.deleted", "Alert channel deleted"), "warning");
+      await load();
+      return;
+    }
+    toast(tr("page.settings_alerts.toast.delete_failed", "Could not delete this alert channel"), "error");
   }
 
   async function handleToggle(c: AlertChannel) {
-    await apiFetch(`/alert-channels/${c.id}`, {
+    const res = await apiFetch(`/alert-channels/${c.id}`, {
       method: "PUT",
       body: JSON.stringify({ is_active: !c.is_active }),
     });
-    await load();
+    if (res.ok) {
+      toast(c.is_active ? tr("page.settings_alerts.toast.paused", "Channel paused") : tr("page.settings_alerts.toast.activated", "Channel activated"), "success");
+      await load();
+      return;
+    }
+    toast(tr("page.settings_alerts.toast.toggle_failed", "Could not update this channel"), "error");
   }
 
   async function handleTest(id: number) {
@@ -151,6 +169,7 @@ export default function AlertsPage() {
       const res = await apiFetch(`/alert-channels/${id}/test`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       setTestResult((prev) => ({ ...prev, [id]: data.success === true }));
+      toast(data.success ? tr("page.settings_alerts.toast.test_sent", "Test sent") : tr("page.settings_alerts.toast.test_failed", "Test failed"), data.success ? "success" : "warning");
     } finally {
       setTesting(null);
     }
@@ -161,9 +180,9 @@ export default function AlertsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Alert Channels</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{tr("page.settings_alerts.title", "Alert Channels")}</h2>
           <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-            Push platform events to Slack, Teams, Discord, or any webhook.
+            {tr("page.settings_alerts.subtitle", "Push platform events to Slack, Teams, Discord, or any webhook.")}
           </p>
         </div>
         <button
@@ -173,7 +192,7 @@ export default function AlertsPage() {
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Add Channel
+          {tr("page.settings_alerts.add_channel", "Add Channel")}
         </button>
       </div>
 
@@ -187,9 +206,10 @@ export default function AlertsPage() {
           <svg className="mx-auto mb-3 h-10 w-10 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
           </svg>
-          <p className="text-sm text-gray-500 dark:text-gray-400">No alert channels configured.</p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{tr("page.settings_alerts.empty_title", "No alert channels configured")}</p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{tr("page.settings_alerts.empty_body", "Create one when you want external teams or systems to react to key platform events.")}</p>
           <button onClick={openCreate} className="mt-3 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400">
-            Add your first channel →
+            {tr("page.settings_alerts.empty_cta", "Add your first channel →")}
           </button>
         </div>
       ) : (

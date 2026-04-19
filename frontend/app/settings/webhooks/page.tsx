@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { PageHeader, StatCard, Badge, useToast } from "../../components/ui";
 import { apiFetch } from "@/lib/api";
 import { formatRelativeTime } from "../../lib/dateFormat";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,12 +137,17 @@ function Spinner({ className = "h-4 w-4" }: { className?: string }) {
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function WebhooksPage() {
+    const { t } = useLanguage();
     const { toast } = useToast();
     const [hooks, setHooks] = useState<WebhookRecord[]>([]);
     const [stats, setStats] = useState<WebhookStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
     const [expandedId, setExpandedId] = useState<number | null>(null);
+    const tr = useCallback((key: string, fallback: string) => {
+        const value = t(key);
+        return value === key ? fallback : value;
+    }, [t]);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -167,8 +173,8 @@ export default function WebhooksPage() {
                     { label: "Settings", href: "/settings" },
                     { label: "Webhooks" },
                 ]}
-                title="Webhooks"
-                description="Manage outbound HTTP callbacks fired on platform events"
+                title={tr("page.settings_webhooks.title", "Webhooks")}
+                description={tr("page.settings_webhooks.subtitle", "Manage outbound HTTP callbacks fired on platform events")}
             />
 
             {/* Stats cards */}
@@ -221,7 +227,7 @@ export default function WebhooksPage() {
                     className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 hover:shadow-md active:scale-[0.98]"
                 >
                     {showCreate ? <CloseIcon /> : <PlusIcon />}
-                    {showCreate ? "Cancel" : "New Webhook"}
+                    {showCreate ? tr("common.cancel", "Cancel") : tr("page.settings_webhooks.new_webhook", "New Webhook")}
                 </button>
             </div>
 
@@ -231,6 +237,7 @@ export default function WebhooksPage() {
                     onCreated={() => { setShowCreate(false); load(); }}
                     onCancel={() => setShowCreate(false)}
                     toast={toast}
+                    tr={tr}
                 />
             )}
 
@@ -242,8 +249,8 @@ export default function WebhooksPage() {
             ) : hooks.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 py-16 dark:border-gray-700">
                     <WebhookIcon className="h-12 w-12 text-gray-300 dark:text-gray-600" />
-                    <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400">No webhooks configured yet</p>
-                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Create one to receive event notifications via HTTP</p>
+                    <p className="mt-4 text-sm font-medium text-gray-700 dark:text-gray-300">{tr("page.settings_webhooks.empty_title", "No webhooks configured yet")}</p>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{tr("page.settings_webhooks.empty_body", "Create one when another system should receive HTTP callbacks from key UKIP events.")}</p>
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -255,6 +262,7 @@ export default function WebhooksPage() {
                             onToggleExpand={() => setExpandedId(expandedId === hook.id ? null : hook.id)}
                             onReload={load}
                             toast={toast}
+                            tr={tr}
                         />
                     ))}
                 </div>
@@ -269,10 +277,12 @@ function CreateWebhookForm({
     onCreated,
     onCancel,
     toast,
+    tr,
 }: {
     onCreated: () => void;
     onCancel: () => void;
     toast: (msg: string, v?: "success" | "error" | "warning" | "info") => void;
+    tr: (key: string, fallback: string) => string;
 }) {
     const [form, setForm] = useState({ url: "", secret: "", events: [] as string[] });
     const [saving, setSaving] = useState(false);
@@ -288,7 +298,7 @@ function CreateWebhookForm({
 
     const handleCreate = async () => {
         if (!form.url || form.events.length === 0) {
-            toast("URL and at least one event are required", "warning");
+            toast(tr("page.settings_webhooks.toast.required", "URL and at least one event are required"), "warning");
             return;
         }
         setSaving(true);
@@ -299,10 +309,10 @@ function CreateWebhookForm({
                 body: JSON.stringify({ url: form.url, events: form.events, secret: form.secret || null }),
             });
             if (!res.ok) throw new Error(await res.text());
-            toast("Webhook created", "success");
+            toast(tr("page.settings_webhooks.toast.created", "Webhook created"), "success");
             onCreated();
         } catch {
-            toast("Failed to create webhook", "error");
+            toast(tr("page.settings_webhooks.toast.create_failed", "Failed to create webhook"), "error");
         } finally {
             setSaving(false);
         }
@@ -310,38 +320,38 @@ function CreateWebhookForm({
 
     return (
         <div className="animate-in slide-in-from-top-2 rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/80 to-white p-6 shadow-sm dark:border-indigo-500/20 dark:from-indigo-500/5 dark:to-gray-900">
-            <h3 className="mb-5 text-base font-semibold text-gray-900 dark:text-white">New Webhook</h3>
+            <h3 className="mb-5 text-base font-semibold text-gray-900 dark:text-white">{tr("page.settings_webhooks.modal_title", "New Webhook")}</h3>
             <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                        <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Endpoint URL *</label>
+                        <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">{tr("page.settings_webhooks.endpoint_url", "Endpoint URL")} *</label>
                         <input
                             type="url"
                             value={form.url}
                             onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
-                            placeholder="https://your-app.com/webhooks/ukip"
+                            placeholder={tr("page.settings_webhooks.endpoint_placeholder", "https://your-app.com/webhooks/ukip")}
                             className={inputClass}
                         />
                     </div>
                     <div>
                         <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                            Secret <span className="font-normal text-gray-400">(HMAC-SHA256)</span>
+                            {tr("page.settings_webhooks.secret", "Secret")} <span className="font-normal text-gray-400">{tr("page.settings_webhooks.secret_hint", "(HMAC-SHA256)")}</span>
                         </label>
                         <input
                             type="text"
                             value={form.secret}
                             onChange={e => setForm(f => ({ ...f, secret: e.target.value }))}
-                            placeholder="optional-signing-key"
+                            placeholder={tr("page.settings_webhooks.secret_placeholder", "optional-signing-key")}
                             className={inputClass}
                         />
                     </div>
                 </div>
                 <div>
                     <div className="mb-2 flex items-center justify-between">
-                        <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Events *</label>
+                        <label className="text-xs font-medium text-gray-600 dark:text-gray-400">{tr("page.settings_webhooks.events", "Events")} *</label>
                         <div className="flex gap-2">
-                            <button onClick={selectAll} className="text-xs text-indigo-600 hover:underline dark:text-indigo-400">Select all</button>
-                            <button onClick={clearAll} className="text-xs text-gray-400 hover:underline">Clear</button>
+                            <button onClick={selectAll} className="text-xs text-indigo-600 hover:underline dark:text-indigo-400">{tr("page.settings_webhooks.select_all", "Select all")}</button>
+                            <button onClick={clearAll} className="text-xs text-gray-400 hover:underline">{tr("page.settings_webhooks.clear", "Clear")}</button>
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -369,7 +379,7 @@ function CreateWebhookForm({
                         onClick={onCancel}
                         className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                     >
-                        Cancel
+                        {tr("common.cancel", "Cancel")}
                     </button>
                     <button
                         onClick={handleCreate}
@@ -377,7 +387,7 @@ function CreateWebhookForm({
                         className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 disabled:opacity-50"
                     >
                         {saving && <Spinner />}
-                        {saving ? "Creating…" : "Create Webhook"}
+                        {saving ? tr("page.settings_webhooks.creating", "Creating…") : tr("page.settings_webhooks.create", "Create Webhook")}
                     </button>
                 </div>
             </div>
@@ -393,12 +403,14 @@ function WebhookCard({
     onToggleExpand,
     onReload,
     toast,
+    tr,
 }: {
     hook: WebhookRecord;
     expanded: boolean;
     onToggleExpand: () => void;
     onReload: () => void;
     toast: (msg: string, v?: "success" | "error" | "warning" | "info") => void;
+    tr: (key: string, fallback: string) => string;
 }) {
     const [testing, setTesting] = useState(false);
     const [testResult, setTestResult] = useState<TestResult | null>(null);
@@ -412,10 +424,10 @@ function WebhookCard({
             body: JSON.stringify({ is_active: !hook.is_active }),
         });
         if (res.ok) {
-            toast(hook.is_active ? "Webhook disabled" : "Webhook enabled", "success");
+            toast(hook.is_active ? tr("page.settings_webhooks.toast.paused", "Webhook paused") : tr("page.settings_webhooks.toast.activated", "Webhook activated"), "success");
             onReload();
         } else {
-            toast("Update failed", "error");
+            toast(tr("page.settings_webhooks.toast.update_failed", "Update failed"), "error");
         }
     };
 
@@ -427,9 +439,9 @@ function WebhookCard({
             if (res.ok) {
                 const data = await res.json();
                 setTestResult(data);
-                toast(data.success ? "Test succeeded!" : "Test failed — see details", data.success ? "success" : "warning");
+                toast(data.success ? tr("page.settings_webhooks.toast.test_sent", "Test succeeded") : tr("page.settings_webhooks.toast.test_failed", "Test failed — see details"), data.success ? "success" : "warning");
             } else {
-                toast("Test request failed", "error");
+                toast(tr("page.settings_webhooks.toast.test_request_failed", "Test request failed"), "error");
             }
         } finally {
             setTesting(false);
@@ -437,13 +449,13 @@ function WebhookCard({
     };
 
     const handleDelete = async () => {
-        if (!confirm(`Delete webhook for ${hook.url}? This cannot be undone.`)) return;
+        if (!confirm(tr("page.settings_webhooks.confirm.delete", `Delete webhook for ${hook.url}? This cannot be undone.`))) return;
         const res = await apiFetch(`/webhooks/${hook.id}`, { method: "DELETE" });
         if (res.ok) {
-            toast("Webhook deleted", "success");
+            toast(tr("page.settings_webhooks.toast.deleted", "Webhook deleted"), "warning");
             onReload();
         } else {
-            toast("Delete failed", "error");
+            toast(tr("page.settings_webhooks.toast.delete_failed", "Delete failed"), "error");
         }
     };
 
@@ -459,11 +471,11 @@ function WebhookCard({
             body: JSON.stringify(payload),
         });
         if (res.ok) {
-            toast("Webhook updated", "success");
+            toast(tr("page.settings_webhooks.toast.updated", "Webhook updated"), "success");
             setEditing(false);
             onReload();
         } else {
-            toast("Update failed", "error");
+            toast(tr("page.settings_webhooks.toast.update_failed", "Update failed"), "error");
         }
     };
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { PageHeader, StatCard, Badge, useToast } from "../../components/ui";
 import { apiFetch } from "@/lib/api";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,12 +76,17 @@ function Spinner({ className = "h-4 w-4" }: { className?: string }) {
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ScheduledImportsPage() {
+    const { t } = useLanguage();
     const { toast } = useToast();
     const [items, setItems] = useState<ScheduledImport[]>([]);
     const [stats, setStats] = useState<Stats | null>(null);
     const [stores, setStores] = useState<{ id: number; name: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
+    const tr = useCallback((key: string, fallback: string) => {
+        const value = t(key);
+        return value === key ? fallback : value;
+    }, [t]);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -108,8 +114,8 @@ export default function ScheduledImportsPage() {
                     { label: "Settings", href: "/settings" },
                     { label: "Scheduled Imports" },
                 ]}
-                title="Scheduled Imports"
-                description="Automate data ingestion from configured store connections"
+                title={tr("page.settings_scheduled_imports.title", "Scheduled Imports")}
+                description={tr("page.settings_scheduled_imports.subtitle", "Automate data ingestion from configured store connections")}
             />
 
             {/* Stats */}
@@ -149,7 +155,7 @@ export default function ScheduledImportsPage() {
                     onClick={() => setShowCreate(s => !s)}
                     className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-[0.98]"
                 >
-                    {showCreate ? "Cancel" : "+ New Schedule"}
+                    {showCreate ? tr("common.cancel", "Cancel") : tr("page.settings_scheduled_imports.new_schedule", "+ New Schedule")}
                 </button>
             </div>
 
@@ -160,6 +166,7 @@ export default function ScheduledImportsPage() {
                     onCreated={() => { setShowCreate(false); load(); }}
                     onCancel={() => setShowCreate(false)}
                     toast={toast}
+                    tr={tr}
                 />
             )}
 
@@ -171,13 +178,13 @@ export default function ScheduledImportsPage() {
             ) : items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 py-16 dark:border-gray-700">
                     <svg className="h-12 w-12 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400">No scheduled imports yet</p>
-                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Set up automated ingestion from your connected stores</p>
+                    <p className="mt-4 text-sm font-medium text-gray-700 dark:text-gray-300">{tr("page.settings_scheduled_imports.empty_title", "No scheduled imports yet")}</p>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{tr("page.settings_scheduled_imports.empty_body", "Create one when you want UKIP to pull data from connected stores on a reliable cadence.")}</p>
                 </div>
             ) : (
                 <div className="space-y-3">
                     {items.map(item => (
-                        <ScheduleCard key={item.id} item={item} onReload={load} toast={toast} />
+                        <ScheduleCard key={item.id} item={item} onReload={load} toast={toast} tr={tr} />
                     ))}
                 </div>
             )}
@@ -192,18 +199,20 @@ function CreateScheduleForm({
     onCreated,
     onCancel,
     toast,
+    tr,
 }: {
     stores: { id: number; name: string }[];
     onCreated: () => void;
     onCancel: () => void;
     toast: (msg: string, v?: "success" | "error" | "warning" | "info") => void;
+    tr: (key: string, fallback: string) => string;
 }) {
     const [form, setForm] = useState({ name: "", store_id: stores[0]?.id ?? 0, interval_minutes: 60 });
     const [saving, setSaving] = useState(false);
 
     const handleCreate = async () => {
         if (!form.name || !form.store_id) {
-            toast("Name and store are required", "warning");
+            toast(tr("page.settings_scheduled_imports.toast.required", "Name and store are required"), "warning");
             return;
         }
         setSaving(true);
@@ -214,10 +223,10 @@ function CreateScheduleForm({
                 body: JSON.stringify(form),
             });
             if (!res.ok) throw new Error(await res.text());
-            toast("Schedule created", "success");
+            toast(tr("page.settings_scheduled_imports.toast.created", "Schedule created"), "success");
             onCreated();
         } catch {
-            toast("Failed to create schedule", "error");
+            toast(tr("page.settings_scheduled_imports.toast.create_failed", "Failed to create schedule"), "error");
         } finally {
             setSaving(false);
         }
@@ -225,33 +234,33 @@ function CreateScheduleForm({
 
     return (
         <div className="animate-in slide-in-from-top-2 rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/80 to-white p-6 shadow-sm dark:border-indigo-500/20 dark:from-indigo-500/5 dark:to-gray-900">
-            <h3 className="mb-5 text-base font-semibold text-gray-900 dark:text-white">New Scheduled Import</h3>
+            <h3 className="mb-5 text-base font-semibold text-gray-900 dark:text-white">{tr("page.settings_scheduled_imports.modal_title", "New Scheduled Import")}</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
-                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Name *</label>
+                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">{tr("common.name", "Name")} *</label>
                     <input
                         type="text"
                         value={form.name}
                         onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                        placeholder="Nightly catalog sync"
+                        placeholder={tr("page.settings_scheduled_imports.name_placeholder", "Nightly catalog sync")}
                         className={inputClass}
                     />
                 </div>
                 <div>
-                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Store *</label>
+                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">{tr("page.settings_scheduled_imports.store", "Store")} *</label>
                     <select
                         value={form.store_id}
                         onChange={e => setForm(f => ({ ...f, store_id: Number(e.target.value) }))}
                         className={inputClass}
                     >
-                        {stores.length === 0 && <option value={0}>No stores available</option>}
+                        {stores.length === 0 && <option value={0}>{tr("page.settings_scheduled_imports.no_stores", "No stores available")}</option>}
                         {stores.map(s => (
                             <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                     </select>
                 </div>
                 <div>
-                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">Interval</label>
+                    <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">{tr("page.settings_scheduled_imports.interval", "Interval")}</label>
                     <select
                         value={form.interval_minutes}
                         onChange={e => setForm(f => ({ ...f, interval_minutes: Number(e.target.value) }))}
@@ -264,10 +273,10 @@ function CreateScheduleForm({
                 </div>
             </div>
             <div className="mt-4 flex items-center justify-end gap-2">
-                <button onClick={onCancel} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">Cancel</button>
+                <button onClick={onCancel} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">{tr("common.cancel", "Cancel")}</button>
                 <button onClick={handleCreate} disabled={saving || !form.name || !form.store_id} className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
                     {saving && <Spinner />}
-                    {saving ? "Creating…" : "Create Schedule"}
+                    {saving ? tr("page.settings_scheduled_imports.creating", "Creating…") : tr("page.settings_scheduled_imports.create", "Create Schedule")}
                 </button>
             </div>
         </div>
@@ -280,10 +289,12 @@ function ScheduleCard({
     item,
     onReload,
     toast,
+    tr,
 }: {
     item: ScheduledImport;
     onReload: () => void;
     toast: (msg: string, v?: "success" | "error" | "warning" | "info") => void;
+    tr: (key: string, fallback: string) => string;
 }) {
     const [triggering, setTriggering] = useState(false);
     const [triggerResult, setTriggerResult] = useState<Record<string, unknown> | null>(null);
@@ -295,7 +306,7 @@ function ScheduleCard({
             body: JSON.stringify({ is_active: !item.is_active }),
         });
         if (res.ok) {
-            toast(item.is_active ? "Schedule paused" : "Schedule activated", "success");
+            toast(item.is_active ? tr("page.settings_scheduled_imports.toast.paused", "Schedule paused") : tr("page.settings_scheduled_imports.toast.activated", "Schedule activated"), "success");
             onReload();
         }
     };
@@ -308,7 +319,7 @@ function ScheduleCard({
             if (res.ok) {
                 const data = await res.json();
                 setTriggerResult(data);
-                toast(data.success ? "Import completed!" : "Import failed", data.success ? "success" : "warning");
+                toast(data.success ? tr("page.settings_scheduled_imports.toast.run_success", "Import completed") : tr("page.settings_scheduled_imports.toast.run_failed", "Import failed"), data.success ? "success" : "warning");
                 onReload();
             }
         } finally {
@@ -317,10 +328,10 @@ function ScheduleCard({
     };
 
     const handleDelete = async () => {
-        if (!confirm(`Delete schedule "${item.name}"?`)) return;
+        if (!confirm(tr("page.settings_scheduled_imports.confirm.delete", `Delete schedule "${item.name}"?`))) return;
         const res = await apiFetch(`/scheduled-imports/${item.id}`, { method: "DELETE" });
         if (res.ok) {
-            toast("Schedule deleted", "success");
+            toast(tr("page.settings_scheduled_imports.toast.deleted", "Schedule deleted"), "warning");
             onReload();
         }
     };
