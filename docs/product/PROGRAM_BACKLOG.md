@@ -110,6 +110,8 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
   `docs/product/DEMO_SCRIPT_BY_STAKEHOLDER.md`
 - plantilla de propuesta de piloto documentada en
   `docs/product/PILOT_PROPOSAL_TEMPLATE.md`
+- objection handling sheet documentado en
+  `docs/product/OBJECTION_HANDLING_SHEET.md`
 
 ## Hallazgo modulo scientific import
 
