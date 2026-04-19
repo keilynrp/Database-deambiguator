@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTheme } from "../contexts/ThemeContext";
@@ -214,7 +214,7 @@ export default function Header() {
   const pathname = usePathname();
   const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
-  const { domains, activeDomainId, setActiveDomainId, isLoading } = useDomain();
+  const { domains, activeDomainId, activeDomain, setActiveDomainId, isLoading } = useDomain();
   const { branding } = useBranding();
   const { pilotMode, togglePilotMode } = usePilotMode();
   const { toggleMobile } = useSidebar();
@@ -225,6 +225,13 @@ export default function Header() {
     titleFallback: "Dashboard",
     subtitleFallback: "",
   };
+  const activeDomainLabel = useMemo(() => {
+    if (isLoading) return t("header.workspace.loading");
+    if (activeDomain?.name) return activeDomain.name;
+    if (activeDomainId === "default") return t("header.workspace.default_name");
+    return activeDomainId || t("header.workspace.none");
+  }, [activeDomain?.name, activeDomainId, isLoading, t]);
+  const hasDomains = domains.length > 0;
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center border-b border-gray-200 bg-white/80 shadow-sm backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/80">
@@ -269,7 +276,14 @@ export default function Header() {
 
           {/* Domain Selector */}
           <div className="flex min-w-0 items-center gap-2">
-            <span className="hidden text-sm font-medium text-gray-500 dark:text-gray-400 xl:inline">{t("header.workspace.label")}</span>
+            <div className="hidden min-w-0 xl:block">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
+                {t("header.workspace.label")}
+              </p>
+              <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                {activeDomainLabel}
+              </p>
+            </div>
             {isLoading ? (
               <div className="h-9 w-28 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800 xl:w-40"></div>
             ) : (
@@ -278,13 +292,20 @@ export default function Header() {
                 value={activeDomainId}
                 onChange={(e) => setActiveDomainId(e.target.value)}
                 aria-label={t("header.workspace.aria")}
-                className="h-9 max-w-[8rem] cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-50 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 sm:max-w-[10rem] xl:max-w-none"
+                disabled={!hasDomains}
+                className="h-9 max-w-[8rem] cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-50 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 dark:disabled:bg-gray-800 dark:disabled:text-gray-500 sm:max-w-[10rem] xl:max-w-none"
               >
-                {domains.map((domain) => (
-                  <option key={domain.id} value={domain.id}>
-                    {domain.name}
+                {hasDomains ? (
+                  domains.map((domain) => (
+                    <option key={domain.id} value={domain.id}>
+                      {domain.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value={activeDomainId || "default"}>
+                    {t("header.workspace.none")}
                   </option>
-                ))}
+                )}
               </select>
             )}
           </div>
