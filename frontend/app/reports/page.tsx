@@ -195,6 +195,44 @@ export default function ReportsPage() {
   }, [format, preset, selected.size, t, title]);
   const briefReady = briefChecklist.filter((item) => item.done).length >= 3;
   const presetHref = `/reports?preset=pilot-brief&domain=${encodeURIComponent(activeDomainId)}&format=pdf&benchmark_profile=${encodeURIComponent(selectedBenchmarkProfile)}&stakeholder=${encodeURIComponent(selectedStakeholderProfile)}`;
+  const reportOverviewCards = useMemo(() => ([
+    {
+      title: t("page.reports.overview.story_title"),
+      body: t("page.reports.overview.story_body"),
+    },
+    {
+      title: t("page.reports.overview.sections_title"),
+      body: t("page.reports.overview.sections_body"),
+    },
+    {
+      title: t("page.reports.overview.output_title"),
+      body: t("page.reports.overview.output_body"),
+    },
+  ]), [t]);
+  const configSummary = useMemo(() => {
+    const sectionCount = sections.length;
+    const selectedFormat = formatOptions.find((option) => option.value === format);
+
+    return [
+      {
+        label: t("page.reports.summary.sections"),
+        value: `${selected.size}/${sectionCount || 0}`,
+        detail: selected.size >= 4
+          ? t("page.reports.summary.sections_ready")
+          : t("page.reports.summary.sections_light"),
+      },
+      {
+        label: t("page.reports.summary.audience"),
+        value: activeStakeholder.label,
+        detail: activeStakeholder.desc,
+      },
+      {
+        label: t("page.reports.summary.output"),
+        value: format.toUpperCase(),
+        detail: selectedFormat?.desc ?? "",
+      },
+    ];
+  }, [activeStakeholder.desc, activeStakeholder.label, format, formatOptions, sections.length, selected.size, t]);
 
   // Fetch available sections from backend
   const loadSections = useCallback(async () => {
@@ -453,25 +491,45 @@ export default function ReportsPage() {
         }}
       />
 
+      <div className="grid gap-3 lg:grid-cols-3">
+        {reportOverviewCards.map((card) => (
+          <div
+            key={card.title}
+            className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900"
+          >
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">
+              {card.title}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
+              {card.body}
+            </p>
+          </div>
+        ))}
+      </div>
+
       {preset === "pilot-brief" && (
         <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-5 shadow-sm dark:border-blue-500/20 dark:from-blue-500/5 dark:to-indigo-500/5">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">
-                Pilot brief preset loaded
+                {t("page.reports.pilot_preset_loaded")}
               </p>
               <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
-                {importedRows ? `${Number(importedRows).toLocaleString()} imported entities` : "This dataset"} in domain{" "}
-                <span className="font-semibold">{presetDomain ?? activeDomainId}</span> already has the recommended sections for a first stakeholder-facing brief.
+                {importedRows
+                  ? `${Number(importedRows).toLocaleString()} ${t("page.reports.imported_entities")}`
+                  : t("page.reports.this_dataset")}{" "}
+                {t("page.reports.pilot_preset_hint.before_domain")}{" "}
+                <span className="font-semibold">{presetDomain ?? activeDomainId}</span>{" "}
+                {t("page.reports.pilot_preset_hint.after_domain")}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {[
-                  "Executive summary",
-                  "Coverage and enrichment",
-                  "Priority actions",
-                  "Institutional benchmark",
-                  "Portfolio concentration",
-                  "Concept signal",
+                  t("page.reports.preset_badge.baseline"),
+                  t("page.reports.preset_badge.coverage"),
+                  t("page.reports.preset_badge.actions"),
+                  t("page.reports.preset_badge.benchmark"),
+                  t("page.reports.preset_badge.concentration"),
+                  t("page.reports.preset_badge.concepts"),
                 ].map((item) => (
                   <span
                     key={item}
@@ -483,7 +541,7 @@ export default function ReportsPage() {
               </div>
             </div>
             <div className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-gray-900/80 dark:text-blue-300">
-              Format: {format.toUpperCase()}
+              {t("page.reports.summary.output")}: {format.toUpperCase()}
             </div>
           </div>
         </div>
@@ -702,7 +760,7 @@ export default function ReportsPage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                  Benchmark profile
+                  {t("page.reports.benchmark_profile_label")}
                 </label>
                 <select
                   value={selectedBenchmarkProfile}
@@ -716,7 +774,7 @@ export default function ReportsPage() {
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                  Used when the institutional benchmark section is part of the brief.
+                  {t("page.reports.benchmark_profile_help")}
                 </p>
                 <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-3 text-xs text-violet-900 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-100">
                   <p className="font-semibold">
@@ -769,6 +827,31 @@ export default function ReportsPage() {
                     <span className="font-semibold">{t("page.reports.stakeholder.goal_label")}</span>{" "}
                     {stakeholderNarrativeGoal}
                   </p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-xs text-sky-900 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-100">
+                <p className="font-semibold">
+                  {t("page.reports.summary.title")}
+                </p>
+                <div className="mt-3 space-y-2">
+                  {configSummary.map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-lg bg-white/80 px-3 py-2 shadow-sm dark:bg-gray-900/70"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700 dark:text-sky-300">
+                          {item.label}
+                        </span>
+                        <span className="text-sm font-semibold text-sky-950 dark:text-sky-50">
+                          {item.value}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] leading-5 text-sky-800 dark:text-sky-200">
+                        {item.detail}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
