@@ -116,6 +116,8 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
   `docs/product/EMAIL_FOLLOW_UP_TEMPLATE_POST_DEMO.md`
 - discovery call checklist documentado en
   `docs/product/DISCOVERY_CALL_CHECKLIST.md`
+- short sales deck outline documentado en
+  `docs/product/SHORT_SALES_DECK_OUTLINE.md`
 
 ## Hallazgo modulo scientific import
 
