@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { apiFetch } from "@/lib/api";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Organization {
   id: number;
@@ -73,6 +74,7 @@ function PlanBadge({ plan }: { plan: string }) {
 }
 
 export default function OrganizationsPage() {
+  const { t } = useLanguage();
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -86,6 +88,10 @@ export default function OrganizationsPage() {
   const [editingRules, setEditingRules] = useState<Record<string, BenchmarkRule>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const tr = useCallback((key: string, fallback: string) => {
+    const value = t(key);
+    return value === key ? fallback : value;
+  }, [t]);
 
   const loadOrgs = useCallback(async () => {
     setLoading(true);
@@ -191,7 +197,7 @@ export default function OrganizationsPage() {
       loadOrgs();
     } else {
       const d = await r.json().catch(() => ({}));
-      setError(d.detail ?? "Failed to create organization");
+      setError(d.detail ?? tr("page.settings_organizations.error.create_org", "Failed to create organization"));
     }
     setSaving(false);
   }
@@ -211,13 +217,13 @@ export default function OrganizationsPage() {
       loadMembers(selectedOrg.id);
     } else {
       const d = await r.json().catch(() => ({}));
-      setError(d.detail ?? "Failed to invite member");
+      setError(d.detail ?? tr("page.settings_organizations.error.invite_member", "Failed to invite member"));
     }
     setSaving(false);
   }
 
   async function removeMember(userId: number) {
-    if (!selectedOrg || !confirm("Remove this member?")) return;
+    if (!selectedOrg || !confirm(tr("page.settings_organizations.confirm.remove_member", "Remove this member?"))) return;
     await apiFetch(`/organizations/${selectedOrg.id}/members/${userId}`, { method: "DELETE" });
     loadMembers(selectedOrg.id);
   }
@@ -228,7 +234,7 @@ export default function OrganizationsPage() {
   }
 
   async function deleteOrg(orgId: number) {
-    if (!confirm("Delete this organization? This cannot be undone.")) return;
+    if (!confirm(tr("page.settings_organizations.confirm.delete_org", "Delete this organization? This cannot be undone."))) return;
     await apiFetch(`/organizations/${orgId}`, { method: "DELETE" });
     setSelectedOrg(null);
     loadOrgs();
@@ -253,7 +259,7 @@ export default function OrganizationsPage() {
       }
     } else {
       const d = await r.json().catch(() => ({}));
-      setError(d.detail ?? "Failed to save benchmark profile");
+      setError(d.detail ?? tr("page.settings_organizations.error.save_benchmark", "Failed to save benchmark profile"));
     }
     setSavingBenchmark(false);
   }
@@ -301,7 +307,7 @@ export default function OrganizationsPage() {
       }
     } else {
       const d = await r.json().catch(() => ({}));
-      setError(d.detail ?? "Failed to save benchmark profile overrides");
+      setError(d.detail ?? tr("page.settings_organizations.error.save_overrides", "Failed to save benchmark profile overrides"));
     }
     setSavingBenchmark(false);
   }
@@ -316,20 +322,47 @@ export default function OrganizationsPage() {
     }));
   }
 
+  const selectedProfile = useMemo(
+    () => benchmarkProfiles.find((profile) => profile.id === (selectedOrg?.benchmark_profile_id ?? "")) ?? null,
+    [benchmarkProfiles, selectedOrg],
+  );
+
+  const benchmarkSummary = useMemo(() => {
+    if (!selectedProfile) return [];
+    return [
+      {
+        label: tr("page.settings_organizations.benchmark_summary.profile", "Active profile"),
+        value: selectedProfile.name,
+      },
+      {
+        label: tr("page.settings_organizations.benchmark_summary.region", "Region"),
+        value: selectedProfile.region || tr("common.none", "None"),
+      },
+      {
+        label: tr("page.settings_organizations.benchmark_summary.rules", "Rules"),
+        value: String(selectedProfile.rules_count),
+      },
+    ];
+  }, [selectedProfile, tr]);
+
   const inputClass = "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Organizations</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Manage multi-tenant workspaces and member access</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {tr("header.page.settings_organizations.title", "Organizations")}
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {tr("header.page.settings_organizations.subtitle", "Manage multi-tenant workspaces and member access")}
+          </p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
           className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
         >
-          <span>+</span> New Organization
+          <span>+</span> {tr("page.settings_organizations.new_org", "New Organization")}
         </button>
       </div>
 
@@ -342,14 +375,18 @@ export default function OrganizationsPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Org list */}
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Your Organizations</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            {tr("page.settings_organizations.your_orgs", "Your Organizations")}
+          </h2>
           {loading ? (
             <div className="animate-pulse space-y-2">
               {[1, 2].map(i => <div key={i} className="h-20 rounded-xl bg-gray-100 dark:bg-gray-800" />)}
             </div>
           ) : orgs.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-200 p-8 text-center dark:border-gray-700">
-              <p className="text-sm text-gray-500">No organizations yet.</p>
+              <p className="text-sm text-gray-500">
+                {tr("page.settings_organizations.empty", "No organizations yet.")}
+              </p>
             </div>
           ) : (
             orgs.map(org => (
@@ -368,7 +405,12 @@ export default function OrganizationsPage() {
                       <span className="font-semibold text-gray-900 dark:text-white">{org.name}</span>
                       <PlanBadge plan={org.plan} />
                     </div>
-                    <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">/{org.slug} · {org.member_count} member{org.member_count !== 1 ? "s" : ""}</div>
+                    <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      /{org.slug} · {org.member_count}{" "}
+                      {org.member_count === 1
+                        ? tr("page.settings_organizations.member_label_singular", "member")
+                        : tr("page.settings_organizations.member_label_plural", "members")}
+                    </div>
                   </div>
                 </div>
                 {org.description && (
@@ -383,7 +425,9 @@ export default function OrganizationsPage() {
         <div className="lg:col-span-2">
           {!selectedOrg ? (
             <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
-              <p className="text-sm text-gray-400">Select an organization to manage it</p>
+              <p className="text-sm text-gray-400">
+                {tr("page.settings_organizations.select_prompt", "Select an organization to manage it")}
+              </p>
             </div>
           ) : (
             <div className="space-y-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -403,24 +447,25 @@ export default function OrganizationsPage() {
                     onClick={() => switchOrg(selectedOrg.id)}
                     className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
                   >
-                    Switch to this org
+                    {tr("page.settings_organizations.switch_org", "Switch to this org")}
                   </button>
                   <button
                     onClick={() => deleteOrg(selectedOrg.id)}
                     className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400"
                   >
-                    Delete
+                    {tr("common.delete", "Delete")}
                   </button>
                 </div>
               </div>
 
-              {/* Members */}
               <div className="space-y-4 rounded-xl border border-gray-100 p-4 dark:border-gray-800">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Benchmark Profile</h4>
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      {tr("page.settings_organizations.benchmark.title", "Benchmark Profile")}
+                    </h4>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Choose the default institutional benchmark profile for this tenant.
+                      {tr("page.settings_organizations.benchmark.help", "Choose the default institutional benchmark profile for this tenant.")}
                     </p>
                   </div>
                   <div className="min-w-[260px]">
@@ -436,20 +481,49 @@ export default function OrganizationsPage() {
                         </option>
                       ))}
                     </select>
-                    {selectedOrg.benchmark_profile_id && (
+                    {!benchmarkProfiles.length && (
                       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        {benchmarkProfiles.find((profile) => profile.id === selectedOrg.benchmark_profile_id)?.description}
+                        {tr("page.settings_organizations.benchmark.empty", "No benchmark profiles available yet.")}
+                      </p>
+                    )}
+                    {selectedProfile && (
+                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        {selectedProfile.description}
                       </p>
                     )}
                   </div>
                 </div>
+                {selectedProfile && (
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {benchmarkSummary.map((item) => (
+                      <div
+                        key={item.label}
+                        className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-950/40"
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
+                          {item.label}
+                        </p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.value}</p>
+                          {item.label === tr("page.settings_organizations.benchmark_summary.profile", "Active profile") && selectedProfile.is_default && (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                              {tr("page.settings_organizations.benchmark.default_badge", "Default")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {selectedOrg.benchmark_profile_id && Object.values(editingRules).length > 0 && (
                   <div className="space-y-3 rounded-xl bg-gray-50 p-4 dark:bg-gray-950/40">
                     <div className="flex items-center justify-between gap-4">
                       <div>
-                        <h5 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Rule overrides</h5>
+                        <h5 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                          {tr("page.settings_organizations.benchmark.overrides_title", "Rule overrides")}
+                        </h5>
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          Adjust thresholds and copy for this tenant. The dashboard and briefs will inherit these values.
+                          {tr("page.settings_organizations.benchmark.overrides_help", "Adjust thresholds and copy for this tenant. The dashboard and briefs will inherit these values.")}
                         </p>
                       </div>
                       <button
@@ -457,15 +531,19 @@ export default function OrganizationsPage() {
                         disabled={savingBenchmark}
                         className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
                       >
-                        {savingBenchmark ? "Saving..." : "Save overrides"}
+                        {savingBenchmark
+                          ? tr("page.settings_organizations.saving", "Saving...")
+                          : tr("page.settings_organizations.benchmark.save_overrides", "Save overrides")}
                       </button>
                     </div>
                     <div className="space-y-3">
                       {Object.values(editingRules).map((rule) => (
                         <div key={rule.id} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
                           <div className="grid gap-3 lg:grid-cols-[1.2fr,120px,140px]">
-                            <div>
-                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Rule label</label>
+                          <div>
+                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                                {tr("page.settings_organizations.benchmark.rule_label", "Rule label")}
+                              </label>
                               <input
                                 value={rule.label}
                                 onChange={(e) => updateEditingRule(rule.id, "label", e.target.value)}
@@ -473,7 +551,9 @@ export default function OrganizationsPage() {
                               />
                             </div>
                             <div>
-                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Threshold</label>
+                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                                {tr("page.settings_organizations.benchmark.threshold", "Threshold")}
+                              </label>
                               <input
                                 type="number"
                                 value={rule.threshold}
@@ -482,21 +562,25 @@ export default function OrganizationsPage() {
                               />
                             </div>
                             <div>
-                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Priority</label>
+                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                                {tr("page.settings_organizations.benchmark.priority", "Priority")}
+                              </label>
                               <select
                                 value={rule.priority}
                                 onChange={(e) => updateEditingRule(rule.id, "priority", e.target.value)}
                                 className={inputClass}
                               >
-                                <option value="high">High</option>
-                                <option value="medium">Medium</option>
-                                <option value="low">Low</option>
+                                <option value="high">{tr("page.settings_organizations.priority.high", "High")}</option>
+                                <option value="medium">{tr("page.settings_organizations.priority.medium", "Medium")}</option>
+                                <option value="low">{tr("page.settings_organizations.priority.low", "Low")}</option>
                               </select>
                             </div>
                           </div>
                           <div className="mt-3 grid gap-3 lg:grid-cols-2">
                             <div>
-                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Pass message</label>
+                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                                {tr("page.settings_organizations.benchmark.pass_message", "Pass message")}
+                              </label>
                               <textarea
                                 value={rule.pass_text}
                                 onChange={(e) => updateEditingRule(rule.id, "pass_text", e.target.value)}
@@ -505,7 +589,9 @@ export default function OrganizationsPage() {
                               />
                             </div>
                             <div>
-                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">Fail message</label>
+                              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">
+                                {tr("page.settings_organizations.benchmark.fail_message", "Fail message")}
+                              </label>
                               <textarea
                                 value={rule.fail_text}
                                 onChange={(e) => updateEditingRule(rule.id, "fail_text", e.target.value)}
@@ -514,7 +600,9 @@ export default function OrganizationsPage() {
                               />
                             </div>
                           </div>
-                          <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">Metric: {rule.metric}</p>
+                          <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
+                            {tr("page.settings_organizations.benchmark.metric", "Metric")}: {rule.metric}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -525,12 +613,14 @@ export default function OrganizationsPage() {
               {/* Members */}
               <div>
                 <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Members ({members.length})</h4>
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    {tr("page.settings_organizations.members", "Members")} ({members.length})
+                  </h4>
                   <button
                     onClick={() => setShowInvite(true)}
                     className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                   >
-                    + Invite
+                    + {tr("page.settings_organizations.invite", "Invite")}
                   </button>
                 </div>
                 <div className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-100 dark:divide-gray-800 dark:border-gray-800">
@@ -550,12 +640,12 @@ export default function OrganizationsPage() {
                           m.role === "owner" ? "bg-amber-100 text-amber-700" :
                           m.role === "admin" ? "bg-blue-100 text-blue-700" :
                           "bg-gray-100 text-gray-600"
-                        }`}>{m.role}</span>
+                        }`}>{tr(`page.settings_organizations.role.${m.role}`, m.role)}</span>
                         {m.role !== "owner" && (
                           <button
                             onClick={() => removeMember(m.user_id)}
                             className="rounded p-1 text-gray-400 hover:text-red-500"
-                            title="Remove"
+                            title={tr("common.remove", "Remove")}
                           >
                             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -576,24 +666,26 @@ export default function OrganizationsPage() {
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
-            <h3 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">New Organization</h3>
+            <h3 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
+              {tr("page.settings_organizations.new_org", "New Organization")}
+            </h3>
             <div className="space-y-3">
-              <input placeholder="Organization name" value={form.name} onChange={e => setForm({...form, name: e.target.value, slug: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")})} className={inputClass} />
-              <input placeholder="Slug (e.g. my-org)" value={form.slug} onChange={e => setForm({...form, slug: e.target.value})} className={inputClass} />
-              <textarea placeholder="Description (optional)" value={form.description} onChange={e => setForm({...form, description: e.target.value})} rows={2} className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+              <input placeholder={tr("page.settings_organizations.form.name", "Organization name")} value={form.name} onChange={e => setForm({...form, name: e.target.value, slug: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")})} className={inputClass} />
+              <input placeholder={tr("page.settings_organizations.form.slug", "Slug (e.g. my-org)")} value={form.slug} onChange={e => setForm({...form, slug: e.target.value})} className={inputClass} />
+              <textarea placeholder={tr("page.settings_organizations.form.description", "Description (optional)")} value={form.description} onChange={e => setForm({...form, description: e.target.value})} rows={2} className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
               <select value={form.plan} onChange={e => setForm({...form, plan: e.target.value})} className={inputClass}>
-                <option value="free">Free</option>
-                <option value="pro">Pro</option>
-                <option value="enterprise">Enterprise</option>
+                <option value="free">{tr("page.settings_organizations.plan.free", "Free")}</option>
+                <option value="pro">{tr("page.settings_organizations.plan.pro", "Pro")}</option>
+                <option value="enterprise">{tr("page.settings_organizations.plan.enterprise", "Enterprise")}</option>
               </select>
             </div>
             {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
             <div className="mt-4 flex gap-2">
               <button onClick={createOrg} disabled={saving || !form.name || !form.slug} className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white disabled:opacity-50 hover:bg-blue-700">
-                {saving ? "Creating…" : "Create"}
+                {saving ? tr("page.settings_organizations.creating", "Creating…") : tr("common.create", "Create")}
               </button>
               <button onClick={() => { setShowCreate(false); setError(null); }} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-700 dark:border-gray-700 dark:text-gray-300">
-                Cancel
+                {tr("common.cancel", "Cancel")}
               </button>
             </div>
           </div>
@@ -604,21 +696,23 @@ export default function OrganizationsPage() {
       {showInvite && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
-            <h3 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">Invite Member</h3>
+            <h3 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
+              {tr("page.settings_organizations.invite_member", "Invite Member")}
+            </h3>
             <div className="space-y-3">
-              <input placeholder="Username" value={inviteForm.username} onChange={e => setInviteForm({...inviteForm, username: e.target.value})} className={inputClass} />
+              <input placeholder={tr("settings.account.username", "Username")} value={inviteForm.username} onChange={e => setInviteForm({...inviteForm, username: e.target.value})} className={inputClass} />
               <select value={inviteForm.role} onChange={e => setInviteForm({...inviteForm, role: e.target.value})} className={inputClass}>
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
+                <option value="member">{tr("page.settings_organizations.role.member", "Member")}</option>
+                <option value="admin">{tr("page.settings_organizations.role.admin", "Admin")}</option>
               </select>
             </div>
             {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
             <div className="mt-4 flex gap-2">
               <button onClick={inviteMember} disabled={saving || !inviteForm.username} className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
-                {saving ? "Inviting…" : "Invite"}
+                {saving ? tr("page.settings_organizations.inviting", "Inviting…") : tr("page.settings_organizations.invite", "Invite")}
               </button>
               <button onClick={() => { setShowInvite(false); setError(null); }} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold dark:border-gray-700">
-                Cancel
+                {tr("common.cancel", "Cancel")}
               </button>
             </div>
           </div>
