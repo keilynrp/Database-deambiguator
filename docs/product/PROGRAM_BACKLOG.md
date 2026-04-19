@@ -118,6 +118,8 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
   `docs/product/DISCOVERY_CALL_CHECKLIST.md`
 - short sales deck outline documentado en
   `docs/product/SHORT_SALES_DECK_OUTLINE.md`
+- pilot success review template documentado en
+  `docs/product/PILOT_SUCCESS_REVIEW_TEMPLATE.md`
 
 ## Hallazgo modulo scientific import
 
