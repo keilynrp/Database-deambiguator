@@ -170,6 +170,7 @@ export default function NotificationsPage() {
   const [items, setItems]           = useState<NotifEntry[]>([]);
   const [skip, setSkip]             = useState(0);
   const [action, setAction]         = useState("");
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [loading, setLoading]       = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const [markingEntryId, setMarkingEntryId] = useState<number | null>(null);
@@ -246,6 +247,29 @@ export default function NotificationsPage() {
 
   const hasMore = page ? items.length < page.total : false;
   const unreadCount = page?.unread_count ?? 0;
+  const filteredItems = showUnreadOnly ? items.filter((item) => !item.is_read) : items;
+  const activeFilterLabel = ACTION_FILTERS.find((filter) => filter.key === action)?.labelKey ?? "page.notifications.filter_all";
+  const summaryCards = [
+    {
+      label: t("page.notifications.summary_total_label"),
+      value: page ? String(page.total) : "—",
+      detail: t("page.notifications.summary_total_detail"),
+    },
+    {
+      label: t("page.notifications.summary_unread_label"),
+      value: String(unreadCount),
+      detail: unreadCount > 0
+        ? t("page.notifications.summary_unread_detail")
+        : t("page.notifications.summary_caught_up_detail"),
+    },
+    {
+      label: t("page.notifications.summary_focus_label"),
+      value: showUnreadOnly ? t("page.notifications.summary_focus_unread") : t(activeFilterLabel),
+      detail: showUnreadOnly
+        ? t("page.notifications.summary_focus_unread_detail")
+        : t("page.notifications.summary_focus_detail"),
+    },
+  ];
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -284,23 +308,54 @@ export default function NotificationsPage() {
         )}
       </div>
 
+      <div className="mb-5 grid gap-3 md:grid-cols-3">
+        {summaryCards.map((card) => (
+          <div
+            key={card.label}
+            className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900"
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
+              {card.label}
+            </p>
+            <p className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">
+              {card.value}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+              {card.detail}
+            </p>
+          </div>
+        ))}
+      </div>
+
       {/* ── Action type filter tabs ───────────────────────────────────────── */}
-      <div className="mb-5 flex flex-wrap gap-1.5">
-        {ACTION_FILTERS.map((f) => {
-          return (
-            <button
-              key={f.key}
-              onClick={() => setAction(f.key)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                action === f.key
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-              }`}
-            >
-              {t(f.labelKey)}
-            </button>
-          );
-        })}
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-1.5">
+          {ACTION_FILTERS.map((f) => {
+            return (
+              <button
+                key={f.key}
+                onClick={() => setAction(f.key)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  action === f.key
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                }`}
+              >
+                {t(f.labelKey)}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => setShowUnreadOnly((prev) => !prev)}
+          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            showUnreadOnly
+              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          }`}
+        >
+          {showUnreadOnly ? t("page.notifications.show_all") : t("page.notifications.show_unread_only")}
+        </button>
       </div>
 
       {/* ── List ──────────────────────────────────────────────────────────── */}
@@ -312,18 +367,21 @@ export default function NotificationsPage() {
           </svg>
           <p className="text-sm">{t("page.notifications.loading_notifications")}</p>
         </div>
-      ) : items.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <EmptyState
           icon="bell"
-          title={t('page.notifications.empty_title')}
-          description={t('page.notifications.empty_description')}
+          title={showUnreadOnly ? t("page.notifications.empty_unread_title") : t('page.notifications.empty_title')}
+          description={showUnreadOnly ? t("page.notifications.empty_unread_description") : t('page.notifications.empty_description')}
           size="page"
-          cta={action ? [{ label: t("page.notifications.clear_filter"), onClick: () => setAction("") }] : undefined}
+          cta={[
+            ...(action ? [{ label: t("page.notifications.clear_filter"), onClick: () => setAction("") }] : []),
+            ...(showUnreadOnly ? [{ label: t("page.notifications.show_all"), onClick: () => setShowUnreadOnly(false) }] : []),
+          ]}
         />
       ) : (
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-            {items.map((entry) => {
+            {filteredItems.map((entry) => {
               const isRead = entry.is_read;
               const detail = entryDetail(entry, t);
               const dotColor = ACTION_COLOR[entry.action] ?? "bg-gray-400";
@@ -356,7 +414,7 @@ export default function NotificationsPage() {
                       )}
                     </div>
                     {detail && (
-                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 truncate">
+                      <p className="mt-0.5 break-words text-xs leading-relaxed text-gray-500 dark:text-gray-400">
                         {detail}
                       </p>
                     )}
