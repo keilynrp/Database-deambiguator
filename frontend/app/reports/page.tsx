@@ -592,7 +592,10 @@ export default function ReportsPage() {
         >
           <div className="flex items-center gap-2">
             <span className="text-base">📐</span>
-            <span className="text-sm font-semibold text-gray-900 dark:text-white">{t('page.reports.templates_panel_title')}</span>
+            <div>
+              <span className="text-sm font-semibold text-gray-900 dark:text-white">{t('page.reports.templates_panel_title')}</span>
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{t("page.reports.templates_panel_help")}</p>
+            </div>
             {templates.length > 0 && (
               <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
                 {templates.length}
@@ -629,13 +632,13 @@ export default function ReportsPage() {
                       <span className="text-sm font-medium text-gray-900 dark:text-white">{tpl.name}</span>
                       {tpl.is_builtin && (
                         <span className="shrink-0 rounded-full bg-gray-200 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-                          built-in
+                          {t("page.reports.builtin_badge")}
                         </span>
                       )}
                     </div>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{tpl.description}</p>
                     <span className="mt-2 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
-                      {tpl.sections.length} section{tpl.sections.length !== 1 ? "s" : ""}
+                      {t("page.reports.template_sections_count", { count: tpl.sections.length })}
                     </span>
                   </button>
                 ))}
@@ -649,7 +652,7 @@ export default function ReportsPage() {
                   type="text"
                   value={newTemplateName}
                   onChange={(e) => setNewTemplateName(e.target.value)}
-                  placeholder="New template name…"
+                  placeholder={t("page.reports.template_name_placeholder")}
                   className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
                 />
                 <button
@@ -672,7 +675,7 @@ export default function ReportsPage() {
             <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
               {t('page.reports.sections_title')}
               <span className="ml-2 text-xs font-normal text-gray-400">
-                {selected.size} of {sections.length} {t('page.reports.sections_selected_count')}
+                {t("page.reports.sections_selected_summary", { selected: selected.size, total: sections.length })}
               </span>
             </h2>
             <div className="flex gap-2">
