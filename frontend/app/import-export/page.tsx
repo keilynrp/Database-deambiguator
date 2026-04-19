@@ -27,6 +27,10 @@ export default function ImportExportPage() {
     const { activeDomain } = useDomain();
     const { toast } = useToast();
     const { t } = useLanguage();
+    const tr = (key: string, fallback: string) => {
+        const value = t(key);
+        return value === key ? fallback : value;
+    };
     const [dragOver, setDragOver] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
@@ -151,7 +155,7 @@ export default function ImportExportPage() {
             <PageHeader
                 breadcrumbs={[{ label: "Home", href: "/" }, { label: t('page.import_export.title') }]}
                 title={t('page.import_export.title')}
-                description="Upload and download dataset in Excel, CSV, JSON-LD, Parquet, and RDF formats"
+                description={tr("page.import_export.description", "Bring data in, inspect what changed, and move the workspace to the next useful step.")}
             />
             <PilotFlowCard
                 currentStep="import"
@@ -163,6 +167,30 @@ export default function ImportExportPage() {
                     label: t("page.import_export.guided.cta_scientific"),
                 }}
             />
+            <div className="grid gap-4 md:grid-cols-3">
+                {[
+                    {
+                        title: tr("page.import_export.overview.import_title", "Bring records in"),
+                        body: tr("page.import_export.overview.import_body", "Use this path when you already have a file and want to get quickly to preview, dashboard, and first interpretation."),
+                    },
+                    {
+                        title: tr("page.import_export.overview.science_title", "Use scientific sources"),
+                        body: tr("page.import_export.overview.science_body", "If your source is bibliography-first, Scientific Import is often faster than preparing a generic spreadsheet."),
+                    },
+                    {
+                        title: tr("page.import_export.overview.export_title", "Take a clean snapshot out"),
+                        body: tr("page.import_export.overview.export_body", "Export after import or review when the team needs a reusable extract or offline handoff."),
+                    },
+                ].map((item) => (
+                    <div
+                        key={item.title}
+                        className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+                    >
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.title}</p>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{item.body}</p>
+                    </div>
+                ))}
+            </div>
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 {/* Import section */}
                 <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -174,8 +202,21 @@ export default function ImportExportPage() {
                         </div>
                         <div>
                             <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t('page.import_export.import_title')}</h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Excel, CSV, JSON, XML, Parquet, RDF · BibTeX, RIS (Science)</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {tr("page.import_export.import_subtitle", "Excel, CSV, JSON, XML, Parquet, RDF · BibTeX, RIS (Science)")}
+                            </p>
                         </div>
+                    </div>
+                    <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/5">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+                            {tr("page.import_export.import_guide.eyebrow", "Recommended path")}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                            {tr("page.import_export.import_guide.title", "Import a pilot-sized file first")}
+                        </p>
+                        <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">
+                            {tr("page.import_export.import_guide.body", "A small, real dataset is enough to unlock the rest of UKIP. After import, move straight to the Executive Dashboard for the fastest first readout.")}
+                        </p>
                     </div>
 
                     {/* Drop zone */}
@@ -213,8 +254,8 @@ export default function ImportExportPage() {
                                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                     {t('page.import_export.drop_zone_text')}
                                 </p>
-                                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Excel · CSV · JSON · XML · Parquet · RDF</p>
-                                <p className="mt-0.5 text-xs text-violet-500 dark:text-violet-400">BibTeX (.bib) · RIS (.ris) — auto-maps to Science domain</p>
+                                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{tr("page.import_export.drop_zone_formats", "Excel · CSV · JSON · XML · Parquet · RDF")}</p>
+                                <p className="mt-0.5 text-xs text-violet-500 dark:text-violet-400">{tr("page.import_export.drop_zone_science", "BibTeX (.bib) · RIS (.ris) — auto-maps to Science domain")}</p>
                             </>
                         )}
                     </div>
@@ -248,14 +289,14 @@ export default function ImportExportPage() {
                                 {uploadResult.domain === "science" && (
                                     <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-800">
                                         <p className="text-xs text-green-600 dark:text-green-400">
-                                            Mapped: title → primary_label · DOI → canonical_id · first author → secondary_label · keywords → enrichment_concepts
+                                            {tr("page.import_export.science_mapping_hint", "Mapped: title → primary_label · DOI → canonical_id · first author → secondary_label · keywords → enrichment_concepts")}
                                         </p>
                                     </div>
                                 )}
                                 {uploadResult.unmatched_columns.length > 0 && (
                                     <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-800">
                                         <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">
-                                            Unrecognized columns ({uploadResult.unmatched_columns.length}):
+                                            {tr("page.import_export.unrecognized_columns", "Unrecognized columns")} ({uploadResult.unmatched_columns.length}):
                                         </p>
                                         <div className="flex flex-wrap gap-1.5">
                                             {uploadResult.unmatched_columns.map((col) => (
@@ -290,7 +331,7 @@ export default function ImportExportPage() {
                     {/* Upload error */}
                     {uploadError && (
                         <div className="mt-4">
-                            <ErrorBanner message="Import Failed" detail={uploadError} variant="card" />
+                            <ErrorBanner message={tr("page.import_export.import_failed", "Import Failed")} detail={uploadError} variant="card" />
                         </div>
                     )}
                 </div>
@@ -307,8 +348,18 @@ export default function ImportExportPage() {
                         </div>
                         <div>
                             <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t('page.import_export.export_title')}</h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Download products as Excel with original column headers</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {tr("page.import_export.export_subtitle", "Download the current dataset as Excel with original column headers")}
+                            </p>
                         </div>
+                    </div>
+                    <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-500/20 dark:bg-blue-500/5">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">
+                            {tr("page.import_export.export_guide.eyebrow", "Useful after import or review")}
+                        </p>
+                        <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                            {tr("page.import_export.export_guide.body", "Export when the team needs a reusable snapshot, an offline handoff, or a filtered cut of the current workspace.")}
+                        </p>
                     </div>
 
                     {/* Info card */}
@@ -331,7 +382,7 @@ export default function ImportExportPage() {
                     {/* Search filter */}
                     <div className="mb-4">
                         <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Filter before export (optional)
+                            {tr("page.import_export.export_filter_label", "Filter before export (optional)")}
                         </label>
                         <div className="relative">
                             <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -339,7 +390,7 @@ export default function ImportExportPage() {
                             </svg>
                             <input
                                 type="text"
-                                placeholder="Search dataset by attribute keywords..."
+                                placeholder={tr("page.import_export.export_filter_placeholder", "Search dataset by attribute keywords...")}
                                 value={exportSearch}
                                 onChange={(e) => setExportSearch(e.target.value)}
                                 className="h-10 w-full rounded-lg border border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-700 placeholder-gray-400 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500"
@@ -347,7 +398,7 @@ export default function ImportExportPage() {
                         </div>
                         {exportSearch && (
                             <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
-                                Only matching products will be exported
+                                {tr("page.import_export.export_filter_hint", "Only matching records will be exported")}
                             </p>
                         )}
                     </div>
@@ -387,7 +438,7 @@ export default function ImportExportPage() {
                         </svg>
                         <h3 className="text-base font-semibold text-red-700 dark:text-red-400">{t('page.import_export.danger_zone_title')}</h3>
                     </div>
-                    <p className="mt-0.5 text-xs text-red-500 dark:text-red-500">Irreversible actions - proceed with caution</p>
+                    <p className="mt-0.5 text-xs text-red-500 dark:text-red-500">{tr("page.import_export.danger_zone_subtitle", "Irreversible actions — proceed with caution")}</p>
                 </div>
                 <div className="p-5">
                     {purgeResult ? (
@@ -399,8 +450,8 @@ export default function ImportExportPage() {
                                 <span className="text-sm font-semibold text-green-800 dark:text-green-300">{t('page.import_export.purge_success')}</span>
                             </div>
                             <p className="mt-1 text-sm text-green-700 dark:text-green-400">
-                                {purgeResult.products_deleted.toLocaleString()} products deleted
-                                {purgeResult.rules_deleted > 0 && `, ${purgeResult.rules_deleted} rules deleted`}
+                                {purgeResult.products_deleted.toLocaleString()} {tr("page.import_export.purge.deleted_records", "records deleted")}
+                                {purgeResult.rules_deleted > 0 && `, ${purgeResult.rules_deleted} ${tr("page.import_export.purge.deleted_rules", "rules deleted")}`}
                             </p>
                         </div>
                     ) : null}
@@ -408,8 +459,8 @@ export default function ImportExportPage() {
                     {!purgeConfirm ? (
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">Delete all product records</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Remove all products from the database to start a fresh import</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">{tr("page.import_export.purge.title", "Delete all product records")}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{tr("page.import_export.purge.body", "Remove all products from the database to start a fresh import")}</p>
                             </div>
                             <button
                                 onClick={() => setPurgeConfirm(true)}
@@ -425,7 +476,7 @@ export default function ImportExportPage() {
                     ) : (
                         <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-500/5">
                             <p className="mb-3 text-sm font-semibold text-red-800 dark:text-red-300">
-                                Are you sure? This will permanently delete all {totalProducts?.toLocaleString()} product records.
+                                {tr("page.import_export.purge.confirm_body", "Are you sure? This will permanently delete all current product records.")} {totalProducts?.toLocaleString()}
                             </p>
                             <label className="mb-4 flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
                                 <input
@@ -434,7 +485,7 @@ export default function ImportExportPage() {
                                     onChange={(e) => setPurgeRules(e.target.checked)}
                                     className="h-4 w-4 rounded border-red-300 text-red-600 focus:ring-red-500"
                                 />
-                                Also delete all normalization rules
+                                {tr("page.import_export.purge.include_rules", "Also delete all normalization rules")}
                             </label>
                             <div className="flex gap-2">
                                 <button
@@ -458,7 +509,7 @@ export default function ImportExportPage() {
                                     onClick={() => { setPurgeConfirm(false); setPurgeRules(false); }}
                                     className="inline-flex h-9 items-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                                 >
-                                    Cancel
+                                    {tr("common.cancel", "Cancel")}
                                 </button>
                             </div>
                         </div>
@@ -468,16 +519,16 @@ export default function ImportExportPage() {
 
             {/* Science Import card */}
             <div className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-500/5">
-                <div className="flex items-start gap-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-500/10">
+                    <div className="flex items-start gap-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-500/10">
                         <svg className="h-5 w-5 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1 1 .03 2.798-1.414 2.798H4.212c-1.444 0-2.414-1.798-1.414-2.798L4.2 15.3" />
                         </svg>
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-base font-semibold text-violet-900 dark:text-violet-200">Science Domain Import — BibTeX & RIS</h3>
+                        </div>
+                        <div className="flex-1">
+                        <h3 className="text-base font-semibold text-violet-900 dark:text-violet-200">{tr("page.import_export.science_card.title", "Science Domain Import — BibTeX & RIS")}</h3>
                         <p className="mt-1 text-sm text-violet-700 dark:text-violet-400">
-                            Drop a <strong>.bib</strong> (BibTeX) or <strong>.ris</strong> file exported from Zotero, Mendeley, EndNote, or any reference manager. UKIP auto-maps academic fields to the Science domain schema.
+                            {tr("page.import_export.science_card.body", "Drop a .bib or .ris file from Zotero, Mendeley, EndNote, or another reference manager. UKIP will auto-map the most common academic fields into the Science domain schema.")}
                         </p>
                         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
                             {[
@@ -505,7 +556,7 @@ export default function ImportExportPage() {
             <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
                     <h3 className="text-base font-semibold text-gray-900 dark:text-white">{t('page.import_export.reference_title')}</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Expected Excel columns mapped to database fields</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{tr("page.import_export.reference_subtitle", "Expected import columns mapped to domain fields")}</p>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
@@ -538,7 +589,7 @@ export default function ImportExportPage() {
                     </table>
                 </div>
                 <div className="border-t border-gray-200 px-5 py-3 dark:border-gray-800">
-                    <p className="text-xs text-gray-400 dark:text-gray-500">Showing 17 of 34 mapped columns. Additional GTIN, product code, and configuration columns are also supported.</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">{tr("page.import_export.reference_footer", "Additional mapped fields may exist depending on the active domain schema.")}</p>
                 </div>
             </div>
         </div>
