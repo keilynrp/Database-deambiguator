@@ -194,6 +194,20 @@ export default function ReportsPage() {
     ];
   }, [format, preset, selected.size, t, title]);
   const briefReady = briefChecklist.filter((item) => item.done).length >= 3;
+  const pilotExitSummary = useMemo(() => {
+    if (briefReady) {
+      return {
+        tone: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100",
+        title: tr("page.reports.exit_summary.ready_title", "This brief is in a good state for a stakeholder session"),
+        body: tr("page.reports.exit_summary.ready_body", "You already have enough structure to generate a credible pilot artifact. Use the final pass mainly to tighten framing and audience fit."),
+      };
+    }
+    return {
+      tone: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100",
+      title: tr("page.reports.exit_summary.pending_title", "This brief still needs a little framing before you share it"),
+      body: tr("page.reports.exit_summary.pending_body", "Complete the missing checklist items so the exported artifact reads as intentional rather than exploratory."),
+    };
+  }, [briefReady, tr]);
   const presetHref = `/reports?preset=pilot-brief&domain=${encodeURIComponent(activeDomainId)}&format=pdf&benchmark_profile=${encodeURIComponent(selectedBenchmarkProfile)}&stakeholder=${encodeURIComponent(selectedStakeholderProfile)}`;
   const reportOverviewCards = useMemo(() => ([
     {
@@ -490,6 +504,21 @@ export default function ReportsPage() {
           label: t("page.reports.guided.cta_explorer"),
         }}
       />
+
+      <div className={`rounded-2xl border px-5 py-4 ${pilotExitSummary.tone}`}>
+        <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+          <div>
+            <p className="text-sm font-semibold">{pilotExitSummary.title}</p>
+            <p className="mt-1 text-xs opacity-80">{pilotExitSummary.body}</p>
+          </div>
+          <div className="rounded-xl bg-white/70 px-4 py-3 text-xs shadow-sm dark:bg-gray-950/30">
+            <p className="font-semibold">{tr("page.reports.exit_summary.audience", "Primary audience")}</p>
+            <p className="mt-1 opacity-80">{activeStakeholder.label}</p>
+            <p className="mt-3 font-semibold">{tr("page.reports.exit_summary.format", "Output")}</p>
+            <p className="mt-1 opacity-80">{format.toUpperCase()} · {selected.size} {tr("page.reports.exit_summary.sections", "sections selected")}</p>
+          </div>
+        </div>
+      </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
         {reportOverviewCards.map((card) => (

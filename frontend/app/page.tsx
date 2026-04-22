@@ -49,6 +49,10 @@ export default function Home() {
   const [pilotPersona, setPilotPersona] = useState<PilotPersonaId>("research");
   const { token } = useAuth();
   const { t } = useLanguage();
+  const tr = useCallback((key: string, fallback: string) => {
+    const value = t(key);
+    return value === key ? fallback : value;
+  }, [t]);
   const hasEntities = (stats?.total_entities ?? 0) > 0;
   const stakeholderQuery = useMemo(
     () => `stakeholder=${encodeURIComponent(pilotPersonaToStakeholder(pilotPersona))}`,
@@ -151,6 +155,38 @@ export default function Home() {
       readiness,
     };
   }, [enrichPct, guidedStages, hasEntities]);
+
+  const pilotSessionSummary = useMemo(() => {
+    if (!hasEntities) {
+      return {
+        tone: "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100",
+        title: tr("page.home.pilot_readiness.starting_title", "Pilot workspace is still empty"),
+        body: tr("page.home.pilot_readiness.starting_body", "Before a stakeholder session, load a real or demo dataset so the platform can show signal, quality, and recommended next steps."),
+      };
+    }
+
+    if (enrichPct < 30) {
+      return {
+        tone: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100",
+        title: tr("page.home.pilot_readiness.building_title", "Pilot workspace is building signal"),
+        body: tr("page.home.pilot_readiness.building_body", `Enrichment is at ${Math.round(enrichPct)}%. This is already useful for internal discussion, but still light for a polished stakeholder readout.`),
+      };
+    }
+
+    if (enrichPct < 60) {
+      return {
+        tone: "border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-100",
+        title: tr("page.home.pilot_readiness.review_title", "Pilot workspace is ready for review"),
+        body: tr("page.home.pilot_readiness.review_body", `Enrichment is at ${Math.round(enrichPct)}%. This is the right moment to review low-confidence records before generating a brief.`),
+      };
+    }
+
+    return {
+      tone: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100",
+      title: tr("page.home.pilot_readiness.ready_title", "Pilot workspace is ready for a stakeholder-facing brief"),
+      body: tr("page.home.pilot_readiness.ready_body", "Coverage and review signal are now strong enough to move from internal exploration into a more formal narrative."),
+    };
+  }, [enrichPct, hasEntities, tr]);
 
   const fetchDemoStatus = useCallback(async () => {
     try {
@@ -258,6 +294,29 @@ export default function Home() {
         description={t('page.home.description')}
         actions={viewToggle}
       />
+
+      <div className={`rounded-2xl border px-5 py-4 ${pilotSessionSummary.tone}`}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-1">
+            <p className="text-sm font-semibold">{pilotSessionSummary.title}</p>
+            <p className="text-xs opacity-80">{pilotSessionSummary.body}</p>
+          </div>
+          <div className="grid gap-2 text-xs sm:grid-cols-3 lg:min-w-[28rem]">
+            <div className="rounded-xl bg-white/70 px-3 py-2 shadow-sm dark:bg-gray-950/30">
+              <p className="font-semibold">{tr("page.home.pilot_readiness.audience", "Audience")}</p>
+              <p className="mt-1 opacity-80">{personaLabel}</p>
+            </div>
+            <div className="rounded-xl bg-white/70 px-3 py-2 shadow-sm dark:bg-gray-950/30">
+              <p className="font-semibold">{tr("page.home.pilot_readiness.workspace", "Workspace")}</p>
+              <p className="mt-1 opacity-80">{hasEntities ? tr("page.home.pilot_readiness.workspace_populated", "Populated and ready to inspect") : tr("page.home.pilot_readiness.workspace_empty", "Still waiting for data")}</p>
+            </div>
+            <div className="rounded-xl bg-white/70 px-3 py-2 shadow-sm dark:bg-gray-950/30">
+              <p className="font-semibold">{tr("page.home.pilot_readiness.next_label", "Next move")}</p>
+              <p className="mt-1 opacity-80">{nextGuidedAction.cta}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Metric cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

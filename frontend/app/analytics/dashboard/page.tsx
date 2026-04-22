@@ -425,6 +425,29 @@ export default function ExecutiveDashboardPage() {
         body: tr("page.exec_dashboard.next.review.body", "Use authority and review queues to clean the weakest records before sharing conclusions."),
         cta: tr("page.exec_dashboard.next.review.cta", "Open review"),
       };
+  const stakeholderReadout = useMemo(() => {
+    if (!data) return null;
+
+    const importedMessage = importedFlag
+      ? `This dashboard is reflecting the latest imported workspace${importedRows ? ` with ${importedRows} rows` : ""}.`
+      : "This dashboard is summarizing the current active workspace for a stakeholder-facing review.";
+
+    const readinessMessage =
+      data.institutional_benchmark.status === "ready"
+        ? "The current benchmark signal is strong enough for an external readout."
+        : data.institutional_benchmark.status === "watch"
+          ? "The signal is already useful, but it still benefits from a review framing before wider circulation."
+          : "Treat this as an internal pilot readout for now; the current gaps should be explained explicitly in the conversation.";
+
+    const tone =
+      data.institutional_benchmark.status === "ready"
+        ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100"
+        : data.institutional_benchmark.status === "watch"
+          ? "border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-100"
+          : "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100";
+
+    return { importedMessage, readinessMessage, tone };
+  }, [data, importedFlag, importedRows]);
   const dashboardFlowStep: PilotFlowStepId =
     !data ? "enrich" :
     data.kpis.enrichment_pct >= 60 ? "brief" :
@@ -490,6 +513,21 @@ export default function ExecutiveDashboardPage() {
           </div>
         }
       />
+
+      {stakeholderReadout && (
+        <div className={`rounded-2xl border px-5 py-4 ${stakeholderReadout.tone}`}>
+          <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+            <div>
+              <p className="text-sm font-semibold">{tr("page.exec_dashboard.session.title", "Stakeholder session readout")}</p>
+              <p className="mt-1 text-xs opacity-80">{stakeholderReadout.importedMessage}</p>
+            </div>
+            <div className="rounded-xl bg-white/70 px-4 py-3 text-xs shadow-sm dark:bg-gray-950/30">
+              <p className="font-semibold">{tr("page.exec_dashboard.session.readiness", "How to frame this session")}</p>
+              <p className="mt-1 opacity-80">{stakeholderReadout.readinessMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && <ErrorBanner message={error} onRetry={fetchDashboard} variant="card" />}
 
