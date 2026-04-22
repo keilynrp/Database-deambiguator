@@ -63,6 +63,7 @@ from backend.routers import (
     webhooks,
     onboarding,
     widgets,
+    workspace_reset,
     workflows,
     ws,
 )
@@ -341,6 +342,7 @@ app.include_router(scientific_import.router)
 app.include_router(scrapers.router)
 app.include_router(onboarding.router)
 app.include_router(widgets.router)
+app.include_router(workspace_reset.router)
 app.include_router(workflows.router)
 app.include_router(ws.router)
 

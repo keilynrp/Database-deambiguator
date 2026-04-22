@@ -11,10 +11,11 @@ import AccountTab from "./AccountTab";
 import NotificationsTab from "./NotificationsTab";
 import UsersTab from "./UsersTab";
 import WebhooksTab from "./WebhooksTab";
+import WorkspaceResetTab from "./WorkspaceResetTab";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type Tab = "preferences" | "account" | "users" | "webhooks" | "notifications" | "branding";
+type Tab = "preferences" | "account" | "users" | "webhooks" | "notifications" | "branding" | "workspace_reset";
 
 
 // ── Main Page ────────────────────────────────────────────────────────────────
@@ -36,6 +37,7 @@ export default function SettingsPage() {
         ...(isAdmin ? [{ id: "webhooks", label: t("settings.tab.webhooks") }] : []),
         ...(isAdmin ? [{ id: "notifications", label: t("settings.tab.notifications") }] : []),
         ...(isAdmin ? [{ id: "branding", label: t("settings.tab.branding") }] : []),
+        ...(isAdmin ? [{ id: "workspace_reset", label: t("settings.tab.workspace_reset") }] : []),
     ];
 
     const [tab, setTab] = useState<Tab>("preferences");
@@ -68,6 +70,7 @@ export default function SettingsPage() {
             {tab === "webhooks"       && isAdmin && <WebhooksTab toast={toast} />}
             {tab === "notifications"  && isAdmin && <NotificationsTab toast={toast} />}
             {tab === "branding"       && isAdmin && <BrandingTab toast={toast} />}
+            {tab === "workspace_reset" && isAdmin && <WorkspaceResetTab toast={toast} />}
         </div>
     );
 }
