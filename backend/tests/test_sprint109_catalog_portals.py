@@ -150,3 +150,49 @@ def test_catalog_portal_is_scoped_to_active_organization(client, db_session):
 
     outsider_results = client.get("/catalogs/org-a-portal/results", headers=outsider_headers)
     assert outsider_results.status_code == 404
+
+
+def test_catalog_portal_update_persists_editable_fields(client, auth_headers, db_session):
+    db_session.add(
+        models.RawEntity(
+            primary_label="Editable Record",
+            entity_type="publication",
+            domain="science",
+            quality_score=0.75,
+            source="scientific_import",
+        )
+    )
+    db_session.commit()
+
+    create_resp = client.post(
+        "/catalogs",
+        json={
+            "title": "Editable Catalog",
+            "slug": "editable-catalog",
+            "domain_id": "science",
+            "visibility": "private",
+        },
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201, create_resp.text
+
+    update_resp = client.put(
+        "/catalogs/editable-catalog",
+        json={
+            "title": "Edited Catalog",
+            "description": "Updated portal description",
+            "visibility": "org",
+            "source_label": "Manual pilot collection",
+            "search": "Editable",
+            "min_quality": 0.7,
+        },
+        headers=auth_headers,
+    )
+    assert update_resp.status_code == 200, update_resp.text
+    updated = update_resp.json()
+    assert updated["title"] == "Edited Catalog"
+    assert updated["description"] == "Updated portal description"
+    assert updated["visibility"] == "org"
+    assert updated["source_label"] == "Manual pilot collection"
+    assert updated["search"] == "Editable"
+    assert updated["min_quality"] == 0.7

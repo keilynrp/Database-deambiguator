@@ -80,13 +80,27 @@ export default function CatalogPortalPage() {
   const [portal, setPortal] = useState<CatalogPortal | null>(null);
   const [results, setResults] = useState<CatalogResultsPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [selectedFacets, setSelectedFacets] = useState<Record<string, string>>({
     ft_entity_type: searchParams.get("ft_entity_type") ?? "",
     ft_validation_status: searchParams.get("ft_validation_status") ?? "",
     ft_enrichment_status: searchParams.get("ft_enrichment_status") ?? "",
     ft_source: searchParams.get("ft_source") ?? "",
+  });
+  const [editForm, setEditForm] = useState({
+    title: "",
+    description: "",
+    visibility: "private",
+    source_label: "",
+    search: "",
+    min_quality: "",
+    ft_entity_type: "",
+    ft_validation_status: "",
+    ft_enrichment_status: "",
+    ft_source: "",
   });
 
   const currentPage = Number(searchParams.get("page") || "1");
@@ -100,6 +114,18 @@ export default function CatalogPortalPage() {
       if (!portalRes.ok) throw new Error(`HTTP ${portalRes.status}`);
       const portalPayload = await portalRes.json();
       setPortal(portalPayload);
+      setEditForm({
+        title: portalPayload.title ?? "",
+        description: portalPayload.description ?? "",
+        visibility: portalPayload.visibility ?? "private",
+        source_label: portalPayload.source_label ?? "",
+        search: portalPayload.search ?? "",
+        min_quality: portalPayload.min_quality !== null && portalPayload.min_quality !== undefined ? String(portalPayload.min_quality) : "",
+        ft_entity_type: portalPayload.ft_entity_type ?? "",
+        ft_validation_status: portalPayload.ft_validation_status ?? "",
+        ft_enrichment_status: portalPayload.ft_enrichment_status ?? "",
+        ft_source: portalPayload.ft_source ?? "",
+      });
 
       const query = new URLSearchParams({
         skip: String((currentPage - 1) * limit),
@@ -144,6 +170,38 @@ export default function CatalogPortalPage() {
     const next = new URLSearchParams(searchParams.toString());
     next.set("page", String(page));
     router.replace(`/catalogs/${slug}?${next.toString()}`);
+  };
+
+  const savePortal = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/catalogs/${slug}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          title: editForm.title,
+          description: editForm.description,
+          visibility: editForm.visibility,
+          source_label: editForm.source_label,
+          search: editForm.search || null,
+          min_quality: editForm.min_quality ? Number(editForm.min_quality) : null,
+          ft_entity_type: editForm.ft_entity_type || null,
+          ft_validation_status: editForm.ft_validation_status || null,
+          ft_enrichment_status: editForm.ft_enrichment_status || null,
+          ft_source: editForm.ft_source || null,
+        }),
+      });
+      if (!res.ok) {
+        const detail = await res.json().catch(() => null);
+        throw new Error(detail?.detail || `HTTP ${res.status}`);
+      }
+      setEditing(false);
+      await loadPortal();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : tr("catalogs.update_failed", "Failed to update the catalog portal."));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -200,6 +258,80 @@ export default function CatalogPortalPage() {
 
       <section className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+                  {tr("catalogs.manage.eyebrow", "Portal settings")}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                  {tr("catalogs.manage.title", "Adjust this collection")}
+                </p>
+              </div>
+              <button
+                onClick={() => setEditing((prev) => !prev)}
+                className="rounded-xl border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                {editing ? tr("common.cancel", "Cancel") : tr("common.edit", "Edit")}
+              </button>
+            </div>
+
+            {editing && (
+              <div className="mt-4 space-y-3">
+                <input
+                  value={editForm.title}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, title: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:ring-blue-900/40"
+                  placeholder={tr("catalogs.field.title", "Title")}
+                />
+                <textarea
+                  rows={3}
+                  value={editForm.description}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, description: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:ring-blue-900/40"
+                  placeholder={tr("catalogs.field.description", "Description")}
+                />
+                <input
+                  value={editForm.source_label}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, source_label: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:ring-blue-900/40"
+                  placeholder={tr("catalogs.manage.source_label", "Collection origin label")}
+                />
+                <select
+                  value={editForm.visibility}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, visibility: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:ring-blue-900/40"
+                >
+                  <option value="private">{tr("catalogs.visibility.private", "Private workspace")}</option>
+                  <option value="org">{tr("catalogs.visibility.org", "Organization members")}</option>
+                </select>
+                <input
+                  value={editForm.search}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, search: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:ring-blue-900/40"
+                  placeholder={tr("catalogs.manage.default_search", "Default search")}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={editForm.min_quality}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, min_quality: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:ring-blue-900/40"
+                  placeholder={tr("catalogs.field.min_quality", "Minimum quality")}
+                />
+                <button
+                  onClick={savePortal}
+                  disabled={saving}
+                  className="w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {saving ? tr("catalogs.saving", "Saving...") : tr("catalogs.save", "Save portal")}
+                </button>
+              </div>
+            )}
+          </div>
+
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600 dark:text-blue-400">
               {tr("catalogs.filters_eyebrow", "Search and refine")}
