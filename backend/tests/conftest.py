@@ -194,6 +194,7 @@ _TABLES_TO_CLEAN = [
     "workflow_runs",
     "workflows",
     "catalog_portals",
+    "import_batches",
     "organization_members",
     "organizations",
     "entity_relationships",

@@ -30,6 +30,7 @@ class EntityService:
         fields_raw: str,
         search: Optional[str] = None,
         min_quality: Optional[float] = None,
+        import_batch_id: Optional[int] = None,
         ft_entity_type: Optional[str] = None,
         ft_domain: Optional[str] = None,
         ft_validation_status: Optional[str] = None,
@@ -62,6 +63,8 @@ class EntityService:
 
             if min_quality is not None:
                 query = query.filter(models.RawEntity.quality_score >= min_quality)
+            if import_batch_id is not None:
+                query = query.filter(models.RawEntity.import_batch_id == import_batch_id)
 
             if ft_entity_type and field != "entity_type":
                 query = query.filter(models.RawEntity.entity_type == ft_entity_type)

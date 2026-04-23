@@ -29,7 +29,24 @@ interface CatalogPortal {
   created_at: string | null;
 }
 
-const DEFAULT_FACETS = ["entity_type", "validation_status", "enrichment_status", "source"];
+interface CatalogImportCandidate {
+  kind: string;
+  batch_id: number | null;
+  domain_id: string;
+  source: string;
+  entity_type: string | null;
+  total_records: number;
+  avg_quality: number | null;
+  source_label: string;
+  search: string | null;
+  min_quality: number | null;
+  ft_source: string | null;
+  ft_entity_type: string | null;
+  created_at?: string | null;
+  file_format?: string | null;
+}
+
+const KNOWLEDGE_PANEL_FACETS = ["entity_type", "validation_status", "enrichment_status", "source"];
 const SEEDED_QUERY_KEYS = [
   "domain_id",
   "title",
@@ -39,6 +56,7 @@ const SEEDED_QUERY_KEYS = [
   "source_label",
   "source_format",
   "source_rows",
+  "source_batch_id",
   "seeded_from",
   "search",
   "min_quality",
@@ -92,6 +110,7 @@ export default function CatalogPortalsPage() {
   };
 
   const [portals, setPortals] = useState<CatalogPortal[]>([]);
+  const [candidates, setCandidates] = useState<CatalogImportCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +121,7 @@ export default function CatalogPortalsPage() {
     domain_id: activeDomainId || "default",
     visibility: searchParams.get("visibility") ?? "private",
     source_label: searchParams.get("source_label") ?? "",
+    source_batch_id: searchParams.get("source_batch_id") ?? "",
     search: searchParams.get("search") ?? "",
     min_quality: searchParams.get("min_quality") ?? "",
     ft_entity_type: searchParams.get("ft_entity_type") ?? "",
@@ -140,6 +160,12 @@ export default function CatalogPortalsPage() {
         );
       }
       setPortals(await res.json());
+      const candidatesRes = await apiFetch("/catalogs/import-candidates");
+      if (candidatesRes.ok) {
+        setCandidates(await candidatesRes.json());
+      } else {
+        setCandidates([]);
+      }
     } catch (loadError) {
       setError(
         normalizeFeedback(
@@ -150,6 +176,36 @@ export default function CatalogPortalsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const seedFromCandidate = (candidate: CatalogImportCandidate) => {
+    const slugBase = `${candidate.domain_id}-${candidate.source}${candidate.entity_type ? `-${candidate.entity_type}` : ""}`
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 70);
+    const timestamp = Date.now();
+    setForm((prev) => ({
+      ...prev,
+      title: `${candidate.domain_id} ${candidate.entity_type || tr("catalogs.candidate.collection", "collection")}`.replace(/\b\w/g, (char) => char.toUpperCase()),
+      slug: `catalog-${slugBase || "import"}-${timestamp}`.slice(0, 120),
+      description: tr(
+        "catalogs.candidate.description",
+        "Catalog portal seeded from an existing imported collection so the team can browse it in a friendlier discovery view.",
+      ),
+      domain_id: candidate.domain_id,
+      source_label: candidate.source_label,
+      source_batch_id: candidate.batch_id !== null ? String(candidate.batch_id) : "",
+      search: candidate.search ?? "",
+      min_quality: candidate.min_quality !== null && candidate.min_quality !== undefined ? String(candidate.min_quality) : "",
+      ft_entity_type: candidate.ft_entity_type ?? "",
+      ft_validation_status: "",
+      ft_enrichment_status: "",
+      ft_source: candidate.ft_source ?? "",
+      default_sort: "primary_label",
+      default_order: "asc",
+    }));
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -168,13 +224,15 @@ export default function CatalogPortalsPage() {
     try {
       const payload = {
         ...form,
+        source_batch_id: form.source_batch_id ? Number(form.source_batch_id) : null,
         min_quality: form.min_quality ? Number(form.min_quality) : null,
         source_context: {
           format: searchParams.get("source_format") ?? null,
           rows: searchParams.get("source_rows") ? Number(searchParams.get("source_rows")) : null,
+          source_batch_id: form.source_batch_id ? Number(form.source_batch_id) : null,
           seeded_from: searchParams.get("seeded_from") ?? null,
         },
-        featured_facets: DEFAULT_FACETS,
+        featured_facets: KNOWLEDGE_PANEL_FACETS,
       };
       const res = await apiFetch("/catalogs", {
         method: "POST",
@@ -235,6 +293,10 @@ export default function CatalogPortalsPage() {
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
               {tr("catalogs.create_help", "Start with one domain and a few saved filters. We will keep this first cut private to your workspace.")}
             </p>
+            <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
+              <p className="font-semibold">{tr("catalogs.facets_sync_title", "Knowledge facets stay in sync")}</p>
+              <p className="mt-1">{tr("catalogs.facets_sync_body", "This portal reuses the same facet set shown in the Knowledge panel, so filters stay consistent without duplicating configuration.")}</p>
+            </div>
             {form.source_label && (
               <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-800 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-200">
                 <p className="font-semibold">{tr("catalogs.source_seeded", "Seeded from import")}</p>
@@ -409,6 +471,67 @@ export default function CatalogPortalsPage() {
             </div>
           )}
         </section>
+      </section>
+
+      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <div className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600 dark:text-emerald-400">
+            {tr("catalogs.candidate.eyebrow", "Previous imports")}
+          </p>
+          <h2 className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">
+            {tr("catalogs.candidate.title", "Seed a portal from data already in the workspace")}
+          </h2>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            {tr("catalogs.candidate.body", "Pick an existing imported collection and we will prefill the portal scope with the same domain and source filters. This is the fastest way to build a catalog from earlier ingestion work.")}
+          </p>
+        </div>
+
+        {candidates.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {tr("catalogs.candidate.empty", "We do not have prior imported collections to suggest yet. Import data first, then come back here to seed a portal from it.")}
+          </p>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {candidates.map((candidate) => (
+              <div
+                key={`${candidate.domain_id}-${candidate.source}-${candidate.entity_type || "any"}`}
+                className="rounded-2xl border border-gray-200 p-4 dark:border-gray-800"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                    {candidate.domain_id}
+                  </span>
+                  <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    {candidate.source}
+                  </span>
+                  {candidate.entity_type && (
+                    <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                      {candidate.entity_type}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  {candidate.source_label}
+                </p>
+                <div className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                  <p>
+                    {tr("catalogs.candidate.records", "Records")}: {candidate.total_records.toLocaleString()}
+                  </p>
+                  <p>
+                    {tr("catalogs.candidate.quality", "Average quality")}: {candidate.avg_quality !== null ? candidate.avg_quality.toFixed(2) : "—"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => seedFromCandidate(candidate)}
+                  className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700"
+                >
+                  {tr("catalogs.candidate.use", "Use for portal")}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

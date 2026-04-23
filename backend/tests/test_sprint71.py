@@ -245,6 +245,29 @@ class TestUploadWithDomain:
         assert resp.status_code == 201
         assert "domain" in resp.json()
 
+    def test_upload_creates_import_batch_and_marks_entities(self, client, editor_headers, db_session):
+        from backend import models
+
+        buf = _csv_file([{"primary_label": "Batch Entity", "entity_type": "publication"}])
+        resp = client.post(
+            "/upload",
+            data={"domain": "science"},
+            files={"file": ("batch.csv", buf, "text/csv")},
+            headers=editor_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        data = resp.json()
+        assert data["import_batch_id"] > 0
+
+        batch = db_session.query(models.ImportBatch).filter(models.ImportBatch.id == data["import_batch_id"]).first()
+        assert batch is not None
+        assert batch.domain_id == "science"
+        assert batch.total_rows == 1
+
+        entity = db_session.query(models.RawEntity).filter(models.RawEntity.primary_label == "Batch Entity").first()
+        assert entity is not None
+        assert entity.import_batch_id == batch.id
+
     def test_upload_default_domain(self, client, editor_headers):
         buf = _csv_file([{"primary_label": "E2"}])
         resp = client.post(

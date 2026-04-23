@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Query as SAQuery, Session
 
 from backend import models, schemas
@@ -31,6 +31,17 @@ _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-]{1,118}[a-z0-9]$")
 _ALLOWED_SORTS = {"id", "quality_score", "primary_label", "enrichment_status"}
 _ALLOWED_ORDERS = {"asc", "desc"}
 _ALLOWED_FACETS = {"entity_type", "domain", "validation_status", "enrichment_status", "source"}
+_PORTAL_FACETS_DEFAULT = tuple(schemas.CATALOG_PORTAL_FACETS_DEFAULT)
+
+
+def _normalize_featured_facets(fields: list[str] | None) -> list[str]:
+    normalized: list[str] = []
+    for field in fields or []:
+        if field == "domain":
+            continue
+        if field in _ALLOWED_FACETS and field not in normalized:
+            normalized.append(field)
+    return normalized or list(_PORTAL_FACETS_DEFAULT)
 
 
 def _parse_json(raw: str | None, fallback: Any) -> Any:
@@ -78,6 +89,7 @@ def _serialize_portal(portal: models.CatalogPortal) -> dict[str, Any]:
     return {
         "id": portal.id,
         "org_id": portal.org_id,
+        "source_batch_id": portal.source_batch_id,
         "title": portal.title,
         "slug": portal.slug,
         "description": portal.description,
@@ -100,12 +112,36 @@ def _serialize_portal(portal: models.CatalogPortal) -> dict[str, Any]:
     }
 
 
+def _serialize_import_batch(batch: models.ImportBatch) -> dict[str, Any]:
+    return {
+        "id": batch.id,
+        "org_id": batch.org_id,
+        "domain_id": batch.domain_id,
+        "source_type": batch.source_type,
+        "file_name": batch.file_name,
+        "file_format": batch.file_format,
+        "source_label": batch.source_label,
+        "total_rows": batch.total_rows,
+        "entity_type_hint": batch.entity_type_hint,
+        "created_by": batch.created_by,
+        "created_at": batch.created_at,
+    }
+
+
 def _get_scoped_portal_or_404(db: Session, slug: str, org_id: int | None) -> models.CatalogPortal:
     query = scope_query_to_org(db.query(models.CatalogPortal), models.CatalogPortal, org_id)
     portal = query.filter(models.CatalogPortal.slug == slug).first()
     if not portal:
         raise HTTPException(status_code=404, detail="Catalog portal not found")
     return portal
+
+
+def _get_scoped_import_batch_or_404(db: Session, batch_id: int, org_id: int | None) -> models.ImportBatch:
+    query = scope_query_to_org(db.query(models.ImportBatch), models.ImportBatch, org_id)
+    batch = query.filter(models.ImportBatch.id == batch_id).first()
+    if not batch:
+        raise HTTPException(status_code=404, detail="Import batch not found")
+    return batch
 
 
 def _get_public_portal_or_404(db: Session, slug: str) -> models.CatalogPortal:
@@ -217,7 +253,10 @@ def _portal_entity_query(
     ft_source: str | None,
 ) -> SAQuery:
     query = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
-    query = query.filter(models.RawEntity.domain == portal.domain_id)
+    if portal.source_batch_id:
+        query = query.filter(models.RawEntity.import_batch_id == portal.source_batch_id)
+    else:
+        query = query.filter(models.RawEntity.domain == portal.domain_id)
     query = _apply_entity_filters(
         query,
         search=search,
@@ -244,6 +283,103 @@ def list_catalog_portals(
     return [_serialize_portal(portal) for portal in portals]
 
 
+@router.get("/catalogs/import-candidates")
+def list_catalog_import_candidates(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    org_id = resolve_request_org_id(db, current_user)
+    candidates: list[dict[str, Any]] = []
+
+    batches = (
+        scope_query_to_org(db.query(models.ImportBatch), models.ImportBatch, org_id)
+        .order_by(models.ImportBatch.created_at.desc(), models.ImportBatch.id.desc())
+        .limit(12)
+        .all()
+    )
+    for batch in batches:
+        candidates.append(
+            {
+                "kind": "batch",
+                "batch_id": batch.id,
+                "domain_id": batch.domain_id,
+                "source": batch.source_type,
+                "entity_type": batch.entity_type_hint,
+                "total_records": batch.total_rows,
+                "avg_quality": None,
+                "source_label": batch.source_label or batch.file_name or f"Batch #{batch.id}",
+                "search": None,
+                "min_quality": None,
+                "ft_source": None,
+                "ft_entity_type": batch.entity_type_hint,
+                "created_at": batch.created_at,
+                "file_format": batch.file_format,
+            }
+        )
+
+    rows = (
+        scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+        .filter(models.RawEntity.import_batch_id.is_(None))
+        .with_entities(
+            models.RawEntity.domain.label("domain_id"),
+            models.RawEntity.source.label("source"),
+            models.RawEntity.entity_type.label("entity_type"),
+            func.count(models.RawEntity.id).label("total_records"),
+            func.avg(models.RawEntity.quality_score).label("avg_quality"),
+        )
+        .group_by(
+            models.RawEntity.domain,
+            models.RawEntity.source,
+            models.RawEntity.entity_type,
+        )
+        .order_by(
+            func.count(models.RawEntity.id).desc(),
+            models.RawEntity.domain.asc(),
+            models.RawEntity.source.asc(),
+        )
+        .limit(max(0, 12 - len(candidates)))
+        .all()
+    )
+    for row in rows:
+        domain_id = row.domain_id or "default"
+        source = row.source or "user"
+        entity_type = row.entity_type
+        source_label = f"{domain_id} · {source}"
+        if entity_type:
+            source_label = f"{source_label} · {entity_type}"
+        candidates.append(
+            {
+                "kind": "legacy_scope",
+                "batch_id": None,
+                "domain_id": domain_id,
+                "source": source,
+                "entity_type": entity_type,
+                "total_records": int(row.total_records or 0),
+                "avg_quality": round(float(row.avg_quality), 3) if row.avg_quality is not None else None,
+                "source_label": source_label,
+                "search": None,
+                "min_quality": None,
+                "ft_source": source,
+                "ft_entity_type": entity_type,
+            }
+        )
+    return candidates
+
+
+@router.get("/catalogs/import-batches", response_model=list[schemas.ImportBatchResponse])
+def list_import_batches(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    org_id = resolve_request_org_id(db, current_user)
+    batches = (
+        scope_query_to_org(db.query(models.ImportBatch), models.ImportBatch, org_id)
+        .order_by(models.ImportBatch.created_at.desc(), models.ImportBatch.id.desc())
+        .all()
+    )
+    return [_serialize_import_batch(batch) for batch in batches]
+
+
 @router.post("/catalogs", response_model=schemas.CatalogPortalResponse, status_code=201)
 def create_catalog_portal(
     payload: schemas.CatalogPortalCreate,
@@ -255,8 +391,14 @@ def create_catalog_portal(
     normalized_slug = _normalize_slug(payload.slug)
     if db.query(models.CatalogPortal).filter(models.CatalogPortal.slug == normalized_slug).first():
         raise HTTPException(status_code=409, detail="Catalog portal slug already exists")
+    source_batch_id = None
+    if payload.source_batch_id is not None:
+        batch = _get_scoped_import_batch_or_404(db, payload.source_batch_id, org_id)
+        if batch.domain_id != payload.domain_id:
+            raise HTTPException(status_code=422, detail="Import batch domain does not match portal domain")
+        source_batch_id = batch.id
 
-    featured_facets = [field for field in payload.featured_facets if field in _ALLOWED_FACETS and field != "domain"]
+    featured_facets = _normalize_featured_facets(payload.featured_facets)
     query_json = json.dumps(
         {
             "search": payload.search,
@@ -272,6 +414,7 @@ def create_catalog_portal(
     now = datetime.now(timezone.utc)
     portal = models.CatalogPortal(
         org_id=persisted_org_id(org_id),
+        source_batch_id=source_batch_id,
         domain_id=payload.domain_id,
         title=payload.title.strip(),
         slug=normalized_slug,
@@ -341,6 +484,11 @@ def update_catalog_portal(
         portal.title = payload.title.strip()
     if payload.description is not None:
         portal.description = payload.description
+    if payload.source_batch_id is not None:
+        batch = _get_scoped_import_batch_or_404(db, payload.source_batch_id, org_id)
+        if batch.domain_id != portal.domain_id:
+            raise HTTPException(status_code=422, detail="Import batch domain does not match portal domain")
+        portal.source_batch_id = batch.id
     if payload.visibility is not None:
         portal.visibility = payload.visibility
     if payload.source_label is not None:
@@ -351,9 +499,7 @@ def update_catalog_portal(
         portal.default_sort = payload.default_sort
 
     if payload.featured_facets is not None:
-        portal.featured_facets_json = json.dumps(
-            [field for field in payload.featured_facets if field in _ALLOWED_FACETS and field != "domain"]
-        )
+        portal.featured_facets_json = json.dumps(_normalize_featured_facets(payload.featured_facets))
 
     query_payload = {
         "search": payload.search if payload.search is not None else defaults["search"],
@@ -370,6 +516,19 @@ def update_catalog_portal(
     db.commit()
     db.refresh(portal)
     return _serialize_portal(portal)
+
+
+@router.delete("/catalogs/{slug}", status_code=204)
+def delete_catalog_portal(
+    slug: str = Path(..., min_length=3),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
+):
+    org_id = resolve_request_org_id(db, current_user)
+    portal = _get_scoped_portal_or_404(db, slug, org_id)
+    db.delete(portal)
+    db.commit()
+    return None
 
 
 @router.get("/catalogs/{slug}/results")
@@ -422,15 +581,16 @@ def get_catalog_results(
     total = query.count()
     items = query.offset(skip).limit(limit).all()
 
-    featured_facets = _parse_json(portal.featured_facets_json, [])
-    facet_fields = ",".join([field for field in featured_facets if field in _ALLOWED_FACETS and field != "domain"])
+    featured_facets = _normalize_featured_facets(_parse_json(portal.featured_facets_json, []))
+    facet_fields = ",".join(featured_facets)
     facets = EntityService.get_facets(
         db,
-        facet_fields or "entity_type,validation_status,enrichment_status,source",
+        facet_fields,
         search=filters["search"],
         min_quality=filters["min_quality"],
+        import_batch_id=portal.source_batch_id,
         ft_entity_type=filters["ft_entity_type"],
-        ft_domain=portal.domain_id,
+        ft_domain=None if portal.source_batch_id else portal.domain_id,
         ft_validation_status=filters["ft_validation_status"],
         ft_enrichment_status=filters["ft_enrichment_status"],
         ft_source=filters["ft_source"],

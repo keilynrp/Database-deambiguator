@@ -21,6 +21,7 @@ class EntityBase(BaseModel):
 
 class Entity(EntityBase):
     id: int
+    import_batch_id: Optional[int] = None
     attributes_json: Optional[str] = None
     normalized_json: Optional[str] = None
     source: Optional[str] = None
@@ -28,10 +29,19 @@ class Entity(EntityBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+CATALOG_PORTAL_FACETS_DEFAULT = [
+    "entity_type",
+    "validation_status",
+    "enrichment_status",
+    "source",
+]
+
+
 class CatalogPortalBase(BaseModel):
     title: str
     slug: str
     description: Optional[str] = None
+    source_batch_id: Optional[int] = None
     domain_id: str
     visibility: Literal["private", "org", "public"] = "private"
     source_label: Optional[str] = None
@@ -44,7 +54,7 @@ class CatalogPortalBase(BaseModel):
     ft_source: Optional[str] = None
     default_sort: Literal["id", "quality_score", "primary_label", "enrichment_status"] = "primary_label"
     default_order: Literal["asc", "desc"] = "asc"
-    featured_facets: List[str] = Field(default_factory=lambda: ["entity_type", "validation_status", "enrichment_status", "source"])
+    featured_facets: List[str] = Field(default_factory=lambda: list(CATALOG_PORTAL_FACETS_DEFAULT))
 
 
 class CatalogPortalCreate(CatalogPortalBase):
@@ -54,6 +64,7 @@ class CatalogPortalCreate(CatalogPortalBase):
 class CatalogPortalUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    source_batch_id: Optional[int] = None
     visibility: Optional[Literal["private", "org", "public"]] = None
     source_label: Optional[str] = None
     source_context: Optional[dict] = None
@@ -74,6 +85,7 @@ class CatalogPortalResponse(BaseModel):
     title: str
     slug: str
     description: Optional[str] = None
+    source_batch_id: Optional[int] = None
     domain_id: str
     visibility: str
     source_label: Optional[str] = None
@@ -94,6 +106,20 @@ class CatalogPortalResponse(BaseModel):
 
 class CatalogPortalSummaryResponse(CatalogPortalResponse):
     summary: dict
+
+
+class ImportBatchResponse(BaseModel):
+    id: int
+    org_id: Optional[int] = None
+    domain_id: str
+    source_type: str
+    file_name: Optional[str] = None
+    file_format: Optional[str] = None
+    source_label: Optional[str] = None
+    total_rows: int = 0
+    entity_type_hint: Optional[str] = None
+    created_by: Optional[int] = None
+    created_at: Optional[datetime] = None
 
 class QualityDimension(BaseModel):
     weight: float

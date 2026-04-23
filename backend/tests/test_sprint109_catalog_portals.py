@@ -68,6 +68,7 @@ def test_catalog_portal_create_and_results_global_scope(client, auth_headers, db
     assert portal["domain_id"] == "science"
     assert portal["source_label"] == "Latest science import"
     assert portal["source_context"]["format"] == "wos_plaintext"
+    assert portal["featured_facets"] == ["entity_type", "enrichment_status", "source"]
 
     summary_resp = client.get("/catalogs/science-catalog", headers=auth_headers)
     assert summary_resp.status_code == 200
@@ -86,6 +87,77 @@ def test_catalog_portal_create_and_results_global_scope(client, auth_headers, db
     detail_resp = client.get(f"/catalogs/science-catalog/records/{record_id}", headers=auth_headers)
     assert detail_resp.status_code == 200
     assert detail_resp.json()["primary_label"] == "Portal Record A"
+
+
+def test_catalog_portal_can_scope_to_exact_import_batch(client, auth_headers, db_session):
+    batch_a = models.ImportBatch(
+        domain_id="science",
+        source_type="science_upload",
+        file_name="a.ris",
+        file_format="ris",
+        source_label="Batch A",
+        total_rows=1,
+        entity_type_hint="publication",
+    )
+    batch_b = models.ImportBatch(
+        domain_id="science",
+        source_type="science_upload",
+        file_name="b.ris",
+        file_format="ris",
+        source_label="Batch B",
+        total_rows=1,
+        entity_type_hint="publication",
+    )
+    db_session.add_all([batch_a, batch_b])
+    db_session.flush()
+    db_session.add_all(
+        [
+            models.RawEntity(
+                primary_label="Batch Scoped Record",
+                entity_type="publication",
+                domain="science",
+                source="science_upload",
+                import_batch_id=batch_a.id,
+                quality_score=0.91,
+            ),
+            models.RawEntity(
+                primary_label="Same Domain Other Batch",
+                entity_type="publication",
+                domain="science",
+                source="science_upload",
+                import_batch_id=batch_b.id,
+                quality_score=0.88,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    create_resp = client.post(
+        "/catalogs",
+        json={
+            "title": "Exact Batch Portal",
+            "slug": "exact-batch-portal",
+            "domain_id": "science",
+            "visibility": "private",
+            "source_batch_id": batch_a.id,
+            "featured_facets": ["entity_type", "source"],
+        },
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201, create_resp.text
+    portal = create_resp.json()
+    assert portal["source_batch_id"] == batch_a.id
+
+    results_resp = client.get("/catalogs/exact-batch-portal/results", headers=auth_headers)
+    assert results_resp.status_code == 200, results_resp.text
+    results = results_resp.json()
+    assert results["total"] == 1
+    assert [item["primary_label"] for item in results["items"]] == ["Batch Scoped Record"]
+
+    candidates_resp = client.get("/catalogs/import-candidates", headers=auth_headers)
+    assert candidates_resp.status_code == 200
+    candidates = candidates_resp.json()
+    assert any(candidate["kind"] == "batch" and candidate["batch_id"] == batch_a.id for candidate in candidates)
 
 
 def test_catalog_portal_is_scoped_to_active_organization(client, db_session):
@@ -243,3 +315,78 @@ def test_public_catalog_portal_is_readable_without_auth(client, auth_headers, db
     detail_resp = client.get(f"/catalogs/public-science-catalog/records/{record_id}")
     assert detail_resp.status_code == 200, detail_resp.text
     assert detail_resp.json()["canonical_id"] == "10.1000/public"
+
+
+def test_catalog_portal_delete_removes_only_portal(client, auth_headers, db_session):
+    record = models.RawEntity(
+        primary_label="Persistent Imported Record",
+        entity_type="publication",
+        domain="science",
+        source="scientific_import",
+    )
+    db_session.add(record)
+    db_session.commit()
+
+    create_resp = client.post(
+        "/catalogs",
+        json={
+            "title": "Disposable Catalog",
+            "slug": "disposable-catalog",
+            "domain_id": "science",
+            "visibility": "private",
+        },
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201, create_resp.text
+
+    delete_resp = client.delete("/catalogs/disposable-catalog", headers=auth_headers)
+    assert delete_resp.status_code == 204, delete_resp.text
+
+    portal = db_session.query(models.CatalogPortal).filter(models.CatalogPortal.slug == "disposable-catalog").first()
+    assert portal is None
+
+    persisted_record = db_session.query(models.RawEntity).filter(models.RawEntity.id == record.id).first()
+    assert persisted_record is not None
+    assert persisted_record.primary_label == "Persistent Imported Record"
+
+
+def test_catalog_import_candidates_are_grouped_from_existing_records(client, auth_headers, db_session):
+    db_session.add_all(
+        [
+            models.RawEntity(
+                primary_label="Grouped Record A",
+                entity_type="publication",
+                domain="science",
+                source="scientific_import",
+                quality_score=0.8,
+            ),
+            models.RawEntity(
+                primary_label="Grouped Record B",
+                entity_type="publication",
+                domain="science",
+                source="scientific_import",
+                quality_score=0.6,
+            ),
+            models.RawEntity(
+                primary_label="Grouped Record C",
+                entity_type="dataset",
+                domain="science",
+                source="user",
+                quality_score=0.4,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    resp = client.get("/catalogs/import-candidates", headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert len(payload) >= 2
+
+    top = payload[0]
+    assert top["domain_id"] == "science"
+    assert top["source"] == "scientific_import"
+    assert top["entity_type"] == "publication"
+    assert top["total_records"] == 2
+    assert top["ft_source"] == "scientific_import"
+    assert top["ft_entity_type"] == "publication"

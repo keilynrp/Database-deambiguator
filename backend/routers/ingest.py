@@ -15,6 +15,7 @@ import re
 import shutil
 import tempfile
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from typing import List, Optional
 
 import pandas as pd
@@ -216,6 +217,53 @@ def _record_virtual_field(target: dict, field_name: str, value) -> None:
         match = re.search(r"\b(19\d{2}|20\d{2})\b", text_value)
         if match and "year" not in target:
             target["year"] = int(match.group(1))
+
+
+def _infer_entity_type_hint(records: list[dict]) -> Optional[str]:
+    counts: dict[str, int] = {}
+    for row in records:
+        if not isinstance(row, dict):
+            continue
+        raw = row.get("entity_type")
+        if raw is None:
+            continue
+        value = str(raw).strip()
+        if not value:
+            continue
+        counts[value] = counts.get(value, 0) + 1
+    if not counts:
+        return None
+    return max(counts.items(), key=lambda item: item[1])[0]
+
+
+def _create_import_batch(
+    db: Session,
+    *,
+    org_id: int | None,
+    domain_id: str,
+    source_type: str,
+    file_name: str,
+    file_format: str,
+    total_rows: int,
+    entity_type_hint: Optional[str],
+    created_by: int | None,
+    source_label: Optional[str] = None,
+) -> models.ImportBatch:
+    batch = models.ImportBatch(
+        org_id=org_id,
+        domain_id=domain_id,
+        source_type=source_type,
+        file_name=file_name,
+        file_format=file_format,
+        source_label=source_label,
+        total_rows=total_rows,
+        entity_type_hint=entity_type_hint,
+        created_by=created_by,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(batch)
+    db.flush()
+    return batch
 
 
 # ── LLM-assisted mapping suggestion (Sprint 74) ───────────────────────────────
@@ -433,25 +481,40 @@ async def upload_file(
         except Exception as exc:
             raise HTTPException(status_code=400, detail=f"Failed to parse file: {exc}")
 
+        import_batch = _create_import_batch(
+            db,
+            org_id=stored_org_id,
+            domain_id=effective_domain,
+            source_type="science_upload",
+            file_name=file.filename,
+            file_format=fmt,
+            total_rows=len(science_records),
+            entity_type_hint="publication",
+            created_by=current_user.id,
+            source_label=f"{file.filename} · {fmt.upper()}",
+        )
         objects = []
         for r in science_records:
             entity_data = science_record_to_entity(r)
             entity_data["domain"] = effective_domain
             entity_data["org_id"] = stored_org_id
+            entity_data["import_batch_id"] = import_batch.id
             objects.append(models.RawEntity(**entity_data))
 
         for i in range(0, len(objects), _CHUNK_SIZE):
             db.bulk_save_objects(objects[i : i + _CHUNK_SIZE])
         _audit(db, "upload", user_id=current_user.id,
-               details={"filename": file.filename, "rows": len(objects), "format": fmt})
+               details={"filename": file.filename, "rows": len(objects), "format": fmt, "import_batch_id": import_batch.id})
         db.commit()
-        _dispatch_webhook("upload", {"filename": file.filename, "rows": len(objects)},
+        _dispatch_webhook("upload", {"filename": file.filename, "rows": len(objects), "import_batch_id": import_batch.id},
                           database.SessionLocal)
         return {
             "message": f"Successfully imported {len(objects)} publications from {fmt.upper()}",
             "total_rows": len(objects),
             "format": fmt,
             "domain": effective_domain,
+            "import_batch_id": import_batch.id,
+            "source_label": import_batch.source_label,
             "matched_columns": list(_SCIENCE_AUTO_MAPPING.keys()),
             "unmatched_columns": [],
         }
@@ -502,12 +565,25 @@ async def upload_file(
         else:
             unmatched_columns.add(col_str)
 
+    import_batch = _create_import_batch(
+        db,
+        org_id=stored_org_id,
+        domain_id=domain,
+        source_type="tabular_upload",
+        file_name=file.filename,
+        file_format=_fmt,
+        total_rows=len(records),
+        entity_type_hint=_infer_entity_type_hint(records),
+        created_by=current_user.id,
+        source_label=f"{file.filename} · {_fmt.upper()}",
+    )
+
     objects = []
     for row in records:
         if not isinstance(row, dict):
             continue
 
-        row_data: dict = {"domain": domain, "org_id": stored_org_id}
+        row_data: dict = {"domain": domain, "org_id": stored_org_id, "import_batch_id": import_batch.id}
         unmatched_data: dict = {}
         virtual_field_data: dict = {}
 
@@ -560,12 +636,12 @@ async def upload_file(
     _audit(
         db, "upload",
         user_id=current_user.id,
-        details={"filename": file.filename, "rows": len(objects)},
+        details={"filename": file.filename, "rows": len(objects), "import_batch_id": import_batch.id},
     )
     db.commit()
     _dispatch_webhook(
         "upload",
-        {"filename": file.filename, "rows": len(objects)},
+        {"filename": file.filename, "rows": len(objects), "import_batch_id": import_batch.id},
         database.SessionLocal,
     )
 
@@ -573,6 +649,9 @@ async def upload_file(
         "message": f"Successfully imported {len(objects)} entities",
         "total_rows": len(objects),
         "domain": domain,
+        "format": _fmt,
+        "import_batch_id": import_batch.id,
+        "source_label": import_batch.source_label,
         "matched_columns": list(matched_columns),
         "unmatched_columns": list(unmatched_columns),
     }

@@ -9,6 +9,7 @@ class UniversalEntity(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True, index=True)
 
     # Universal fields
     domain = Column(String, default="default", index=True)
@@ -470,6 +471,26 @@ class ScheduledImport(Base):
     created_at      = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class ImportBatch(Base):
+    """
+    Formal ingestion batch used to trace exactly which records came from one import event.
+    Catalog portals can point to a concrete batch for precise discovery scope.
+    """
+    __tablename__ = "import_batches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
+    domain_id = Column(String(80), nullable=False, index=True)
+    source_type = Column(String(50), nullable=False, default="upload", index=True)
+    file_name = Column(String(255), nullable=True)
+    file_format = Column(String(50), nullable=True)
+    source_label = Column(String(200), nullable=True)
+    total_rows = Column(Integer, default=0)
+    entity_type_hint = Column(String(80), nullable=True, index=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
+
 # ── Sprint 81: Alert Channels (Slack / Teams / Discord / Generic) ─────────────
 
 class AlertChannel(Base):
@@ -607,6 +628,7 @@ class CatalogPortal(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
+    source_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True, index=True)
     domain_id = Column(String(80), nullable=False, index=True)
     title = Column(String(200), nullable=False)
     slug = Column(String(120), nullable=False, unique=True, index=True)
