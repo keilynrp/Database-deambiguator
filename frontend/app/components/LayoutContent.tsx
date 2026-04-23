@@ -14,13 +14,14 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   const router = useRouter();
 
   const isLoginPage = pathname === "/login";
+  const isPublicCatalogRoute = pathname.startsWith("/catalogs/") && pathname !== "/catalogs";
 
   useEffect(() => {
     if (!hydrated) return;
-    if (!isAuthenticated && !isLoginPage) {
+    if (!isAuthenticated && !isLoginPage && !isPublicCatalogRoute) {
       router.replace("/login");
     }
-  }, [hydrated, isAuthenticated, isLoginPage, router]);
+  }, [hydrated, isAuthenticated, isLoginPage, isPublicCatalogRoute, router]);
 
   // Block ALL rendering until auth state is resolved from localStorage.
   // Server renders null, client hydration also renders null (hydrated starts false),
@@ -31,6 +32,10 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
 
   // Login page renders without the shell (no sidebar / header)
   if (isLoginPage) {
+    return <>{children}</>;
+  }
+
+  if (isPublicCatalogRoute && !isAuthenticated) {
     return <>{children}</>;
   }
 

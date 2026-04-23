@@ -30,6 +30,42 @@ interface CatalogPortal {
 }
 
 const DEFAULT_FACETS = ["entity_type", "validation_status", "enrichment_status", "source"];
+const SEEDED_QUERY_KEYS = [
+  "domain_id",
+  "title",
+  "slug",
+  "description",
+  "visibility",
+  "source_label",
+  "source_format",
+  "source_rows",
+  "seeded_from",
+  "search",
+  "min_quality",
+  "ft_entity_type",
+  "ft_validation_status",
+  "ft_enrichment_status",
+  "ft_source",
+  "default_sort",
+  "default_order",
+];
+
+async function readCatalogError(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  const payload = await response.json().catch(() => null);
+  const detail =
+    typeof payload?.detail === "string"
+      ? payload.detail
+      : typeof payload?.message === "string"
+        ? payload.message
+        : null;
+  if (response.status === 404) {
+    return fallback;
+  }
+  return detail || fallback;
+}
 
 export default function CatalogPortalsPage() {
   const { domains, activeDomainId } = useDomain();
@@ -40,6 +76,19 @@ export default function CatalogPortalsPage() {
   const tr = (key: string, fallback: string) => {
     const value = t(key);
     return value === key ? fallback : value;
+  };
+  const normalizeFeedback = (message: string | null | undefined, fallback: string) => {
+    const normalized = message?.trim();
+    if (!normalized) return fallback;
+    if (/^https?:\/\//i.test(normalized)) return fallback;
+    if (typeof window !== "undefined") {
+      const currentUrl = window.location.href;
+      const currentPath = `${window.location.origin}${window.location.pathname}`;
+      if (normalized === currentUrl || normalized === currentPath || normalized === window.location.pathname) {
+        return fallback;
+      }
+    }
+    return normalized;
   };
 
   const [portals, setPortals] = useState<CatalogPortal[]>([]);
@@ -70,15 +119,34 @@ export default function CatalogPortalsPage() {
     }));
   }, [activeDomainId, searchParams]);
 
+  useEffect(() => {
+    const hasSeededParams = SEEDED_QUERY_KEYS.some((key) => searchParams.get(key) !== null);
+    if (hasSeededParams) {
+      router.replace("/catalogs", { scroll: false });
+    }
+  }, [router, searchParams]);
+
   const loadPortals = async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await apiFetch("/catalogs");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(
+          await readCatalogError(
+            res,
+            tr("catalogs.load_failed", "Catalog portals are not available right now. Refresh the app or restart the backend and try again."),
+          ),
+        );
+      }
       setPortals(await res.json());
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : tr("catalogs.load_failed", "Failed to load catalog portals."));
+      setError(
+        normalizeFeedback(
+          loadError instanceof Error ? loadError.message : null,
+          tr("catalogs.load_failed", "Catalog portals are not available right now. Refresh the app or restart the backend and try again."),
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -113,8 +181,12 @@ export default function CatalogPortalsPage() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        const detail = await res.json().catch(() => null);
-        throw new Error(detail?.detail || `HTTP ${res.status}`);
+        throw new Error(
+          await readCatalogError(
+            res,
+            tr("catalogs.create_failed", "Could not create the catalog portal. Please review the form and try again."),
+          ),
+        );
       }
       const created = await res.json();
       toast(
@@ -124,7 +196,10 @@ export default function CatalogPortalsPage() {
       await loadPortals();
       router.push(`/catalogs/${created.slug}`);
     } catch (saveError) {
-      const message = saveError instanceof Error ? saveError.message : tr("catalogs.create_failed", "Failed to create catalog portal.");
+      const message = normalizeFeedback(
+        saveError instanceof Error ? saveError.message : null,
+        tr("catalogs.create_failed", "Failed to create catalog portal."),
+      );
       setError(message);
       toast(`${tr("catalogs.create_failed_title", "Unable to create portal")}: ${message}`, "error");
     } finally {
@@ -222,6 +297,7 @@ export default function CatalogPortalsPage() {
               >
                 <option value="private">{tr("catalogs.visibility.private", "Private workspace")}</option>
                 <option value="org">{tr("catalogs.visibility.org", "Organization members")}</option>
+                <option value="public">{tr("catalogs.visibility.public", "Public read-only")}</option>
               </select>
             </label>
             <label className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
@@ -257,12 +333,12 @@ export default function CatalogPortalsPage() {
             </label>
           </div>
 
-          <div className="mt-6 flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:bg-gray-950 dark:text-gray-300">
-            <p>{tr("catalogs.create_note", "This first version stays private and uses the active domain plus saved filters as the collection scope.")}</p>
+          <div className="mt-6 rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:bg-gray-950 dark:text-gray-300">
+            <p className="mb-3">{tr("catalogs.create_note", "Use private for internal setup, org for member access, or public for a read-only portal you can share during pilot sessions.")}</p>
             <button
               type="submit"
               disabled={saving}
-              className="rounded-xl bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+              className="w-full rounded-xl bg-blue-600 px-4 py-2.5 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {saving ? tr("catalogs.creating", "Creating...") : tr("catalogs.create_submit", "Create portal")}
             </button>

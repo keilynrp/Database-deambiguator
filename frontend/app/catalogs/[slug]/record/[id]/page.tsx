@@ -23,6 +23,23 @@ interface CatalogRecord {
   normalized_json: string | null;
 }
 
+async function readCatalogError(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  const payload = await response.json().catch(() => null);
+  const detail =
+    typeof payload?.detail === "string"
+      ? payload.detail
+      : typeof payload?.message === "string"
+        ? payload.message
+        : null;
+  if (response.status === 404) {
+    return fallback;
+  }
+  return detail || fallback;
+}
+
 function parseJson(raw: string | null): Record<string, unknown> {
   if (!raw) return {};
   try {
@@ -57,7 +74,14 @@ export default function CatalogRecordPage() {
       setError(null);
       try {
         const res = await apiFetch(`/catalogs/${slug}/records/${id}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          throw new Error(
+            await readCatalogError(
+              res,
+              tr("catalogs.record_load_failed", "This catalog record is not available right now."),
+            ),
+          );
+        }
         setRecord(await res.json());
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : tr("catalogs.record_load_failed", "Failed to load this catalog record."));

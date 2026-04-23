@@ -6,6 +6,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { EmptyState, ErrorBanner, PageHeader, StatCard } from "../../components/ui";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface CatalogPortal {
   id: number;
@@ -58,6 +59,23 @@ interface CatalogResultsPayload {
   facets: Record<string, { value: string; count: number }[]>;
 }
 
+async function readCatalogError(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  const payload = await response.json().catch(() => null);
+  const detail =
+    typeof payload?.detail === "string"
+      ? payload.detail
+      : typeof payload?.message === "string"
+        ? payload.message
+        : null;
+  if (response.status === 404) {
+    return fallback;
+  }
+  return detail || fallback;
+}
+
 function parseAttributes(raw: string | null): Record<string, unknown> {
   if (!raw) return {};
   try {
@@ -72,6 +90,7 @@ export default function CatalogPortalPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { t } = useLanguage();
+  const { isAuthenticated } = useAuth();
   const tr = (key: string, fallback: string) => {
     const value = t(key);
     return value === key ? fallback : value;
@@ -111,7 +130,14 @@ export default function CatalogPortalPage() {
     setError(null);
     try {
       const portalRes = await apiFetch(`/catalogs/${slug}`);
-      if (!portalRes.ok) throw new Error(`HTTP ${portalRes.status}`);
+      if (!portalRes.ok) {
+        throw new Error(
+          await readCatalogError(
+            portalRes,
+            tr("catalogs.portal_load_failed", "This catalog portal is not available right now."),
+          ),
+        );
+      }
       const portalPayload = await portalRes.json();
       setPortal(portalPayload);
       setEditForm({
@@ -137,7 +163,14 @@ export default function CatalogPortalPage() {
       });
 
       const resultsRes = await apiFetch(`/catalogs/${slug}/results?${query.toString()}`);
-      if (!resultsRes.ok) throw new Error(`HTTP ${resultsRes.status}`);
+      if (!resultsRes.ok) {
+        throw new Error(
+          await readCatalogError(
+            resultsRes,
+            tr("catalogs.results_load_failed", "The catalog results could not be loaded right now."),
+          ),
+        );
+      }
       setResults(await resultsRes.json());
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : tr("catalogs.portal_load_failed", "Failed to load the catalog portal."));
@@ -192,8 +225,12 @@ export default function CatalogPortalPage() {
         }),
       });
       if (!res.ok) {
-        const detail = await res.json().catch(() => null);
-        throw new Error(detail?.detail || `HTTP ${res.status}`);
+        throw new Error(
+          await readCatalogError(
+            res,
+            tr("catalogs.update_failed", "Failed to update the catalog portal."),
+          ),
+        );
       }
       setEditing(false);
       await loadPortal();
@@ -214,6 +251,16 @@ export default function CatalogPortalPage() {
         ]}
         title={portal?.title || tr("catalogs.portal_title_loading", "Catalog portal")}
         description={portal?.description || tr("catalogs.portal_subtitle", "A lighter discovery view over the current workspace scope.")}
+        actions={portal?.visibility === "public" ? (
+          <a
+            href={typeof window !== "undefined" ? window.location.href : `/catalogs/${slug}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center rounded-xl border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/30"
+          >
+            {tr("catalogs.share.open_public", "Open public view")}
+          </a>
+        ) : undefined}
       />
 
       {error && <ErrorBanner message={error} />}
@@ -268,15 +315,27 @@ export default function CatalogPortalPage() {
                   {tr("catalogs.manage.title", "Adjust this collection")}
                 </p>
               </div>
-              <button
-                onClick={() => setEditing((prev) => !prev)}
-                className="rounded-xl border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
-              >
-                {editing ? tr("common.cancel", "Cancel") : tr("common.edit", "Edit")}
-              </button>
+              {isAuthenticated ? (
+                <button
+                  onClick={() => setEditing((prev) => !prev)}
+                  className="rounded-xl border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                >
+                  {editing ? tr("common.cancel", "Cancel") : tr("common.edit", "Edit")}
+                </button>
+              ) : (
+                <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                  {tr("catalogs.visibility.public_readonly", "Public read-only")}
+                </span>
+              )}
             </div>
 
-            {editing && (
+            {!isAuthenticated && (
+              <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">
+                {tr("catalogs.manage.readonly_help", "This public portal is open for consultation only. Sign in to manage filters, visibility, or descriptive settings.")}
+              </p>
+            )}
+
+            {editing && isAuthenticated && (
               <div className="mt-4 space-y-3">
                 <input
                   value={editForm.title}
@@ -304,6 +363,7 @@ export default function CatalogPortalPage() {
                 >
                   <option value="private">{tr("catalogs.visibility.private", "Private workspace")}</option>
                   <option value="org">{tr("catalogs.visibility.org", "Organization members")}</option>
+                  <option value="public">{tr("catalogs.visibility.public", "Public read-only")}</option>
                 </select>
                 <input
                   value={editForm.search}

@@ -34,6 +34,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("JWT_EXPIRE_MINUTES", "480"))  
 REFRESH_TOKEN_EXPIRE_MINUTES = int(os.environ.get("JWT_REFRESH_MINUTES", "10080")) # 7 days
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
@@ -170,6 +171,42 @@ async def get_current_user(
     if not user:
         raise credentials_exc
     return user
+
+
+async def get_current_user_optional(
+    token: Optional[str] = Depends(optional_oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> Optional[models.User]:
+    """
+    Best-effort auth resolver for routes that may be publicly readable.
+    Invalid, expired, or missing credentials are treated as anonymous access.
+    """
+    if not token:
+        return None
+
+    if token.startswith("ukip_"):
+        from backend.routers.api_keys import verify_api_key
+        key_record = verify_api_key(token, db)
+        if not key_record:
+            return None
+        return db.query(models.User).filter(
+            models.User.id == key_record.user_id,
+            models.User.is_active == True,  # noqa: E712
+        ).first()
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: Optional[str] = payload.get("sub")
+        if not username:
+            return None
+    except JWTError:
+        return None
+
+    return (
+        db.query(models.User)
+        .filter(models.User.username == username, models.User.is_active == True)
+        .first()
+    )
 
 
 def require_role(*roles: str):

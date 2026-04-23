@@ -19,7 +19,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Query as SAQuery, Session
 
 from backend import models, schemas
-from backend.auth import get_current_user, require_role
+from backend.auth import get_current_user, get_current_user_optional, require_role
 from backend.database import get_db
 from backend.schema_registry import registry
 from backend.services.entity_service import EntityService
@@ -106,6 +106,39 @@ def _get_scoped_portal_or_404(db: Session, slug: str, org_id: int | None) -> mod
     if not portal:
         raise HTTPException(status_code=404, detail="Catalog portal not found")
     return portal
+
+
+def _get_public_portal_or_404(db: Session, slug: str) -> models.CatalogPortal:
+    portal = (
+        db.query(models.CatalogPortal)
+        .filter(
+            models.CatalogPortal.slug == slug,
+            models.CatalogPortal.visibility == "public",
+        )
+        .first()
+    )
+    if not portal:
+        raise HTTPException(status_code=404, detail="Catalog portal not found")
+    return portal
+
+
+def _resolve_portal_access(
+    db: Session,
+    slug: str,
+    current_user: models.User | None,
+) -> tuple[models.CatalogPortal, int | None]:
+    if current_user is not None:
+        user_org_id = resolve_request_org_id(db, current_user)
+        scoped_portal = (
+            scope_query_to_org(db.query(models.CatalogPortal), models.CatalogPortal, user_org_id)
+            .filter(models.CatalogPortal.slug == slug)
+            .first()
+        )
+        if scoped_portal:
+            return scoped_portal, user_org_id
+
+    public_portal = _get_public_portal_or_404(db, slug)
+    return public_portal, public_portal.org_id
 
 
 def _apply_entity_filters(
@@ -263,10 +296,9 @@ def create_catalog_portal(
 def get_catalog_portal(
     slug: str = Path(..., min_length=3),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User | None = Depends(get_current_user_optional),
 ):
-    org_id = resolve_request_org_id(db, current_user)
-    portal = _get_scoped_portal_or_404(db, slug, org_id)
+    portal, org_id = _resolve_portal_access(db, slug, current_user)
     defaults = _portal_query_defaults(portal)
     query = _portal_entity_query(
         db,
@@ -354,10 +386,9 @@ def get_catalog_results(
     sort_by: str | None = Query(default=None),
     order: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User | None = Depends(get_current_user_optional),
 ):
-    org_id = resolve_request_org_id(db, current_user)
-    portal = _get_scoped_portal_or_404(db, slug, org_id)
+    portal, org_id = _resolve_portal_access(db, slug, current_user)
     filters = _resolve_filters(
         portal,
         search=search,
@@ -422,10 +453,9 @@ def get_catalog_record(
     slug: str = Path(..., min_length=3),
     entity_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User | None = Depends(get_current_user_optional),
 ):
-    org_id = resolve_request_org_id(db, current_user)
-    portal = _get_scoped_portal_or_404(db, slug, org_id)
+    portal, org_id = _resolve_portal_access(db, slug, current_user)
     defaults = _portal_query_defaults(portal)
     record = (
         _portal_entity_query(

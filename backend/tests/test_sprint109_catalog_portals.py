@@ -196,3 +196,50 @@ def test_catalog_portal_update_persists_editable_fields(client, auth_headers, db
     assert updated["source_label"] == "Manual pilot collection"
     assert updated["search"] == "Editable"
     assert updated["min_quality"] == 0.7
+
+
+def test_public_catalog_portal_is_readable_without_auth(client, auth_headers, db_session):
+    db_session.add(
+        models.RawEntity(
+            primary_label="Public Record",
+            secondary_label="Open Author",
+            canonical_id="10.1000/public",
+            entity_type="publication",
+            domain="science",
+            validation_status="valid",
+            enrichment_status="completed",
+            enrichment_citation_count=14,
+            quality_score=0.88,
+            source="scientific_import",
+            attributes_json=json.dumps({"journal": "Open Science", "year": 2025}),
+        )
+    )
+    db_session.commit()
+
+    create_resp = client.post(
+        "/catalogs",
+        json={
+            "title": "Public Science Catalog",
+            "slug": "public-science-catalog",
+            "domain_id": "science",
+            "visibility": "public",
+            "ft_entity_type": "publication",
+        },
+        headers=auth_headers,
+    )
+    assert create_resp.status_code == 201, create_resp.text
+
+    summary_resp = client.get("/catalogs/public-science-catalog")
+    assert summary_resp.status_code == 200, summary_resp.text
+    assert summary_resp.json()["visibility"] == "public"
+
+    results_resp = client.get("/catalogs/public-science-catalog/results")
+    assert results_resp.status_code == 200, results_resp.text
+    results = results_resp.json()
+    assert results["total"] == 1
+    assert results["items"][0]["primary_label"] == "Public Record"
+
+    record_id = results["items"][0]["id"]
+    detail_resp = client.get(f"/catalogs/public-science-catalog/records/{record_id}")
+    assert detail_resp.status_code == 200, detail_resp.text
+    assert detail_resp.json()["canonical_id"] == "10.1000/public"
