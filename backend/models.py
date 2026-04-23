@@ -612,6 +612,8 @@ class CatalogPortal(Base):
     slug = Column(String(120), nullable=False, unique=True, index=True)
     description = Column(Text, nullable=True)
     visibility = Column(String(20), nullable=False, default="private", index=True)  # private | org | public
+    source_label = Column(String(200), nullable=True)
+    source_context_json = Column(Text, default="{}")
     query_json = Column(Text, default="{}")
     featured_facets_json = Column(Text, default="[]")
     default_sort = Column(String(40), nullable=False, default="primary_label")

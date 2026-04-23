@@ -53,6 +53,8 @@ def test_catalog_portal_create_and_results_global_scope(client, auth_headers, db
             "description": "Portal for science entities",
             "domain_id": "science",
             "visibility": "private",
+            "source_label": "Latest science import",
+            "source_context": {"format": "wos_plaintext", "rows": 2},
             "ft_entity_type": "publication",
             "featured_facets": ["entity_type", "enrichment_status", "source"],
             "default_sort": "primary_label",
@@ -64,6 +66,8 @@ def test_catalog_portal_create_and_results_global_scope(client, auth_headers, db
     portal = create_resp.json()
     assert portal["slug"] == "science-catalog"
     assert portal["domain_id"] == "science"
+    assert portal["source_label"] == "Latest science import"
+    assert portal["source_context"]["format"] == "wos_plaintext"
 
     summary_resp = client.get("/catalogs/science-catalog", headers=auth_headers)
     assert summary_resp.status_code == 200

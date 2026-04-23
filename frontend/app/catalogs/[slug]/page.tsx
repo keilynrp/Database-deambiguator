@@ -14,6 +14,8 @@ interface CatalogPortal {
   description: string | null;
   domain_id: string;
   visibility: string;
+  source_label: string | null;
+  source_context: Record<string, string | number | boolean | null>;
   search: string | null;
   min_quality: number | null;
   ft_entity_type: string | null;
@@ -179,6 +181,21 @@ export default function CatalogPortalPage() {
             subtitle={tr("catalogs.summary.quality_hint", "Use this as a quick signal before sharing broadly")}
           />
         </div>
+      )}
+
+      {portal?.source_label && (
+        <section className="rounded-2xl border border-violet-200 bg-violet-50 px-5 py-4 text-sm text-violet-900 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-100">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-600 dark:text-violet-300">
+            {tr("catalogs.source_context.eyebrow", "Collection origin")}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-semibold">{portal.source_label}</span>
+            {portal.source_context?.format && <span>{String(portal.source_context.format).toUpperCase()}</span>}
+            {portal.source_context?.rows !== null && portal.source_context?.rows !== undefined && (
+              <span>{String(portal.source_context.rows)} {tr("catalogs.source_context.rows", "rows")}</span>
+            )}
+          </div>
+        </section>
       )}
 
       <section className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">

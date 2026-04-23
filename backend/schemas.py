@@ -34,6 +34,8 @@ class CatalogPortalBase(BaseModel):
     description: Optional[str] = None
     domain_id: str
     visibility: Literal["private", "org", "public"] = "private"
+    source_label: Optional[str] = None
+    source_context: dict = Field(default_factory=dict)
     search: Optional[str] = None
     min_quality: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     ft_entity_type: Optional[str] = None
@@ -53,6 +55,8 @@ class CatalogPortalUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     visibility: Optional[Literal["private", "org", "public"]] = None
+    source_label: Optional[str] = None
+    source_context: Optional[dict] = None
     search: Optional[str] = None
     min_quality: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     ft_entity_type: Optional[str] = None
@@ -72,6 +76,8 @@ class CatalogPortalResponse(BaseModel):
     description: Optional[str] = None
     domain_id: str
     visibility: str
+    source_label: Optional[str] = None
+    source_context: dict = Field(default_factory=dict)
     search: Optional[str] = None
     min_quality: Optional[float] = None
     ft_entity_type: Optional[str] = None

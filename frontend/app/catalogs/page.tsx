@@ -15,6 +15,8 @@ interface CatalogPortal {
   description: string | null;
   domain_id: string;
   visibility: string;
+  source_label: string | null;
+  source_context: Record<string, string | number | boolean | null>;
   search: string | null;
   min_quality: number | null;
   ft_entity_type: string | null;
@@ -50,6 +52,7 @@ export default function CatalogPortalsPage() {
     description: searchParams.get("description") ?? "",
     domain_id: activeDomainId || "default",
     visibility: searchParams.get("visibility") ?? "private",
+    source_label: searchParams.get("source_label") ?? "",
     search: searchParams.get("search") ?? "",
     min_quality: searchParams.get("min_quality") ?? "",
     ft_entity_type: searchParams.get("ft_entity_type") ?? "",
@@ -98,6 +101,11 @@ export default function CatalogPortalsPage() {
       const payload = {
         ...form,
         min_quality: form.min_quality ? Number(form.min_quality) : null,
+        source_context: {
+          format: searchParams.get("source_format") ?? null,
+          rows: searchParams.get("source_rows") ? Number(searchParams.get("source_rows")) : null,
+          seeded_from: searchParams.get("seeded_from") ?? null,
+        },
         featured_facets: DEFAULT_FACETS,
       };
       const res = await apiFetch("/catalogs", {
@@ -152,6 +160,12 @@ export default function CatalogPortalsPage() {
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
               {tr("catalogs.create_help", "Start with one domain and a few saved filters. We will keep this first cut private to your workspace.")}
             </p>
+            {form.source_label && (
+              <div className="mt-4 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-800 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-200">
+                <p className="font-semibold">{tr("catalogs.source_seeded", "Seeded from import")}</p>
+                <p className="mt-1">{form.source_label}</p>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -301,6 +315,11 @@ export default function CatalogPortalsPage() {
                           {portal.visibility}
                         </span>
                       </div>
+                      {portal.source_label && (
+                        <p className="text-xs font-medium text-violet-700 dark:text-violet-300">
+                          {portal.source_label}
+                        </p>
+                      )}
                       <p className="text-sm text-gray-600 dark:text-gray-300">
                         {portal.description || tr("catalogs.no_description", "No description yet.")}
                       </p>

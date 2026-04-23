@@ -83,6 +83,8 @@ def _serialize_portal(portal: models.CatalogPortal) -> dict[str, Any]:
         "description": portal.description,
         "domain_id": portal.domain_id,
         "visibility": portal.visibility,
+        "source_label": portal.source_label,
+        "source_context": _parse_json(portal.source_context_json, {}),
         "search": defaults["search"],
         "min_quality": defaults["min_quality"],
         "ft_entity_type": defaults["ft_entity_type"],
@@ -242,6 +244,8 @@ def create_catalog_portal(
         slug=normalized_slug,
         description=payload.description,
         visibility=payload.visibility,
+        source_label=payload.source_label,
+        source_context_json=json.dumps(payload.source_context or {}),
         query_json=query_json,
         featured_facets_json=json.dumps(featured_facets),
         default_sort=payload.default_sort,
@@ -307,6 +311,10 @@ def update_catalog_portal(
         portal.description = payload.description
     if payload.visibility is not None:
         portal.visibility = payload.visibility
+    if payload.source_label is not None:
+        portal.source_label = payload.source_label
+    if payload.source_context is not None:
+        portal.source_context_json = json.dumps(payload.source_context)
     if payload.default_sort is not None:
         portal.default_sort = payload.default_sort
 

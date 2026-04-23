@@ -86,8 +86,12 @@ export const translations = {
         'catalogs.record.section_core': 'Core record',
         'catalogs.record.section_system': 'System signals',
         'catalogs.record.section_extended': 'Extended metadata',
+        'catalogs.source_seeded': 'Seeded from import',
+        'catalogs.source_context.eyebrow': 'Collection origin',
+        'catalogs.source_context.rows': 'rows',
         'page.import_export.next.catalog': 'Create Catalog Portal',
         'page.import_export.next.catalog_description': 'Catalog portal seeded from the latest import so stakeholders can browse this collection in a friendlier discovery view.',
+        'page.import_export.next.catalog_source_label': 'Latest import collection',
 
         // Settings
         'settings.title': 'Settings',
@@ -2545,8 +2549,12 @@ export const translations = {
         'catalogs.record.section_core': 'Registro núcleo',
         'catalogs.record.section_system': 'Señales del sistema',
         'catalogs.record.section_extended': 'Metadatos extendidos',
+        'catalogs.source_seeded': 'Sembrado desde importación',
+        'catalogs.source_context.eyebrow': 'Origen de la colección',
+        'catalogs.source_context.rows': 'filas',
         'page.import_export.next.catalog': 'Crear portal de catálogo',
         'page.import_export.next.catalog_description': 'Portal de catálogo sembrado desde la importación más reciente para que los stakeholders naveguen esta colección en una vista de descubrimiento más amigable.',
+        'page.import_export.next.catalog_source_label': 'Colección de la importación más reciente',
 
         // Settings
         'settings.title': 'Configuración',
