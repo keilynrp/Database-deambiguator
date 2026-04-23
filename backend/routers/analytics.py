@@ -260,6 +260,7 @@ def analyzer_correlation(
 def dashboard_summary(
     domain_id: str = Query(default="default", min_length=1, max_length=64),
     profile_id: str = Query(default="", max_length=80),
+    force_refresh: bool = Query(default=False),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -268,9 +269,12 @@ def dashboard_summary(
     benchmark_org = db.get(models.Organization, org_id) if org_id else None
     profile_key = profile_id or "default_profile"
     _key = f"dashboard_{domain_id}_{profile_key}_{scope_tag(org_id)}"
-    cached = _dashboard_cache.get(_key)
-    if cached is not None:
-        return cached
+    if force_refresh:
+        _dashboard_cache.invalidate(_key)
+    else:
+        cached = _dashboard_cache.get(_key)
+        if cached is not None:
+            return cached
     result = AnalyticsService.get_domain_snapshot(
         db,
         _topic_analyzer,

@@ -16,6 +16,39 @@ function parseNormalizedJson(normalizedJson: string | null): Record<string, unkn
     }
 }
 
+function resolveAttributeValue(
+    entity: Entity,
+    parsedJson: Record<string, unknown>,
+    attributeName: string,
+    isCore: boolean,
+): unknown {
+    if (!isCore) {
+        return parsedJson[attributeName] ?? "";
+    }
+
+    const directValue = entity[attributeName as keyof Entity];
+    if (directValue !== undefined && directValue !== null && directValue !== "") {
+        return directValue;
+    }
+
+    switch (attributeName) {
+        case "title":
+            return entity.primary_label ?? parsedJson.title ?? "";
+        case "authors":
+            return parsedJson.authors ?? entity.secondary_label ?? "";
+        case "doi":
+            return entity.canonical_id ?? parsedJson.doi ?? "";
+        case "journal":
+            return parsedJson.journal ?? "";
+        case "year":
+            return parsedJson.year ?? "";
+        case "citations":
+            return entity.enrichment_citation_count ?? parsedJson.citation_count ?? "";
+        default:
+            return parsedJson[attributeName] ?? "";
+    }
+}
+
 function renderDisplayValue(attributeName: string, value: unknown, emptyLabel: string) {
     if (value === null || value === "") {
         return <span className="text-gray-400">{emptyLabel}</span>;
@@ -266,9 +299,8 @@ export default function EntityTableContent({
                                                 <td className="px-5 py-2.5 text-gray-500 dark:text-gray-400">{entity.id}</td>
                                                 {activeDomain ? (
                                                     activeDomain.attributes.map((attribute) => {
-                                                        const value = attribute.is_core
-                                                            ? editData[attribute.name as keyof EditableFields]
-                                                            : parsedJson[attribute.name] ?? "";
+                                                        const value = resolveAttributeValue(entity, parsedJson, attribute.name, attribute.is_core);
+                                                        const isEditableCoreField = attribute.is_core && attribute.name in editData;
 
                                                         return (
                                                             <td key={attribute.name} className="px-5 py-2.5">
@@ -276,15 +308,15 @@ export default function EntityTableContent({
                                                                     className={inputClass}
                                                                     value={String(value ?? "")}
                                                                     onChange={(event) => {
-                                                                        if (attribute.is_core) {
+                                                                        if (isEditableCoreField) {
                                                                             onEditDataChange({
                                                                                 ...editData,
                                                                                 [attribute.name]: event.target.value,
                                                                             });
                                                                         }
                                                                     }}
-                                                                    disabled={!attribute.is_core}
-                                                                    title={!attribute.is_core ? t("page.entity_table.extended_attributes_readonly") : ""}
+                                                                    disabled={!isEditableCoreField}
+                                                                    title={!isEditableCoreField ? t("page.entity_table.extended_attributes_readonly") : ""}
                                                                 />
                                                             </td>
                                                         );
@@ -369,9 +401,7 @@ export default function EntityTableContent({
                                             <td className="px-5 py-3.5 text-gray-500 dark:text-gray-400">{entity.id}</td>
                                             {activeDomain ? (
                                                 activeDomain.attributes.map((attribute) => {
-                                                    const value = attribute.is_core
-                                                        ? entity[attribute.name as keyof Entity]
-                                                        : parsedJson[attribute.name] ?? "";
+                                                    const value = resolveAttributeValue(entity, parsedJson, attribute.name, attribute.is_core);
 
                                                     return (
                                                         <td key={attribute.name} className="px-5 py-3.5 text-gray-600 dark:text-gray-300">

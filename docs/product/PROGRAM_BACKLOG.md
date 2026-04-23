@@ -72,6 +72,14 @@ No abras epic nueva si el trabajo cabe como historia o sub-historia de una epic 
 4. `US-069` - Emerging Topic Trend Signals
 5. seguir endureciendo operacion solo en respuesta a hallazgos reales del despliegue
 
+## Nuevas historias propuestas
+
+- `US-071` - Catalog Portal by Ingestion
+  - artefacto: `docs/product/stories/US-071_CATALOG_PORTAL_BY_INGESTION.md`
+  - objetivo: convertir una ingesta o snapshot en un portal de consulta tipo catalogo/OPAC
+  - valor: mejorar descubrimiento, legibilidad y compartibilidad para stakeholders no tecnicos
+  - recomendacion de entrada: arrancar por `US-071A` con snapshot privado, resultados y detalle
+
 ## Hallazgo piloto reciente
 
 - piloto real UDG ejecutado y documentado en

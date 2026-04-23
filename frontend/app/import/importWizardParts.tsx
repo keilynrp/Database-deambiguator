@@ -38,6 +38,7 @@ const SUPPORTED_FORMATS = [
     { ext: "Excel", color: "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400" },
     { ext: "BibTeX", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400" },
     { ext: "RIS", color: "bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400" },
+    { ext: "Plaintext", color: "bg-sky-100 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400" },
     { ext: "JSON", color: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" },
     { ext: "XML", color: "bg-orange-100 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400" },
     { ext: "Parquet", color: "bg-pink-100 text-pink-700 dark:bg-pink-500/10 dark:text-pink-400" },
@@ -51,6 +52,7 @@ const FORMAT_DISPLAY: Record<string, string> = {
     parquet: "Parquet",
     bibtex: "BibTeX",
     ris: "RIS",
+    wos_plaintext: "Plaintext (.txt)",
     rdf: "RDF/TTL",
 };
 
@@ -228,7 +230,7 @@ export function StepUpload({
                         <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">{tr("page.import.upload.max_size", "Maximum 20 MB")}</p>
                     </>
                 )}
-                <input ref={inputRef} type="file" className="hidden" onChange={handleChange} accept=".csv,.xlsx,.json,.jsonld,.xml,.parquet,.bib,.ris,.rdf,.ttl" />
+                <input ref={inputRef} type="file" className="hidden" onChange={handleChange} accept=".csv,.xlsx,.json,.jsonld,.xml,.parquet,.bib,.ris,.txt,.rdf,.ttl" />
             </div>
 
             <div className="flex flex-wrap justify-center gap-2">

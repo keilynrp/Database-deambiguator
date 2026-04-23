@@ -50,6 +50,127 @@ function formatValue(value: unknown, emptyLabel: string): string {
     return String(value);
 }
 
+function resolveDomainAttributeValue(
+    entity: Entity,
+    mergedAttributes: Record<string, unknown>,
+    attributeName: string,
+): unknown {
+    const direct = entity[attributeName as keyof Entity];
+    if (direct !== undefined && direct !== null && direct !== "") {
+        return direct;
+    }
+
+    switch (attributeName) {
+        case "title":
+            return entity.primary_label ?? mergedAttributes.title ?? "";
+        case "authors":
+            return mergedAttributes.authors ?? entity.secondary_label ?? "";
+        case "doi":
+            return entity.canonical_id ?? mergedAttributes.doi ?? "";
+        case "journal":
+            return mergedAttributes.journal ?? "";
+        case "year":
+            return mergedAttributes.year ?? "";
+        case "citations":
+            return entity.enrichment_citation_count ?? mergedAttributes.citation_count ?? "";
+        default:
+            return mergedAttributes[attributeName] ?? "";
+    }
+}
+
+const SCIENCE_ATTRIBUTE_LABELS: Record<string, string> = {
+    full_authors: "Full Authors",
+    document_type: "Document Type",
+    corresponding_author: "Corresponding Author",
+    researcher_ids: "Researcher IDs",
+    orcids: "ORCIDs",
+    funding: "Funding",
+    reference_count: "Reference Count",
+    open_access: "Open Access",
+    retrieved_at: "Retrieved At",
+    eissn: "EISSN",
+    pubmed_id: "PubMed ID",
+    month: "Publication Month",
+    raw_fn: "Source File Header",
+    raw_vr: "Source Format Version",
+    raw_pt: "Raw Publication Type",
+    raw_au: "Raw Authors",
+    raw_af: "Raw Full Authors",
+    raw_ti: "Raw Title",
+    raw_so: "Raw Source Title",
+    raw_la: "Raw Language",
+    raw_dt: "Raw Document Type",
+    raw_c1: "Raw Author Affiliations",
+    raw_c3: "Raw Institutions",
+    raw_rp: "Raw Corresponding Author",
+    raw_ri: "Raw Researcher IDs",
+    raw_oi: "Raw ORCIDs",
+    raw_fu: "Raw Funding",
+    raw_ct: "Raw Citation Count",
+    raw_nr: "Raw Reference Count",
+    raw_pu: "Raw Publisher",
+    raw_sn: "Raw ISSN",
+    raw_ei: "Raw EISSN",
+    raw_pd: "Raw Publication Month",
+    raw_py: "Raw Publication Year",
+    raw_vl: "Raw Volume",
+    raw_is: "Raw Issue",
+    raw_bp: "Raw Begin Page",
+    raw_ep: "Raw End Page",
+    raw_di: "Raw DOI",
+    raw_pg: "Raw Page Count",
+    raw_pm: "Raw PubMed ID",
+    raw_oa: "Raw Open Access",
+    raw_da: "Raw Retrieved At",
+};
+
+const SCIENCE_FIELD_ORDER = [
+    "authors",
+    "full_authors",
+    "journal",
+    "year",
+    "document_type",
+    "publisher",
+    "volume",
+    "issue",
+    "start_page",
+    "end_page",
+    "pages",
+    "issn",
+    "eissn",
+    "language",
+    "institution",
+    "corresponding_author",
+    "researcher_ids",
+    "orcids",
+    "funding",
+    "citation_count",
+    "reference_count",
+    "open_access",
+    "retrieved_at",
+    "_source_name",
+    "_source_version",
+    "_plaintext_type",
+    "raw_c1",
+    "raw_c3",
+    "raw_rp",
+    "raw_ri",
+    "raw_oi",
+    "raw_fu",
+];
+
+function sortExtendedFields(activeDomainId: string | null | undefined, fields: Array<{ key: string; label: string; value: unknown }>) {
+    if (activeDomainId !== "science") return fields;
+    return [...fields].sort((left, right) => {
+        const leftIndex = SCIENCE_FIELD_ORDER.indexOf(left.key);
+        const rightIndex = SCIENCE_FIELD_ORDER.indexOf(right.key);
+        const normalizedLeft = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
+        const normalizedRight = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
+        if (normalizedLeft !== normalizedRight) return normalizedLeft - normalizedRight;
+        return left.label.localeCompare(right.label);
+    });
+}
+
 export default function EntityTableDetailsModal({ entity, activeDomain, onClose }: EntityTableDetailsModalProps) {
     const { t } = useLanguage();
     if (!entity) return null;
@@ -61,7 +182,7 @@ export default function EntityTableDetailsModal({ entity, activeDomain, onClose 
     const coreFields = activeDomain
         ? activeDomain.attributes.filter((attribute) => attribute.is_core).map((attribute) => ({
             label: CORE_FIELD_LABEL_KEYS[attribute.name] ? t(CORE_FIELD_LABEL_KEYS[attribute.name]) : attribute.label,
-            value: entity[attribute.name as keyof Entity],
+            value: resolveDomainAttributeValue(entity, mergedExtendedAttributes, attribute.name),
           }))
         : [
             { label: t("entities.primary_label"), value: entity.primary_label },
@@ -76,11 +197,18 @@ export default function EntityTableDetailsModal({ entity, activeDomain, onClose 
         value: entity[field.key],
     }));
 
-    const extendedFields = Object.entries(mergedExtendedAttributes)
+    const extendedFields = sortExtendedFields(
+        activeDomain?.id,
+        Object.entries(mergedExtendedAttributes)
         .filter(([, value]) => value !== null && value !== undefined && value !== "")
         .map(([key, value]) => ({
+            key,
             label: activeDomain?.attributes.find((attribute) => attribute.name === key)?.label ?? titleCaseKey(key),
             value,
+        }))
+    ).map((field) => ({
+            ...field,
+            label: SCIENCE_ATTRIBUTE_LABELS[field.key] ?? field.label,
         }));
 
     return (

@@ -164,6 +164,7 @@ export default function ExecutiveDashboardPage() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL_SEC);
@@ -234,24 +235,34 @@ export default function ExecutiveDashboardPage() {
     return raw === key ? action[field] : raw;
   }, [t]);
 
-  const fetchDashboard = useCallback(async () => {
-    setLoading(true);
+  const fetchDashboard = useCallback(async (options?: { forceRefresh?: boolean; preserveData?: boolean }) => {
+    const forceRefresh = options?.forceRefresh ?? false;
+    const preserveData = options?.preserveData ?? false;
+    if (preserveData) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
       const profileQuery = selectedBenchmarkProfile
         ? `&profile_id=${encodeURIComponent(selectedBenchmarkProfile)}`
         : "";
-      const res = await apiFetch(`/dashboard/summary?domain_id=${activeDomainId}${profileQuery}`);
+      const forceQuery = forceRefresh ? "&force_refresh=true" : "";
+      const res = await apiFetch(`/dashboard/summary?domain_id=${activeDomainId}${profileQuery}${forceQuery}`, {
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json());
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : tr("page.exec_dashboard.dashboard_load_failed", "Failed to load dashboard"));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [activeDomainId, selectedBenchmarkProfile, tr]);
 
-  useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
+  useEffect(() => { void fetchDashboard(); }, [fetchDashboard]);
 
   useEffect(() => {
     let cancelled = false;
@@ -282,7 +293,7 @@ export default function ExecutiveDashboardPage() {
     if (!autoRefresh) { setCountdown(REFRESH_INTERVAL_SEC); return; }
     const tick = setInterval(() => {
       setCountdown(c => {
-        if (c <= 1) { fetchDashboard(); return REFRESH_INTERVAL_SEC; }
+        if (c <= 1) { void fetchDashboard({ forceRefresh: true, preserveData: true }); return REFRESH_INTERVAL_SEC; }
         return c - 1;
       });
     }, 1000);
@@ -483,13 +494,16 @@ export default function ExecutiveDashboardPage() {
 
             {/* Manual refresh */}
             <button
-              onClick={fetchDashboard}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+              onClick={() => void fetchDashboard({ forceRefresh: true, preserveData: true })}
+              disabled={refreshing || loading}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
             >
-              <svg className="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
               </svg>
-              {tr("page.exec_dashboard.refresh", "Refresh")}
+              {refreshing
+                ? tr("page.exec_dashboard.refreshing", "Refreshing...")
+                : tr("page.exec_dashboard.refresh", "Refresh")}
             </button>
 
             {/* Export Dashboard PDF */}

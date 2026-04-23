@@ -46,6 +46,7 @@ def science_record_to_entity(record: dict[str, Any]) -> dict[str, Any]:
     abstract = record.get("abstract")
     keywords = record.get("keywords")
     etype   = record.get("entity_type", "publication")
+    citation_count = record.get("citation_count")
 
     # Build attributes_json with all science-specific fields
     attrs: dict[str, Any] = {}
@@ -53,7 +54,16 @@ def science_record_to_entity(record: dict[str, Any]) -> dict[str, Any]:
         "authors", "editors", "journal", "year", "volume", "issue",
         "start_page", "end_page", "pages", "publisher", "doi", "url",
         "issn", "isbn", "language", "institution", "note", "address",
-        "_cite_key", "_entry_type", "_ris_type", "abstract",
+        "_cite_key", "_entry_type", "_ris_type", "_plaintext_type",
+        "abstract", "citation_count", "reference_count", "document_type",
+        "full_authors", "corresponding_author", "researcher_ids", "orcids",
+        "funding", "open_access", "retrieved_at", "eissn", "pubmed_id",
+        "_source_name", "_source_version",
+        "raw_fn", "raw_vr", "raw_pt", "raw_au", "raw_af", "raw_ti", "raw_so",
+        "raw_la", "raw_dt", "raw_c1", "raw_c3", "raw_rp", "raw_ri", "raw_oi",
+        "raw_fu", "raw_ct", "raw_nr", "raw_pu", "raw_sn", "raw_ei", "raw_pd",
+        "raw_py", "raw_vl", "raw_is", "raw_bp", "raw_ep", "raw_di", "raw_pg",
+        "raw_pm", "raw_oa", "raw_da",
     ):
         val = record.get(field)
         if val is not None:
@@ -73,6 +83,7 @@ def science_record_to_entity(record: dict[str, Any]) -> dict[str, Any]:
         "canonical_id":         doi,
         "secondary_label":      _first_author(authors),
         "entity_type":          etype,
+        "enrichment_citation_count": int(citation_count) if citation_count not in (None, "") else None,
         "enrichment_concepts":  concepts,
         "attributes_json":      json.dumps(attrs, ensure_ascii=False) if attrs else None,
     }

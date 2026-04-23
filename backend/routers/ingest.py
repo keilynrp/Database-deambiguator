@@ -32,6 +32,7 @@ from backend.datasource_analyzer import DataSourceAnalyzer
 from backend.parsers.bibtex_parser import parse_bibtex
 from backend.parsers.ris_parser import parse_ris
 from backend.parsers.science_mapper import science_record_to_entity
+from backend.parsers.wos_plaintext_parser import looks_like_wos_plaintext, parse_wos_plaintext
 from backend.routers.column_maps import COLUMN_MAPPING, EXPORT_COLUMN_MAPPING
 from backend.routers.deps import _audit, _dispatch_webhook, _get_active_integration
 from backend.tenant_access import persisted_org_id, resolve_request_org_id, scope_query_to_org
@@ -192,6 +193,17 @@ def _parse_file_to_records(filename: str, contents: bytes) -> tuple[str, list[di
         raise HTTPException(status_code=400, detail="Unsupported file format for tabular parsing.")
 
 
+def _parse_science_records(filename: str, contents: bytes) -> tuple[str, list[dict]]:
+    text = contents.decode("utf-8", errors="replace")
+    if filename.endswith(".bib"):
+        return "bibtex", parse_bibtex(text)
+    if filename.endswith(".ris"):
+        return "ris", parse_ris(text)
+    if filename.endswith(".txt") and looks_like_wos_plaintext(text):
+        return "wos_plaintext", parse_wos_plaintext(text)
+    raise HTTPException(status_code=400, detail="Unsupported science import format.")
+
+
 def _record_virtual_field(target: dict, field_name: str, value) -> None:
     """Persist wizard-only virtual fields into attributes_json-compatible data."""
     if value is None:
@@ -295,25 +307,12 @@ async def preview_upload(
     if len(contents) > _MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="File too large. Maximum 20 MB.")
 
-    # Science formats: BibTeX and RIS have fixed semantic mapping
+    # Science formats have fixed semantic mapping
     try:
-        if filename.endswith(".bib"):
-            records = parse_bibtex(contents.decode("utf-8", errors="replace"))
+        if filename.endswith(".bib") or filename.endswith(".ris") or filename.endswith(".txt"):
+            fmt, records = _parse_science_records(filename, contents)
             return {
-                "format": "bibtex",
-                "row_count": len(records),
-                "columns": list(_SCIENCE_AUTO_MAPPING.keys()),
-                "sample_rows": [
-                    {k: v for k, v in r.items() if k in _SCIENCE_AUTO_MAPPING}
-                    for r in records[:5]
-                ],
-                "auto_mapping": _SCIENCE_AUTO_MAPPING,
-                "is_science_format": True,
-            }
-        elif filename.endswith(".ris"):
-            records = parse_ris(contents.decode("utf-8", errors="replace"))
-            return {
-                "format": "ris",
+                "format": fmt,
                 "row_count": len(records),
                 "columns": list(_SCIENCE_AUTO_MAPPING.keys()),
                 "sample_rows": [
@@ -403,7 +402,7 @@ async def upload_file(
     filename = file.filename.lower()
     allowed_extensions = (
         ".xlsx", ".csv", ".json", ".xml", ".parquet",
-        ".jsonld", ".rdf", ".ttl", ".bib", ".ris",
+        ".jsonld", ".rdf", ".ttl", ".bib", ".ris", ".txt",
     )
     if not any(filename.endswith(ext) for ext in allowed_extensions):
         raise HTTPException(
@@ -426,15 +425,11 @@ async def upload_file(
         custom_mapping = {}
 
     # ── Science formats: fixed mapping ────────────────────────────────────────
-    if filename.endswith(".bib") or filename.endswith(".ris"):
+    if filename.endswith(".bib") or filename.endswith(".ris") or filename.endswith(".txt"):
         # Science formats default to "science" domain when none is specified
         effective_domain = domain if domain and domain != "default" else "science"
         try:
-            science_records = (
-                parse_bibtex(contents.decode("utf-8", errors="replace"))
-                if filename.endswith(".bib")
-                else parse_ris(contents.decode("utf-8", errors="replace"))
-            )
+            fmt, science_records = _parse_science_records(filename, contents)
         except Exception as exc:
             raise HTTPException(status_code=400, detail=f"Failed to parse file: {exc}")
 
@@ -445,7 +440,6 @@ async def upload_file(
             entity_data["org_id"] = stored_org_id
             objects.append(models.RawEntity(**entity_data))
 
-        fmt = "bibtex" if filename.endswith(".bib") else "ris"
         for i in range(0, len(objects), _CHUNK_SIZE):
             db.bulk_save_objects(objects[i : i + _CHUNK_SIZE])
         _audit(db, "upload", user_id=current_user.id,
