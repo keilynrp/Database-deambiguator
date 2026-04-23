@@ -1,0 +1,439 @@
+"""
+Sprint 108+ — Catalog Portals (US-071A)
+  GET    /catalogs
+  POST   /catalogs
+  GET    /catalogs/{slug}
+  PUT    /catalogs/{slug}
+  GET    /catalogs/{slug}/results
+  GET    /catalogs/{slug}/records/{entity_id}
+"""
+from __future__ import annotations
+
+import json
+import re
+from datetime import datetime, timezone
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from sqlalchemy import or_
+from sqlalchemy.orm import Query as SAQuery, Session
+
+from backend import models, schemas
+from backend.auth import get_current_user, require_role
+from backend.database import get_db
+from backend.schema_registry import registry
+from backend.services.entity_service import EntityService
+from backend.tenant_access import persisted_org_id, resolve_request_org_id, scope_query_to_org
+
+router = APIRouter(tags=["catalogs"])
+
+_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-]{1,118}[a-z0-9]$")
+_ALLOWED_SORTS = {"id", "quality_score", "primary_label", "enrichment_status"}
+_ALLOWED_ORDERS = {"asc", "desc"}
+_ALLOWED_FACETS = {"entity_type", "domain", "validation_status", "enrichment_status", "source"}
+
+
+def _parse_json(raw: str | None, fallback: Any) -> Any:
+    if not raw:
+        return fallback
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return fallback
+
+
+def _normalize_slug(slug: str) -> str:
+    normalized = slug.strip().lower()
+    if not _SLUG_RE.match(normalized):
+        raise HTTPException(
+            status_code=422,
+            detail="slug must be 3-120 lowercase alphanumeric characters or hyphens",
+        )
+    return normalized
+
+
+def _ensure_domain_exists(domain_id: str) -> None:
+    if not registry.get_domain(domain_id):
+        raise HTTPException(status_code=422, detail="Unknown domain")
+
+
+def _portal_query_defaults(portal: models.CatalogPortal) -> dict[str, Any]:
+    defaults = _parse_json(portal.query_json, {})
+    if not isinstance(defaults, dict):
+        defaults = {}
+    return {
+        "search": defaults.get("search"),
+        "min_quality": defaults.get("min_quality"),
+        "ft_entity_type": defaults.get("ft_entity_type"),
+        "ft_validation_status": defaults.get("ft_validation_status"),
+        "ft_enrichment_status": defaults.get("ft_enrichment_status"),
+        "ft_source": defaults.get("ft_source"),
+        "sort_by": defaults.get("sort_by") or portal.default_sort or "primary_label",
+        "order": defaults.get("order") or "asc",
+    }
+
+
+def _serialize_portal(portal: models.CatalogPortal) -> dict[str, Any]:
+    defaults = _portal_query_defaults(portal)
+    return {
+        "id": portal.id,
+        "org_id": portal.org_id,
+        "title": portal.title,
+        "slug": portal.slug,
+        "description": portal.description,
+        "domain_id": portal.domain_id,
+        "visibility": portal.visibility,
+        "search": defaults["search"],
+        "min_quality": defaults["min_quality"],
+        "ft_entity_type": defaults["ft_entity_type"],
+        "ft_validation_status": defaults["ft_validation_status"],
+        "ft_enrichment_status": defaults["ft_enrichment_status"],
+        "ft_source": defaults["ft_source"],
+        "default_sort": defaults["sort_by"],
+        "default_order": defaults["order"],
+        "featured_facets": _parse_json(portal.featured_facets_json, []),
+        "created_by": portal.created_by,
+        "created_at": portal.created_at,
+        "updated_at": portal.updated_at,
+    }
+
+
+def _get_scoped_portal_or_404(db: Session, slug: str, org_id: int | None) -> models.CatalogPortal:
+    query = scope_query_to_org(db.query(models.CatalogPortal), models.CatalogPortal, org_id)
+    portal = query.filter(models.CatalogPortal.slug == slug).first()
+    if not portal:
+        raise HTTPException(status_code=404, detail="Catalog portal not found")
+    return portal
+
+
+def _apply_entity_filters(
+    query: SAQuery,
+    *,
+    search: str | None,
+    min_quality: float | None,
+    ft_entity_type: str | None,
+    ft_validation_status: str | None,
+    ft_enrichment_status: str | None,
+    ft_source: str | None,
+) -> SAQuery:
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            or_(
+                models.RawEntity.primary_label.ilike(search_filter),
+                models.RawEntity.canonical_id.ilike(search_filter),
+                models.RawEntity.secondary_label.ilike(search_filter),
+                models.RawEntity.entity_type.ilike(search_filter),
+            )
+        )
+    if min_quality is not None:
+        query = query.filter(models.RawEntity.quality_score >= min_quality)
+    if ft_entity_type:
+        query = query.filter(models.RawEntity.entity_type == ft_entity_type)
+    if ft_validation_status:
+        query = query.filter(models.RawEntity.validation_status == ft_validation_status)
+    if ft_enrichment_status:
+        query = query.filter(models.RawEntity.enrichment_status == ft_enrichment_status)
+    if ft_source:
+        query = query.filter(models.RawEntity.source == ft_source)
+    return query
+
+
+def _resolve_filters(
+    portal: models.CatalogPortal,
+    *,
+    search: str | None,
+    min_quality: float | None,
+    ft_entity_type: str | None,
+    ft_validation_status: str | None,
+    ft_enrichment_status: str | None,
+    ft_source: str | None,
+    sort_by: str | None,
+    order: str | None,
+) -> dict[str, Any]:
+    defaults = _portal_query_defaults(portal)
+    resolved = {
+        "search": search if search is not None else defaults["search"],
+        "min_quality": min_quality if min_quality is not None else defaults["min_quality"],
+        "ft_entity_type": ft_entity_type if ft_entity_type is not None else defaults["ft_entity_type"],
+        "ft_validation_status": ft_validation_status if ft_validation_status is not None else defaults["ft_validation_status"],
+        "ft_enrichment_status": ft_enrichment_status if ft_enrichment_status is not None else defaults["ft_enrichment_status"],
+        "ft_source": ft_source if ft_source is not None else defaults["ft_source"],
+        "sort_by": sort_by if sort_by is not None else defaults["sort_by"],
+        "order": order if order is not None else defaults["order"],
+    }
+    if resolved["sort_by"] not in _ALLOWED_SORTS:
+        resolved["sort_by"] = "primary_label"
+    if resolved["order"] not in _ALLOWED_ORDERS:
+        resolved["order"] = "asc"
+    return resolved
+
+
+def _portal_entity_query(
+    db: Session,
+    portal: models.CatalogPortal,
+    org_id: int | None,
+    *,
+    search: str | None,
+    min_quality: float | None,
+    ft_entity_type: str | None,
+    ft_validation_status: str | None,
+    ft_enrichment_status: str | None,
+    ft_source: str | None,
+) -> SAQuery:
+    query = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
+    query = query.filter(models.RawEntity.domain == portal.domain_id)
+    query = _apply_entity_filters(
+        query,
+        search=search,
+        min_quality=min_quality,
+        ft_entity_type=ft_entity_type,
+        ft_validation_status=ft_validation_status,
+        ft_enrichment_status=ft_enrichment_status,
+        ft_source=ft_source,
+    )
+    return query
+
+
+@router.get("/catalogs", response_model=list[schemas.CatalogPortalResponse])
+def list_catalog_portals(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    org_id = resolve_request_org_id(db, current_user)
+    portals = (
+        scope_query_to_org(db.query(models.CatalogPortal), models.CatalogPortal, org_id)
+        .order_by(models.CatalogPortal.created_at.desc(), models.CatalogPortal.id.desc())
+        .all()
+    )
+    return [_serialize_portal(portal) for portal in portals]
+
+
+@router.post("/catalogs", response_model=schemas.CatalogPortalResponse, status_code=201)
+def create_catalog_portal(
+    payload: schemas.CatalogPortalCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
+):
+    org_id = resolve_request_org_id(db, current_user)
+    _ensure_domain_exists(payload.domain_id)
+    normalized_slug = _normalize_slug(payload.slug)
+    if db.query(models.CatalogPortal).filter(models.CatalogPortal.slug == normalized_slug).first():
+        raise HTTPException(status_code=409, detail="Catalog portal slug already exists")
+
+    featured_facets = [field for field in payload.featured_facets if field in _ALLOWED_FACETS and field != "domain"]
+    query_json = json.dumps(
+        {
+            "search": payload.search,
+            "min_quality": payload.min_quality,
+            "ft_entity_type": payload.ft_entity_type,
+            "ft_validation_status": payload.ft_validation_status,
+            "ft_enrichment_status": payload.ft_enrichment_status,
+            "ft_source": payload.ft_source,
+            "sort_by": payload.default_sort,
+            "order": payload.default_order,
+        }
+    )
+    now = datetime.now(timezone.utc)
+    portal = models.CatalogPortal(
+        org_id=persisted_org_id(org_id),
+        domain_id=payload.domain_id,
+        title=payload.title.strip(),
+        slug=normalized_slug,
+        description=payload.description,
+        visibility=payload.visibility,
+        query_json=query_json,
+        featured_facets_json=json.dumps(featured_facets),
+        default_sort=payload.default_sort,
+        created_by=current_user.id,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(portal)
+    db.commit()
+    db.refresh(portal)
+    return _serialize_portal(portal)
+
+
+@router.get("/catalogs/{slug}", response_model=schemas.CatalogPortalSummaryResponse)
+def get_catalog_portal(
+    slug: str = Path(..., min_length=3),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    org_id = resolve_request_org_id(db, current_user)
+    portal = _get_scoped_portal_or_404(db, slug, org_id)
+    defaults = _portal_query_defaults(portal)
+    query = _portal_entity_query(
+        db,
+        portal,
+        org_id,
+        search=defaults["search"],
+        min_quality=defaults["min_quality"],
+        ft_entity_type=defaults["ft_entity_type"],
+        ft_validation_status=defaults["ft_validation_status"],
+        ft_enrichment_status=defaults["ft_enrichment_status"],
+        ft_source=defaults["ft_source"],
+    )
+    total_records = query.count()
+    enriched_records = query.filter(models.RawEntity.enrichment_status == "completed").count()
+    avg_quality = query.with_entities(models.RawEntity.quality_score).all()
+    quality_values = [row[0] for row in avg_quality if row[0] is not None]
+
+    data = _serialize_portal(portal)
+    data["summary"] = {
+        "total_records": total_records,
+        "enriched_records": enriched_records,
+        "enriched_pct": round((enriched_records / total_records) * 100, 1) if total_records else 0.0,
+        "avg_quality": round(sum(quality_values) / len(quality_values), 3) if quality_values else None,
+    }
+    return data
+
+
+@router.put("/catalogs/{slug}", response_model=schemas.CatalogPortalResponse)
+def update_catalog_portal(
+    payload: schemas.CatalogPortalUpdate,
+    slug: str = Path(..., min_length=3),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
+):
+    org_id = resolve_request_org_id(db, current_user)
+    portal = _get_scoped_portal_or_404(db, slug, org_id)
+    defaults = _portal_query_defaults(portal)
+
+    if payload.title is not None:
+        portal.title = payload.title.strip()
+    if payload.description is not None:
+        portal.description = payload.description
+    if payload.visibility is not None:
+        portal.visibility = payload.visibility
+    if payload.default_sort is not None:
+        portal.default_sort = payload.default_sort
+
+    if payload.featured_facets is not None:
+        portal.featured_facets_json = json.dumps(
+            [field for field in payload.featured_facets if field in _ALLOWED_FACETS and field != "domain"]
+        )
+
+    query_payload = {
+        "search": payload.search if payload.search is not None else defaults["search"],
+        "min_quality": payload.min_quality if payload.min_quality is not None else defaults["min_quality"],
+        "ft_entity_type": payload.ft_entity_type if payload.ft_entity_type is not None else defaults["ft_entity_type"],
+        "ft_validation_status": payload.ft_validation_status if payload.ft_validation_status is not None else defaults["ft_validation_status"],
+        "ft_enrichment_status": payload.ft_enrichment_status if payload.ft_enrichment_status is not None else defaults["ft_enrichment_status"],
+        "ft_source": payload.ft_source if payload.ft_source is not None else defaults["ft_source"],
+        "sort_by": payload.default_sort if payload.default_sort is not None else defaults["sort_by"],
+        "order": payload.default_order if payload.default_order is not None else defaults["order"],
+    }
+    portal.query_json = json.dumps(query_payload)
+    portal.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(portal)
+    return _serialize_portal(portal)
+
+
+@router.get("/catalogs/{slug}/results")
+def get_catalog_results(
+    slug: str = Path(..., min_length=3),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=24, ge=1, le=100),
+    search: str | None = Query(default=None),
+    min_quality: float | None = Query(default=None, ge=0.0, le=1.0),
+    ft_entity_type: str | None = Query(default=None),
+    ft_validation_status: str | None = Query(default=None),
+    ft_enrichment_status: str | None = Query(default=None),
+    ft_source: str | None = Query(default=None),
+    sort_by: str | None = Query(default=None),
+    order: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    org_id = resolve_request_org_id(db, current_user)
+    portal = _get_scoped_portal_or_404(db, slug, org_id)
+    filters = _resolve_filters(
+        portal,
+        search=search,
+        min_quality=min_quality,
+        ft_entity_type=ft_entity_type,
+        ft_validation_status=ft_validation_status,
+        ft_enrichment_status=ft_enrichment_status,
+        ft_source=ft_source,
+        sort_by=sort_by,
+        order=order,
+    )
+
+    query = _portal_entity_query(
+        db,
+        portal,
+        org_id,
+        search=filters["search"],
+        min_quality=filters["min_quality"],
+        ft_entity_type=filters["ft_entity_type"],
+        ft_validation_status=filters["ft_validation_status"],
+        ft_enrichment_status=filters["ft_enrichment_status"],
+        ft_source=filters["ft_source"],
+    )
+    sort_col = {
+        "id": models.RawEntity.id,
+        "quality_score": models.RawEntity.quality_score,
+        "primary_label": models.RawEntity.primary_label,
+        "enrichment_status": models.RawEntity.enrichment_status,
+    }[filters["sort_by"]]
+    query = query.order_by(sort_col.desc() if filters["order"] == "desc" else sort_col.asc())
+    total = query.count()
+    items = query.offset(skip).limit(limit).all()
+
+    featured_facets = _parse_json(portal.featured_facets_json, [])
+    facet_fields = ",".join([field for field in featured_facets if field in _ALLOWED_FACETS and field != "domain"])
+    facets = EntityService.get_facets(
+        db,
+        facet_fields or "entity_type,validation_status,enrichment_status,source",
+        search=filters["search"],
+        min_quality=filters["min_quality"],
+        ft_entity_type=filters["ft_entity_type"],
+        ft_domain=portal.domain_id,
+        ft_validation_status=filters["ft_validation_status"],
+        ft_enrichment_status=filters["ft_enrichment_status"],
+        ft_source=filters["ft_source"],
+        org_id=org_id,
+    )
+
+    return {
+        "portal": _serialize_portal(portal),
+        "filters": {**filters, "domain_id": portal.domain_id},
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "items": [schemas.Entity.model_validate(item).model_dump() for item in items],
+        "facets": facets,
+    }
+
+
+@router.get("/catalogs/{slug}/records/{entity_id}", response_model=schemas.Entity)
+def get_catalog_record(
+    slug: str = Path(..., min_length=3),
+    entity_id: int = Path(..., ge=1),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    org_id = resolve_request_org_id(db, current_user)
+    portal = _get_scoped_portal_or_404(db, slug, org_id)
+    defaults = _portal_query_defaults(portal)
+    record = (
+        _portal_entity_query(
+            db,
+            portal,
+            org_id,
+            search=None,
+            min_quality=defaults["min_quality"],
+            ft_entity_type=defaults["ft_entity_type"],
+            ft_validation_status=defaults["ft_validation_status"],
+            ft_enrichment_status=defaults["ft_enrichment_status"],
+            ft_source=defaults["ft_source"],
+        )
+        .filter(models.RawEntity.id == entity_id)
+        .first()
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail="Catalog record not found")
+    return record

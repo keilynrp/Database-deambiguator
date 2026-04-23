@@ -597,6 +597,29 @@ class OrganizationMember(Base):
     joined_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class CatalogPortal(Base):
+    """
+    Lightweight discovery portal scoped to an organization and domain.
+    Phase A persists domain and saved filters instead of a concrete import batch,
+    so we can ship a navigable catalog view before ingestion snapshots exist.
+    """
+    __tablename__ = "catalog_portals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
+    domain_id = Column(String(80), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    slug = Column(String(120), nullable=False, unique=True, index=True)
+    description = Column(Text, nullable=True)
+    visibility = Column(String(20), nullable=False, default="private", index=True)  # private | org | public
+    query_json = Column(Text, default="{}")
+    featured_facets_json = Column(Text, default="[]")
+    default_sort = Column(String(40), nullable=False, default="primary_label")
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 # ── Sprint 90: Web Scraper Configs ────────────────────────────────────────────
 
 class WebScraperConfig(Base):

@@ -36,6 +36,7 @@ from backend.routers import (
     auth_users,
     authority,
     branding,
+    catalogs,
     context,
     dashboards,
     demo,
@@ -322,6 +323,7 @@ app.include_router(demo.router)
 app.include_router(annotations.router)
 app.include_router(notifications.router)
 app.include_router(branding.router)
+app.include_router(catalogs.router)
 app.include_router(artifacts.router)
 app.include_router(context.router)
 app.include_router(audit_log.router)

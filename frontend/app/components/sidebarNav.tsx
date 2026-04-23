@@ -67,6 +67,17 @@ export const navSections: NavSection[] = [
         translationKey: "nav.scientific_import",
       },
       {
+        label: "Catalog Portals",
+        href: "/catalogs",
+        icon: (
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.5 6.75A2.25 2.25 0 016.75 4.5h10.5A2.25 2.25 0 0119.5 6.75v10.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 17.25V6.75z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.25 8.25h7.5M8.25 12h7.5M8.25 15.75h4.5" />
+          </svg>
+        ),
+        translationKey: "nav.catalogs",
+      },
+      {
         label: "Entity Sync",
         href: "/import-export",
         icon: (

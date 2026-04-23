@@ -27,6 +27,68 @@ class Entity(EntityBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class CatalogPortalBase(BaseModel):
+    title: str
+    slug: str
+    description: Optional[str] = None
+    domain_id: str
+    visibility: Literal["private", "org", "public"] = "private"
+    search: Optional[str] = None
+    min_quality: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    ft_entity_type: Optional[str] = None
+    ft_validation_status: Optional[str] = None
+    ft_enrichment_status: Optional[str] = None
+    ft_source: Optional[str] = None
+    default_sort: Literal["id", "quality_score", "primary_label", "enrichment_status"] = "primary_label"
+    default_order: Literal["asc", "desc"] = "asc"
+    featured_facets: List[str] = Field(default_factory=lambda: ["entity_type", "validation_status", "enrichment_status", "source"])
+
+
+class CatalogPortalCreate(CatalogPortalBase):
+    pass
+
+
+class CatalogPortalUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    visibility: Optional[Literal["private", "org", "public"]] = None
+    search: Optional[str] = None
+    min_quality: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    ft_entity_type: Optional[str] = None
+    ft_validation_status: Optional[str] = None
+    ft_enrichment_status: Optional[str] = None
+    ft_source: Optional[str] = None
+    default_sort: Optional[Literal["id", "quality_score", "primary_label", "enrichment_status"]] = None
+    default_order: Optional[Literal["asc", "desc"]] = None
+    featured_facets: Optional[List[str]] = None
+
+
+class CatalogPortalResponse(BaseModel):
+    id: int
+    org_id: Optional[int] = None
+    title: str
+    slug: str
+    description: Optional[str] = None
+    domain_id: str
+    visibility: str
+    search: Optional[str] = None
+    min_quality: Optional[float] = None
+    ft_entity_type: Optional[str] = None
+    ft_validation_status: Optional[str] = None
+    ft_enrichment_status: Optional[str] = None
+    ft_source: Optional[str] = None
+    default_sort: str
+    default_order: str
+    featured_facets: List[str]
+    created_by: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class CatalogPortalSummaryResponse(CatalogPortalResponse):
+    summary: dict
+
 class QualityDimension(BaseModel):
     weight: float
     contribution: float

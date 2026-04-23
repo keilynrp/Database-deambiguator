@@ -193,6 +193,7 @@ _TABLES_TO_CLEAN = [
     "web_scraper_configs",
     "workflow_runs",
     "workflows",
+    "catalog_portals",
     "organization_members",
     "organizations",
     "entity_relationships",
