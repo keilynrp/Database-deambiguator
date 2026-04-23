@@ -316,6 +316,12 @@ export default function ImportExportPage() {
                                     {t("page.import_export.next.dashboard")}
                                 </Link>
                                 <Link
+                                    href={`/catalogs?domain_id=${encodeURIComponent(uploadResult.domain ?? activeDomain?.id ?? "default")}&title=${encodeURIComponent(`${activeDomain?.name || "Workspace"} Catalog`)}&slug=${encodeURIComponent(`catalog-${Date.now()}`)}&description=${encodeURIComponent(tr("page.import_export.next.catalog_description", "Catalog portal seeded from the latest import so stakeholders can browse this collection in a friendlier discovery view."))}&ft_entity_type=${encodeURIComponent(uploadResult.domain === "science" ? "publication" : "")}`}
+                                    className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700"
+                                >
+                                    {tr("page.import_export.next.catalog", "Create Catalog Portal")}
+                                </Link>
+                                <Link
                                     href="/"
                                     className="inline-flex items-center gap-2 rounded-lg border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-100 dark:border-green-700 dark:bg-gray-900 dark:text-green-300 dark:hover:bg-green-950/30"
                                 >

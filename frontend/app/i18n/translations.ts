@@ -86,6 +86,8 @@ export const translations = {
         'catalogs.record.section_core': 'Core record',
         'catalogs.record.section_system': 'System signals',
         'catalogs.record.section_extended': 'Extended metadata',
+        'page.import_export.next.catalog': 'Create Catalog Portal',
+        'page.import_export.next.catalog_description': 'Catalog portal seeded from the latest import so stakeholders can browse this collection in a friendlier discovery view.',
 
         // Settings
         'settings.title': 'Settings',
@@ -2543,6 +2545,8 @@ export const translations = {
         'catalogs.record.section_core': 'Registro núcleo',
         'catalogs.record.section_system': 'Señales del sistema',
         'catalogs.record.section_extended': 'Metadatos extendidos',
+        'page.import_export.next.catalog': 'Crear portal de catálogo',
+        'page.import_export.next.catalog_description': 'Portal de catálogo sembrado desde la importación más reciente para que los stakeholders naveguen esta colección en una vista de descubrimiento más amigable.',
 
         // Settings
         'settings.title': 'Configuración',

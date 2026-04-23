@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { PageHeader, EmptyState, ErrorBanner, useToast } from "../components/ui";
 import { useDomain } from "../contexts/DomainContext";
@@ -34,6 +34,7 @@ export default function CatalogPortalsPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const tr = (key: string, fallback: string) => {
     const value = t(key);
     return value === key ? fallback : value;
@@ -44,27 +45,27 @@ export default function CatalogPortalsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
-    title: "",
-    slug: "",
-    description: "",
+    title: searchParams.get("title") ?? "",
+    slug: searchParams.get("slug") ?? "",
+    description: searchParams.get("description") ?? "",
     domain_id: activeDomainId || "default",
-    visibility: "private",
-    search: "",
-    min_quality: "",
-    ft_entity_type: "",
-    ft_validation_status: "",
-    ft_enrichment_status: "",
-    ft_source: "",
-    default_sort: "primary_label",
-    default_order: "asc",
+    visibility: searchParams.get("visibility") ?? "private",
+    search: searchParams.get("search") ?? "",
+    min_quality: searchParams.get("min_quality") ?? "",
+    ft_entity_type: searchParams.get("ft_entity_type") ?? "",
+    ft_validation_status: searchParams.get("ft_validation_status") ?? "",
+    ft_enrichment_status: searchParams.get("ft_enrichment_status") ?? "",
+    ft_source: searchParams.get("ft_source") ?? "",
+    default_sort: searchParams.get("default_sort") ?? "primary_label",
+    default_order: searchParams.get("default_order") ?? "asc",
   });
 
   useEffect(() => {
     setForm((prev) => ({
       ...prev,
-      domain_id: prev.domain_id || activeDomainId || "default",
+      domain_id: searchParams.get("domain_id") || prev.domain_id || activeDomainId || "default",
     }));
-  }, [activeDomainId]);
+  }, [activeDomainId, searchParams]);
 
   const loadPortals = async () => {
     setLoading(true);
