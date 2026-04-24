@@ -4,6 +4,7 @@ import type { DomainSchema } from "../contexts/DomainContext";
 
 export interface Entity {
     id: number;
+    import_batch_id?: number | null;
     primary_label: string | null;
     secondary_label: string | null;
     canonical_id: string | null;

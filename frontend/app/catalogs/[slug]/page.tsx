@@ -1,10 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { EmptyState, ErrorBanner, PageHeader, StatCard } from "../../components/ui";
+import { Badge, EmptyState, ErrorBanner, PageHeader, QualityBadge, StatCard, useToast } from "../../components/ui";
+import FacetPanel from "../../components/FacetPanel";
+import EntityTableToolbar from "../../components/EntityTableToolbar";
+import RecordResultCard from "../../components/RecordResultCard";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -102,6 +104,7 @@ export default function CatalogPortalPage() {
   const router = useRouter();
   const { t } = useLanguage();
   const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const tr = (key: string, fallback: string) => {
     const value = t(key);
     return value === key ? fallback : value;
@@ -116,19 +119,21 @@ export default function CatalogPortalPage() {
         return tr("catalogs.visibility.private", "Private workspace");
     }
   };
-
   const [portal, setPortal] = useState<CatalogPortal | null>(null);
   const [results, setResults] = useState<CatalogResultsPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
-  const [selectedFacets, setSelectedFacets] = useState<Record<string, string>>({
-    ft_entity_type: searchParams.get("ft_entity_type") ?? "",
-    ft_validation_status: searchParams.get("ft_validation_status") ?? "",
-    ft_enrichment_status: searchParams.get("ft_enrichment_status") ?? "",
-    ft_source: searchParams.get("ft_source") ?? "",
+  const [minQuality, setMinQuality] = useState(searchParams.get("min_quality") ?? "");
+  const [activeFacets, setActiveFacets] = useState<Record<string, string | null>>({
+    entity_type: searchParams.get("ft_entity_type") ?? null,
+    domain: searchParams.get("ft_domain") ?? null,
+    validation_status: searchParams.get("ft_validation_status") ?? null,
+    enrichment_status: searchParams.get("ft_enrichment_status") ?? null,
+    source: searchParams.get("ft_source") ?? null,
   });
   const [editForm, setEditForm] = useState({
     title: "",
@@ -179,8 +184,17 @@ export default function CatalogPortalPage() {
         limit: String(limit),
       });
       if (search) query.set("search", search);
-      Object.entries(selectedFacets).forEach(([key, value]) => {
-        if (value) query.set(key, value);
+      if (minQuality) query.set("min_quality", minQuality);
+      const facetParamMap: Record<string, string> = {
+        entity_type: "ft_entity_type",
+        domain: "ft_domain",
+        validation_status: "ft_validation_status",
+        enrichment_status: "ft_enrichment_status",
+        source: "ft_source",
+      };
+      Object.entries(activeFacets).forEach(([key, value]) => {
+        const paramName = facetParamMap[key];
+        if (paramName && value) query.set(paramName, value);
       });
 
       const resultsRes = await apiFetch(`/catalogs/${slug}/results?${query.toString()}`);
@@ -212,12 +226,58 @@ export default function CatalogPortalPage() {
   const applyFilters = () => {
     const next = new URLSearchParams();
     if (search) next.set("search", search);
-    Object.entries(selectedFacets).forEach(([key, value]) => {
-      if (value) next.set(key, value);
+    if (minQuality) next.set("min_quality", minQuality);
+    const facetParamMap: Record<string, string> = {
+      entity_type: "ft_entity_type",
+      domain: "ft_domain",
+      validation_status: "ft_validation_status",
+      enrichment_status: "ft_enrichment_status",
+      source: "ft_source",
+    };
+    Object.entries(activeFacets).forEach(([key, value]) => {
+      const paramName = facetParamMap[key];
+      if (paramName && value) next.set(paramName, value);
     });
     next.set("page", "1");
     router.replace(`/catalogs/${slug}?${next.toString()}`);
     void loadPortal();
+  };
+
+  const handleFacetChange = (field: string, value: string | null) => {
+    setActiveFacets((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const enrichmentVariant = (value: string | null | undefined): "success" | "warning" | "error" | "default" => {
+    switch (value) {
+      case "completed":
+        return "success";
+      case "pending":
+      case "processing":
+        return "warning";
+      case "failed":
+        return "error";
+      default:
+        return "default";
+    }
+  };
+
+  const statusLabel = (field: "validation" | "enrichment", value: string | null | undefined) => {
+    if (!value) return tr("page.entity_table.empty_value", "—");
+    if (field === "validation") {
+      const key = `page.entity_table.status_${value}`;
+      const translated = t(key);
+      return translated === key ? value : translated;
+    }
+    const enrichmentKeyMap: Record<string, string> = {
+      completed: "entities.filter.enriched",
+      pending: "entities.filter.pending",
+      processing: "page.entity_table.status_processing",
+      failed: "entities.filter.failed",
+      none: "page.entity_table.status_not_started",
+    };
+    const key = enrichmentKeyMap[value] ?? `entities.filter.${value}`;
+    const translated = t(key);
+    return translated === key ? value : translated;
   };
 
   const goToPage = (page: number) => {
@@ -259,6 +319,47 @@ export default function CatalogPortalPage() {
       setError(saveError instanceof Error ? saveError.message : tr("catalogs.update_failed", "Failed to update the catalog portal."));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const deletePortal = async () => {
+    if (!portal) return;
+    const confirmed = window.confirm(
+      tr(
+        "catalogs.delete_confirm",
+        "Delete this portal only? The imported records and source ingestion will remain untouched.",
+      ),
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/catalogs/${slug}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        throw new Error(
+          await readCatalogError(
+            res,
+            tr("catalogs.delete_failed", "Failed to delete the catalog portal."),
+          ),
+        );
+      }
+      toast(
+        `${tr("catalogs.delete_success_title", "Portal deleted")}: ${tr("catalogs.delete_success_body", "The portal was removed, but the imported records remain available in the workspace.")}`,
+        "success",
+      );
+      router.push("/catalogs");
+    } catch (deleteError) {
+      const message =
+        deleteError instanceof Error
+          ? deleteError.message
+          : tr("catalogs.delete_failed", "Failed to delete the catalog portal.");
+      setError(message);
+      toast(`${tr("catalogs.delete_failed_title", "Unable to delete portal")}: ${message}`, "error");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -427,6 +528,10 @@ export default function CatalogPortalPage() {
 
             {editing && isAuthenticated && (
               <div className="mt-4 space-y-3">
+                <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
+                  <p className="font-semibold">{tr("catalogs.facets_sync_title", "Knowledge facets stay in sync")}</p>
+                  <p className="mt-1">{tr("catalogs.facets_sync_body", "This portal reuses the same facet set shown in the Knowledge panel, so filters stay consistent without duplicating configuration.")}</p>
+                </div>
                 <input
                   value={editForm.title}
                   onChange={(event) => setEditForm((prev) => ({ ...prev, title: event.target.value }))}
@@ -478,165 +583,250 @@ export default function CatalogPortalPage() {
                 >
                   {saving ? tr("catalogs.saving", "Saving...") : tr("catalogs.save", "Save portal")}
                 </button>
+                <button
+                  onClick={deletePortal}
+                  disabled={deleting}
+                  className="w-full rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/30"
+                >
+                  {deleting ? tr("catalogs.deleting", "Deleting...") : tr("catalogs.delete", "Delete portal")}
+                </button>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {tr("catalogs.delete_hint", "Deleting the portal removes only this discovery view. It does not delete imported records or source ingestion data.")}
+                </p>
               </div>
             )}
           </div>
 
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600 dark:text-blue-400">
-              {tr("catalogs.filters_eyebrow", "Search and refine")}
-            </p>
-            <h2 className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">
-              {tr("catalogs.filters_title", "Catalog filters")}
-            </h2>
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
+            <p className="font-semibold">{tr("catalogs.filters_title", "Catalog filters")}</p>
+            <p className="mt-1">{tr("catalogs.vufind_like_hint", "Use the search bar, then narrow by facets on the left. This portal now follows the same consultation pattern as the internal catalog view.")}</p>
           </div>
 
-          <label className="block space-y-2 text-sm text-gray-700 dark:text-gray-300">
-            <span>{tr("catalogs.field.search", "Search")}</span>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:ring-blue-900/40"
-              placeholder={tr("catalogs.field.search_placeholder", "CRISPR, education, materials science...")}
-            />
-          </label>
-
-          {results && Object.entries(results.facets).map(([field, options]) => (
-            <label key={field} className="block space-y-2 text-sm text-gray-700 dark:text-gray-300">
-              <span className="capitalize">{field.replaceAll("_", " ")}</span>
-              <select
-                value={selectedFacets[field] || ""}
-                onChange={(event) => setSelectedFacets((prev) => ({ ...prev, [field]: event.target.value }))}
-                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:ring-blue-900/40"
-              >
-                <option value="">{tr("catalogs.filters.any", "Any")}</option>
-                {options.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.value} ({option.count})
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-
-          <button
-            onClick={applyFilters}
-            className="w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
-          >
-            {tr("catalogs.filters.apply", "Apply filters")}
-          </button>
+          <FacetPanel
+            activeFacets={activeFacets}
+            onFacetChange={handleFacetChange}
+            search={search}
+            minQuality={minQuality}
+            facetsData={results?.facets ?? null}
+          />
         </aside>
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-                {tr("catalogs.results.section_eyebrow", "Catalog results")}
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                {tr("catalogs.results.section_title", "Browse the collection")}
-              </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {results
-                  ? tr("catalogs.results_count", "{count} records in this portal").replace("{count}", results.total.toLocaleString())
-                  : tr("catalogs.results_loading", "Loading records...")}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                {portal?.domain_id || "—"}
-              </span>
-              <span className={`rounded-full px-3 py-1 text-xs font-medium ${visibilityTone(portal?.visibility)}`}>
-                {visibilityLabel(portal?.visibility)}
-              </span>
+        <section className="space-y-5">
+          <div className="rounded-2xl border border-sky-200 bg-sky-50/80 px-4 py-4 shadow-sm dark:border-sky-900/40 dark:bg-sky-950/20">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700 dark:text-sky-400">
+                  {tr("catalogs.results.section_eyebrow", "Catalog results")}
+                </p>
+                <h2 className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {tr("catalogs.results.section_title", "Browse the collection")}
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
+                  {tr("catalogs.vufind_like_hint", "Use the search bar, then narrow by facets on the left. This portal now follows the same consultation pattern as the internal catalog view.")}
+                </p>
+              </div>
+              <div className="grid gap-3 text-xs text-slate-600 dark:text-slate-400 sm:grid-cols-3 lg:max-w-xl">
+                <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/70">
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">{tr("catalogs.summary.total", "Records")}</p>
+                  <p className="mt-1">{results ? results.total.toLocaleString() : "—"}</p>
+                </div>
+                <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/70">
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">{tr("catalogs.results.scope_source", "Collection origin")}</p>
+                  <p className="mt-1">{portal?.source_label || tr("catalogs.results.scope_search_any", "Open discovery")}</p>
+                </div>
+                <div className="rounded-xl border border-white/70 bg-white/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/70">
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">{tr("catalogs.visibility.private", "Private workspace")}</p>
+                  <p className="mt-1">{visibilityLabel(portal?.visibility)}</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {loading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="h-28 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
-              ))}
-            </div>
-          ) : results && results.items.length > 0 ? (
-            <div className="space-y-4">
-              {results.items.map((record) => {
-                const attributes = parseAttributes(record.attributes_json);
-                const journal = (attributes.journal as string | undefined) || "—";
-                const year = attributes.year as string | number | undefined;
-                return (
-                  <Link
-                  key={record.id}
-                  href={`/catalogs/${slug}/record/${record.id}`}
-                  className="block rounded-3xl border border-gray-200 p-5 transition hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-sm dark:border-gray-800 dark:hover:border-blue-700 dark:hover:bg-blue-950/20"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                          {record.entity_type || tr("catalogs.record.type_unknown", "Record")}
-                        </span>
-                        <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                          {record.enrichment_status || tr("catalogs.record.status_unknown", "Unknown status")}
-                        </span>
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                          {record.primary_label || tr("common.no_data", "No data")}
-                      </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-300">
-                          {record.secondary_label || tr("catalogs.record.no_author", "Author data not available")}
-                        </p>
-                        <div className="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400">
-                          <span>{journal}</span>
-                          <span>•</span>
-                          <span>{year || "—"}</span>
-                          <span>•</span>
-                          <span>{record.canonical_id || "—"}</span>
-                        </div>
-                      </div>
-                    <div className="space-y-2 text-right">
-                      <div className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                          {tr("catalogs.record.citations", "Citations")}: {(record.enrichment_citation_count ?? 0).toLocaleString()}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {tr("catalogs.record.quality", "Quality")}: {record.quality_score !== null && record.quality_score !== undefined ? record.quality_score.toFixed(2) : "—"}
-                      </div>
-                      <div className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                        {tr("catalogs.record.open", "Open full record")} →
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-                );
-              })}
+          <EntityTableToolbar
+            activeFacets={activeFacets}
+            search={search}
+            minQuality={minQuality}
+            page={Math.max(0, currentPage - 1)}
+            onSearchChange={setSearch}
+            onMinQualityChange={setMinQuality}
+            onClearFacet={(field) => handleFacetChange(field, null)}
+          />
 
-              <div className="flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-800">
-                <button
-                  onClick={() => goToPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage <= 1}
-                  className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
-                >
-                  {tr("catalogs.pagination.previous", "Previous")}
-                </button>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {tr("catalogs.pagination.page", "Page")} {currentPage} / {totalPages}
-                </span>
-                <button
-                  onClick={() => goToPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage >= totalPages}
-                  className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
-                >
-                  {tr("catalogs.pagination.next", "Next")}
-                </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={applyFilters}
+              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+            >
+              {tr("catalogs.filters.apply", "Apply filters")}
+            </button>
+            <button
+              onClick={() => {
+                setSearch("");
+                setMinQuality("");
+                setActiveFacets({
+                  entity_type: null,
+                  domain: null,
+                  validation_status: null,
+                  enrichment_status: null,
+                  source: null,
+                });
+              }}
+              className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              {tr("catalogs.filters.clear", "Clear filters")}
+            </button>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <div className="border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  {results ? results.total.toLocaleString() : "0"}
+                </p>
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                  {tr("catalogs.results.section_eyebrow", "Catalog results")}
+                </p>
               </div>
             </div>
-          ) : (
-            <EmptyState
-              icon="search"
-              color="blue"
-              title={tr("catalogs.results_empty_title", "No records match these filters")}
-              description={tr("catalogs.results_empty_description", "Try a broader query or remove one of the active filters to recover results.")}
-            />
+
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              {loading ? (
+                <div className="space-y-4 p-4">
+                  {Array.from({ length: 8 }).map((_, index) => (
+                    <div key={index} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+                      <div className="flex animate-pulse gap-4">
+                        <div className="h-16 w-16 rounded-2xl bg-gray-100 dark:bg-gray-800" />
+                        <div className="flex-1 space-y-3">
+                          <div className="h-4 w-2/3 rounded bg-gray-100 dark:bg-gray-800" />
+                          <div className="h-3 w-1/2 rounded bg-gray-100 dark:bg-gray-800" />
+                          <div className="grid gap-2 sm:grid-cols-3">
+                            <div className="h-10 rounded-xl bg-gray-100 dark:bg-gray-800" />
+                            <div className="h-10 rounded-xl bg-gray-100 dark:bg-gray-800" />
+                            <div className="h-10 rounded-xl bg-gray-100 dark:bg-gray-800" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : results && results.items.length > 0 ? (
+                results.items.map((record) => {
+                  const attributes = parseAttributes(record.attributes_json);
+                  const journal = (attributes.journal as string | undefined) || (attributes.venue as string | undefined);
+                  const year = attributes.year as string | number | undefined;
+                  return (
+                    <RecordResultCard
+                      key={record.id}
+                      onClick={() => router.push(`/catalogs/${slug}/record/${record.id}`)}
+                      tileLabel={(record.entity_type || record.domain || "record").slice(0, 3)}
+                      title={record.primary_label || tr("common.no_data", "No data")}
+                      idTag={<Badge variant="default">#{record.id}</Badge>}
+                      secondaryLine={
+                        <>
+                          {record.secondary_label ? <span>{record.secondary_label}</span> : null}
+                          {record.secondary_label && (journal || year) ? <span>·</span> : null}
+                          {journal ? <span>{journal}</span> : null}
+                          {journal && year ? <span>·</span> : null}
+                          {year ? <span>{String(year)}</span> : null}
+                        </>
+                      }
+                      statusRow={
+                        <>
+                          <Badge variant="default">{statusLabel("validation", record.validation_status)}</Badge>
+                          <Badge variant={enrichmentVariant(record.enrichment_status)}>
+                            {statusLabel("enrichment", record.enrichment_status)}
+                          </Badge>
+                          <QualityBadge score={record.quality_score} />
+                          {record.entity_type ? <Badge variant="default">{record.entity_type}</Badge> : null}
+                          {record.domain ? <Badge variant="default">{record.domain}</Badge> : null}
+                        </>
+                      }
+                      primaryMeta={[
+                        {
+                          label: tr("page.import.field.canonical_id", "Identifier"),
+                          value: (
+                            <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                              {record.canonical_id || "—"}
+                            </code>
+                          ),
+                          minWidthClassName: "min-w-[12rem]",
+                        },
+                        {
+                          label: tr("page.entity_table.system_status", "System status"),
+                          value: <Badge variant={enrichmentVariant(record.enrichment_status)}>{statusLabel("enrichment", record.enrichment_status)}</Badge>,
+                        },
+                        {
+                          label: tr("page.entity_table.review_status", "Review status"),
+                          value: statusLabel("validation", record.validation_status),
+                        },
+                        {
+                          label: tr("page.exec_dashboard.source", "Source"),
+                          value: record.source || "—",
+                        },
+                      ]}
+                      secondaryMeta={[
+                        {
+                          label: tr("catalogs.record.citations", "Citations"),
+                          value: (record.enrichment_citation_count ?? 0).toLocaleString(),
+                          minWidthClassName: "min-w-[8rem]",
+                        },
+                        {
+                          label: tr("catalogs.record.journal", "Journal / Venue"),
+                          value: journal || "—",
+                          minWidthClassName: "min-w-[12rem]",
+                        },
+                        {
+                          label: tr("catalogs.record.publication_year", "Publication year"),
+                          value: year ? String(year) : "—",
+                        },
+                      ]}
+                      actions={
+                        <button
+                          className="rounded-xl border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-950/30"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            router.push(`/catalogs/${slug}/record/${record.id}`);
+                          }}
+                        >
+                          {tr("catalogs.record.open", "Open record")}
+                        </button>
+                      }
+                    />
+                  );
+                })
+              ) : (
+                <div className="px-5 py-10">
+                  <EmptyState
+                    icon="search"
+                    color="blue"
+                    title={tr("catalogs.results_empty_title", "No records match these filters")}
+                    description={tr("catalogs.results_empty_description", "Try a broader query or remove one of the active filters to recover results.")}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {results && results.items.length > 0 && (
+            <div className="flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-800">
+              <button
+                onClick={() => goToPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage <= 1}
+                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                {tr("catalogs.pagination.previous", "Previous")}
+              </button>
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                {tr("catalogs.pagination.page", "Page")} {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => goToPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage >= totalPages}
+                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                {tr("catalogs.pagination.next", "Next")}
+              </button>
+            </div>
           )}
         </section>
       </section>

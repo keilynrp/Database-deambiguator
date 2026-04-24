@@ -48,6 +48,7 @@ export default function EntityTable() {
         fetchError,
         activeFacets,
         facetRefreshKey,
+        portalByBatchId,
         handleFacetChange,
         fetchEntities,
         startEdit,
@@ -148,6 +149,7 @@ export default function EntityTable() {
                         saving={saving}
                         deletingId={deletingId}
                         enrichingId={enrichingId}
+                        portalByBatchId={portalByBatchId}
                         sortBy={sortBy}
                         sortOrder={sortOrder}
                         scrollContainerRef={scrollContainerRef}

@@ -31,9 +31,10 @@ interface FacetPanelProps {
   search?: string;
   minQuality?: string;
   refreshKey?: number; // increment to trigger re-fetch
+  facetsData?: FacetData | null;
 }
 
-export default function FacetPanel({ activeFacets, onFacetChange, search, minQuality, refreshKey }: FacetPanelProps) {
+export default function FacetPanel({ activeFacets, onFacetChange, search, minQuality, refreshKey, facetsData }: FacetPanelProps) {
   const { t } = useLanguage();
   const [facets, setFacets] = useState<FacetData>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -57,9 +58,14 @@ export default function FacetPanel({ activeFacets, onFacetChange, search, minQua
   }, [activeFacets.domain, activeFacets.enrichment_status, activeFacets.entity_type, activeFacets.source, activeFacets.validation_status, minQuality, search]);
 
   useEffect(() => {
+    if (facetsData) {
+      setFacets(facetsData);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     fetchFacets();
-  }, [fetchFacets, refreshKey]);
+  }, [facetsData, fetchFacets, refreshKey]);
 
   const toggleCollapse = (field: string) =>
     setCollapsed(prev => ({ ...prev, [field]: !prev[field] }));

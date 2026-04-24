@@ -12,6 +12,11 @@ interface UseEntityTableControllerOptions {
     toast: (message: string, variant?: ToastVariant) => void;
 }
 
+interface CatalogPortalSummary {
+    slug: string;
+    source_batch_id: number | null;
+}
+
 export function useEntityTableController({ toast }: UseEntityTableControllerOptions) {
     const { t } = useLanguage();
     const searchParams = useSearchParams();
@@ -52,6 +57,7 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
     const [activeFacets, setActiveFacets] = useState<ActiveFacets>(readFacetParams);
     const [facetRefreshKey, setFacetRefreshKey] = useState(0);
     const [scrollTop, setScrollTop] = useState(0);
+    const [portalByBatchId, setPortalByBatchId] = useState<Record<number, string>>({});
     const paramSignature = searchParams.toString();
 
     useEffect(() => {
@@ -110,6 +116,27 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
     useEffect(() => {
         fetchEntities();
     }, [fetchEntities]);
+
+    const fetchCatalogPortals = useCallback(async () => {
+        try {
+            const res = await apiFetch("/catalogs");
+            if (!res.ok) throw new Error("Unable to load catalog portals");
+            const portals = await res.json() as CatalogPortalSummary[];
+            const nextMap: Record<number, string> = {};
+            portals.forEach((portal) => {
+                if (portal.source_batch_id && !nextMap[portal.source_batch_id]) {
+                    nextMap[portal.source_batch_id] = portal.slug;
+                }
+            });
+            setPortalByBatchId(nextMap);
+        } catch {
+            setPortalByBatchId({});
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchCatalogPortals();
+    }, [fetchCatalogPortals]);
 
     function handleFacetChange(field: string, value: string | null) {
         setActiveFacets((prev) => ({ ...prev, [field]: value }));
@@ -339,5 +366,6 @@ export function useEntityTableController({ toast }: UseEntityTableControllerOpti
         handleBulkExport,
         scrollTop,
         setScrollTop,
+        portalByBatchId,
     };
 }
