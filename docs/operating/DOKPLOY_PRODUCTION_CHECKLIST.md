@@ -3,6 +3,7 @@
 For the full step-by-step rollout path, use:
 
 - [D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_VPS_RUNBOOK.md](D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_VPS_RUNBOOK.md)
+- [D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_STEP_BY_STEP_SETUP.md](D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_STEP_BY_STEP_SETUP.md)
 - [D:\universal-knowledge-intelligence-platform\.env.dokploy.example](D:\universal-knowledge-intelligence-platform\.env.dokploy.example)
 - [D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_PILOT_DEPLOYMENT_VALUES.md](D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_PILOT_DEPLOYMENT_VALUES.md)
 

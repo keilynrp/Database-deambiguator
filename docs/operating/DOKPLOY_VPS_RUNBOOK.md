@@ -28,6 +28,7 @@ still intentionally conservative:
 
 - Compose file: [D:\universal-knowledge-intelligence-platform\docker-compose.prod.yml](D:\universal-knowledge-intelligence-platform\docker-compose.prod.yml)
 - Env template: [D:\universal-knowledge-intelligence-platform\.env.dokploy.example](D:\universal-knowledge-intelligence-platform\.env.dokploy.example)
+- Step-by-step setup: [D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_STEP_BY_STEP_SETUP.md](D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_STEP_BY_STEP_SETUP.md)
 - Current pilot values: [D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_PILOT_DEPLOYMENT_VALUES.md](D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_PILOT_DEPLOYMENT_VALUES.md)
 - High-level checklist: [D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_PRODUCTION_CHECKLIST.md](D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_PRODUCTION_CHECKLIST.md)
 
