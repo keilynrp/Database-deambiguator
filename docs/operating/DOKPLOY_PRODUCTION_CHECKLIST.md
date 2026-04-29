@@ -4,6 +4,7 @@ For the full step-by-step rollout path, use:
 
 - [D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_VPS_RUNBOOK.md](D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_VPS_RUNBOOK.md)
 - [D:\universal-knowledge-intelligence-platform\.env.dokploy.example](D:\universal-knowledge-intelligence-platform\.env.dokploy.example)
+- [D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_PILOT_DEPLOYMENT_VALUES.md](D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_PILOT_DEPLOYMENT_VALUES.md)
 
 This guide defines the minimum operational bar for a UKIP "pilot production"
 deployment on a VPS managed with Dokploy.
@@ -31,6 +32,7 @@ process. A single backend replica avoids duplicate scheduler execution.
 4. Two domains:
    - `ukip.inbounduxd.com`
    - `api.ukip.inbounduxd.com`
+5. GHCR registry credentials if packages are private
 
 ## GHCR Images
 

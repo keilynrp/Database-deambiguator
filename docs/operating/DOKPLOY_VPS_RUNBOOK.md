@@ -28,6 +28,7 @@ still intentionally conservative:
 
 - Compose file: [D:\universal-knowledge-intelligence-platform\docker-compose.prod.yml](D:\universal-knowledge-intelligence-platform\docker-compose.prod.yml)
 - Env template: [D:\universal-knowledge-intelligence-platform\.env.dokploy.example](D:\universal-knowledge-intelligence-platform\.env.dokploy.example)
+- Current pilot values: [D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_PILOT_DEPLOYMENT_VALUES.md](D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_PILOT_DEPLOYMENT_VALUES.md)
 - High-level checklist: [D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_PRODUCTION_CHECKLIST.md](D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_PRODUCTION_CHECKLIST.md)
 
 ## Before Touching the VPS
@@ -66,6 +67,22 @@ Create these resources first:
 4. Two domains with TLS:
    - app
    - API
+5. GHCR registry credentials if the images are private
+
+## GHCR Registry Access
+
+If `docker manifest inspect ghcr.io/<owner>/ukip-backend:<tag>` returns
+`unauthorized`, configure Dokploy registry credentials before deploying.
+
+Use a GitHub token with package read access:
+
+- scope: `read:packages`
+- registry: `ghcr.io`
+- username: the GitHub account with package access
+- password/token: the generated token
+
+Alternatively, make the GHCR packages public. For the first controlled pilot,
+authenticated registry pulls are preferred.
 
 ## Recommended VPS Size
 
@@ -96,6 +113,7 @@ Use:
 
 - repository: this repo
 - compose file: `docker-compose.prod.yml`
+- registry credentials: GHCR credentials if the package is private
 
 ### 3. Set Environment Variables
 
