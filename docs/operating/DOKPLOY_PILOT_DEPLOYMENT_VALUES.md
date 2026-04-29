@@ -7,16 +7,16 @@ passwords, or encryption keys in this file.
 
 ## Current Release Candidate
 
-- Commit: `d3ebae070fe8b812096435a28d12249316ee72cd`
-- Short SHA: `d3ebae0`
+- Commit: `80905837c147b1e5e566767be3cb65754c60637b`
+- Short SHA: `8090583`
 
 ## GHCR Image Tags
 
 Use pinned SHA tags for the first pilot:
 
 ```env
-UKIP_BACKEND_IMAGE=ghcr.io/keilynrp/ukip-backend:sha-d3ebae070fe8b812096435a28d12249316ee72cd
-UKIP_FRONTEND_IMAGE=ghcr.io/keilynrp/ukip-frontend:sha-d3ebae070fe8b812096435a28d12249316ee72cd
+UKIP_BACKEND_IMAGE=ghcr.io/keilynrp/ukip-backend:sha-8090583
+UKIP_FRONTEND_IMAGE=ghcr.io/keilynrp/ukip-frontend:sha-8090583
 ```
 
 ## Dokploy Registry Access
