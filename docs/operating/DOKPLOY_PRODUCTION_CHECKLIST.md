@@ -1,5 +1,10 @@
 # Dokploy Production Checklist
 
+For the full step-by-step rollout path, use:
+
+- [D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_VPS_RUNBOOK.md](D:\universal-knowledge-intelligence-platform\docs\operating\DOKPLOY_VPS_RUNBOOK.md)
+- [D:\universal-knowledge-intelligence-platform\.env.dokploy.example](D:\universal-knowledge-intelligence-platform\.env.dokploy.example)
+
 This guide defines the minimum operational bar for a UKIP "pilot production"
 deployment on a VPS managed with Dokploy.
 
@@ -20,7 +25,7 @@ process. A single backend replica avoids duplicate scheduler execution.
 
 ## Required Dokploy Resources
 
-1. One application using [docker-compose.prod.yml](D:\universal-knowledge-intelligence-platform\docker-compose.prod.yml)
+1. One application using [D:\universal-knowledge-intelligence-platform\docker-compose.prod.yml](D:\universal-knowledge-intelligence-platform\docker-compose.prod.yml)
 2. One PostgreSQL database with persistent storage
 3. One S3-compatible backup target for database and volume backups
 4. Two domains:
