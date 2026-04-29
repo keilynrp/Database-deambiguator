@@ -37,14 +37,19 @@ still intentionally conservative:
 2. Choose a pinned image tag for the rollout:
    - `ghcr.io/<owner>/ukip-backend:sha-<commit>`
    - `ghcr.io/<owner>/ukip-frontend:sha-<commit>`
-3. Generate production secrets:
+3. Confirm the frontend image was built with the final API domain.
+4. Generate production secrets:
    - `JWT_SECRET_KEY`
    - `SESSION_SECRET_KEY`
    - `ENCRYPTION_KEY`
-4. Decide the pilot domains:
+5. Decide the pilot domains:
    - app domain
    - API domain
-5. Decide the bootstrap admin account for the pilot.
+6. Decide the bootstrap admin account for the pilot.
+
+The frontend Docker image embeds `NEXT_PUBLIC_API_URL` during build. Set the
+GitHub Actions repository variable `NEXT_PUBLIC_API_URL` before building the
+release image if the pilot API domain is not `https://api.ukip.inbounduxd.com`.
 
 ## Secret Generation
 

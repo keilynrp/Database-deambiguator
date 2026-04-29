@@ -50,6 +50,19 @@ NEXT_PUBLIC_API_URL=https://api.ukip.example.org
 The frontend image bakes `NEXT_PUBLIC_API_URL` at build time, so the first
 production image should be built with the final API domain when possible.
 
+Before building a release image for a different API domain, set this GitHub
+Actions repository variable:
+
+```env
+NEXT_PUBLIC_API_URL=https://api.ukip.example.org
+```
+
+If the variable is not set, the Docker workflow defaults to:
+
+```env
+NEXT_PUBLIC_API_URL=https://api.ukip.inbounduxd.com
+```
+
 ## Required Secret Values
 
 Set these directly in Dokploy:
