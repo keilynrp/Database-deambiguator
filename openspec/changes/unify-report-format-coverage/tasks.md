@@ -185,10 +185,19 @@ endpoints green and shippable.
 - [x] 4.4 Extend the section listing response. (Each row now carries a `formats`
       map `{html, pdf, excel, pptx} → bool`; additive, existing id/label consumers
       unaffected.)
-- [ ] 4.5 Frontend: the section picker shows per-format availability and warns
-      before an export that would omit a selected section. (Deferred — backend
-      contract is live; frontend is a separate change.)
-- [ ] 4.6 Translation parity for any new UI strings (EN + ES). (With 4.5.)
+- [x] 4.5 Frontend: the section picker shows per-format availability and warns
+      before an export that would omit a selected section. **Done in a separate
+      frontend PR (#189, branch `feat/report-picker-format-availability`, off
+      main).** `Section` gains optional `formats?`; a "Not in {FORMAT}" badge marks
+      unavailable sections, a warning banner lists selected-but-omitted sections
+      before export, and the `X-UKIP-Report-Omitted-Sections` header drives a
+      post-export warning toast. Degrades gracefully when `formats` is absent, so
+      it ships independently of this PR and lights up once the backend contract
+      reaches main.
+- [x] 4.6 Translation parity for any new UI strings (EN + ES). Three keys added to
+      both blocks of `app/i18n/translations.ts` (#189):
+      `page.reports.toast.omitted`, `page.reports.availability.not_in_format`,
+      `page.reports.availability.warning`.
 
 ## 5. Validation consistency
 
@@ -226,8 +235,12 @@ endpoints green and shippable.
       render; unsupported → the export must succeed and the section must be named
       by `unsupported_sections()` (the omission contract). agentic_trace is the
       sole declared-unsupported section. Ratchet is at zero.
-- [ ] 7.2 Full backend suite green (`pytest backend/tests/`).
-- [ ] 7.3 Frontend gates: ESLint `--max-warnings=0`, Design System governance,
-      translation parity.
+- [x] 7.2 Full backend suite green (`pytest backend/tests/`). 3416 passed / 7
+      skipped after the omission-reporting + agentic_trace close-out (2026-07-24).
+- [x] 7.3 Frontend gates: ESLint `--max-warnings=0`, Design System governance,
+      translation parity — all green on #189 (baseline held, EN/ES parity, tsc +
+      ESLint clean on the changed files).
 - [ ] 7.4 Manual check: one report exported in all four formats from the same
-      payload, sections consistent across all four.
+      payload, sections consistent across all four. **Pending** — needs a running
+      instance with #187 + #189 deployed; the parity guard covers this
+      programmatically, but the human 4-format spot-check is not yet done.
