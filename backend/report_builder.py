@@ -1149,6 +1149,131 @@ def _section_collaboration_graph(db: Session, domain_id: str, org_id: int | None
     return render_html(collect_collaboration_graph(db, domain_id, org_id))
 
 
+_JOURNAL_TOP_LIMIT = 12
+
+
+def _bayes_with_interval(bayes, ci_low, ci_high) -> str:
+    """Render the Bayesian NIF *only* bound to its credible interval.
+
+    The point estimate exists because raw NIF is unstable for low-volume
+    journals; showing it without the interval would hide the very uncertainty
+    the estimator expresses. So the estimate and its bounds are formatted into a
+    single cell — there is no code path that emits one without the other. When
+    the interval is missing, the estimate is withheld entirely.
+    """
+    if bayes is None or ci_low is None or ci_high is None:
+        return "—"
+    return f"{float(bayes):.2f} [{float(ci_low):.2f}, {float(ci_high):.2f}]"
+
+
+def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+    """Format-neutral journal-portfolio reading from `JournalMetric`: where the
+    work was published, at what open-access cost, and with what field-normalized
+    standing — the Bayesian estimate always carried with its credible interval.
+
+    `domain_id` is not a filter (org-scoped like the other new sections).
+    """
+    from backend.reporting.section_data import (
+        Narrative, SectionData, StatGrid, StatItem, Table,
+    )
+
+    query = scope_query_to_org(
+        db.query(models.JournalMetric), models.JournalMetric, org_id
+    )
+    total = query.with_entities(func.count(models.JournalMetric.id)).scalar() or 0
+
+    if not total:
+        return SectionData(
+            key="journal_portfolio",
+            title="Journal Portfolio",
+            blocks=(
+                Narrative(
+                    heading="Journal metrics not available",
+                    paragraphs=(
+                        "No journal metrics exist for this workspace, so the publication "
+                        "portfolio — where the work was published, at what open-access cost, "
+                        "and with what field-normalized standing — cannot be reported yet.",
+                        "Run journal enrichment to populate it.",
+                    ),
+                ),
+            ),
+        )
+
+    in_doaj = query.with_entities(func.count(models.JournalMetric.id))\
+        .filter(models.JournalMetric.is_in_doaj.is_(True)).scalar() or 0
+    with_apc = query.with_entities(func.count(models.JournalMetric.id))\
+        .filter(models.JournalMetric.apc_usd.isnot(None),
+                models.JournalMetric.apc_usd > 0).scalar() or 0
+    doaj_pct = round(in_doaj / total * 100) if total else 0
+
+    grid = StatGrid(items=(
+        StatItem(label="Journals", value=f"{total:,}", sub="distinct venues"),
+        StatItem(label="In DOAJ", value=f"{doaj_pct}%",
+                 sub=f"{in_doaj:,} of {total:,} open-access listed"),
+        StatItem(label="Charging APC", value=f"{with_apc:,}",
+                 sub="venues with a publication fee"),
+    ))
+
+    top = query.with_entities(
+        models.JournalMetric.display_name,
+        models.JournalMetric.normalized_impact_factor,
+        models.JournalMetric.nif_bayes,
+        models.JournalMetric.nif_ci_low,
+        models.JournalMetric.nif_ci_high,
+        models.JournalMetric.works_2yr,
+        models.JournalMetric.apc_usd,
+        models.JournalMetric.is_in_doaj,
+    ).order_by(
+        models.JournalMetric.normalized_impact_factor.desc().nullslast()
+    ).limit(_JOURNAL_TOP_LIMIT).all()
+    table = Table(
+        columns=(
+            "Journal",
+            "NIF (field-normalized)",
+            "Bayesian NIF [95% CI]",
+            "Local works (2yr)",
+            "APC (USD)",
+            "DOAJ",
+        ),
+        rows=tuple(
+            (
+                r[0] or "—",
+                f"{float(r[1]):.2f}" if r[1] is not None else "—",
+                _bayes_with_interval(r[2], r[3], r[4]),
+                f"{r[5] or 0:,}",
+                f"${int(r[6]):,}" if r[6] else "—",
+                "Yes" if r[7] else "No",
+            )
+            for r in top
+        ),
+    )
+
+    note = Narrative(
+        heading="How to read these metrics",
+        paragraphs=(
+            "NIF is a field-normalized open proxy for journal standing (two-year mean "
+            "citedness, normalized within field). It is NOT a Journal Impact Factor and "
+            "must not be read as one.",
+            "The Bayesian NIF is the shrunk estimate for low-volume journals and is always "
+            "shown with its 95% credible interval; a point estimate without the interval "
+            "would misrepresent its uncertainty.",
+            "\"Local works (2yr)\" counts the works in THIS workspace, not the journal's "
+            "global two-year output — it is local coverage, not a global volume.",
+        ),
+    )
+
+    return SectionData(
+        key="journal_portfolio",
+        title="Journal Portfolio",
+        blocks=(grid, table, note),
+    )
+
+
+def _section_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -> str:
+    from backend.reporting.html_renderer import render_html
+    return render_html(collect_journal_portfolio(db, domain_id, org_id))
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 SECTION_BUILDERS = {
@@ -1165,6 +1290,7 @@ SECTION_BUILDERS = {
     "harmonization_log": _section_harmonization_log,
     "authority_control": _section_authority_control,
     "collaboration_graph": _section_collaboration_graph,
+    "journal_portfolio": _section_journal_portfolio,
 }
 
 SECTION_LABELS = {
@@ -1181,6 +1307,7 @@ SECTION_LABELS = {
     "harmonization_log": "Harmonization Log",
     "authority_control": "Authority Control",
     "collaboration_graph": "Collaboration Graph",
+    "journal_portfolio": "Journal Portfolio",
 }
 
 # Deprecated section ids mapped to the public id that GET /reports/sections

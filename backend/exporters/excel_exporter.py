@@ -112,6 +112,7 @@ class EnterpriseExcelExporter:
             "decision_recommendations": report_builder.collect_decision_recommendations,
             "authority_control": report_builder.collect_authority_control,
             "collaboration_graph": report_builder.collect_collaboration_graph,
+            "journal_portfolio": report_builder.collect_journal_portfolio,
         }
         for section_id, collect in migrated_collectors.items():
             if section_id in requested:

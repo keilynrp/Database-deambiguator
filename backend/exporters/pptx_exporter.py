@@ -272,6 +272,7 @@ def generate_pptx(
         "harmonization_log": report_builder.collect_harmonization_log,
         "authority_control": report_builder.collect_authority_control,
         "collaboration_graph": report_builder.collect_collaboration_graph,
+        "journal_portfolio": report_builder.collect_journal_portfolio,
     }
     for section_id, collect in migrated_collectors.items():
         if section_id in sections:

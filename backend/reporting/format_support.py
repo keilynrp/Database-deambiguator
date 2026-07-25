@@ -46,6 +46,7 @@ SECTION_FORMAT_SUPPORT: dict[str, frozenset[str]] = {
         "harmonization_log",
         "authority_control",
         "collaboration_graph",
+        "journal_portfolio",
     }),
     "pptx": frozenset({
         "entity_stats",

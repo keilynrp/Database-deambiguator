@@ -326,6 +326,102 @@ def test_collect_collaboration_graph_is_tenant_scoped(db_session):
     assert "Secret Author" not in blob
 
 
+# ── 4. Journal portfolio ────────────────────────────────────────────────────
+
+def _seed_journals(db, org_id=None) -> None:
+    rows = [
+        # display, nif, nif_field, bayes, ci_low, ci_high, works_2yr, apc, doaj
+        ("Nature Methods", 4.20, "biology", 4.05, 3.60, 4.55, 40, 11690, True),
+        ("Open Data J",    1.80, "cs",      1.75, 1.30, 2.25, 12, 0,     True),
+        # A journal with a Bayesian point estimate but NO credible interval:
+        # its estimate must never be shown bare.
+        ("Sparse Journal", 0.90, "physics", 2.50, None, None, 3, 3000, False),
+    ]
+    for display, nif, field, bayes, lo, hi, works, apc, doaj in rows:
+        db.add(models.JournalMetric(
+            org_id=org_id, issn_l=f"issn-{display[:4]}", display_name=display,
+            normalized_impact_factor=nif, nif_field=field,
+            nif_bayes=bayes, nif_ci_low=lo, nif_ci_high=hi,
+            works_2yr=works, apc_usd=apc, is_in_doaj=doaj,
+        ))
+    db.commit()
+
+
+def _journal_section(db, org_id=None):
+    return report_builder.collect_journal_portfolio(db, "default", org_id)
+
+
+def test_collect_journal_portfolio_reports_distribution(db_session):
+    """4.1 — distinct journals, DOAJ share and APC exposure."""
+    _seed_journals(db_session)
+    section = _journal_section(db_session)
+
+    assert section.key == "journal_portfolio"
+    grid = next(b for b in section.blocks if isinstance(b, StatGrid))
+    labels = {i.label: i.value for i in grid.items}
+    assert labels["Journals"] == "3"
+    assert "67%" in labels["In DOAJ"] or "2 of 3" in (labels["In DOAJ"] + (next(i.sub for i in grid.items if i.label == "In DOAJ") or ""))
+
+
+def test_journal_bayes_never_renders_without_its_interval(db_session):
+    """4.3 — nif_bayes never appears without [ci_low, ci_high]."""
+    _seed_journals(db_session)
+    section = _journal_section(db_session)
+    table = next(t for t in section.blocks if isinstance(t, Table) and any("Bayes" in c for c in t.columns))
+    bayes_col = next(i for i, c in enumerate(table.columns) if "Bayes" in c)
+
+    by_name = {row[0]: row for row in table.rows}
+    # journal with an interval → estimate and both bounds appear, bound together
+    nature = by_name["Nature Methods"][bayes_col]
+    assert "4.05" in nature and "3.60" in nature and "4.55" in nature
+    # journal whose interval is missing → estimate is NOT shown bare
+    sparse = by_name["Sparse Journal"][bayes_col]
+    assert "2.5" not in sparse                      # the bare point estimate never leaks
+
+
+def test_journal_nif_labelled_as_field_normalized_not_jif(db_session):
+    """4.5 — NIF is labelled a field-normalized open proxy, never a JIF."""
+    _seed_journals(db_session)
+    html = report_builder._section_journal_portfolio(db_session, "default", None)
+    lower = html.lower()
+    assert "field-normalized" in lower
+    assert "impact factor" not in lower or "not a journal impact factor" in lower
+    assert "jif" not in lower.replace("verify", "")   # no stray "JIF" claim
+
+
+def test_journal_works_2yr_labelled_local(db_session):
+    """4.6 — works_2yr is labelled as local coverage."""
+    _seed_journals(db_session)
+    html = report_builder._section_journal_portfolio(db_session, "default", None).lower()
+    assert "local" in html
+
+
+def test_collect_journal_portfolio_empty_state(db_session):
+    """4.7 — no journal metrics → explanatory empty state."""
+    section = _journal_section(db_session)
+    narrative = next(b for b in section.blocks if isinstance(b, Narrative))
+    assert "journal" in " ".join(narrative.paragraphs).lower()
+
+
+def test_collect_journal_portfolio_is_tenant_scoped(db_session):
+    """4.8 — another org's journals never appear."""
+    _seed_journals(db_session, org_id=1)
+    db_session.add(models.JournalMetric(
+        org_id=2, issn_l="issn-secret", display_name="Secret Journal",
+        normalized_impact_factor=9.9, nif_field="x", works_2yr=1, is_in_doaj=False,
+    ))
+    db_session.commit()
+
+    section = _journal_section(db_session, org_id=1)
+    grid = next(b for b in section.blocks if isinstance(b, StatGrid))
+    assert {i.label: i.value for i in grid.items}["Journals"] == "3"
+    blob = " ".join(
+        " ".join(" ".join(r) for r in b.rows) if isinstance(b, Table) else ""
+        for b in section.blocks
+    )
+    assert "Secret Journal" not in blob
+
+
 # ── Section-count ceiling ───────────────────────────────────────────────────
 
 def test_every_public_section_can_be_requested_at_once(client, auth_headers):

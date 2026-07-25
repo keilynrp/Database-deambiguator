@@ -89,20 +89,24 @@ that proves it reached all four formats.
 
 ## 4. Journal portfolio section
 
-- [ ] 4.1 Failing test: section reports distinct journals, DOAJ share and APC
-      exposure from seeded `JournalMetric` rows.
-- [ ] 4.2 Implement `collect_journal_portfolio`. Scope via
-      `scope_query_to_org`.
-- [ ] 4.3 Failing test: `nif_bayes` never renders without
-      `[nif_ci_low, nif_ci_high]`.
-- [ ] 4.4 Implement the top-journals table with the interval bound to the
-      estimate so they cannot be separated.
-- [ ] 4.5 Failing test: rendered output labels NIF as a field-normalized open
-      proxy and never as a Journal Impact Factor.
-- [ ] 4.6 Failing test: `works_2yr` is labelled as local coverage.
-- [ ] 4.7 Failing test: no journal metrics → explanatory empty state.
-- [ ] 4.8 Test: tenant isolation.
-- [ ] 4.9 Register the section.
+- [x] 4.1 Failing test: distinct journals, DOAJ share and APC exposure.
+- [x] 4.2 Implement `collect_journal_portfolio`. Scope via `scope_query_to_org`.
+- [x] 4.3 Failing test: `nif_bayes` never renders without `[nif_ci_low, nif_ci_high]`.
+- [x] 4.4 Top-journals table with the interval bound to the estimate — a single
+      `_bayes_with_interval()` cell formats "e [lo, hi]" and returns "—" when the
+      interval is missing, so there is **no code path** that emits the estimate
+      bare.
+- [x] 4.5 Failing test: NIF labelled a field-normalized open proxy, never a JIF.
+      The column header says "NIF (field-normalized)" and a narrative states it is
+      NOT a Journal Impact Factor.
+- [x] 4.6 Failing test: `works_2yr` labelled as local coverage ("Local works
+      (2yr)" column + a narrative note that it is this workspace's count, not the
+      journal's global volume).
+- [x] 4.7 Failing test: no journal metrics → explanatory empty state.
+- [x] 4.8 Test: tenant isolation.
+- [x] 4.9 Register the section (builders/labels, both support sets, both exporter
+      loops, parity markers). Guard seed extended with a journal carrying a full
+      credible interval so the populated table renders in every format.
 
 ## 5. Surfacing
 

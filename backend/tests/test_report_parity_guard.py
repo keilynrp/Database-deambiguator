@@ -48,6 +48,7 @@ _MARKERS: dict[str, dict[str, str]] = {
         "harmonization_log": "Harmonization",
         "authority_control": "Authority Control",  # extend-report-module-coverage
         "collaboration_graph": "Collaboration Graph",
+        "journal_portfolio": "Journal Portfolio",
     },
     "pptx": {
         "entity_stats": "Entity Statistics",
@@ -62,6 +63,7 @@ _MARKERS: dict[str, dict[str, str]] = {
         "harmonization_log": "Harmonization Log",
         "authority_control": "Authority Control",  # extend-report-module-coverage
         "collaboration_graph": "Collaboration Graph",
+        "journal_portfolio": "Journal Portfolio",
     },
 }
 
@@ -149,6 +151,14 @@ def _seed(db) -> None:
         ))
     db.add(models.CoauthorEdge(author_a_id=2, author_b_id=3, org_id=None,
                                domain_id="default", weight=1.0))
+    # A journal metric with a full credible interval so journal_portfolio renders
+    # its populated table (NIF, Bayesian NIF [CI], DOAJ, APC) in every format.
+    db.add(models.JournalMetric(
+        org_id=None, issn_l="issn-parity", display_name="Parity Journal",
+        normalized_impact_factor=2.10, nif_field="cs",
+        nif_bayes=2.05, nif_ci_low=1.60, nif_ci_high=2.50,
+        works_2yr=8, apc_usd=1500, is_in_doaj=True,
+    ))
     db.commit()
 
 
