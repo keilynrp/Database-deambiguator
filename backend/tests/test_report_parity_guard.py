@@ -47,6 +47,7 @@ _MARKERS: dict[str, dict[str, str]] = {
         "topic_clusters": "Concepts",
         "harmonization_log": "Harmonization",
         "authority_control": "Authority Control",  # extend-report-module-coverage
+        "collaboration_graph": "Collaboration Graph",
     },
     "pptx": {
         "entity_stats": "Entity Statistics",
@@ -60,6 +61,7 @@ _MARKERS: dict[str, dict[str, str]] = {
         "decision_recommendations": "Suggested Next Actions",
         "harmonization_log": "Harmonization Log",
         "authority_control": "Authority Control",  # extend-report-module-coverage
+        "collaboration_graph": "Collaboration Graph",
     },
 }
 
@@ -134,6 +136,19 @@ def _seed(db) -> None:
         confidence=0.41, status="pending", resolution_status="ambiguous",
         review_required=True, nil_reason="multiple_candidates",
     ))
+    # Author stats + a cross-community edge so collaboration_graph renders its
+    # populated content (counts, centrality, a bridge) in every format.
+    for aid, key, name, comm, cent in [
+        (1, "alice", "Alice Ng", 1, 0.9), (2, "bob", "Bob Ito", 1, 0.5),
+        (3, "carol", "Carol Vex", 2, 0.7),
+    ]:
+        db.add(models.Author(id=aid, name_key=key, display_name=name))
+        db.add(models.AuthorStats(
+            author_id=aid, org_id=None, domain_id="default",
+            degree=3, centrality=cent, community_id=comm, publication_count=10,
+        ))
+    db.add(models.CoauthorEdge(author_a_id=2, author_b_id=3, org_id=None,
+                               domain_id="default", weight=1.0))
     db.commit()
 
 

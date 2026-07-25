@@ -985,6 +985,170 @@ def _section_authority_control(db: Session, domain_id: str, org_id: int | None) 
     return render_html(collect_authority_control(db, domain_id, org_id))
 
 
+# How many top authors / bridges a brief lists. A reading, not a graph export.
+_COLLAB_TOP_LIMIT = 10
+# Author stats older than this read as stale; the section says so rather than
+# presenting a months-old collaboration structure as current.
+_COLLAB_STALENESS_DAYS = 30
+
+
+def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+    """Format-neutral collaboration-graph reading from PRECOMPUTED `AuthorStats`
+    and `CoauthorEdge`: author/edge/community counts, the most central authors,
+    and bridge authors spanning communities.
+
+    Reads columns only — it never invokes the coauthorship recompute or graph
+    analytics path, so a brief stays cheap and reflects the last computed state.
+    `domain_id` is not a filter here (org-scoped like the rest of the graph).
+    """
+    from datetime import datetime, timezone
+
+    from backend.reporting.section_data import (
+        Narrative, SectionData, StatGrid, StatItem, Table,
+    )
+
+    stats_q = scope_query_to_org(
+        db.query(models.AuthorStats), models.AuthorStats, org_id
+    )
+    author_count = stats_q.with_entities(
+        func.count(func.distinct(models.AuthorStats.author_id))
+    ).scalar() or 0
+
+    if not author_count:
+        return SectionData(
+            key="collaboration_graph",
+            title="Collaboration Graph",
+            blocks=(
+                Narrative(
+                    heading="Collaboration graph not available",
+                    paragraphs=(
+                        "No author statistics exist for this workspace, so the "
+                        "coauthorship graph has not been computed over it.",
+                        "Run coauthorship analysis to surface collaboration structure "
+                        "— central authors, communities and the bridges between them.",
+                    ),
+                ),
+            ),
+        )
+
+    edge_count = scope_query_to_org(
+        db.query(models.CoauthorEdge), models.CoauthorEdge, org_id
+    ).with_entities(func.count(models.CoauthorEdge.author_a_id)).scalar() or 0
+    community_count = stats_q.with_entities(
+        func.count(func.distinct(models.AuthorStats.community_id))
+    ).filter(models.AuthorStats.community_id.isnot(None)).scalar() or 0
+
+    grid = StatGrid(items=(
+        StatItem(label="Authors", value=f"{author_count:,}"),
+        StatItem(label="Collaborations", value=f"{edge_count:,}",
+                 sub="coauthorship edges"),
+        StatItem(label="Communities", value=f"{community_count:,}",
+                 sub="detected clusters"),
+    ))
+
+    central = stats_q.with_entities(
+        models.Author.display_name,
+        models.AuthorStats.degree,
+        models.AuthorStats.centrality,
+        models.AuthorStats.publication_count,
+    ).join(
+        models.Author, models.Author.id == models.AuthorStats.author_id
+    ).order_by(
+        models.AuthorStats.centrality.desc().nullslast(),
+        models.AuthorStats.degree.desc().nullslast(),
+    ).limit(_COLLAB_TOP_LIMIT).all()
+    central_table = Table(
+        columns=("Author", "Degree", "Centrality", "Publications"),
+        rows=tuple(
+            (
+                r[0] or "—",
+                f"{r[1] or 0:,}",
+                f"{float(r[2] or 0):.3f}",
+                f"{r[3] or 0:,}",
+            )
+            for r in central
+        ),
+    )
+
+    # Bridge authors = endpoints of an edge whose two authors sit in different
+    # communities. Read entirely from the precomputed community_id column — no
+    # graph traversal. Alias AuthorStats twice to compare the two endpoints.
+    from sqlalchemy.orm import aliased
+    stats_a = aliased(models.AuthorStats)
+    stats_b = aliased(models.AuthorStats)
+    cross_edges = scope_query_to_org(
+        db.query(models.CoauthorEdge), models.CoauthorEdge, org_id
+    ).join(
+        stats_a, stats_a.author_id == models.CoauthorEdge.author_a_id
+    ).join(
+        stats_b, stats_b.author_id == models.CoauthorEdge.author_b_id
+    ).filter(
+        stats_a.community_id.isnot(None),
+        stats_b.community_id.isnot(None),
+        stats_a.community_id != stats_b.community_id,
+    ).with_entities(
+        models.CoauthorEdge.author_a_id,
+        stats_a.community_id,
+        models.CoauthorEdge.author_b_id,
+        stats_b.community_id,
+    ).all()
+    # Collect each bridging author with the two communities it links.
+    bridge_links: dict[int, set] = {}
+    for a_id, a_comm, b_id, b_comm in cross_edges:
+        bridge_links.setdefault(a_id, set()).update((a_comm, b_comm))
+        bridge_links.setdefault(b_id, set()).update((a_comm, b_comm))
+    bridge_names = {
+        a.id: a.display_name
+        for a in db.query(models.Author).filter(models.Author.id.in_(bridge_links.keys())).all()
+    } if bridge_links else {}
+    bridges_table = Table(
+        columns=("Bridge Author", "Communities Linked"),
+        rows=tuple(
+            (bridge_names.get(aid, "—"), ", ".join(str(c) for c in sorted(comms)))
+            for aid, comms in sorted(bridge_links.items(), key=lambda kv: -len(kv[1]))
+        ),
+    )
+
+    blocks = [grid, central_table, bridges_table]
+
+    # Staleness: the reader must know if this structure is old or uncomputed.
+    latest_computed = stats_q.with_entities(
+        func.max(models.AuthorStats.computed_at)
+    ).scalar()
+    if latest_computed is None:
+        blocks.append(Narrative(
+            heading="Staleness",
+            paragraphs=(
+                "These statistics have no computation timestamp, so the collaboration "
+                "structure may be stale — treat it as indicative, not current.",
+            ),
+        ))
+    else:
+        if latest_computed.tzinfo is None:
+            latest_computed = latest_computed.replace(tzinfo=timezone.utc)
+        age_days = (datetime.now(timezone.utc) - latest_computed).days
+        if age_days >= _COLLAB_STALENESS_DAYS:
+            blocks.append(Narrative(
+                heading="Staleness",
+                paragraphs=(
+                    f"The collaboration graph was last computed {age_days} days ago "
+                    f"({latest_computed.strftime('%Y-%m-%d')}); it may be stale relative "
+                    "to recent imports. Recompute before relying on the structure.",
+                ),
+            ))
+
+    return SectionData(
+        key="collaboration_graph",
+        title="Collaboration Graph",
+        blocks=tuple(blocks),
+    )
+
+
+def _section_collaboration_graph(db: Session, domain_id: str, org_id: int | None) -> str:
+    from backend.reporting.html_renderer import render_html
+    return render_html(collect_collaboration_graph(db, domain_id, org_id))
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 SECTION_BUILDERS = {
@@ -1000,6 +1164,7 @@ SECTION_BUILDERS = {
     "topic_clusters": _section_topic_clusters,
     "harmonization_log": _section_harmonization_log,
     "authority_control": _section_authority_control,
+    "collaboration_graph": _section_collaboration_graph,
 }
 
 SECTION_LABELS = {
@@ -1015,6 +1180,7 @@ SECTION_LABELS = {
     "topic_clusters": "Topic Clusters",
     "harmonization_log": "Harmonization Log",
     "authority_control": "Authority Control",
+    "collaboration_graph": "Collaboration Graph",
 }
 
 # Deprecated section ids mapped to the public id that GET /reports/sections

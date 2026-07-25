@@ -193,6 +193,139 @@ def test_authority_backlog_threshold_is_configurable(db_session, monkeypatch):
     assert "not settled" in strict
 
 
+# ── 3. Collaboration graph ──────────────────────────────────────────────────
+
+from datetime import datetime, timedelta, timezone  # noqa: E402
+
+
+def _seed_coauthorship(db, org_id=None, *, computed_at="now") -> None:
+    """Two communities (1: Alice, Bob; 2: Carol, Dave) with a Bob–Carol bridge
+    edge across them. Alice is the most central."""
+    authors = [
+        (1, "alice", "Alice Ng", 1, 5, 0.90, 20),
+        (2, "bob", "Bob Ito", 1, 3, 0.50, 10),
+        (3, "carol", "Carol Vex", 2, 4, 0.70, 15),
+        (4, "dave", "Dave Roe", 2, 2, 0.30, 5),
+    ]
+    ts = None if computed_at is None else (
+        datetime.now(timezone.utc) if computed_at == "now"
+        else datetime.now(timezone.utc) - timedelta(days=120)
+    )
+    for aid, key, name, comm, degree, cent, pubs in authors:
+        db.add(models.Author(id=aid, name_key=key, display_name=name))
+        db.add(models.AuthorStats(
+            author_id=aid, org_id=org_id, domain_id="default",
+            degree=degree, centrality=cent, community_id=comm,
+            publication_count=pubs, computed_at=ts,
+        ))
+    edges = [(1, 2), (3, 4), (2, 3)]  # (2,3) crosses communities
+    for a, b in edges:
+        db.add(models.CoauthorEdge(
+            author_a_id=a, author_b_id=b, org_id=org_id,
+            domain_id="default", weight=1.0,
+        ))
+    db.commit()
+
+
+def test_collect_collaboration_graph_reports_counts(db_session):
+    """3.1 — author, edge and community counts."""
+    _seed_coauthorship(db_session)
+    section = report_builder.collect_collaboration_graph(db_session, "default", None)
+
+    assert section.key == "collaboration_graph"
+    grid = next(b for b in section.blocks if isinstance(b, StatGrid))
+    labels = {i.label: i.value for i in grid.items}
+    assert labels["Authors"] == "4"
+    assert labels["Collaborations"] == "3"
+    assert labels["Communities"] == "2"
+
+
+def test_collect_collaboration_graph_lists_most_central(db_session):
+    """3.3 — most central authors with degree, centrality, publications."""
+    _seed_coauthorship(db_session)
+    section = report_builder.collect_collaboration_graph(db_session, "default", None)
+
+    table = next(t for t in section.blocks if isinstance(t, Table) and "Centrality" in t.columns)
+    assert table.rows[0][0] == "Alice Ng"          # highest centrality leads
+    joined = " ".join(" ".join(r) for r in table.rows)
+    assert "Bob Ito" in joined and "Carol Vex" in joined
+
+
+def test_collect_collaboration_graph_identifies_bridges(db_session):
+    """3.5 — bridge authors spanning communities are identified."""
+    _seed_coauthorship(db_session)
+    section = report_builder.collect_collaboration_graph(db_session, "default", None)
+
+    tables = [t for t in section.blocks if isinstance(t, Table)]
+    bridges = next(t for t in tables if "Bridges" in t.columns[0] or "bridge" in t.columns[0].lower())
+    names = " ".join(" ".join(r) for r in bridges.rows)
+    # Bob (comm 1) and Carol (comm 2) are the endpoints of the cross-community edge
+    assert "Bob Ito" in names and "Carol Vex" in names
+    assert "Dave Roe" not in names                 # Dave has no cross-community edge
+
+
+def test_collect_collaboration_graph_issues_no_graph_computation(db_session, monkeypatch):
+    """3.7 — rendering reads precomputed stats; it must not recompute the graph."""
+    _seed_coauthorship(db_session)
+
+    import backend.coauthorship.recompute as recompute_mod
+    import backend.graph_analytics as ga
+
+    def _boom(*a, **k):
+        raise AssertionError("collaboration_graph invoked the graph analytics path")
+
+    monkeypatch.setattr(recompute_mod, "recompute_coauthor_stats", _boom)
+    monkeypatch.setattr(ga, "detect_communities", _boom)
+    monkeypatch.setattr(ga, "pagerank", _boom)
+
+    section = report_builder.collect_collaboration_graph(db_session, "default", None)
+    assert section.key == "collaboration_graph"     # rendered without recomputation
+
+
+def test_collect_collaboration_graph_flags_staleness(db_session):
+    """3.8 — a stale computed_at raises a staleness notice.
+
+    (`AuthorStats.computed_at` defaults to now() at insert, so 'absent' is a
+    legacy-row case not reproducible through the constructor; the stale path is
+    the one a live workspace actually hits.)
+    """
+    _seed_coauthorship(db_session, computed_at="stale")   # 120 days old
+    section = report_builder.collect_collaboration_graph(db_session, "default", None)
+
+    narrative = next(b for b in section.blocks if isinstance(b, Narrative))
+    assert "stale" in " ".join(narrative.paragraphs).lower()
+
+
+def test_collect_collaboration_graph_empty_state(db_session):
+    """3.9 — no author stats → explanatory empty state."""
+    section = report_builder.collect_collaboration_graph(db_session, "default", None)
+    narrative = next(b for b in section.blocks if isinstance(b, Narrative))
+    prose = " ".join(narrative.paragraphs).lower()
+    assert "coauthorship" in prose or "collaboration" in prose
+    assert "not" in prose                           # "has not been run" / "no author..."
+
+
+def test_collect_collaboration_graph_is_tenant_scoped(db_session):
+    """3.10 — another org's authors never appear."""
+    _seed_coauthorship(db_session, org_id=1)
+    db_session.add(models.Author(id=99, name_key="secret", display_name="Secret Author"))
+    db_session.add(models.AuthorStats(
+        author_id=99, org_id=2, domain_id="default",
+        degree=9, centrality=0.99, community_id=7, publication_count=99,
+        computed_at=datetime.now(timezone.utc),
+    ))
+    db_session.commit()
+
+    section = report_builder.collect_collaboration_graph(db_session, "default", 1)
+    grid = next(b for b in section.blocks if isinstance(b, StatGrid))
+    assert {i.label: i.value for i in grid.items}["Authors"] == "4"
+    blob = " ".join(
+        " ".join(" ".join(r) for r in b.rows) if isinstance(b, Table) else ""
+        for b in section.blocks
+    )
+    assert "Secret Author" not in blob
+
+
 # ── Section-count ceiling ───────────────────────────────────────────────────
 
 def test_every_public_section_can_be_requested_at_once(client, auth_headers):

@@ -63,21 +63,29 @@ that proves it reached all four formats.
 
 ## 3. Collaboration graph section
 
-- [ ] 3.1 Failing test: section reports author, edge and community counts from
-      seeded `Author` / `CoauthorEdge` / `AuthorStats`.
-- [ ] 3.2 Implement `collect_collaboration_graph` reading precomputed
-      `AuthorStats`. Scope via `scope_query_to_org`.
-- [ ] 3.3 Failing test: most central authors listed with degree, centrality and
+- [x] 3.1 Failing test: section reports author, edge and community counts.
+- [x] 3.2 Implement `collect_collaboration_graph` reading precomputed
+      `AuthorStats` / `CoauthorEdge`. Scope via `scope_query_to_org` (authors are
+      counted through `AuthorStats`, which carries `org_id`; `Author` has none).
+- [x] 3.3 Failing test: most central authors listed with degree, centrality,
       publication count.
-- [ ] 3.4 Add the centrality table block.
-- [ ] 3.5 Failing test: bridge authors spanning communities are identified.
-- [ ] 3.6 Implement bridge detection from precomputed columns only.
-- [ ] 3.7 Failing test: rendering issues no graph computation — assert the
-      section does not invoke the graph analytics path.
-- [ ] 3.8 Failing test: absent or stale `computed_at` → staleness notice.
-- [ ] 3.9 Failing test: no author stats → explanatory empty state.
-- [ ] 3.10 Test: tenant isolation.
-- [ ] 3.11 Register the section.
+- [x] 3.4 Add the centrality table block (top `_COLLAB_TOP_LIMIT`, centrality desc).
+- [x] 3.5 Failing test: bridge authors spanning communities are identified.
+- [x] 3.6 Bridge detection from precomputed `community_id` only — a self-join on
+      `AuthorStats` over `CoauthorEdge` endpoints where the two communities differ.
+      No traversal.
+- [x] 3.7 Failing test: rendering issues no graph computation — monkeypatches
+      `recompute_coauthor_stats`, `graph_analytics.detect_communities` and
+      `pagerank` to raise, and asserts the section still renders.
+- [x] 3.8 Failing test: stale `computed_at` → staleness notice
+      (`_COLLAB_STALENESS_DAYS = 30`). Absent-timestamp is a legacy-row case not
+      reproducible via the constructor (column defaults to now()) but is handled
+      defensively.
+- [x] 3.9 Failing test: no author stats → explanatory empty state.
+- [x] 3.10 Test: tenant isolation.
+- [x] 3.11 Register the section (builders/labels, both support sets, both exporter
+      loops, parity markers). Guard's seed extended with authors + a cross-community
+      edge so the populated path renders in every format.
 
 ## 4. Journal portfolio section
 

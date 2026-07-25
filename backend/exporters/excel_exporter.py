@@ -111,6 +111,7 @@ class EnterpriseExcelExporter:
             "hidden_patterns": report_builder.collect_hidden_patterns,
             "decision_recommendations": report_builder.collect_decision_recommendations,
             "authority_control": report_builder.collect_authority_control,
+            "collaboration_graph": report_builder.collect_collaboration_graph,
         }
         for section_id, collect in migrated_collectors.items():
             if section_id in requested:
