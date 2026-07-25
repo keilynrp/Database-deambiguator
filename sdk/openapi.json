@@ -9597,12 +9597,15 @@
               "institutional_benchmark",
               "top_secondary_labels",
               "topic_clusters",
-              "harmonization_log"
+              "harmonization_log",
+              "authority_control",
+              "collaboration_graph",
+              "journal_portfolio"
             ],
             "items": {
               "type": "string"
             },
-            "maxItems": 10,
+            "maxItems": 14,
             "title": "Sections",
             "type": "array"
           },
