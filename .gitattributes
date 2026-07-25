@@ -4,3 +4,10 @@
 # gate reports permanent drift that regenerating cannot fix — the commit would
 # just be converted back. Pin it to LF on every platform.
 sdk/openapi.json text eol=lf
+
+# Shell scripts MUST keep LF endings. They are COPYed into Linux images and run
+# as container entrypoints; a Windows checkout (core.autocrlf=true) rewrites them
+# to CRLF, so the shebang becomes "#!/bin/sh\r" and the container dies with
+# "exec /app/docker/backend-entrypoint.sh: no such file or directory". CI/prod
+# build on Linux (LF) and were unaffected; only local Windows Docker builds broke.
+*.sh text eol=lf
