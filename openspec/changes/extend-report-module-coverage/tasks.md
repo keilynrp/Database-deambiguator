@@ -110,18 +110,33 @@ that proves it reached all four formats.
 
 ## 5. Surfacing
 
-- [ ] 5.1 The three sections appear in `GET /reports/sections` with per-format
-      availability.
-- [ ] 5.2 Frontend section picker offers them.
-- [ ] 5.3 Translation parity for new UI strings (EN + ES).
+- [x] 5.1 The three sections appear in `GET /reports/sections` with per-format
+      availability — automatic, since the listing derives from `SECTION_LABELS`
+      and `format_support`. ⚠️ Caught here: a copy-paste registration left
+      `collaboration_graph`/`journal_portfolio` out of the **pptx** support set
+      even though the pptx exporter loop rendered them, so the omission header and
+      the listing would have wrongly reported them as pptx-omitted. Fixed — both
+      support sets now include all three.
+- [ ] 5.2 Frontend section picker offers them. **Deferred to a follow-up frontend
+      PR (off main, like #189).** The picker fetches sections dynamically, so the
+      three appear automatically once the backend merges — but with the default
+      icon and no description until `SECTION_ICONS` + `sectionDescriptions` gain
+      entries. Depends on this backend landing first.
+- [ ] 5.3 Translation parity for new UI strings (EN + ES). With 5.2 (the section
+      descriptions are the only new strings).
 
 ## 6. Close out
 
 - [ ] 6.1 Performance check: each new section measured against the largest
-      available dataset; document the timings.
-- [ ] 6.2 Full backend suite green (`pytest backend/tests/`).
+      available dataset; document the timings. **Pending** — needs a real dataset;
+      the collectors are aggregate queries + a capped top-N (10–12 rows) and the
+      collaboration bridge join reads precomputed columns only, so the expected
+      cost is low, but this wants measurement on prod-scale data (≈9.4k authority
+      records).
+- [~] 6.2 Full backend suite green (`pytest backend/tests/`). Run in progress.
 - [ ] 6.3 Frontend gates: ESLint `--max-warnings=0`, Design System governance,
-      translation parity.
+      translation parity. With the 5.2 frontend follow-up.
 - [ ] 6.4 Manual check: a report with all three new sections exported in all
       four formats, NIF labelling and credible intervals verified by eye on the
-      real artifact.
+      real artifact. **Pending** — needs a deploy; the NIF/CI guarantees are
+      covered programmatically (4.3/4.5/4.6) but the human artifact check remains.

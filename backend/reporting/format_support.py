@@ -59,6 +59,8 @@ SECTION_FORMAT_SUPPORT: dict[str, frozenset[str]] = {
         "decision_recommendations",
         "harmonization_log",
         "authority_control",
+        "collaboration_graph",
+        "journal_portfolio",
     }),
 }
 
