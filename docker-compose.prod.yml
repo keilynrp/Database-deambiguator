@@ -105,6 +105,12 @@ services:
       # Default ON in prod so governed history is captured; emission is
       # non-fatal and idempotent. Set to 0 to disable. See /health features.
       UKIP_RETRO_EVENTS: ${UKIP_RETRO_EVENTS:-1}
+      # Report stakeholder-reading backlog caveat: fraction of authority records
+      # awaiting review at or above which the reading flags identity resolution as
+      # not settled. 0.15 is a starting point for judgement, not a derived
+      # constant. Declared here so a Dokploy override actually reaches the
+      # container (a value read in code but absent here never takes effect).
+      UKIP_REPORT_AUTHORITY_BACKLOG_THRESHOLD: ${UKIP_REPORT_AUTHORITY_BACKLOG_THRESHOLD:-0.15}
       # API key scope enforcement. Ships as 0 (WARN MODE) on purpose: until this
       # change, key scopes were stored but never checked, so any live
       # integration holding a "read" key may in fact be writing. Warn mode

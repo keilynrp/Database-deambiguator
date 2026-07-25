@@ -134,6 +134,65 @@ def test_collect_authority_control_is_tenant_scoped(db_session):
     assert {i.label: i.value for i in grid.items}["Authority Records"] == "5"
 
 
+# ── 2. Readiness caveat in the stakeholder reading ──────────────────────────
+
+def _reading_prose(db, org_id=None) -> str:
+    section = report_builder.collect_stakeholder_reading(db, "default", org_id)
+    narrative = next(b for b in section.blocks if isinstance(b, Narrative))
+    return " ".join(narrative.paragraphs)
+
+
+def test_stakeholder_reading_flags_material_authority_backlog(db_session):
+    """2.1 — a backlog above threshold adds a caveat to the readiness language."""
+    _seed_authority(db_session)          # 3 of 5 pending = 60%
+    prose = _reading_prose(db_session)
+
+    assert "3 of 5" in prose or "60%" in prose
+    assert "backlog" in prose.lower()
+    # the caveat must qualify readiness, not merely mention a number
+    assert "not settled" in prose.lower() or "provisional" in prose.lower()
+
+
+def test_stakeholder_reading_always_discloses_the_observed_ratio(db_session):
+    """2.3 — the observed ratio is disclosed whether or not it clears threshold."""
+    for record in (
+        _authority_record(original_value="a"),
+        _authority_record(original_value="b"),
+    ):
+        db_session.add(record)           # both confirmed → 0% backlog
+    db_session.commit()
+
+    prose = _reading_prose(db_session)
+    assert "0 of 2" in prose or "0%" in prose
+
+
+def test_stakeholder_reading_below_threshold_raises_no_caveat(db_session):
+    """2.4 — a clean backlog states the ratio but adds no readiness caveat."""
+    for record in (
+        _authority_record(original_value="a"),
+        _authority_record(original_value="b"),
+    ):
+        db_session.add(record)
+    db_session.commit()
+
+    prose = _reading_prose(db_session).lower()
+    assert "not settled" not in prose
+    assert "material" not in prose
+
+
+def test_authority_backlog_threshold_is_configurable(db_session, monkeypatch):
+    """2.5 — the threshold is configuration, not a buried constant."""
+    _seed_authority(db_session)          # 60% backlog
+
+    monkeypatch.setenv("UKIP_REPORT_AUTHORITY_BACKLOG_THRESHOLD", "0.9")
+    relaxed = _reading_prose(db_session).lower()
+    assert "not settled" not in relaxed  # 60% no longer clears a 90% bar
+
+    monkeypatch.setenv("UKIP_REPORT_AUTHORITY_BACKLOG_THRESHOLD", "0.1")
+    strict = _reading_prose(db_session).lower()
+    assert "not settled" in strict
+
+
 # ── Section-count ceiling ───────────────────────────────────────────────────
 
 def test_every_public_section_can_be_requested_at_once(client, auth_headers):

@@ -5,6 +5,7 @@ No external template dependencies; uses f-strings with inline CSS.
 from __future__ import annotations
 
 import json
+import os
 from html import escape
 from datetime import datetime, timezone
 from typing import List, TypedDict
@@ -154,6 +155,26 @@ def collect_stakeholder_reading(
             f"The highest-impact visible entity right now is {entity_label}, which can anchor a concrete stakeholder discussion."
         )
     paragraphs.append(f"Recommended emphasis: {action_text}")
+
+    # Readiness caveat: an identity-resolution backlog sitting underneath the
+    # dataset must qualify readiness language, so a brief cannot call the data
+    # decision-ready while thousands of unresolved identity conflicts wait below.
+    # The ratio is ALWAYS disclosed; the qualifier is added only above threshold.
+    pending_authority, total_authority = _authority_backlog_ratio(db, org_id)
+    if total_authority:
+        backlog_pct = round(pending_authority / total_authority * 100)
+        disclosure = (
+            f"Identity resolution: {pending_authority:,} of {total_authority:,} "
+            f"authority records ({backlog_pct}%) are awaiting human review."
+        )
+        if pending_authority / total_authority >= _authority_backlog_threshold():
+            disclosure += (
+                " That backlog is material, so entity identity is not settled: read "
+                "the readiness above as provisional to that extent until the review "
+                "queue is worked down."
+            )
+        paragraphs.append(disclosure)
+
     attention_points = stakeholder.get("attention_points", [])
     if attention_points:
         paragraphs.append("How to read this brief for this audience:")
@@ -797,6 +818,36 @@ def _section_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> s
 # Explicit cap on the conflicts table: a brief lists the worst offenders, it is
 # not an export of the review queue (production holds ~9.4k pending records).
 _AUTHORITY_CONFLICT_LIMIT = 10
+
+# Fraction of authority records awaiting review at or above which the stakeholder
+# reading gains an explicit backlog caveat, so readiness language cannot silently
+# contradict a known identity-resolution backlog sitting underneath it. This is a
+# starting point for judgement, NOT a derived constant — override per deployment
+# via UKIP_REPORT_AUTHORITY_BACKLOG_THRESHOLD (declared in docker-compose.prod.yml).
+_DEFAULT_AUTHORITY_BACKLOG_THRESHOLD = 0.15
+
+
+def _authority_backlog_threshold() -> float:
+    raw = os.environ.get("UKIP_REPORT_AUTHORITY_BACKLOG_THRESHOLD")
+    if raw is None:
+        return _DEFAULT_AUTHORITY_BACKLOG_THRESHOLD
+    try:
+        return max(0.0, min(1.0, float(raw)))
+    except ValueError:
+        return _DEFAULT_AUTHORITY_BACKLOG_THRESHOLD
+
+
+def _authority_backlog_ratio(db: Session, org_id: int | None) -> tuple[int, int]:
+    """(pending_review, total) authority records for this org. (0, 0) when none."""
+    query = scope_query_to_org(
+        db.query(models.AuthorityRecord), models.AuthorityRecord, org_id
+    )
+    total = query.with_entities(func.count(models.AuthorityRecord.id)).scalar() or 0
+    if not total:
+        return 0, 0
+    pending = query.with_entities(func.count(models.AuthorityRecord.id))\
+        .filter(models.AuthorityRecord.review_required.is_(True)).scalar() or 0
+    return pending, total
 
 
 def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -> "SectionData":

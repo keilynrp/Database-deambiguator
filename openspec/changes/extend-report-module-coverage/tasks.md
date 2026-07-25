@@ -47,15 +47,19 @@ that proves it reached all four formats.
 
 ## 2. Readiness caveat
 
-- [ ] 2.1 Failing test: pending-to-total above threshold adds a backlog caveat
-      to the stakeholder reading. (RED — the reading cannot see authority data.)
-- [ ] 2.2 Compute the ratio and thread it into
-      `_section_stakeholder_reading`.
-- [ ] 2.3 Failing test: the observed ratio is always disclosed, above or below
+- [x] 2.1 Failing test: pending-to-total above threshold adds a backlog caveat
+      to the stakeholder reading.
+- [x] 2.2 Compute the ratio and thread it into `collect_stakeholder_reading`
+      (`_authority_backlog_ratio`). The caveat qualifies the readiness language
+      as provisional; the ratio is always disclosed.
+- [x] 2.3 Failing test: the observed ratio is always disclosed, above or below
       threshold.
-- [ ] 2.4 Failing test: below threshold raises no caveat.
-- [ ] 2.5 Surface the threshold as configuration; document the default and that
-      it is a starting point, not a derived constant.
+- [x] 2.4 Failing test: below threshold raises no caveat.
+- [x] 2.5 Surface the threshold as configuration
+      (`UKIP_REPORT_AUTHORITY_BACKLOG_THRESHOLD`, `_authority_backlog_threshold()`,
+      default 0.15, clamped to [0,1]). Documented as a starting point for judgement,
+      not a derived constant, and declared in `docker-compose.prod.yml` per the
+      "any code-read env var must also be declared in prod compose" rule.
 
 ## 3. Collaboration graph section
 
