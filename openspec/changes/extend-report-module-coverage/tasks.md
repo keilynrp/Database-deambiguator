@@ -6,25 +6,44 @@ that proves it reached all four formats.
 
 ## 0. Prerequisite
 
-- [ ] 0.1 Confirm `unify-report-format-coverage` is merged and its parity test
-      has no remaining `xfail`. Do not start otherwise — authoring against the
-      old builders means writing each section four times.
+- [x] 0.1 Confirm `unify-report-format-coverage` is merged and its parity test
+      has no remaining `xfail`. **Satisfied 2026-07-25:** merged via PR #187
+      (squash `f4838c0`) + #189 (`2af0dea`); parity guard on main = 41 passed,
+      0 xfailed.
 
 ## 1. Authority control section
 
-- [ ] 1.1 Failing test: section reports total, confirmed and pending-review
+- [x] 1.1 Failing test: section reports total, confirmed and pending-review
       counts from seeded `AuthorityRecord` rows.
-- [ ] 1.2 Implement `collect_authority_control` — aggregate counts, status
-      distribution, mean confidence. Scope via `scope_query_to_org`.
-- [ ] 1.3 Failing test: unresolved conflicts are listed with confidence and
+      (`test_report_module_coverage.py`.)
+- [x] 1.2 Implement `collect_authority_control` — aggregate counts, status
+      distribution, mean confidence. Scope via `scope_query_to_org`. Note:
+      `AuthorityRecord` has no domain column, so `domain_id` is accepted for
+      signature consistency but is not a filter (org-scoped only).
+- [x] 1.3 Failing test: unresolved conflicts are listed with confidence and
       `nil_reason`.
-- [ ] 1.4 Add the conflicts table block, with an explicit limit.
-- [ ] 1.5 Failing test: a backlog produces a prose reliability statement.
-- [ ] 1.6 Add the `Narrative` block.
-- [ ] 1.7 Failing test: no authority records → explanatory empty state, not a
-      zero-conflict finding.
-- [ ] 1.8 Test: tenant isolation — another org's records never appear.
-- [ ] 1.9 Register the section; parity test picks it up across all four formats.
+- [x] 1.4 Add the conflicts table block, with an explicit limit
+      (`_AUTHORITY_CONFLICT_LIMIT = 10`), lowest-confidence first. When the limit
+      is hit the narrative says so, so the table is never mistaken for the whole
+      queue (prod holds ~9.4k pending).
+- [x] 1.5 Failing test: a backlog produces a prose reliability statement.
+- [x] 1.6 Add the `Narrative` block ("Reliability reading").
+- [x] 1.7 Failing test: no authority records → explanatory empty state, not a
+      zero-conflict finding. Implemented as an early-return Narrative stating
+      resolution has not been run and explicitly **not** claiming zero conflicts.
+      (Deliberate divergence from change 1's convention of dropping empty states:
+      here an empty section would read as false reassurance.)
+- [x] 1.8 Test: tenant isolation — another org's records never appear.
+- [x] 1.9 Register the section; parity test picks it up across all four formats.
+      Registered in `SECTION_BUILDERS`/`SECTION_LABELS`, both format-support sets,
+      and both exporter collector loops; markers added to the parity guard. Guard
+      45 passed / 0 xfailed. The guard's seed now includes authority records so
+      the **populated** path is exercised in every format, not the empty state.
+      ⚠️ **Latent break caught here:** `_ReportRequest.sections` capped at
+      `max_length=10`; an 11th public section made "select all + export" a 422
+      (the picker selects every section by default, and Pydantic does not validate
+      field defaults, so only real callers broke). Cap now derived:
+      `_MAX_REQUEST_SECTIONS = len(_ALL_REPORT_SECTIONS)`, with a regression test.
 
 ## 2. Readiness caveat
 

@@ -44,6 +44,7 @@ SECTION_FORMAT_SUPPORT: dict[str, frozenset[str]] = {
         "decision_recommendations",
         "topic_clusters",
         "harmonization_log",
+        "authority_control",
     }),
     "pptx": frozenset({
         "entity_stats",
@@ -55,6 +56,7 @@ SECTION_FORMAT_SUPPORT: dict[str, frozenset[str]] = {
         "hidden_patterns",
         "decision_recommendations",
         "harmonization_log",
+        "authority_control",
     }),
 }
 

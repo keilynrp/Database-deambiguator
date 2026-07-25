@@ -792,6 +792,148 @@ def _section_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> s
     {''.join(cards)}
 </section>"""
 
+# ── Authority / coauthorship / journals (extend-report-module-coverage) ──────
+
+# Explicit cap on the conflicts table: a brief lists the worst offenders, it is
+# not an export of the review queue (production holds ~9.4k pending records).
+_AUTHORITY_CONFLICT_LIMIT = 10
+
+
+def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+    """Format-neutral authority-control reading: resolution status, review
+    backlog, and what that backlog means for the report's own reliability.
+
+    `domain_id` is accepted for signature consistency with the other collectors
+    but is not a filter — `AuthorityRecord` is scoped per organisation, not per
+    domain.
+    """
+    from backend.reporting.section_data import (
+        Narrative, SectionData, StatGrid, StatItem, Table,
+    )
+
+    query = scope_query_to_org(
+        db.query(models.AuthorityRecord), models.AuthorityRecord, org_id
+    )
+    total = query.with_entities(func.count(models.AuthorityRecord.id)).scalar() or 0
+
+    if not total:
+        # Absence of authority data is NOT evidence of clean identity
+        # resolution. Saying "no conflicts" here would be a false reassurance.
+        return SectionData(
+            key="authority_control",
+            title="Authority Control",
+            blocks=(
+                Narrative(
+                    heading="Authority resolution not available",
+                    paragraphs=(
+                        "No authority records exist for this workspace, so identity "
+                        "resolution has not been run over it.",
+                        "This is not a finding of zero conflicts: unresolved duplicates "
+                        "and identity collisions may still be present and simply have not "
+                        "been looked for. Run authority resolution before treating entity "
+                        "identity in this brief as settled.",
+                    ),
+                ),
+            ),
+        )
+
+    confirmed = query.with_entities(func.count(models.AuthorityRecord.id))\
+        .filter(models.AuthorityRecord.status == "confirmed").scalar() or 0
+    pending = query.with_entities(func.count(models.AuthorityRecord.id))\
+        .filter(models.AuthorityRecord.review_required.is_(True)).scalar() or 0
+    mean_confidence = query.with_entities(
+        func.avg(models.AuthorityRecord.confidence)
+    ).scalar() or 0.0
+    backlog_pct = round(pending / total * 100) if total else 0
+
+    grid = StatGrid(items=(
+        StatItem(label="Authority Records", value=f"{total:,}"),
+        StatItem(label="Confirmed", value=f"{confirmed:,}",
+                 sub=f"{round(confirmed / total * 100)}% of total"),
+        StatItem(label="Pending Review", value=f"{pending:,}",
+                 sub=f"{backlog_pct}% awaiting a human decision"),
+        StatItem(label="Mean Confidence", value=f"{round(float(mean_confidence) * 100)}%",
+                 sub="across all resolution attempts"),
+    ))
+
+    by_resolution = query.with_entities(
+        models.AuthorityRecord.resolution_status,
+        func.count(models.AuthorityRecord.id),
+    ).group_by(models.AuthorityRecord.resolution_status).all()
+    distribution = Table(
+        columns=("Resolution Status", "Records", "Share"),
+        rows=tuple(
+            (status or "unknown", f"{count:,}", f"{round(count / total * 100)}%")
+            for status, count in sorted(by_resolution, key=lambda r: -r[1])
+        ),
+        bar_column=2,
+    )
+
+    # Lowest-confidence unresolved items first: those are the ones a reader
+    # should not assume were decided correctly.
+    conflicts = query.with_entities(
+        models.AuthorityRecord.original_value,
+        models.AuthorityRecord.field_name,
+        models.AuthorityRecord.resolution_status,
+        models.AuthorityRecord.confidence,
+        models.AuthorityRecord.nil_reason,
+    ).filter(
+        models.AuthorityRecord.review_required.is_(True)
+    ).order_by(
+        models.AuthorityRecord.confidence.asc()
+    ).limit(_AUTHORITY_CONFLICT_LIMIT).all()
+    conflicts_table = Table(
+        columns=("Value", "Field", "Resolution", "Confidence", "Reason"),
+        rows=tuple(
+            (
+                r[0] or "—",
+                r[1] or "—",
+                r[2] or "unresolved",
+                f"{round(float(r[3] or 0) * 100)}%",
+                r[4] or "—",
+            )
+            for r in conflicts
+        ),
+    )
+
+    reliability = [
+        f"{pending:,} of {total:,} authority records ({backlog_pct}%) are awaiting "
+        f"human review.",
+    ]
+    if pending:
+        reliability.append(
+            "Entity identity in this brief should be read as provisional to that "
+            "extent: unreviewed records may merge distinct entities or split a single "
+            "one, which shifts counts and rankings elsewhere in the report."
+        )
+        if len(conflicts) == _AUTHORITY_CONFLICT_LIMIT:
+            reliability.append(
+                f"The table above lists the {_AUTHORITY_CONFLICT_LIMIT} lowest-confidence "
+                "cases only; it is a sample of the backlog, not the whole queue."
+            )
+    else:
+        reliability.append(
+            "No records are awaiting review, so identity resolution is settled for "
+            "the records that were processed."
+        )
+
+    return SectionData(
+        key="authority_control",
+        title="Authority Control",
+        blocks=(
+            grid,
+            distribution,
+            conflicts_table,
+            Narrative(heading="Reliability reading", paragraphs=tuple(reliability)),
+        ),
+    )
+
+
+def _section_authority_control(db: Session, domain_id: str, org_id: int | None) -> str:
+    from backend.reporting.html_renderer import render_html
+    return render_html(collect_authority_control(db, domain_id, org_id))
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 SECTION_BUILDERS = {
@@ -806,6 +948,7 @@ SECTION_BUILDERS = {
     "top_brands": _section_top_brands,
     "topic_clusters": _section_topic_clusters,
     "harmonization_log": _section_harmonization_log,
+    "authority_control": _section_authority_control,
 }
 
 SECTION_LABELS = {
@@ -820,6 +963,7 @@ SECTION_LABELS = {
     "top_brands": "Top Secondary Labels / Classifications",
     "topic_clusters": "Topic Clusters",
     "harmonization_log": "Harmonization Log",
+    "authority_control": "Authority Control",
 }
 
 # Deprecated section ids mapped to the public id that GET /reports/sections

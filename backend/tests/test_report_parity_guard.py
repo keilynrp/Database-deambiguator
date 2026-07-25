@@ -46,6 +46,7 @@ _MARKERS: dict[str, dict[str, str]] = {
         "decision_recommendations": "Suggested Next Actions",  # migrated (phase 3.9)
         "topic_clusters": "Concepts",
         "harmonization_log": "Harmonization",
+        "authority_control": "Authority Control",  # extend-report-module-coverage
     },
     "pptx": {
         "entity_stats": "Entity Statistics",
@@ -58,6 +59,7 @@ _MARKERS: dict[str, dict[str, str]] = {
         "hidden_patterns": "Hidden Patterns",
         "decision_recommendations": "Suggested Next Actions",
         "harmonization_log": "Harmonization Log",
+        "authority_control": "Authority Control",  # extend-report-module-coverage
     },
 }
 
@@ -117,6 +119,20 @@ def _seed(db) -> None:
         step_name="Normalize labels",
         records_updated=3,
         fields_modified="primary_label",
+    ))
+    # Authority records so authority_control renders its real content (KPI grid,
+    # distribution, conflicts) rather than its empty state — a section that only
+    # ever renders "not available" would pass the marker check without proving
+    # the populated path works in every format.
+    db.add(models.AuthorityRecord(
+        field_name="brand_capitalized", original_value="acme corp",
+        canonical_label="ACME Corporation", confidence=0.92,
+        status="confirmed", resolution_status="exact_match", review_required=False,
+    ))
+    db.add(models.AuthorityRecord(
+        field_name="brand_capitalized", original_value="initech",
+        confidence=0.41, status="pending", resolution_status="ambiguous",
+        review_required=True, nil_reason="multiple_candidates",
     ))
     db.commit()
 
