@@ -95,6 +95,9 @@ const SECTION_ICONS: Record<string, string> = {
   top_brands:           "🏷️",
   topic_clusters:       "🧩",
   harmonization_log:    "⚙️",
+  authority_control:    "🛂",
+  collaboration_graph:  "🕸️",
+  journal_portfolio:    "📚",
 };
 
 // ── Format types ──────────────────────────────────────────────────────────────
@@ -164,6 +167,9 @@ export default function ReportsPage() {
     top_brands: tr("page.reports.section.top_brands", "Top 15 primary labels or classifications by entity count"),
     topic_clusters: tr("page.reports.section.topic_clusters", "Most frequent concepts from enrichment data"),
     harmonization_log: tr("page.reports.section.harmonization_log", "Last 10 harmonization steps with status"),
+    authority_control: tr("page.reports.section.authority_control", "Identity resolution status, review backlog, and unresolved conflicts"),
+    collaboration_graph: tr("page.reports.section.collaboration_graph", "Author collaboration network: central authors, communities, and bridges"),
+    journal_portfolio: tr("page.reports.section.journal_portfolio", "Publication venues: field-normalized standing, open-access cost, and DOAJ status"),
   }), [tr]);
   // A section is available in the chosen format unless the backend says
   // otherwise; unknown (older backend) defaults to available.

@@ -117,13 +117,14 @@ that proves it reached all four formats.
       even though the pptx exporter loop rendered them, so the omission header and
       the listing would have wrongly reported them as pptx-omitted. Fixed — both
       support sets now include all three.
-- [ ] 5.2 Frontend section picker offers them. **Deferred to a follow-up frontend
-      PR (off main, like #189).** The picker fetches sections dynamically, so the
-      three appear automatically once the backend merges — but with the default
-      icon and no description until `SECTION_ICONS` + `sectionDescriptions` gain
-      entries. Depends on this backend landing first.
-- [ ] 5.3 Translation parity for new UI strings (EN + ES). With 5.2 (the section
-      descriptions are the only new strings).
+- [x] 5.2 Frontend section picker offers them. Done in the follow-up frontend PR
+      off main: `SECTION_ICONS` (🛂 / 🕸️ / 📚) and `sectionDescriptions` gained
+      entries for the three, so they appear with icon + description (they already
+      appeared dynamically; this is the polish). Per-format availability + the
+      omission warning from #189 apply automatically.
+- [x] 5.3 Translation parity for new UI strings (EN + ES). Three
+      `page.reports.section.*` keys added to both language blocks of
+      `translations.ts`.
 
 ## 6. Close out
 
@@ -133,9 +134,11 @@ that proves it reached all four formats.
       collaboration bridge join reads precomputed columns only, so the expected
       cost is low, but this wants measurement on prod-scale data (≈9.4k authority
       records).
-- [~] 6.2 Full backend suite green (`pytest backend/tests/`). Run in progress.
-- [ ] 6.3 Frontend gates: ESLint `--max-warnings=0`, Design System governance,
-      translation parity. With the 5.2 frontend follow-up.
+- [x] 6.2 Full backend suite green (`pytest backend/tests/`). 3455 passed / 7
+      skipped (2026-07-25); merged as PR #190 (squash `c4218f9`).
+- [x] 6.3 Frontend gates: ESLint `--max-warnings=0`, Design System governance,
+      translation parity — all green on the frontend follow-up PR (baseline held,
+      EN/ES parity, tsc + ESLint clean on the changed files).
 - [ ] 6.4 Manual check: a report with all three new sections exported in all
       four formats, NIF labelling and credible intervals verified by eye on the
       real artifact. **Pending** — needs a deploy; the NIF/CI guarantees are
