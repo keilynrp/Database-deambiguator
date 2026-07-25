@@ -11,3 +11,10 @@ sdk/openapi.json text eol=lf
 # "exec /app/docker/backend-entrypoint.sh: no such file or directory". CI/prod
 # build on Linux (LF) and were unaffected; only local Windows Docker builds broke.
 *.sh text eol=lf
+
+# Generated SDK clients. They are produced with LF by the Linux Docker
+# generators and compared for reproducibility; a Windows checkout
+# (core.autocrlf=true) would rewrite them to CRLF and manufacture phantom diffs.
+# Pin the whole generated tree to LF on every platform.
+sdk/typescript/** text eol=lf
+sdk/python/** text eol=lf
