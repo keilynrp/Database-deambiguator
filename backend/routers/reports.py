@@ -95,6 +95,12 @@ router = APIRouter(tags=["reports"])
 _ALL_REPORT_SECTIONS = list(_report_builder.SECTION_LABELS.keys())
 _PUBLIC_REPORT_SECTIONS = [section for section in _ALL_REPORT_SECTIONS if section != "top_brands"]
 
+# Upper bound on `sections` in a request. Derived from the vocabulary rather than
+# hardcoded: a caller cannot name more distinct sections than exist, and the
+# picker selects them all by default — a fixed cap silently turns "select all +
+# export" into a 422 the moment a new section is registered.
+_MAX_REQUEST_SECTIONS = len(_ALL_REPORT_SECTIONS)
+
 
 class _ManualReportSection(BaseModel):
     title: str = Field(default="Analyst Note", max_length=120)
@@ -103,7 +109,7 @@ class _ManualReportSection(BaseModel):
 
 class _ReportRequest(BaseModel):
     domain_id: str = Field(default="default", min_length=1, max_length=64)
-    sections: List[str] = Field(default=_PUBLIC_REPORT_SECTIONS, max_length=10)
+    sections: List[str] = Field(default=_PUBLIC_REPORT_SECTIONS, max_length=_MAX_REQUEST_SECTIONS)
     title: Optional[str] = Field(default=None, max_length=200)
     benchmark_profile_id: Optional[str] = Field(default=None, max_length=80)
     stakeholder_profile: Optional[str] = Field(default="leadership", max_length=80)

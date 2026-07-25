@@ -5,6 +5,7 @@ No external template dependencies; uses f-strings with inline CSS.
 from __future__ import annotations
 
 import json
+import os
 from html import escape
 from datetime import datetime, timezone
 from typing import List, TypedDict
@@ -154,6 +155,26 @@ def collect_stakeholder_reading(
             f"The highest-impact visible entity right now is {entity_label}, which can anchor a concrete stakeholder discussion."
         )
     paragraphs.append(f"Recommended emphasis: {action_text}")
+
+    # Readiness caveat: an identity-resolution backlog sitting underneath the
+    # dataset must qualify readiness language, so a brief cannot call the data
+    # decision-ready while thousands of unresolved identity conflicts wait below.
+    # The ratio is ALWAYS disclosed; the qualifier is added only above threshold.
+    pending_authority, total_authority = _authority_backlog_ratio(db, org_id)
+    if total_authority:
+        backlog_pct = round(pending_authority / total_authority * 100)
+        disclosure = (
+            f"Identity resolution: {pending_authority:,} of {total_authority:,} "
+            f"authority records ({backlog_pct}%) are awaiting human review."
+        )
+        if pending_authority / total_authority >= _authority_backlog_threshold():
+            disclosure += (
+                " That backlog is material, so entity identity is not settled: read "
+                "the readiness above as provisional to that extent until the review "
+                "queue is worked down."
+            )
+        paragraphs.append(disclosure)
+
     attention_points = stakeholder.get("attention_points", [])
     if attention_points:
         paragraphs.append("How to read this brief for this audience:")
@@ -792,6 +813,467 @@ def _section_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> s
     {''.join(cards)}
 </section>"""
 
+# ── Authority / coauthorship / journals (extend-report-module-coverage) ──────
+
+# Explicit cap on the conflicts table: a brief lists the worst offenders, it is
+# not an export of the review queue (production holds ~9.4k pending records).
+_AUTHORITY_CONFLICT_LIMIT = 10
+
+# Fraction of authority records awaiting review at or above which the stakeholder
+# reading gains an explicit backlog caveat, so readiness language cannot silently
+# contradict a known identity-resolution backlog sitting underneath it. This is a
+# starting point for judgement, NOT a derived constant — override per deployment
+# via UKIP_REPORT_AUTHORITY_BACKLOG_THRESHOLD (declared in docker-compose.prod.yml).
+_DEFAULT_AUTHORITY_BACKLOG_THRESHOLD = 0.15
+
+
+def _authority_backlog_threshold() -> float:
+    raw = os.environ.get("UKIP_REPORT_AUTHORITY_BACKLOG_THRESHOLD")
+    if raw is None:
+        return _DEFAULT_AUTHORITY_BACKLOG_THRESHOLD
+    try:
+        return max(0.0, min(1.0, float(raw)))
+    except ValueError:
+        return _DEFAULT_AUTHORITY_BACKLOG_THRESHOLD
+
+
+def _authority_backlog_ratio(db: Session, org_id: int | None) -> tuple[int, int]:
+    """(pending_review, total) authority records for this org. (0, 0) when none."""
+    query = scope_query_to_org(
+        db.query(models.AuthorityRecord), models.AuthorityRecord, org_id
+    )
+    total = query.with_entities(func.count(models.AuthorityRecord.id)).scalar() or 0
+    if not total:
+        return 0, 0
+    pending = query.with_entities(func.count(models.AuthorityRecord.id))\
+        .filter(models.AuthorityRecord.review_required.is_(True)).scalar() or 0
+    return pending, total
+
+
+def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+    """Format-neutral authority-control reading: resolution status, review
+    backlog, and what that backlog means for the report's own reliability.
+
+    `domain_id` is accepted for signature consistency with the other collectors
+    but is not a filter — `AuthorityRecord` is scoped per organisation, not per
+    domain.
+    """
+    from backend.reporting.section_data import (
+        Narrative, SectionData, StatGrid, StatItem, Table,
+    )
+
+    query = scope_query_to_org(
+        db.query(models.AuthorityRecord), models.AuthorityRecord, org_id
+    )
+    total = query.with_entities(func.count(models.AuthorityRecord.id)).scalar() or 0
+
+    if not total:
+        # Absence of authority data is NOT evidence of clean identity
+        # resolution. Saying "no conflicts" here would be a false reassurance.
+        return SectionData(
+            key="authority_control",
+            title="Authority Control",
+            blocks=(
+                Narrative(
+                    heading="Authority resolution not available",
+                    paragraphs=(
+                        "No authority records exist for this workspace, so identity "
+                        "resolution has not been run over it.",
+                        "This is not a finding of zero conflicts: unresolved duplicates "
+                        "and identity collisions may still be present and simply have not "
+                        "been looked for. Run authority resolution before treating entity "
+                        "identity in this brief as settled.",
+                    ),
+                ),
+            ),
+        )
+
+    confirmed = query.with_entities(func.count(models.AuthorityRecord.id))\
+        .filter(models.AuthorityRecord.status == "confirmed").scalar() or 0
+    pending = query.with_entities(func.count(models.AuthorityRecord.id))\
+        .filter(models.AuthorityRecord.review_required.is_(True)).scalar() or 0
+    mean_confidence = query.with_entities(
+        func.avg(models.AuthorityRecord.confidence)
+    ).scalar() or 0.0
+    backlog_pct = round(pending / total * 100) if total else 0
+
+    grid = StatGrid(items=(
+        StatItem(label="Authority Records", value=f"{total:,}"),
+        StatItem(label="Confirmed", value=f"{confirmed:,}",
+                 sub=f"{round(confirmed / total * 100)}% of total"),
+        StatItem(label="Pending Review", value=f"{pending:,}",
+                 sub=f"{backlog_pct}% awaiting a human decision"),
+        StatItem(label="Mean Confidence", value=f"{round(float(mean_confidence) * 100)}%",
+                 sub="across all resolution attempts"),
+    ))
+
+    by_resolution = query.with_entities(
+        models.AuthorityRecord.resolution_status,
+        func.count(models.AuthorityRecord.id),
+    ).group_by(models.AuthorityRecord.resolution_status).all()
+    distribution = Table(
+        columns=("Resolution Status", "Records", "Share"),
+        rows=tuple(
+            (status or "unknown", f"{count:,}", f"{round(count / total * 100)}%")
+            for status, count in sorted(by_resolution, key=lambda r: -r[1])
+        ),
+        bar_column=2,
+    )
+
+    # Lowest-confidence unresolved items first: those are the ones a reader
+    # should not assume were decided correctly.
+    conflicts = query.with_entities(
+        models.AuthorityRecord.original_value,
+        models.AuthorityRecord.field_name,
+        models.AuthorityRecord.resolution_status,
+        models.AuthorityRecord.confidence,
+        models.AuthorityRecord.nil_reason,
+    ).filter(
+        models.AuthorityRecord.review_required.is_(True)
+    ).order_by(
+        models.AuthorityRecord.confidence.asc()
+    ).limit(_AUTHORITY_CONFLICT_LIMIT).all()
+    conflicts_table = Table(
+        columns=("Value", "Field", "Resolution", "Confidence", "Reason"),
+        rows=tuple(
+            (
+                r[0] or "—",
+                r[1] or "—",
+                r[2] or "unresolved",
+                f"{round(float(r[3] or 0) * 100)}%",
+                r[4] or "—",
+            )
+            for r in conflicts
+        ),
+    )
+
+    reliability = [
+        f"{pending:,} of {total:,} authority records ({backlog_pct}%) are awaiting "
+        f"human review.",
+    ]
+    if pending:
+        reliability.append(
+            "Entity identity in this brief should be read as provisional to that "
+            "extent: unreviewed records may merge distinct entities or split a single "
+            "one, which shifts counts and rankings elsewhere in the report."
+        )
+        if len(conflicts) == _AUTHORITY_CONFLICT_LIMIT:
+            reliability.append(
+                f"The table above lists the {_AUTHORITY_CONFLICT_LIMIT} lowest-confidence "
+                "cases only; it is a sample of the backlog, not the whole queue."
+            )
+    else:
+        reliability.append(
+            "No records are awaiting review, so identity resolution is settled for "
+            "the records that were processed."
+        )
+
+    return SectionData(
+        key="authority_control",
+        title="Authority Control",
+        blocks=(
+            grid,
+            distribution,
+            conflicts_table,
+            Narrative(heading="Reliability reading", paragraphs=tuple(reliability)),
+        ),
+    )
+
+
+def _section_authority_control(db: Session, domain_id: str, org_id: int | None) -> str:
+    from backend.reporting.html_renderer import render_html
+    return render_html(collect_authority_control(db, domain_id, org_id))
+
+
+# How many top authors / bridges a brief lists. A reading, not a graph export.
+_COLLAB_TOP_LIMIT = 10
+# Author stats older than this read as stale; the section says so rather than
+# presenting a months-old collaboration structure as current.
+_COLLAB_STALENESS_DAYS = 30
+
+
+def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+    """Format-neutral collaboration-graph reading from PRECOMPUTED `AuthorStats`
+    and `CoauthorEdge`: author/edge/community counts, the most central authors,
+    and bridge authors spanning communities.
+
+    Reads columns only — it never invokes the coauthorship recompute or graph
+    analytics path, so a brief stays cheap and reflects the last computed state.
+    `domain_id` is not a filter here (org-scoped like the rest of the graph).
+    """
+    from datetime import datetime, timezone
+
+    from backend.reporting.section_data import (
+        Narrative, SectionData, StatGrid, StatItem, Table,
+    )
+
+    stats_q = scope_query_to_org(
+        db.query(models.AuthorStats), models.AuthorStats, org_id
+    )
+    author_count = stats_q.with_entities(
+        func.count(func.distinct(models.AuthorStats.author_id))
+    ).scalar() or 0
+
+    if not author_count:
+        return SectionData(
+            key="collaboration_graph",
+            title="Collaboration Graph",
+            blocks=(
+                Narrative(
+                    heading="Collaboration graph not available",
+                    paragraphs=(
+                        "No author statistics exist for this workspace, so the "
+                        "coauthorship graph has not been computed over it.",
+                        "Run coauthorship analysis to surface collaboration structure "
+                        "— central authors, communities and the bridges between them.",
+                    ),
+                ),
+            ),
+        )
+
+    edge_count = scope_query_to_org(
+        db.query(models.CoauthorEdge), models.CoauthorEdge, org_id
+    ).with_entities(func.count(models.CoauthorEdge.author_a_id)).scalar() or 0
+    community_count = stats_q.with_entities(
+        func.count(func.distinct(models.AuthorStats.community_id))
+    ).filter(models.AuthorStats.community_id.isnot(None)).scalar() or 0
+
+    grid = StatGrid(items=(
+        StatItem(label="Authors", value=f"{author_count:,}"),
+        StatItem(label="Collaborations", value=f"{edge_count:,}",
+                 sub="coauthorship edges"),
+        StatItem(label="Communities", value=f"{community_count:,}",
+                 sub="detected clusters"),
+    ))
+
+    central = stats_q.with_entities(
+        models.Author.display_name,
+        models.AuthorStats.degree,
+        models.AuthorStats.centrality,
+        models.AuthorStats.publication_count,
+    ).join(
+        models.Author, models.Author.id == models.AuthorStats.author_id
+    ).order_by(
+        models.AuthorStats.centrality.desc().nullslast(),
+        models.AuthorStats.degree.desc().nullslast(),
+    ).limit(_COLLAB_TOP_LIMIT).all()
+    central_table = Table(
+        columns=("Author", "Degree", "Centrality", "Publications"),
+        rows=tuple(
+            (
+                r[0] or "—",
+                f"{r[1] or 0:,}",
+                f"{float(r[2] or 0):.3f}",
+                f"{r[3] or 0:,}",
+            )
+            for r in central
+        ),
+    )
+
+    # Bridge authors = endpoints of an edge whose two authors sit in different
+    # communities. Read entirely from the precomputed community_id column — no
+    # graph traversal. Alias AuthorStats twice to compare the two endpoints.
+    from sqlalchemy.orm import aliased
+    stats_a = aliased(models.AuthorStats)
+    stats_b = aliased(models.AuthorStats)
+    cross_edges = scope_query_to_org(
+        db.query(models.CoauthorEdge), models.CoauthorEdge, org_id
+    ).join(
+        stats_a, stats_a.author_id == models.CoauthorEdge.author_a_id
+    ).join(
+        stats_b, stats_b.author_id == models.CoauthorEdge.author_b_id
+    ).filter(
+        stats_a.community_id.isnot(None),
+        stats_b.community_id.isnot(None),
+        stats_a.community_id != stats_b.community_id,
+    ).with_entities(
+        models.CoauthorEdge.author_a_id,
+        stats_a.community_id,
+        models.CoauthorEdge.author_b_id,
+        stats_b.community_id,
+    ).all()
+    # Collect each bridging author with the two communities it links.
+    bridge_links: dict[int, set] = {}
+    for a_id, a_comm, b_id, b_comm in cross_edges:
+        bridge_links.setdefault(a_id, set()).update((a_comm, b_comm))
+        bridge_links.setdefault(b_id, set()).update((a_comm, b_comm))
+    bridge_names = {
+        a.id: a.display_name
+        for a in db.query(models.Author).filter(models.Author.id.in_(bridge_links.keys())).all()
+    } if bridge_links else {}
+    bridges_table = Table(
+        columns=("Bridge Author", "Communities Linked"),
+        rows=tuple(
+            (bridge_names.get(aid, "—"), ", ".join(str(c) for c in sorted(comms)))
+            for aid, comms in sorted(bridge_links.items(), key=lambda kv: -len(kv[1]))
+        ),
+    )
+
+    blocks = [grid, central_table, bridges_table]
+
+    # Staleness: the reader must know if this structure is old or uncomputed.
+    latest_computed = stats_q.with_entities(
+        func.max(models.AuthorStats.computed_at)
+    ).scalar()
+    if latest_computed is None:
+        blocks.append(Narrative(
+            heading="Staleness",
+            paragraphs=(
+                "These statistics have no computation timestamp, so the collaboration "
+                "structure may be stale — treat it as indicative, not current.",
+            ),
+        ))
+    else:
+        if latest_computed.tzinfo is None:
+            latest_computed = latest_computed.replace(tzinfo=timezone.utc)
+        age_days = (datetime.now(timezone.utc) - latest_computed).days
+        if age_days >= _COLLAB_STALENESS_DAYS:
+            blocks.append(Narrative(
+                heading="Staleness",
+                paragraphs=(
+                    f"The collaboration graph was last computed {age_days} days ago "
+                    f"({latest_computed.strftime('%Y-%m-%d')}); it may be stale relative "
+                    "to recent imports. Recompute before relying on the structure.",
+                ),
+            ))
+
+    return SectionData(
+        key="collaboration_graph",
+        title="Collaboration Graph",
+        blocks=tuple(blocks),
+    )
+
+
+def _section_collaboration_graph(db: Session, domain_id: str, org_id: int | None) -> str:
+    from backend.reporting.html_renderer import render_html
+    return render_html(collect_collaboration_graph(db, domain_id, org_id))
+
+
+_JOURNAL_TOP_LIMIT = 12
+
+
+def _bayes_with_interval(bayes, ci_low, ci_high) -> str:
+    """Render the Bayesian NIF *only* bound to its credible interval.
+
+    The point estimate exists because raw NIF is unstable for low-volume
+    journals; showing it without the interval would hide the very uncertainty
+    the estimator expresses. So the estimate and its bounds are formatted into a
+    single cell — there is no code path that emits one without the other. When
+    the interval is missing, the estimate is withheld entirely.
+    """
+    if bayes is None or ci_low is None or ci_high is None:
+        return "—"
+    return f"{float(bayes):.2f} [{float(ci_low):.2f}, {float(ci_high):.2f}]"
+
+
+def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+    """Format-neutral journal-portfolio reading from `JournalMetric`: where the
+    work was published, at what open-access cost, and with what field-normalized
+    standing — the Bayesian estimate always carried with its credible interval.
+
+    `domain_id` is not a filter (org-scoped like the other new sections).
+    """
+    from backend.reporting.section_data import (
+        Narrative, SectionData, StatGrid, StatItem, Table,
+    )
+
+    query = scope_query_to_org(
+        db.query(models.JournalMetric), models.JournalMetric, org_id
+    )
+    total = query.with_entities(func.count(models.JournalMetric.id)).scalar() or 0
+
+    if not total:
+        return SectionData(
+            key="journal_portfolio",
+            title="Journal Portfolio",
+            blocks=(
+                Narrative(
+                    heading="Journal metrics not available",
+                    paragraphs=(
+                        "No journal metrics exist for this workspace, so the publication "
+                        "portfolio — where the work was published, at what open-access cost, "
+                        "and with what field-normalized standing — cannot be reported yet.",
+                        "Run journal enrichment to populate it.",
+                    ),
+                ),
+            ),
+        )
+
+    in_doaj = query.with_entities(func.count(models.JournalMetric.id))\
+        .filter(models.JournalMetric.is_in_doaj.is_(True)).scalar() or 0
+    with_apc = query.with_entities(func.count(models.JournalMetric.id))\
+        .filter(models.JournalMetric.apc_usd.isnot(None),
+                models.JournalMetric.apc_usd > 0).scalar() or 0
+    doaj_pct = round(in_doaj / total * 100) if total else 0
+
+    grid = StatGrid(items=(
+        StatItem(label="Journals", value=f"{total:,}", sub="distinct venues"),
+        StatItem(label="In DOAJ", value=f"{doaj_pct}%",
+                 sub=f"{in_doaj:,} of {total:,} open-access listed"),
+        StatItem(label="Charging APC", value=f"{with_apc:,}",
+                 sub="venues with a publication fee"),
+    ))
+
+    top = query.with_entities(
+        models.JournalMetric.display_name,
+        models.JournalMetric.normalized_impact_factor,
+        models.JournalMetric.nif_bayes,
+        models.JournalMetric.nif_ci_low,
+        models.JournalMetric.nif_ci_high,
+        models.JournalMetric.works_2yr,
+        models.JournalMetric.apc_usd,
+        models.JournalMetric.is_in_doaj,
+    ).order_by(
+        models.JournalMetric.normalized_impact_factor.desc().nullslast()
+    ).limit(_JOURNAL_TOP_LIMIT).all()
+    table = Table(
+        columns=(
+            "Journal",
+            "NIF (field-normalized)",
+            "Bayesian NIF [95% CI]",
+            "Local works (2yr)",
+            "APC (USD)",
+            "DOAJ",
+        ),
+        rows=tuple(
+            (
+                r[0] or "—",
+                f"{float(r[1]):.2f}" if r[1] is not None else "—",
+                _bayes_with_interval(r[2], r[3], r[4]),
+                f"{r[5] or 0:,}",
+                f"${int(r[6]):,}" if r[6] else "—",
+                "Yes" if r[7] else "No",
+            )
+            for r in top
+        ),
+    )
+
+    note = Narrative(
+        heading="How to read these metrics",
+        paragraphs=(
+            "NIF is a field-normalized open proxy for journal standing (two-year mean "
+            "citedness, normalized within field). It is NOT a Journal Impact Factor and "
+            "must not be read as one.",
+            "The Bayesian NIF is the shrunk estimate for low-volume journals and is always "
+            "shown with its 95% credible interval; a point estimate without the interval "
+            "would misrepresent its uncertainty.",
+            "\"Local works (2yr)\" counts the works in THIS workspace, not the journal's "
+            "global two-year output — it is local coverage, not a global volume.",
+        ),
+    )
+
+    return SectionData(
+        key="journal_portfolio",
+        title="Journal Portfolio",
+        blocks=(grid, table, note),
+    )
+
+
+def _section_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -> str:
+    from backend.reporting.html_renderer import render_html
+    return render_html(collect_journal_portfolio(db, domain_id, org_id))
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 SECTION_BUILDERS = {
@@ -806,6 +1288,9 @@ SECTION_BUILDERS = {
     "top_brands": _section_top_brands,
     "topic_clusters": _section_topic_clusters,
     "harmonization_log": _section_harmonization_log,
+    "authority_control": _section_authority_control,
+    "collaboration_graph": _section_collaboration_graph,
+    "journal_portfolio": _section_journal_portfolio,
 }
 
 SECTION_LABELS = {
@@ -820,6 +1305,9 @@ SECTION_LABELS = {
     "top_brands": "Top Secondary Labels / Classifications",
     "topic_clusters": "Topic Clusters",
     "harmonization_log": "Harmonization Log",
+    "authority_control": "Authority Control",
+    "collaboration_graph": "Collaboration Graph",
+    "journal_portfolio": "Journal Portfolio",
 }
 
 # Deprecated section ids mapped to the public id that GET /reports/sections
