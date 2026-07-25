@@ -62,7 +62,8 @@ name changes once and breaks whoever adopted the first cut.
 - [x] 4.3 State plainly which surface carries a stability commitment and which is
       generated wholesale — "Stability" + "What is here today" sections.
 - [ ] 4.4 `/developer` page: link the clients next to the curl quickstart.
-- [ ] 4.5 `docs/API.md` cross-reference.
+- [x] 4.5 `docs/API.md` cross-reference — "Generated SDK clients" section links
+      to sdk/README.md and the regeneration script.
 
 ## 5. Verification
 
