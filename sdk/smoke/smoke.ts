@@ -44,7 +44,9 @@ async function login(): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  console.log(`[ts-smoke] target ${BASE_URL} as ${USERNAME}`);
+  // Deliberately does NOT echo USERNAME: it is half of a live credential pair,
+  // and CI logs are broadly readable (CodeQL js/clear-text-logging).
+  console.log(`[ts-smoke] target ${BASE_URL}`);
   const token = await login();
 
   // 3.1: configure the client with one credential, sent as a bearer token.

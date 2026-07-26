@@ -126,7 +126,9 @@ def check_scope_403(admin_token: str) -> None:
 
 
 def main() -> None:
-    print(f"[python-smoke] target {BASE_URL} as {USERNAME}")
+    # Deliberately does NOT echo USERNAME: it is half of a live credential pair,
+    # and CI logs are broadly readable (CodeQL clear-text-logging).
+    print(f"[python-smoke] target {BASE_URL}")
     token = login()
     check_list_entities(token)
     if EXPECT_ENFORCEMENT:
