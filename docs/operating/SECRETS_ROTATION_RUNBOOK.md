@@ -34,7 +34,7 @@ or no `ENCRYPTION_KEY` is configured.
 |--------|----------|----------------|
 | `ENCRYPTION_KEY` | Fernet encryption of stored credentials (`AIIntegration.api_key`, `StoreConnection.api_key/api_secret/access_token`) | Staged dual-key + eager re-encrypt |
 | `JWT_SECRET_KEY` | Signing/verifying access & refresh JWTs | Staged dual-key verify, drop after grace window |
-| `ADMIN_PASSWORD` | Bootstrap super-admin credential | Password change / re-bootstrap |
+| `ADMIN_PASSWORD_HASH` / `ADMIN_PASSWORD` | Bootstrap super-admin credential (re-asserted on every startup) | Env update + redeploy — see §3 |
 
 Key generation:
 
@@ -118,19 +118,54 @@ retiring keys. Already-issued tokens stay valid until they expire.
 
 ---
 
-## 3. Rotate `ADMIN_PASSWORD` (bootstrap super-admin)
+## 3. Rotate the bootstrap super-admin password
 
-`ADMIN_PASSWORD` only seeds the first super-admin on an empty users table; after
-bootstrap, credentials live (bcrypt-hashed) in the `users` table.
+> ⚠️ **The bootstrap env var wins on EVERY startup, not just on first bootstrap.**
+> `backend/bootstrap.py` re-syncs the super-admin's password hash from the
+> environment on each app start. A password changed only through the API is
+> therefore **silently reverted by the next redeploy**. Always land the env change
+> and the credential change together.
 
-- **Normal rotation (account exists):** the admin changes their own password via
-  the authenticated password-change endpoint (`POST /users/me/password`), or a
-  super-admin resets another user via the `/users` admin endpoints. Update the
-  `ADMIN_PASSWORD` env var to the new value so a future re-bootstrap stays
-  consistent, then redeploy.
-- **Re-bootstrap (lost access / empty users table):** set a new `ADMIN_PASSWORD`
-  (and `ADMIN_USERNAME`) in the environment and restart; the lifespan bootstrap
-  recreates the super-admin from those vars when the users table is empty.
+Credentials live bcrypt-hashed in the `users` table; the env vars seed and then
+keep re-asserting that row. Two supported vars, and **`ADMIN_PASSWORD` takes
+precedence** — `ADMIN_PASSWORD_HASH` is consulted only when `ADMIN_PASSWORD` is
+empty (`bootstrap.py`):
+
+| Var | Startup behaviour | Notes |
+|-----|-------------------|-------|
+| `ADMIN_PASSWORD_HASH` | Overwrites the stored hash on **every** start | **Preferred** — no plaintext in the Dokploy environment. Ignored unless `ADMIN_PASSWORD` is unset/empty. |
+| `ADMIN_PASSWORD` | Overwrites the stored hash on every start **when it does not match** the current one | Leaves the password in cleartext in the environment. |
+
+Generate a hash (never commit or paste the plaintext anywhere but the password
+manager):
+
+```bash
+python -c "import bcrypt,getpass; print(bcrypt.hashpw(getpass.getpass().encode(), bcrypt.gensalt()).decode())"
+```
+
+A bcrypt hash contains `$` (`$2b$12$…`), which Docker Compose treats as variable
+interpolation. Dokploy feeds its Environment panel to Compose, so **escape every
+`$` as `$$`** when pasting the hash there — `$2b$12$…` becomes `$$2b$$12$$…`.
+`bootstrap.py` un-escapes it (`resolve_bootstrap_password_hash`), so the escaped
+form is what both Compose and the app expect. Same rule as `.env.example`.
+
+- **Normal rotation (account exists) — preferred, hash-based:**
+  1. Generate the new password in a password manager and hash it as above.
+  2. In the Dokploy Environment, set `ADMIN_PASSWORD_HASH` to the escaped hash
+     **and delete `ADMIN_PASSWORD` entirely** — leaving it set makes the hash
+     inert.
+  3. Redeploy. Bootstrap overwrites the stored hash, clears `failed_attempts` and
+     lifts any `locked_until`.
+  4. Verify by logging in with the new password; confirm the old one fails. If
+     login fails with the new password, suspect a mangled `$` escape first.
+- **Normal rotation (plaintext var):** change the password via `POST
+  /users/me/password`, then set `ADMIN_PASSWORD` to the same new value and
+  redeploy. If you skip the env update the next restart reverts it.
+- **Re-bootstrap (lost access / empty users table):** set `ADMIN_USERNAME` plus
+  either var and restart; the lifespan bootstrap recreates the super-admin.
+
+Because bootstrap also clears `failed_attempts` and `locked_until`, a redeploy is
+the supported way out of an `HTTP 423` lockout — no direct DB edit needed.
 
 ---
 

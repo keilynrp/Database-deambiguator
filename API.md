@@ -867,7 +867,8 @@ Context sessions can be injected into RAG queries via `session_id` to provide me
 | Variable | Required | Description |
 |---|---|---|
 | `ADMIN_USERNAME` | Yes | Bootstrap super_admin username |
-| `ADMIN_PASSWORD` | Yes (first boot) | Bootstrap super_admin plaintext password |
+| `ADMIN_PASSWORD` | Yes | Bootstrap super_admin plaintext password. Re-asserted on every startup, not just first boot |
+| `ADMIN_PASSWORD_HASH` | No | Pre-hashed bcrypt alternative to `ADMIN_PASSWORD`; used only when `ADMIN_PASSWORD` is unset/empty |
 | `JWT_SECRET_KEY` | Yes | Secret for JWT signing |
 | `ENCRYPTION_KEY` | Yes | Fernet key for credential encryption |
 | `ALLOWED_ORIGINS` | No | CORS origins, comma-separated (default: `localhost:3004,localhost:3000`) |

@@ -157,7 +157,7 @@ Required variables:
 | Variable | Purpose |
 | --- | --- |
 | `ADMIN_USERNAME` | Bootstrap admin username |
-| `ADMIN_PASSWORD` | Bootstrap admin password (plain, first boot only) |
+| `ADMIN_PASSWORD` | Bootstrap admin password (plain; re-asserted on every startup, not just first boot — see the [rotation runbook](docs/operating/SECRETS_ROTATION_RUNBOOK.md#3-rotate-the-bootstrap-super-admin-password)) |
 | `JWT_SECRET_KEY` | JWT signing key |
 | `SESSION_SECRET_KEY` | Session signing key |
 | `ENCRYPTION_KEY` | Fernet key for DB credential encryption |
