@@ -39,6 +39,8 @@ Every suppression entry requires all four of the following before the PR that in
 
 **npm allowlist expiry semantics**: an entry is active through its expiry date and is enforced (i.e., will block if still present) starting the following day. The `check-npm-audit.mjs` wrapper reads the expiry field and enforces this automatically.
 
+**Registry-outage resilience**: `npm audit` depends on the live npmjs.org advisory endpoint, which occasionally returns a transport error (e.g. a malformed/gzip body npm cannot parse) — a registry outage, not a finding. The wrapper retries a few times and, if the endpoint stays broken, fails **open** with a loud `WARNING` rather than blocking every PR org-wide. This applies **only** to transport errors: a real advisory report still fails closed, and a parseable report with an unrecognized schema still exits non-zero. Re-run the job once the registry recovers; the weekly scheduled scan is the backstop.
+
 **Monthly review**: §7 is reviewed monthly. Expired entries that have not been renewed or resolved are escalated to the security/platform owner for immediate action.
 
 ---

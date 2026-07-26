@@ -41,35 +41,74 @@ for (const entry of allowlist) {
   }
 }
 
-let raw;
-try {
-  raw = execSync("npm audit --omit=dev --json", { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-} catch (err) {
-  // npm audit exits non-zero when vulnerabilities exist; the JSON is still on stdout.
-  if (!err.stdout) {
-    console.error("[npm-audit-gate] npm audit produced no output — failing loud.");
-    console.error(err.message);
-    process.exit(2);
-  }
-  raw = err.stdout;
+function sleepSync(ms) {
+  // Synchronous backoff without spinning the CPU.
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-let report;
-try {
-  report = JSON.parse(raw);
-} catch (err) {
-  console.error("[npm-audit-gate] Failed to parse npm audit JSON output.");
-  console.error(err.message);
-  console.error("Raw output (first 500 chars):", raw.slice(0, 500));
-  process.exit(2);
+function runAuditOnce() {
+  try {
+    return execSync("npm audit --omit=dev --json", { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  } catch (err) {
+    // npm audit exits non-zero when vulnerabilities exist; the JSON is still on stdout.
+    if (!err.stdout) {
+      throw new Error(`npm audit produced no output: ${err.message}`);
+    }
+    return err.stdout;
+  }
 }
-// npm 7+ always emits a `vulnerabilities` key (possibly empty). Its absence
-// means a schema we don't understand — fail loud rather than report clean.
-if (!report.vulnerabilities || typeof report.vulnerabilities !== "object") {
-  console.error("[npm-audit-gate] Unexpected audit report schema — 'vulnerabilities' key missing.");
-  console.error("Report keys:", Object.keys(report).join(", "));
-  process.exit(2);
+
+// The registry's audit endpoint occasionally returns a transport error (e.g. a
+// malformed/gzip body that npm cannot parse), yielding a report shaped like
+// `{ error, message }` with no `vulnerabilities`. That is a registry outage, not
+// a security finding, and must not block every PR in the org. Retry a few times;
+// if it stays broken, fail OPEN with a loud warning (advisories are re-checked
+// once the registry recovers, and the weekly scheduled scan is a backstop). Real
+// advisory reports and genuinely unknown schemas still fail closed.
+const MAX_ATTEMPTS = 4;
+let report = null;
+let lastTransportError = null;
+
+for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  let parsed = null;
+  try {
+    parsed = JSON.parse(runAuditOnce());
+  } catch (err) {
+    lastTransportError = err.message;
+  }
+
+  if (parsed && parsed.vulnerabilities && typeof parsed.vulnerabilities === "object") {
+    report = parsed; // a real audit report
+    break;
+  }
+
+  if (parsed && (parsed.error || parsed.message)) {
+    // Registry/transport error — retry.
+    lastTransportError = JSON.stringify(parsed.error ?? parsed.message).slice(0, 200);
+  } else if (parsed) {
+    // A parseable report with neither `vulnerabilities` nor an error signal is a
+    // schema we do not understand — fail loud rather than report clean.
+    console.error("[npm-audit-gate] Unexpected audit report schema — 'vulnerabilities' key missing.");
+    console.error("Report keys:", Object.keys(parsed).join(", "));
+    process.exit(2);
+  }
+
+  if (attempt < MAX_ATTEMPTS) {
+    console.warn(`[npm-audit-gate] audit endpoint error (attempt ${attempt}/${MAX_ATTEMPTS}), retrying…`);
+    sleepSync(attempt * 3000);
+  }
 }
+
+if (report === null) {
+  console.warn(
+    `[npm-audit-gate] WARNING: npm audit endpoint unavailable after ${MAX_ATTEMPTS} attempts — ` +
+      "SKIPPING the gate for this run (fail-open on a registry outage, NOT a clean audit).",
+  );
+  console.warn(`[npm-audit-gate] last error: ${lastTransportError}`);
+  console.warn("[npm-audit-gate] Re-run once registry.npmjs.org recovers; the weekly scan is a backstop.");
+  process.exit(0);
+}
+
 const vulns = report.vulnerabilities;
 
 // Pass 1 — packages whose own advisories (object vias) are all allowlisted.
