@@ -1,0 +1,11 @@
+name: "UKIP CodeQL config"
+
+# Exclude the generated SDK clients from analysis. sdk/typescript and sdk/python
+# are produced wholesale by @hey-api/openapi-ts and openapi-python-client (see
+# sdk/README.md) — they are build artifacts, not first-party source, and scanning
+# them adds no signal. Worse, committing them makes CodeQL re-run the JS/Python
+# analysis on every SDK change and re-attribute unrelated pre-existing alerts to
+# that PR (a diff-tracking artifact). The smoke scripts under sdk/smoke are thin
+# test tooling covered by the sdk-smoke job, not application attack surface.
+paths-ignore:
+  - sdk
