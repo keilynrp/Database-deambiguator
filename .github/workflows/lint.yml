@@ -48,6 +48,22 @@ jobs:
       - name: Check the committed OpenAPI spec matches the application
         run: node scripts/generate-sdk.mjs --check
 
+  # ── Generated SDK client drift (blocking) ─────────────────────────────────
+  # openapi-drift proves sdk/openapi.json is current; this proves the committed
+  # clients were regenerated from it. Without this, a PR can refresh the spec and
+  # ship clients that describe the previous API. The generators run inside the
+  # same pinned Docker images the local script uses, so CI and local produce
+  # byte-identical output (Linux LF, pinned node:20-slim / python:3.12-slim).
+  sdk-clients-drift:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Check the committed SDK clients match sdk/openapi.json
+        run: bash scripts/generate-sdk-clients.sh --check
+
   # ── Domain scope contract lint (blocking) ─────────────────────────────────
   domain-scope-lint:
     runs-on: ubuntu-latest
