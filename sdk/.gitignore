@@ -1,0 +1,5 @@
+# openapi-python-client runs ruff, which drops a non-deterministic on-disk cache
+# under the generated package. It is not part of the client and would break the
+# reproducibility check if committed.
+python/.ruff_cache/
+**/.ruff_cache/

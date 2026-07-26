@@ -19,17 +19,21 @@ name changes once and breaks whoever adopted the first cut.
 
 - [x] 1.1 `scripts/generate-sdk.mjs`: dump `sdk/openapi.json` via `app.openapi()`
       — no server, no DB, no lifespan.
-- [ ] 1.2 Pin `@hey-api/openapi-ts` and `openapi-python-client` at exact
-      versions. ⚠️ **BLOCKED on tooling, not design.** `npx` fails with
-      `ECOMPROMISED — Lock compromised` on this Windows environment, on both
-      the shared and an isolated npm cache. Adding them as devDependencies is
-      the cleaner route but regenerates `frontend/package-lock.json`, which is
-      prohibited on Windows (strips Linux native binaries). Resolve on Linux
-      (CI or WSL) — see sdk/README.md for the three options.
-- [ ] 1.3 Generate `sdk/typescript`.
-- [ ] 1.4 Generate `sdk/python`.
-- [ ] 1.5 Verify reproducibility: run twice, second run yields no diff. If it
-      does, find the nondeterminism before going further.
+- [x] 1.2 Pin `@hey-api/openapi-ts@0.99.0`, `typescript@5.7.3` and
+      `openapi-python-client==0.29.0` — pinned in `scripts/generate-sdk-clients.sh`.
+      **UNBLOCKED via Docker** instead of the three README options: the
+      Windows `npx ECOMPROMISED` failure and the lockfile-regeneration hazard are
+      both sidestepped by running each generator in a pinned official image
+      (`node:20-slim`, `python:3.12-slim`) — a clean Linux toolchain that never
+      touches `frontend/package-lock.json`.
+- [x] 1.3 Generate `sdk/typescript` — `@hey-api/openapi-ts`, all 420 operations.
+- [x] 1.4 Generate `sdk/python` — `openapi-python-client`. Full public surface;
+      three internal domain-admin `-Output` models omitted (FastAPI
+      `-Input`/`-Output` name collision the generator cannot split). Documented
+      in sdk/README.md "Python fidelity note".
+- [x] 1.5 Reproducibility verified: regenerated both twice, no source diff. The
+      only nondeterministic artifact is `sdk/python/.ruff_cache/`, which is
+      git-ignored (sdk/.gitignore).
 
 ## 2. Drift gate
 
@@ -49,14 +53,17 @@ name changes once and breaks whoever adopted the first cut.
 
 ## 4. Documentation
 
-- [ ] 4.1 `sdk/README.md`: install by git ref / local path, quickstart per
-      language, regeneration instructions.
-- [ ] 4.2 Scope model per README: the three scopes, the derivation rule, the
-      hierarchy, and what a scope `403` means versus a role `403`.
-- [ ] 4.3 State plainly which surface carries a stability commitment and which is
-      generated wholesale.
+- [x] 4.1 `sdk/README.md`: install by git ref / local path, quickstart per
+      language, regeneration instructions — added "Installing and using" +
+      "Generating the clients".
+- [x] 4.2 Scope model per README: the three scopes, the derivation rule, the
+      hierarchy, and what a scope `403` means versus a role `403` — "API key
+      scopes" section.
+- [x] 4.3 State plainly which surface carries a stability commitment and which is
+      generated wholesale — "Stability" + "What is here today" sections.
 - [ ] 4.4 `/developer` page: link the clients next to the curl quickstart.
-- [ ] 4.5 `docs/API.md` cross-reference.
+- [x] 4.5 `docs/API.md` cross-reference — "Generated SDK clients" section links
+      to sdk/README.md and the regeneration script.
 
 ## 5. Verification
 

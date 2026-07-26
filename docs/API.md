@@ -13,3 +13,16 @@ The current canonical API reference is [`../API.md`](../API.md). UKIP's core API
 | Source adapter | Optional ingestion bridge for a specific external platform or data source |
 
 Legacy commerce aliases remain supported for backward compatibility where existing datasets or adapter contracts require them, including `/brands`, `brand_year_matrix`, `top_brands`, `sku`, `gtin`, `barcode`, and `brand_capitalized`. New core specs, UI copy, API examples, and tests should prefer the canonical terms above.
+
+## Generated SDK clients
+
+Rather than hand-writing HTTP calls, integrators can use the generated clients in
+[`../sdk/`](../sdk/README.md):
+
+- **TypeScript** — `sdk/typescript/`, generated with `@hey-api/openapi-ts` (full coverage).
+- **Python** — `sdk/python/`, generated with `openapi-python-client`.
+
+Both are produced from the drift-gated `sdk/openapi.json` and consumed by git
+reference or local path (not published to npm/PyPI). Install, quickstart, the API
+key scope model, and the stability surface are documented in
+[`sdk/README.md`](../sdk/README.md). Regenerate with `bash scripts/generate-sdk-clients.sh`.
