@@ -40,9 +40,22 @@ def validate_field(db: Session, field: str) -> None:
 def _distinct_values(
     db: Session, field: str, org_id, entity_type_filter: str | None = None
 ) -> list[str]:
+    # Defense in depth: `field` is a SQL identifier, so it cannot be bound as a
+    # parameter and must be interpolated. Callers already run validate_field(),
+    # but this function must not trust that. Resolve `field` against the model's
+    # own column set and interpolate the *allowlisted* value, so the identifier
+    # provably originates from the schema rather than from user input — safe
+    # regardless of caller discipline. The allowlist comes from the mapped model
+    # metadata (pure in-memory), not a live reflection: inspecting the engine
+    # opens a second connection that would roll back a caller's uncommitted flush.
+    columns = set(models.RawEntity.__table__.columns.keys())
+    safe_field = next((col for col in columns if col == field), None)
+    if safe_field is None:
+        raise InvalidFieldError(f"Field '{field}' not found in entity table")
+
     query_text = (
-        f'SELECT DISTINCT "{field}" FROM raw_entities '
-        f"WHERE \"{field}\" IS NOT NULL AND \"{field}\" != ''"
+        f'SELECT DISTINCT "{safe_field}" FROM raw_entities '
+        f"WHERE \"{safe_field}\" IS NOT NULL AND \"{safe_field}\" != ''"
     )
     params: dict[str, object] = {}
     where_clauses: list[str] = []
