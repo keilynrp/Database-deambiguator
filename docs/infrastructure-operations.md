@@ -55,8 +55,8 @@ All workers start as `asyncio.create_task()` during app lifespan. They share the
 | `JWT_SECRET_KEY` | JWT token signing | Yes | None (warns on startup) |
 | `ENCRYPTION_KEY` | Fernet key for DB credential encryption | Yes | None (warns on startup) |
 | `ADMIN_USERNAME` | Bootstrap super_admin username | No | None (warns on startup) |
-| `ADMIN_PASSWORD` | Bootstrap super_admin password (first boot only) | Yes | None |
-| `ADMIN_PASSWORD_HASH` | Alternative: pre-hashed bcrypt password | Yes | None |
+| `ADMIN_PASSWORD` | Bootstrap super_admin password. Re-synced to the `users` row on **every** startup, not only first boot | Yes | None |
+| `ADMIN_PASSWORD_HASH` | Alternative: pre-hashed bcrypt password. Read only when `ADMIN_PASSWORD` is unset/empty; escape `$` as `$$` under Compose | Yes | None |
 
 ### Optional
 

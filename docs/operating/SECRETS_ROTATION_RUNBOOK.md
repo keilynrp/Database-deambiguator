@@ -143,13 +143,21 @@ manager):
 python -c "import bcrypt,getpass; print(bcrypt.hashpw(getpass.getpass().encode(), bcrypt.gensalt()).decode())"
 ```
 
+A bcrypt hash contains `$` (`$2b$12$…`), which Docker Compose treats as variable
+interpolation. Dokploy feeds its Environment panel to Compose, so **escape every
+`$` as `$$`** when pasting the hash there — `$2b$12$…` becomes `$$2b$$12$$…`.
+`bootstrap.py` un-escapes it (`resolve_bootstrap_password_hash`), so the escaped
+form is what both Compose and the app expect. Same rule as `.env.example`.
+
 - **Normal rotation (account exists) — preferred, hash-based:**
   1. Generate the new password in a password manager and hash it as above.
-  2. In the Dokploy Environment, set `ADMIN_PASSWORD_HASH=<hash>` **and delete
-     `ADMIN_PASSWORD` entirely** — leaving it set makes the hash inert.
+  2. In the Dokploy Environment, set `ADMIN_PASSWORD_HASH` to the escaped hash
+     **and delete `ADMIN_PASSWORD` entirely** — leaving it set makes the hash
+     inert.
   3. Redeploy. Bootstrap overwrites the stored hash, clears `failed_attempts` and
      lifts any `locked_until`.
-  4. Verify by logging in with the new password; confirm the old one fails.
+  4. Verify by logging in with the new password; confirm the old one fails. If
+     login fails with the new password, suspect a mangled `$` escape first.
 - **Normal rotation (plaintext var):** change the password via `POST
   /users/me/password`, then set `ADMIN_PASSWORD` to the same new value and
   redeploy. If you skip the env update the next restart reverts it.
