@@ -171,3 +171,120 @@ jobs:
           UKIP_SKIP_STARTUP_SIDE_EFFECTS: "0"
           PYTHONPATH: .
         run: python scripts/ci_lifespan_smoke.py
+
+  # ── Generated SDK client smoke tests (live) ───────────────────────────────
+  # Exercises sdk/typescript and sdk/python against a real running backend:
+  # authenticate, list entities, get a typed result, and (with enforcement on)
+  # confirm a read-scoped key is blocked from a write with a scope-naming 403.
+  # Unit tests cannot cover this — it needs a server, real auth, and the
+  # generated clients installed the way an integrator would install them.
+  sdk-smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt -c requirements.lock
+
+      - name: Prepare ephemeral CI secrets
+        # Per-run secrets generated at runtime (keeps the secret scanner clean).
+        # ADMIN_USERNAME / ADMIN_PASSWORD / JWT_SECRET_KEY come from the workflow
+        # env block; the smoke logs in with those same values.
+        run: |
+          python - >> "$GITHUB_ENV" <<'PY'
+          import secrets
+          from cryptography.fernet import Fernet
+          pw = secrets.token_hex(16)
+          print(f"ENCRYPTION_KEY={Fernet.generate_key().decode()}")
+          print(f"SESSION_SECRET_KEY={secrets.token_urlsafe(32)}")
+          print(f"PG_PASSWORD={pw}")
+          print(f"DATABASE_URL=postgresql+psycopg2://ukip_test:{pw}@localhost:5432/ukip_test")
+          print("UKIP_DB_MODE=postgres")
+          PY
+
+      - name: Start PostgreSQL (retry pull to absorb Docker Hub hiccups)
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${DOCKERHUB_USERNAME}" ] && [ -n "${DOCKERHUB_TOKEN}" ]; then
+            echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+          fi
+          for attempt in 1 2 3 4 5; do
+            docker pull postgres:16-alpine && break
+            [ "${attempt}" -eq 5 ] && { echo "postgres pull failed" >&2; exit 1; }
+            sleep $((attempt * 5))
+          done
+          docker run -d --name ukip-postgres \
+            -e POSTGRES_USER=ukip_test \
+            -e POSTGRES_PASSWORD="${PG_PASSWORD}" \
+            -e POSTGRES_DB=ukip_test \
+            -p 5432:5432 \
+            postgres:16-alpine
+          for attempt in $(seq 1 30); do
+            if docker exec ukip-postgres pg_isready -U ukip_test >/dev/null 2>&1; then
+              echo "PostgreSQL ready"; break
+            fi
+            [ "${attempt}" -eq 30 ] && { docker logs ukip-postgres || true; exit 1; }
+            sleep 2
+          done
+
+      - name: Apply migrations
+        run: python -m alembic upgrade head
+
+      - name: Start the backend (scopes enforced) and wait for health
+        # Enforcement ON so the scope-403 check (3.4) is exercised. Side effects
+        # ON so the admin user is seeded and login works.
+        env:
+          UKIP_API_KEY_SCOPES_ENFORCED: "1"
+          UKIP_SKIP_STARTUP_SIDE_EFFECTS: "0"
+          ENGINE_FALLBACK_PYTHON: "true"
+          PYTHONPATH: .
+        run: |
+          uvicorn backend.main:app --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1 &
+          echo $! > uvicorn.pid
+          for attempt in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1; then
+              echo "backend healthy"; exit 0
+            fi
+            sleep 2
+          done
+          echo "backend did not become healthy" >&2
+          cat uvicorn.log || true
+          exit 1
+
+      - name: Python client smoke (auth + list + scope-403)
+        env:
+          UKIP_SMOKE_BASE_URL: http://127.0.0.1:8000
+          UKIP_SMOKE_USERNAME: ${{ env.ADMIN_USERNAME }}
+          UKIP_SMOKE_PASSWORD: ${{ env.ADMIN_PASSWORD }}
+          UKIP_SMOKE_EXPECT_ENFORCEMENT: "1"
+        run: |
+          pip install ./sdk/python
+          python sdk/smoke/smoke.py
+
+      - name: TypeScript client smoke (auth + list)
+        env:
+          UKIP_SMOKE_BASE_URL: http://127.0.0.1:8000
+          UKIP_SMOKE_USERNAME: ${{ env.ADMIN_USERNAME }}
+          UKIP_SMOKE_PASSWORD: ${{ env.ADMIN_PASSWORD }}
+        run: npx -y tsx@4.19.2 sdk/smoke/smoke.ts
+
+      - name: Stop the backend
+        if: always()
+        run: |
+          [ -f uvicorn.pid ] && kill "$(cat uvicorn.pid)" 2>/dev/null || true

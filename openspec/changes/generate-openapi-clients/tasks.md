@@ -44,12 +44,18 @@ name changes once and breaks whoever adopted the first cut.
 
 ## 3. Auth + smoke tests
 
-- [ ] 3.1 Both clients take one credential and send it as a bearer token.
-- [ ] 3.2 TS smoke test: authenticate → list entities → typed result.
-- [ ] 3.3 Python smoke test: same.
-- [ ] 3.4 Smoke test: write call with a read-scoped key under enforcement → a
-      distinguishable 403. (Cross-checks change 1 — if scope enforcement
-      regresses, this fails.)
+- [x] 3.1 Both clients take one credential and send it as a bearer token —
+      `AuthenticatedClient(token=...)` (Python) and `client.setConfig({headers})`
+      (TS), exercised by the list-entities calls in `sdk/smoke/`.
+- [x] 3.2 TS smoke test: authenticate → list entities → typed result —
+      `sdk/smoke/smoke.ts` (run via `tsx`). Verified against a live backend.
+- [x] 3.3 Python smoke test: same — `sdk/smoke/smoke.py`. Verified.
+- [x] 3.4 Smoke test: write call with a read-scoped key under enforcement → a
+      distinguishable, scope-naming 403 — `smoke.py` (`UKIP_SMOKE_EXPECT_ENFORCEMENT=1`).
+      Verified against an ephemeral backend with `UKIP_API_KEY_SCOPES_ENFORCED=1`.
+      Run in CI by the `sdk-smoke` job (backend booted with enforcement on).
+      Note: the CI job proves the client path; the *production* enforcement flip
+      is the separate `enforce-api-key-scopes` operational rollout (group 6).
 
 ## 4. Documentation
 
