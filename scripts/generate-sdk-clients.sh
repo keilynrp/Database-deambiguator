@@ -17,6 +17,13 @@
 # diffs on unrelated PRs, and a drift gate that cries wolf gets ignored.
 set -euo pipefail
 
+# --check regenerates and fails if the committed clients are stale (CI drift
+# gate). Without it, the clients are regenerated in place.
+CHECK_ONLY=0
+if [ "${1:-}" = "--check" ]; then
+  CHECK_ONLY=1
+fi
+
 # ── Pinned generator versions ────────────────────────────────────────────────
 HEYAPI_VERSION="0.99.0"          # @hey-api/openapi-ts (TypeScript)
 TYPESCRIPT_VERSION="5.7.3"       # peer dep of @hey-api/openapi-ts
@@ -64,5 +71,21 @@ MSYS_NO_PATHCONV=1 docker run --rm -v "${HOST_ROOT}:/w" -w /w "$PYTHON_IMAGE" sh
 # It is not part of the client and must never be committed (it breaks the
 # reproducibility check).
 find "$ROOT/sdk/python" -name ".ruff_cache" -type d -prune -exec rm -rf {} + 2>/dev/null || true
+
+if [ "$CHECK_ONLY" -eq 1 ]; then
+  # Drift gate: the committed clients must match a fresh regeneration from the
+  # committed sdk/openapi.json. If they differ, the API surface (or a generator
+  # pin) changed without regenerating the SDK.
+  if ! git -C "$ROOT" diff --quiet -- sdk/typescript sdk/python; then
+    echo "" >&2
+    echo "[generate-sdk-clients] DRIFT: sdk/typescript or sdk/python is stale." >&2
+    echo "The API surface or a pinned generator changed without regenerating." >&2
+    echo "Run:  bash scripts/generate-sdk-clients.sh" >&2
+    git -C "$ROOT" --no-pager diff --stat -- sdk/typescript sdk/python >&2 || true
+    exit 1
+  fi
+  echo "==> OK — sdk/typescript and sdk/python match sdk/openapi.json."
+  exit 0
+fi
 
 echo "==> Done. Regenerated sdk/typescript and sdk/python."

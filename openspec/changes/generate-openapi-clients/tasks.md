@@ -41,6 +41,11 @@ name changes once and breaks whoever adopted the first cut.
 - [x] 2.2 Failure message names the command: `node scripts/generate-sdk.mjs`.
 - [x] 2.3 Prove the gate works: temporarily add a dummy route, confirm CI red,
       revert. A gate that has never failed has never been tested.
+- [x] 2.4 Extend drift coverage to the generated clients (not just the spec):
+      `sdk-clients-drift` CI job runs `bash scripts/generate-sdk-clients.sh
+      --check`, which regenerates in the pinned Docker images and
+      `git diff`s `sdk/typescript`+`sdk/python`. Failure names the regen command.
+      Verified: clean tree passes; a hand-edit to a generated file turns it red.
 
 ## 3. Auth + smoke tests
 
