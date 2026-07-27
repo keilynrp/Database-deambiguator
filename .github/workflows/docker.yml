@@ -52,14 +52,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build image locally for scanning
+      # One build, and only one. The smoke test, Trivy, the SBOM and the registry
+      # all act on these exact bits.
+      #
+      # This job used to build twice — once with `load: true` to scan, then again
+      # with `push: true` to ship. Since the shipping build also set `pull: true`
+      # and `no-cache: true`, it re-pulled the base image, re-ran apt-get and
+      # re-resolved the unpinned pip requirements: an independent resolution that
+      # could legitimately differ from the one that was scanned. Every gate below
+      # was therefore validating a proxy rather than the artifact. `pull` and
+      # `no-cache` stay here so the shipped image is still built from a fresh
+      # base — they just apply to the image that actually ships now.
+      - name: Build backend image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile.backend
           push: false
           load: true
-          tags: scan-target-backend:${{ github.sha }}
+          tags: |
+            scan-target-backend:${{ github.sha }}
+            ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          pull: true
+          no-cache: true
           build-args: |
             APP_VERSION=${{ github.sha }}
 
@@ -116,18 +132,20 @@ jobs:
           format: spdx-json
           artifact-name: sbom-backend-${{ github.sha }}.spdx.json
 
-      - name: Build backend image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: Dockerfile.backend
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          pull: true
-          no-cache: true
-          build-args: |
-            APP_VERSION=${{ github.sha }}
+      - name: Push the backend image that was scanned
+        if: github.event_name != 'pull_request'
+        # `docker push` on the tags already loaded above — deliberately NOT another
+        # build-push-action run. Re-invoking the build here is exactly what
+        # decoupled the scanned image from the shipped one. These tags name the
+        # local image the gates above verified, so the digest that reaches the
+        # registry is the digest that passed.
+        run: |
+          set -euo pipefail
+          printf '%s\n' '${{ steps.meta.outputs.tags }}' | while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            echo "Pushing $tag"
+            docker push "$tag"
+          done
 
   build-frontend:
     runs-on: ubuntu-latest
@@ -166,14 +184,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build image locally for scanning
+      # Single build — see the note in build-backend for why the scan-then-rebuild
+      # split was unsound. It matters here too: the deploy gate greps the frontend
+      # HTML for NEXT_PUBLIC_APP_VERSION, which only proves the shipped bundle was
+      # built from this SHA, not that it was the bundle Trivy scanned.
+      - name: Build frontend image
         uses: docker/build-push-action@v7
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: false
           load: true
-          tags: scan-target-frontend:${{ github.sha }}
+          tags: |
+            scan-target-frontend:${{ github.sha }}
+            ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          pull: true
+          no-cache: true
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://api.ukip.inbounduxd.com' }}
             NEXT_PUBLIC_APP_VERSION=${{ github.sha }}
@@ -196,20 +223,15 @@ jobs:
           format: spdx-json
           artifact-name: sbom-frontend-${{ github.sha }}.spdx.json
 
-      - name: Build frontend image
-        uses: docker/build-push-action@v7
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          pull: true
-          no-cache: true
-          build-args: |
-            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://api.ukip.inbounduxd.com' }}
-            NEXT_PUBLIC_APP_VERSION=${{ github.sha }}
-            APP_VERSION=${{ github.sha }}
+      - name: Push the frontend image that was scanned
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          printf '%s\n' '${{ steps.meta.outputs.tags }}' | while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            echo "Pushing $tag"
+            docker push "$tag"
+          done
 
   build-engine:
     runs-on: ubuntu-latest
@@ -248,14 +270,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build image locally for scanning
+      # Single build — see the note in build-backend.
+      - name: Build engine image
         uses: docker/build-push-action@v7
         with:
           context: ./engine
           file: ./engine/Dockerfile
           push: false
           load: true
-          tags: scan-target-engine:${{ github.sha }}
+          tags: |
+            scan-target-engine:${{ github.sha }}
+            ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          pull: true
+          no-cache: true
 
       - name: Trivy scan (blocks new CRITICAL)
         uses: aquasecurity/trivy-action@v0.36.0
@@ -274,16 +302,15 @@ jobs:
           format: spdx-json
           artifact-name: sbom-engine-${{ github.sha }}.spdx.json
 
-      - name: Build engine image
-        uses: docker/build-push-action@v7
-        with:
-          context: ./engine
-          file: ./engine/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          pull: true
-          no-cache: true
+      - name: Push the engine image that was scanned
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          printf '%s\n' '${{ steps.meta.outputs.tags }}' | while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            echo "Pushing $tag"
+            docker push "$tag"
+          done
 
   deploy:
     needs: [build-backend, build-frontend, build-engine]
