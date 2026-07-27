@@ -258,13 +258,25 @@ def _execute_report(schedule: models.ScheduledReport, db: Session) -> dict:
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         elif fmt == "pdf":
+            # OSError sits alongside ImportError because weasyprint is a ctypes
+            # binding that loads its native pango/glib libraries at import time:
+            # with the package installed but the libraries missing, the import
+            # raises OSError. Without this arm it still reached the catch-all
+            # below, so `last_error` showed the raw ctypes dump instead of an
+            # actionable message. Mirrors _make_pdf() in routers/reports.py.
             try:
                 from weasyprint import HTML as _WPHTML  # type: ignore
-            except ImportError:
+            except ImportError as exc:
                 raise RuntimeError(
                     "PDF reports require weasyprint. "
                     "Install it with: pip install weasyprint"
-                )
+                ) from exc
+            except OSError as exc:
+                raise RuntimeError(
+                    "PDF reports require the native WeasyPrint runtime libraries "
+                    "(pango/harfbuzz). The backend image installs them; a local "
+                    "run needs the GTK runtime."
+                ) from exc
             html = _rb.build(db, domain_id, sections, report_title, org_id=org_id)
             report_bytes = _WPHTML(string=html).write_pdf()
             attachment_filename = (

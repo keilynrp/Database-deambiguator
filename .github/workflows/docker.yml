@@ -63,6 +63,42 @@ jobs:
           build-args: |
             APP_VERSION=${{ github.sha }}
 
+      - name: Smoke-test PDF export runtime in the built image
+        # WeasyPrint is a ctypes binding: `pip install weasyprint` succeeds even
+        # when the native pango/harfbuzz libraries are absent, and the failure
+        # only surfaces at request time as an OSError that POST /exports/pdf
+        # turns into a 501. That is exactly how PDF export shipped broken to
+        # production — the image built, scanned and deployed green. Rendering a
+        # real PDF inside the artifact is the only check that catches it.
+        #
+        # `-i` is load-bearing: without it the container gets no stdin, the
+        # heredoc is discarded, `python -` reads EOF and exits 0. The step then
+        # passes without executing a single assertion below.
+        run: |
+          docker run --rm -i scan-target-backend:${{ github.sha }} python - <<'PY'
+          import re
+
+          import weasyprint
+
+          html = "<h1>UKIP</h1><p>Reporte 123</p>"
+
+          pdf = weasyprint.HTML(string=html).write_pdf()
+          assert pdf.startswith(b"%PDF-"), "WeasyPrint did not emit a PDF"
+
+          # A fontless container still emits a valid, non-empty PDF — it is just
+          # glyph-less, so byte count proves nothing. The text is no help either:
+          # it is written as subset glyph ids, not literal bytes, and the image
+          # ships no pypdf to decode it. The embedded font program is the signal
+          # that separates the two, and compression hides it, hence uncompressed.
+          raw = weasyprint.HTML(string=html).write_pdf(uncompressed_pdf=True)
+          assert b"/FontFile" in raw, "PDF embeds no font program — no usable font in image"
+
+          names = sorted({m.decode() for m in re.findall(rb"/BaseFont\s*/([A-Za-z0-9+\-]+)", raw)})
+          assert names, "PDF declares no /BaseFont"
+
+          print(f"PDF export runtime OK ({len(pdf)} bytes, fonts: {names})")
+          PY
+
       - name: Trivy scan (blocks new CRITICAL)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
