@@ -315,7 +315,16 @@ jobs:
   deploy:
     needs: [build-backend, build-frontend, build-engine]
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    # Both triggers require main. The workflow_dispatch arm used to carry no
+    # branch condition, so a dispatch from any branch redeployed production —
+    # and then failed anyway: Dokploy's compose.deploy git-clones main, while
+    # the verify step below polls for this run's SHA, which would never show up
+    # on a prod serving main. A mis-set branch in the Actions UI was enough.
+    # Dispatching from a branch now builds, scans and pushes without touching
+    # prod, which also makes it a safe rehearsal for the push steps above.
+    if: >-
+      (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+      && github.ref == 'refs/heads/main'
     steps:
       - name: Trigger Dokploy deploy
         # Use compose.deploy (NOT compose.redeploy): deploy performs a fresh git
