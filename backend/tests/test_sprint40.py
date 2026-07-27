@@ -30,23 +30,29 @@ def test_pdf_requires_auth(client):
     assert resp.status_code in (401, 403)
 
 
+# These two assert unconditionally on purpose. They used to tolerate a 501 and
+# guard their assertions behind `if resp.status_code == 200:`, hedging against
+# weasyprint being absent on a dev machine. But _MOCK_WEASY patches _make_pdf
+# itself — the very function that raises the 501 — so 200 is the only reachable
+# outcome and the hedge could never fire. What it did do was let both tests pass
+# having asserted nothing at all if the route broke. Real PDF-runtime coverage
+# lives where it belongs: the smoke test in .github/workflows/docker.yml renders
+# a PDF inside the shipped image.
 def test_pdf_calls_report_builder(client, auth_headers):
     """_make_pdf must be called with the HTML output from report_builder.build()."""
     fake_pdf = b"%PDF-1.4 fake"
     with patch(_MOCK_WEASY, return_value=fake_pdf) as mock_pdf:
         resp = client.post("/exports/pdf", json=_REPORT_PAYLOAD, headers=auth_headers)
-    # May be 200 or 501 (weasyprint not installed) — should NOT be 422/403/500 from our code
-    assert resp.status_code in (200, 501)
-    if resp.status_code == 200:
-        mock_pdf.assert_called_once()
+    assert resp.status_code == 200
+    mock_pdf.assert_called_once()
 
 
 def test_pdf_response_content_type(client, auth_headers):
     fake_pdf = b"%PDF-1.4 fake"
     with patch(_MOCK_WEASY, return_value=fake_pdf):
         resp = client.post("/exports/pdf", json=_REPORT_PAYLOAD, headers=auth_headers)
-    if resp.status_code == 200:
-        assert "application/pdf" in resp.headers["content-type"]
+    assert resp.status_code == 200
+    assert "application/pdf" in resp.headers["content-type"]
 
 
 def test_pdf_invalid_section_returns_422(client, auth_headers):
