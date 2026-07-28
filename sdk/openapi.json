@@ -3143,49 +3143,7 @@
         "title": "DeletionRequest",
         "type": "object"
       },
-      "DiscourseConfig-Input": {
-        "properties": {
-          "authority_sources": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AuthoritySources"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "communication_channels": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CommunicationChannels"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "health_metrics": {
-            "default": [],
-            "items": {
-              "$ref": "#/components/schemas/HealthMetricDef"
-            },
-            "title": "Health Metrics",
-            "type": "array"
-          },
-          "validation_practices": {
-            "default": [],
-            "items": {
-              "$ref": "#/components/schemas/ValidationPractice"
-            },
-            "title": "Validation Practices",
-            "type": "array"
-          }
-        },
-        "title": "DiscourseConfig",
-        "type": "object"
-      },
-      "DiscourseConfig-Output": {
+      "DiscourseConfig": {
         "properties": {
           "authority_sources": {
             "anyOf": [
@@ -3414,7 +3372,7 @@
         "title": "DomainEnrichmentPolicyUpdate",
         "type": "object"
       },
-      "DomainSchema-Input": {
+      "DomainSchema": {
         "properties": {
           "attributes": {
             "items": {
@@ -3430,7 +3388,7 @@
           "discourse_community": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DiscourseConfig-Input"
+                "$ref": "#/components/schemas/DiscourseConfig"
               },
               {
                 "type": "null"
@@ -3451,97 +3409,7 @@
           "epistemology": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EpistemologyConfig-Input"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "first_entity_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "First Entity Id"
-          },
-          "icon": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": "Database",
-            "title": "Icon"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "primary_entity": {
-            "title": "Primary Entity",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "description",
-          "primary_entity",
-          "attributes"
-        ],
-        "title": "DomainSchema",
-        "type": "object"
-      },
-      "DomainSchema-Output": {
-        "properties": {
-          "attributes": {
-            "items": {
-              "$ref": "#/components/schemas/AttributeSchema"
-            },
-            "title": "Attributes",
-            "type": "array"
-          },
-          "description": {
-            "title": "Description",
-            "type": "string"
-          },
-          "discourse_community": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DiscourseConfig-Output"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "entity_count": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Entity Count"
-          },
-          "epistemology": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/EpistemologyConfig-Output"
+                "$ref": "#/components/schemas/EpistemologyConfig"
               },
               {
                 "type": "null"
@@ -4332,29 +4200,7 @@
         "title": "EntitySnap",
         "type": "object"
       },
-      "EpistemologyConfig-Input": {
-        "properties": {
-          "evidence_hierarchy": {
-            "default": [],
-            "items": {
-              "$ref": "#/components/schemas/EvidenceLevel"
-            },
-            "title": "Evidence Hierarchy",
-            "type": "array"
-          },
-          "paradigms": {
-            "default": [],
-            "items": {
-              "$ref": "#/components/schemas/Paradigm"
-            },
-            "title": "Paradigms",
-            "type": "array"
-          }
-        },
-        "title": "EpistemologyConfig",
-        "type": "object"
-      },
-      "EpistemologyConfig-Output": {
+      "EpistemologyConfig": {
         "properties": {
           "evidence_hierarchy": {
             "default": [],
@@ -18646,7 +18492,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/DomainSchema-Output"
+                    "$ref": "#/components/schemas/DomainSchema"
                   },
                   "title": "Response Get Domains",
                   "type": "array"
@@ -18673,7 +18519,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DomainSchema-Input"
+                "$ref": "#/components/schemas/DomainSchema"
               }
             }
           },
@@ -18684,7 +18530,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DomainSchema-Output"
+                  "$ref": "#/components/schemas/DomainSchema"
                 }
               }
             },
@@ -18775,7 +18621,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DomainSchema-Output"
+                  "$ref": "#/components/schemas/DomainSchema"
                 }
               }
             },
@@ -18833,7 +18679,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DomainSchema-Output"
+                  "$ref": "#/components/schemas/DomainSchema"
                 }
               }
             },

@@ -1601,23 +1601,7 @@ export type DeletionRequest = {
 /**
  * DiscourseConfig
  */
-export type DiscourseConfigInput = {
-    authority_sources?: AuthoritySources | null;
-    communication_channels?: CommunicationChannels | null;
-    /**
-     * Health Metrics
-     */
-    health_metrics?: Array<HealthMetricDef>;
-    /**
-     * Validation Practices
-     */
-    validation_practices?: Array<ValidationPractice>;
-};
-
-/**
- * DiscourseConfig
- */
-export type DiscourseConfigOutput = {
+export type DiscourseConfig = {
     authority_sources?: AuthoritySources | null;
     communication_channels?: CommunicationChannels | null;
     /**
@@ -1744,7 +1728,7 @@ export type DomainEnrichmentPolicyUpdate = {
 /**
  * DomainSchema
  */
-export type DomainSchemaInput = {
+export type DomainSchema = {
     /**
      * Attributes
      */
@@ -1753,52 +1737,12 @@ export type DomainSchemaInput = {
      * Description
      */
     description: string;
-    discourse_community?: DiscourseConfigInput | null;
+    discourse_community?: DiscourseConfig | null;
     /**
      * Entity Count
      */
     entity_count?: number | null;
-    epistemology?: EpistemologyConfigInput | null;
-    /**
-     * First Entity Id
-     */
-    first_entity_id?: number | null;
-    /**
-     * Icon
-     */
-    icon?: string | null;
-    /**
-     * Id
-     */
-    id: string;
-    /**
-     * Name
-     */
-    name: string;
-    /**
-     * Primary Entity
-     */
-    primary_entity: string;
-};
-
-/**
- * DomainSchema
- */
-export type DomainSchemaOutput = {
-    /**
-     * Attributes
-     */
-    attributes: Array<AttributeSchema>;
-    /**
-     * Description
-     */
-    description: string;
-    discourse_community?: DiscourseConfigOutput | null;
-    /**
-     * Entity Count
-     */
-    entity_count?: number | null;
-    epistemology?: EpistemologyConfigOutput | null;
+    epistemology?: EpistemologyConfig | null;
     /**
      * First Entity Id
      */
@@ -2170,21 +2114,7 @@ export type EntitySnap = {
 /**
  * EpistemologyConfig
  */
-export type EpistemologyConfigInput = {
-    /**
-     * Evidence Hierarchy
-     */
-    evidence_hierarchy?: Array<EvidenceLevel>;
-    /**
-     * Paradigms
-     */
-    paradigms?: Array<Paradigm>;
-};
-
-/**
- * EpistemologyConfig
- */
-export type EpistemologyConfigOutput = {
+export type EpistemologyConfig = {
     /**
      * Evidence Hierarchy
      */
@@ -9901,13 +9831,13 @@ export type GetDomainsResponses = {
      *
      * Successful Response
      */
-    200: Array<DomainSchemaOutput>;
+    200: Array<DomainSchema>;
 };
 
 export type GetDomainsResponse = GetDomainsResponses[keyof GetDomainsResponses];
 
 export type PostDomainsData = {
-    body: DomainSchemaInput;
+    body: DomainSchema;
     path?: never;
     query?: never;
     url: '/domains';
@@ -9926,7 +9856,7 @@ export type PostDomainsResponses = {
     /**
      * Successful Response
      */
-    201: DomainSchemaOutput;
+    201: DomainSchema;
 };
 
 export type PostDomainsResponse = PostDomainsResponses[keyof PostDomainsResponses];
@@ -9984,7 +9914,7 @@ export type GetDomainsByDomainIdResponses = {
     /**
      * Successful Response
      */
-    200: DomainSchemaOutput;
+    200: DomainSchema;
 };
 
 export type GetDomainsByDomainIdResponse = GetDomainsByDomainIdResponses[keyof GetDomainsByDomainIdResponses];
@@ -10014,7 +9944,7 @@ export type PatchDomainsByDomainIdEpistemologyResponses = {
     /**
      * Successful Response
      */
-    200: DomainSchemaOutput;
+    200: DomainSchema;
 };
 
 export type PatchDomainsByDomainIdEpistemologyResponse = PatchDomainsByDomainIdEpistemologyResponses[keyof PatchDomainsByDomainIdEpistemologyResponses];

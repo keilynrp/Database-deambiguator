@@ -6,6 +6,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.domain_schema import DomainSchema
 from ...models.epistemology_patch import EpistemologyPatch
 from ...models.http_validation_error import HTTPValidationError
 from ...types import Response
@@ -33,7 +34,14 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> HTTPValidationError | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> DomainSchema | HTTPValidationError | None:
+    if response.status_code == 200:
+        response_200 = DomainSchema.from_dict(response.json())
+
+        return response_200
+
     if response.status_code == 422:
         response_422 = HTTPValidationError.from_dict(response.json())
 
@@ -45,7 +53,9 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[HTTPValidationError]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[DomainSchema | HTTPValidationError]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -59,7 +69,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: EpistemologyPatch,
-) -> Response[HTTPValidationError]:
+) -> Response[DomainSchema | HTTPValidationError]:
     """Patch Domain Epistemology
 
      Update (or clear) the epistemology configuration for a domain.
@@ -74,7 +84,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[HTTPValidationError]
+        Response[DomainSchema | HTTPValidationError]
     """
 
     kwargs = _get_kwargs(
@@ -94,7 +104,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: EpistemologyPatch,
-) -> HTTPValidationError | None:
+) -> DomainSchema | HTTPValidationError | None:
     """Patch Domain Epistemology
 
      Update (or clear) the epistemology configuration for a domain.
@@ -109,7 +119,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        HTTPValidationError
+        DomainSchema | HTTPValidationError
     """
 
     return sync_detailed(
@@ -124,7 +134,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: EpistemologyPatch,
-) -> Response[HTTPValidationError]:
+) -> Response[DomainSchema | HTTPValidationError]:
     """Patch Domain Epistemology
 
      Update (or clear) the epistemology configuration for a domain.
@@ -139,7 +149,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[HTTPValidationError]
+        Response[DomainSchema | HTTPValidationError]
     """
 
     kwargs = _get_kwargs(
@@ -157,7 +167,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: EpistemologyPatch,
-) -> HTTPValidationError | None:
+) -> DomainSchema | HTTPValidationError | None:
     """Patch Domain Epistemology
 
      Update (or clear) the epistemology configuration for a domain.
@@ -172,7 +182,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        HTTPValidationError
+        DomainSchema | HTTPValidationError
     """
 
     return (

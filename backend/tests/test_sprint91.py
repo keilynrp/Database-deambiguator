@@ -54,7 +54,14 @@ class TestConnectionManager:
         self.mgr = ConnectionManager()
 
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        # asyncio.run() rather than get_event_loop().run_until_complete():
+        # the latter reuses whatever loop the process last installed, so once
+        # an async test elsewhere in the suite closes its loop these tests fail
+        # on "Event loop is closed" — but only when run after it, which made
+        # them pass in isolation and fail in the full suite. asyncio.run()
+        # creates and disposes its own loop, so the outcome no longer depends
+        # on execution order.
+        return asyncio.run(coro)
 
     def test_connect_adds_to_room(self):
         ws = _make_ws()

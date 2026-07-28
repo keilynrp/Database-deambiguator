@@ -20,9 +20,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
-# Python deps
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Python deps.
+#
+# `-c requirements.lock` is what CI already installs with. Without it here the
+# image resolved requirements.txt freely while CI resolved it under the lock,
+# and the two drifted to sharing only half their versions — including bcrypt
+# and starlette across major releases. Every gate therefore approved a
+# dependency set that never reached production (issue #201).
+#
+# The lock is now generated FROM this image, so it describes what actually
+# ships; see the header of requirements.lock before refreshing it.
+COPY requirements.txt requirements.lock ./
+RUN pip install --no-cache-dir -r requirements.txt -c requirements.lock
 
 # Application source
 COPY . .

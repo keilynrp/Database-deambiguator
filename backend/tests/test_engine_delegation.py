@@ -1,4 +1,12 @@
-"""Tests for EngineClient compute delegation and fallback behavior."""
+"""Tests for EngineClient compute delegation and fallback behavior.
+
+Coroutines here are driven with ``asyncio.run()``, never
+``asyncio.get_event_loop().run_until_complete()``. The latter reuses whatever
+loop the process last installed, so once an async test elsewhere closes its
+loop these fail on "Event loop is closed" — but only when scheduled after it,
+which is why they passed in isolation and failed in the full suite. Keep new
+tests on ``asyncio.run()`` so results stay independent of execution order.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -36,7 +44,7 @@ class TestFallbackBehavior:
     """Verify all convenience methods return None when engine is unavailable."""
 
     def test_process_authority_fallback(self, offline_client):
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             offline_client.process_authority(
                 field_name="author",
                 values=["John Smith"],
@@ -45,7 +53,7 @@ class TestFallbackBehavior:
         assert result is None
 
     def test_process_analytics_fallback(self, offline_client):
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             offline_client.process_analytics(
                 domain_id="science",
                 mode="topics",
@@ -54,7 +62,7 @@ class TestFallbackBehavior:
         assert result is None
 
     def test_process_disambiguation_fallback(self, offline_client):
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             offline_client.process_disambiguation(
                 field_name="brand",
                 values=["Apple", "apple"],
@@ -63,7 +71,7 @@ class TestFallbackBehavior:
         assert result is None
 
     def test_process_normalization_fallback(self, offline_client):
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             offline_client.process_normalization(
                 values=["García"],
                 mode="unicode",
@@ -72,7 +80,7 @@ class TestFallbackBehavior:
         assert result is None
 
     def test_process_connectors_fallback(self, offline_client):
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             offline_client.process_connectors(
                 source="openalex",
                 query_type="doi",
@@ -82,7 +90,7 @@ class TestFallbackBehavior:
         assert result is None
 
     def test_health_fallback(self, offline_client):
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             offline_client.health()
         )
         assert result is False
@@ -111,7 +119,7 @@ class TestDelegationSuccess:
         mock_resp = MagicMock()
         self.mock_stub.ProcessSync = AsyncMock(return_value=mock_resp)
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             self.client.process_authority(
                 field_name="author",
                 values=["John Smith", "Alice Jones"],
@@ -132,7 +140,7 @@ class TestDelegationSuccess:
         mock_resp = MagicMock()
         self.mock_stub.ProcessSync = AsyncMock(return_value=mock_resp)
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             self.client.process_analytics(
                 domain_id="science",
                 mode="topics",
@@ -151,7 +159,7 @@ class TestDelegationSuccess:
         mock_resp = MagicMock()
         self.mock_stub.ProcessSync = AsyncMock(return_value=mock_resp)
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             self.client.process_disambiguation(
                 field_name="brand",
                 values=["Apple", "apple"],
@@ -169,7 +177,7 @@ class TestDelegationSuccess:
         mock_resp = MagicMock()
         self.mock_stub.ProcessSync = AsyncMock(return_value=mock_resp)
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             self.client.process_normalization(
                 values=["García", "Müller"],
                 mode="unicode",
@@ -186,7 +194,7 @@ class TestDelegationSuccess:
         mock_resp = MagicMock()
         self.mock_stub.ProcessSync = AsyncMock(return_value=mock_resp)
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             self.client.process_normalization(
                 values=["Apple Inc."],
                 mode="rules",
@@ -204,7 +212,7 @@ class TestDelegationSuccess:
         mock_resp = MagicMock()
         self.mock_stub.ProcessSync = AsyncMock(return_value=mock_resp)
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             self.client.process_connectors(
                 source="openalex",
                 query_type="doi",
@@ -225,7 +233,7 @@ class TestDelegationSuccess:
             side_effect=Exception("connection refused")
         )
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             self.client.process_authority(
                 field_name="author",
                 values=["John Smith"],
@@ -257,7 +265,7 @@ class TestAnalyticsDelegationHelpers:
     def test_topics_conversion(self):
         client = AsyncMock()
         client.process_analytics = AsyncMock(return_value=self._make_response("topics"))
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_analytics(client, "default", "topics", 30)
         )
         assert result is not None
@@ -267,7 +275,7 @@ class TestAnalyticsDelegationHelpers:
     def test_cooccurrence_conversion(self):
         client = AsyncMock()
         client.process_analytics = AsyncMock(return_value=self._make_response("cooccurrence"))
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_analytics(client, "default", "cooccurrence", 20)
         )
         assert result is not None
@@ -277,7 +285,7 @@ class TestAnalyticsDelegationHelpers:
     def test_clusters_conversion(self):
         client = AsyncMock()
         client.process_analytics = AsyncMock(return_value=self._make_response("clusters"))
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_analytics(client, "default", "clusters", 6)
         )
         assert result is not None
@@ -288,7 +296,7 @@ class TestAnalyticsDelegationHelpers:
     def test_correlation_conversion(self):
         client = AsyncMock()
         client.process_analytics = AsyncMock(return_value=self._make_response("correlation"))
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_analytics(client, "default", "correlation", 20)
         )
         assert result is not None
@@ -299,13 +307,13 @@ class TestAnalyticsDelegationHelpers:
     def test_engine_unavailable_returns_none(self):
         client = AsyncMock()
         client.process_analytics = AsyncMock(return_value=None)
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_analytics(client, "default", "topics", 30)
         )
         assert result is None
 
     def test_none_client_returns_none(self):
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_analytics(None, "default", "topics", 30)
         )
         assert result is None
@@ -313,7 +321,7 @@ class TestAnalyticsDelegationHelpers:
     def test_exception_returns_none(self):
         client = AsyncMock()
         client.process_analytics = AsyncMock(side_effect=Exception("rpc error"))
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_analytics(client, "default", "topics", 30)
         )
         assert result is None
@@ -332,7 +340,7 @@ class TestDisambiguationDelegationHelpers:
         resp = SimpleNamespace(disambiguation_result=SimpleNamespace(clusters=[cluster]))
         client = AsyncMock()
         client.process_disambiguation = AsyncMock(return_value=resp)
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_disambiguation(client, "institution", ["a"] * 200, 80, 0.85)
         )
         assert result is not None
@@ -343,7 +351,7 @@ class TestDisambiguationDelegationHelpers:
     def test_engine_unavailable_returns_none(self):
         client = AsyncMock()
         client.process_disambiguation = AsyncMock(return_value=None)
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_disambiguation(client, "author", ["a", "b"], 80, 0.85)
         )
         assert result is None
@@ -360,7 +368,7 @@ class TestNormalizationDelegationHelpers:
         resp = SimpleNamespace(normalization_result=nr)
         client = AsyncMock()
         client.process_normalization = AsyncMock(return_value=resp)
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_normalization(
                 client, "company",
                 ["apple inc.", "google llc", "Microsoft Corp."],
@@ -377,7 +385,7 @@ class TestNormalizationDelegationHelpers:
     def test_engine_unavailable_returns_none(self):
         client = AsyncMock()
         client.process_normalization = AsyncMock(return_value=None)
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_normalization(client, "field", ["a"], "rules")
         )
         assert result is None
@@ -405,7 +413,7 @@ class TestConnectorDelegationHelpers:
         resp = SimpleNamespace(connector_result=cr)
         client = AsyncMock()
         client.process_connectors = AsyncMock(return_value=resp)
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_connectors(client, "openalex", "search", ["machine learning"], 10)
         )
         assert result is not None
@@ -419,13 +427,13 @@ class TestConnectorDelegationHelpers:
     def test_engine_unavailable_returns_none(self):
         client = AsyncMock()
         client.process_connectors = AsyncMock(return_value=None)
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_connectors(client, "openalex", "search", ["test"], 10)
         )
         assert result is None
 
     def test_none_client_returns_none(self):
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             try_engine_connectors(None, "openalex", "search", ["test"], 10)
         )
         assert result is None

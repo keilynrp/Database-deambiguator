@@ -29,7 +29,14 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> HTTPValidationError | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> DomainSchema | HTTPValidationError | None:
+    if response.status_code == 201:
+        response_201 = DomainSchema.from_dict(response.json())
+
+        return response_201
+
     if response.status_code == 422:
         response_422 = HTTPValidationError.from_dict(response.json())
 
@@ -41,7 +48,9 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[HTTPValidationError]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[DomainSchema | HTTPValidationError]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -54,7 +63,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: DomainSchema,
-) -> Response[HTTPValidationError]:
+) -> Response[DomainSchema | HTTPValidationError]:
     """Create Domain
 
      Create a new custom domain schema. Persists as YAML in backend/domains/.
@@ -67,7 +76,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[HTTPValidationError]
+        Response[DomainSchema | HTTPValidationError]
     """
 
     kwargs = _get_kwargs(
@@ -85,7 +94,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: DomainSchema,
-) -> HTTPValidationError | None:
+) -> DomainSchema | HTTPValidationError | None:
     """Create Domain
 
      Create a new custom domain schema. Persists as YAML in backend/domains/.
@@ -98,7 +107,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        HTTPValidationError
+        DomainSchema | HTTPValidationError
     """
 
     return sync_detailed(
@@ -111,7 +120,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: DomainSchema,
-) -> Response[HTTPValidationError]:
+) -> Response[DomainSchema | HTTPValidationError]:
     """Create Domain
 
      Create a new custom domain schema. Persists as YAML in backend/domains/.
@@ -124,7 +133,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[HTTPValidationError]
+        Response[DomainSchema | HTTPValidationError]
     """
 
     kwargs = _get_kwargs(
@@ -140,7 +149,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: DomainSchema,
-) -> HTTPValidationError | None:
+) -> DomainSchema | HTTPValidationError | None:
     """Create Domain
 
      Create a new custom domain schema. Persists as YAML in backend/domains/.
@@ -153,7 +162,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        HTTPValidationError
+        DomainSchema | HTTPValidationError
     """
 
     return (
