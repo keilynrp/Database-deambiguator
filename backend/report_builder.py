@@ -246,10 +246,48 @@ tr:last-child td { border-bottom: none; }
 .analyst-note p:last-child { margin-bottom: 0; }
 footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e5e7eb;
          font-size: 12px; color: #9ca3af; text-align: center; }
+/* ── Paged media ───────────────────────────────────────────────────────────
+   This stylesheet is shared: build() produces the one HTML that both the HTML
+   and the PDF export render (routers/reports.py). Everything below is scoped
+   to @page / @media print so the HTML view is untouched. */
+
+@page {
+  size: A4;
+  margin: 22mm 16mm 18mm;
+  @top-left     { content: string(doctitle); font-size: 8pt; color: #6b7280; }
+  @top-right    { content: string(docmeta);  font-size: 8pt; color: #9ca3af; }
+  @bottom-right { content: counter(page) " / " counter(pages);
+                  font-size: 8pt; color: #9ca3af; }
+}
+/* The cover carries its own title; a running header would repeat it. */
+@page :first {
+  @top-left  { content: none; }
+  @top-right { content: none; }
+}
+
 @media print {
-  body { padding: 16px; }
-  .cover { padding: 40px 0 32px; }
-  section { page-break-inside: avoid; }
+  /* @page supplies the margins; body padding on top of it double-counts. */
+  body { padding: 0; }
+
+  /* Pull the cover's own text up into the running header on later pages. */
+  .cover      { padding: 34mm 0 24mm; border-bottom: none; break-after: page; }
+  .cover h1   { string-set: doctitle content(); }
+  .cover .meta{ string-set: docmeta content(); }
+
+  /* `section { break-inside: avoid }` was counterproductive: a section longer
+     than a page cannot honour it, and the engine then breaks it worse than if
+     left alone. Keep sections breakable and protect the units that actually
+     read badly when split. */
+  section        { break-inside: auto; margin-bottom: 32px; }
+  section h2     { break-after: avoid; }
+  thead          { display: table-header-group; }
+  tr             { break-inside: avoid; }
+  .stat-card,
+  .callout,
+  .analyst-note  { break-inside: avoid; }
+  p, td          { orphans: 3; widows: 3; }
+
+  footer { margin-top: 24px; }
 }
 """
 
