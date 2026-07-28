@@ -830,7 +830,26 @@ def _section_institutional_benchmark(
     )
 
 
-def _section_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> str:
+def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+    """Format-neutral saved agentic-chat traces (report-presentation, task 3.5).
+
+    Migrating this fixed two defects the bespoke HTML builder carried. It styled
+    its cards with `class="card"` and `class="muted"`, neither of which exists
+    in the report stylesheet, so the section had been rendering unstyled; and
+    its standing intro paragraph was hard-coded Spanish inside an
+    otherwise-English report. Both disappear by going through the shared
+    renderer, and the intro is where it belonged all along — the method
+    disclosure.
+    """
+    from backend.reporting.section_data import Materiality, Narrative, SectionData
+
+    method = (
+        "AI-generated answers saved from the research assistant, not verified "
+        "findings about the corpus. Each entry records the tools invoked and "
+        "the sources cited so the answer can be audited; the answer itself has "
+        "not been reviewed. Shows the 5 most recent saved traces."
+    )
+
     traces = (
         db.query(models.AnalysisContext)
         .filter(
@@ -841,45 +860,79 @@ def _section_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> s
         .limit(5)
         .all()
     )
-    if not traces:
-        return """<section><h2>Agentic Research Trace</h2>
-        <p style="color:#9ca3af;padding:12px 0">No saved agentic chat traces are available yet. Ask a question from the research assistant and save the trace to include it in this brief.</p></section>"""
 
-    cards = []
+    if not traces:
+        return SectionData(
+            key="agentic_trace",
+            title="Agentic Research Trace",
+            blocks=(
+                Narrative(
+                    heading="No saved traces",
+                    paragraphs=(
+                        "No saved agentic chat traces are available yet. Ask a question "
+                        "from the research assistant and save the trace to include it here.",
+                    ),
+                ),
+            ),
+            takeaway="No agentic research traces have been saved for this domain.",
+            method=method,
+            materiality=Materiality.EMPTY,
+        )
+
+    blocks: list[Narrative] = []
+    tools_seen: set[str] = set()
     for trace in traces:
         try:
             payload = json.loads(trace.context_snapshot or "{}")
         except Exception:
             payload = {}
         question = payload.get("question") or trace.label.replace("agentic-chat:", "").strip()
-        answer = payload.get("answer") or ""
+        answer = (payload.get("answer") or "")[:900]
         trace_meta = payload.get("trace") or {}
         sources = payload.get("sources") or []
-        tool_list = ", ".join(trace_meta.get("tools_used") or []) or "No tools"
-        source_list = ", ".join(
-            str(s.get("label") or s.get("entity_id") or "source") for s in sources[:4] if isinstance(s, dict)
-        ) or "No explicit sources"
-        cards.append(f"""
-        <div class="card" style="margin-bottom:12px">
-            <div class="muted">Saved question</div>
-            <h3 style="margin:4px 0 8px">{question}</h3>
-            <p>{answer[:900]}</p>
-            <p class="muted"><strong>Tools:</strong> {tool_list}</p>
-            <p class="muted"><strong>Sources:</strong> {source_list}</p>
-        </div>
-        """)
 
-    return f"""<section><h2>Agentic Research Trace</h2>
-    <p>Esta seccion resume respuestas asistidas por IA generadas sobre datos del portafolio UKIP. Las fuentes y herramientas usadas quedan registradas para auditoria.</p>
-    {''.join(cards)}
-</section>"""
+        tools = trace_meta.get("tools_used") or []
+        tools_seen.update(tools)
+        tool_list = ", ".join(tools) or "No tools"
+        source_list = ", ".join(
+            str(s.get("label") or s.get("entity_id") or "source")
+            for s in sources[:4]
+            if isinstance(s, dict)
+        ) or "No explicit sources"
+
+        blocks.append(
+            Narrative(
+                heading=question or "Saved question",
+                paragraphs=tuple(
+                    p for p in (answer, f"Tools: {tool_list}", f"Sources: {source_list}") if p
+                ),
+            )
+        )
+
+    return SectionData(
+        key="agentic_trace",
+        title="Agentic Research Trace",
+        blocks=tuple(blocks),
+        takeaway=(
+            f"{len(traces)} saved agentic answer{'s' if len(traces) != 1 else ''} "
+            f"in this brief, drawing on {len(tools_seen) or 'no'} distinct tool"
+            f"{'s' if len(tools_seen) != 1 else ''}"
+        ),
+        method=method,
+        # Never leads: these are generated answers, not findings about the data.
+        materiality=Materiality.ROUTINE,
+    )
+
+
+def _section_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> str:
+    from backend.reporting.html_renderer import render_html
+    return render_html(collect_agentic_trace(db, domain_id, org_id))
+
 
 # ── Authority / coauthorship / journals (extend-report-module-coverage) ──────
-
 # Explicit cap on the conflicts table: a brief lists the worst offenders, it is
 # not an export of the review queue (production holds ~9.4k pending records).
 _AUTHORITY_CONFLICT_LIMIT = 10
-
 # Fraction of authority records awaiting review at or above which the stakeholder
 # reading gains an explicit backlog caveat, so readiness language cannot silently
 # contradict a known identity-resolution backlog sitting underneath it. This is a
