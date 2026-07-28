@@ -397,36 +397,97 @@ def _section_top_brands(db: Session, domain_id: str, org_id: int | None) -> str:
     return render_html(collect_top_secondary_labels(db, domain_id, org_id))
 
 
-def _section_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> str:
-    analyzer = TopicAnalyzer()
+#: One limit, applied in the payload, because no renderer truncates — whatever
+#: this collector returns is what every format shows verbatim. So the number has
+#: to be legible in the worst case, a PPTX slide, not just in a spreadsheet.
+#:
+#: It replaces four different numbers that had drifted apart: Excel fetched 50,
+#: PPTX 20, and HTML fetched 15 while drawing 15 chips and a 10-row table. Same
+#: section key, four answers. Excel readers lose detail here (50 -> 20); raising
+#: it again means teaching the PPTX renderer to truncate with a visible
+#: "showing N of M", which is a change to every section's tables, not just this
+#: one.
+_TOPIC_CAP = 20
+
+
+def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+    """Format-neutral top concepts (report-presentation, task 3.4).
+
+    Note the section key says "clusters" and this returns most-frequent
+    concepts. That was already true of all three previous implementations;
+    reconciling the name is task 3.6, deliberately separate because renaming a
+    section a caller can request is a visible API change.
+    """
+    from backend.reporting.section_data import (
+        Materiality,
+        Narrative,
+        SectionData,
+        Table,
+    )
+
+    method = (
+        "Most frequent enriched concepts for this domain, ranked by occurrence "
+        f"and capped at the top {_TOPIC_CAP}. Frequency counts concept "
+        "occurrences across enriched records, not distinct entities, so one "
+        "record contributes more than once when it carries a concept repeatedly."
+    )
+
     try:
-        result = analyzer.top_topics(domain_id=domain_id, top_n=15, org_id=org_id)
-        topics = result.get("topics", [])
+        result = TopicAnalyzer().top_topics(domain_id=domain_id, top_n=_TOPIC_CAP, org_id=org_id)
+        topics = result.get("topics", []) or []
     except Exception:
+        # An analyzer failure is reported as an empty section rather than a
+        # broken report; the empty-state takeaway says so explicitly.
         topics = []
 
     if not topics:
-        return f"""<section><h2>Topic Clusters</h2>
-        <p style="color:#9ca3af;padding:12px 0">No enriched concepts found — run enrichment first.</p>
-        </section>"""
+        return SectionData(
+            key="topic_clusters",
+            title="Topic Clusters",
+            blocks=(
+                Narrative(
+                    heading="No concepts available",
+                    paragraphs=("No enriched concepts found — run enrichment first.",),
+                ),
+            ),
+            takeaway="No enriched concepts to report; enrichment has not produced any for this domain.",
+            method=method,
+            materiality=Materiality.EMPTY,
+        )
 
-    max_c = topics[0]["count"] if topics else 1
-    chips = "".join(f'<span class="chip">{t["concept"]} <b>({t["count"]})</b></span>' for t in topics[:20])
-    rows = "".join(f"""
-        <tr><td>{t["concept"]}</td>
-            <td>{t["count"]:,}</td>
-            <td><div class="bar-wrap">
-                <div class="bar-bg"><div class="bar" style="width:{round(t['count']/max_c*100)}%"></div></div>
-            </div></td></tr>""" for t in topics[:10])
+    max_count = topics[0]["count"] or 1
+    total = sum(t["count"] for t in topics)
+    lead = topics[0]
+    lead_share = round(lead["count"] / total * 100) if total else 0
 
-    return f"""<section>
-    <h2>Topic Clusters</h2>
-    <div style="margin-bottom:16px">{chips}</div>
-    <table>
-        <thead><tr><th>Concept</th><th>Frequency</th><th>Relative weight</th></tr></thead>
-        <tbody>{rows}</tbody>
-    </table>
-</section>"""
+    rows = tuple(
+        (t["concept"], f'{t["count"]:,}', f'{round(t["count"] / max_count * 100)}%')
+        for t in topics
+    )
+
+    return SectionData(
+        key="topic_clusters",
+        title="Topic Clusters",
+        blocks=(
+            Table(
+                columns=("Concept", "Frequency", "Relative weight"),
+                rows=rows,
+                bar_column=2,
+            ),
+        ),
+        takeaway=(
+            f'"{lead["concept"]}" is the most frequent concept, accounting for '
+            f'{lead_share}% of the top {len(topics)}'
+        ),
+        method=method,
+        # Concentration is the finding worth reading; an even spread is not.
+        materiality=Materiality.NOTABLE if lead_share >= 25 else Materiality.ROUTINE,
+    )
+
+
+def _section_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> str:
+    from backend.reporting.html_renderer import render_html
+    return render_html(collect_topic_clusters(db, domain_id, org_id))
 
 
 def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -> "SectionData":

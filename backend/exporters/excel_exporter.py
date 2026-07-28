@@ -14,7 +14,6 @@ from openpyxl.utils import get_column_letter
 from sqlalchemy.orm import Session
 
 from backend import models
-from backend.analyzers.topic_modeling import TopicAnalyzer
 from backend.tenant_access import scope_query_to_org
 
 logger = logging.getLogger(__name__)
@@ -56,7 +55,6 @@ class EnterpriseExcelExporter:
     """Build a branded multi-sheet Excel workbook and return raw bytes."""
 
     _ENTITY_CAP = 5_000
-    _CONCEPT_CAP = 50
 
     def _entities_query(self, db: Session, domain_id: str, org_id: int | None):
         query = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
@@ -87,10 +85,11 @@ class EnterpriseExcelExporter:
         ws_entities = wb.create_sheet("Entities")
         self._write_entities(ws_entities, db, domain_id, org_id)
 
-        # ── Sheet 3: Concepts ─────────────────────────────────────────────────
-        if "topic_clusters" in sections:
-            ws_concepts = wb.create_sheet("Concepts")
-            self._write_concepts(ws_concepts, db, domain_id, org_id)
+        # topic_clusters used to be written here by a bespoke sheet writer that
+        # queried TopicAnalyzer directly with its own cap of 50, while PPTX used
+        # 20 and HTML 15. It now goes through the shared collector below like
+        # every other migrated section, so all four formats state the same
+        # finding over the same rows.
 
         # ── Migrated sections: rendered from the shared section payload ───────
         # These render via the format-neutral collector + Excel renderer, so the
@@ -113,6 +112,7 @@ class EnterpriseExcelExporter:
             "authority_control": report_builder.collect_authority_control,
             "collaboration_graph": report_builder.collect_collaboration_graph,
             "journal_portfolio": report_builder.collect_journal_portfolio,
+            "topic_clusters": report_builder.collect_topic_clusters,
         }
         for section_id, collect in migrated_collectors.items():
             if section_id in requested:
@@ -191,35 +191,6 @@ class EnterpriseExcelExporter:
             ws.cell(row=row_idx, column=6, value=e.enrichment_status)
             ws.cell(row=row_idx, column=7, value=e.enrichment_citation_count)
             ws.cell(row=row_idx, column=8, value=e.enrichment_source)
-
-        _autofit(ws)
-
-    def _write_concepts(
-        self,
-        ws,
-        db: Session,
-        domain_id: str,
-        org_id: int | None,
-    ) -> None:  # db kept for consistency
-        headers = ["Rank", "Concept", "Count", "Percentage (%)"]
-        _style_header_row(ws, headers)
-
-        try:
-            result = TopicAnalyzer().top_topics(
-                domain_id=domain_id,
-                top_n=self._CONCEPT_CAP,
-                org_id=org_id,
-            )
-            topics = result.get("topics", [])
-        except Exception:
-            logger.warning("TopicAnalyzer failed in excel_exporter", exc_info=True)
-            topics = []
-
-        for row_idx, t in enumerate(topics, start=2):
-            ws.cell(row=row_idx, column=1, value=row_idx - 1)
-            ws.cell(row=row_idx, column=2, value=t.get("concept", ""))
-            ws.cell(row=row_idx, column=3, value=t.get("count", 0))
-            ws.cell(row=row_idx, column=4, value=round(t.get("pct", 0.0), 2))
 
         _autofit(ws)
 

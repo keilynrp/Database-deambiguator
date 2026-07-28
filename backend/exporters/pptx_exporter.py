@@ -13,7 +13,6 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend import models
-from backend.analyzers.topic_modeling import TopicAnalyzer
 from backend.tenant_access import scope_query_to_org
 
 try:
@@ -232,29 +231,10 @@ def generate_pptx(
             _add_text_box(slide, line, Inches(0.5), Inches(0.75 + idx * 0.52), Inches(12), Inches(0.45),
                           font_size=12, color=RGBColor(40, 40, 80))
 
-    # ── Slide 5: Topic Clusters ───────────────────────────────────────────────
-    if "topic_clusters" in sections:
-        try:
-            result = TopicAnalyzer().top_topics(domain_id, top_n=20, org_id=org_id)
-            topics = result.get("topics", [])
-        except Exception:
-            topics = []
-
-        slide = _add_slide(prs)
-        _add_header_bar(slide, accent, W)
-        _add_text_box(slide, "Top Concepts", Inches(0.5), Inches(0.05), Inches(10), Inches(0.45),
-                      font_size=16, bold=True, color=RGBColor(255, 255, 255))
-        col_size = 10
-        left_col  = topics[:col_size]
-        right_col = topics[col_size:col_size * 2]
-        for idx, t in enumerate(left_col):
-            line = f"  {t['concept']}  ({t['count']:,})"
-            _add_text_box(slide, line, Inches(0.5), Inches(0.75 + idx * 0.48), Inches(6), Inches(0.42),
-                          font_size=11, color=RGBColor(40, 40, 80))
-        for idx, t in enumerate(right_col):
-            line = f"  {t['concept']}  ({t['count']:,})"
-            _add_text_box(slide, line, Inches(6.7), Inches(0.75 + idx * 0.48), Inches(6), Inches(0.42),
-                          font_size=11, color=RGBColor(40, 40, 80))
+    # topic_clusters used to be a hand-built two-column slide here, titled "Top
+    # Concepts" and fetching its own top_n=20 while Excel used 50 and HTML 15.
+    # It is now in the migrated map below, so all four formats render the same
+    # rows from one payload.
 
     # ── Migrated sections: rendered from the shared section payload ───────────
     # These render via the format-neutral collectors + the shared PPTX renderer,
@@ -273,6 +253,7 @@ def generate_pptx(
         "authority_control": report_builder.collect_authority_control,
         "collaboration_graph": report_builder.collect_collaboration_graph,
         "journal_portfolio": report_builder.collect_journal_portfolio,
+        "topic_clusters": report_builder.collect_topic_clusters,
     }
     for section_id, collect in migrated_collectors.items():
         if section_id in sections:
