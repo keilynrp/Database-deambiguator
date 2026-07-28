@@ -25,13 +25,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.13 is what ships — Dockerfile.backend builds FROM python:3.13-slim —
-        # yet it was the one version never tested here. 3.11 is dropped rather
-        # than kept: no artifact runs it (the image is the only deliverable, and
-        # the repo declares no packaging metadata), and requirements.lock now
-        # pins the set the 3.13 image resolves, which has no 3.11 distribution
-        # for numpy. Testing it would mean loosening the lock and reopening the
-        # drift this file exists to close.
+        # 3.13 is what ships — Dockerfile.backend builds FROM python:3.13-slim.
+        # 3.11 was dropped rather than kept: no artifact runs it (the image is
+        # the only deliverable, and the repo declares no packaging metadata),
+        # and requirements.lock pins the set the 3.13 image resolves, which has
+        # no 3.11 distribution for numpy. Testing it would mean loosening the
+        # lock and reopening the drift this pin exists to close.
+        #
+        # This matrix is the ONLY place a version other than 3.13 is deliberate:
+        # 3.12 stays for breadth, to catch code that quietly depends on 3.13-only
+        # behaviour. Every standalone `python-version:` in this repo's workflows
+        # is 3.13, so single-version jobs exercise the runtime that ships.
         python-version: ["3.12", "3.13"]
 
     steps:
@@ -63,7 +67,7 @@ jobs:
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v7
-        if: matrix.python-version == '3.12'
+        if: matrix.python-version == '3.13'
         with:
           name: coverage-report
           path: coverage.xml
@@ -80,7 +84,7 @@ jobs:
       - name: Set up Python 3.12
         uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.13"
           cache: pip
 
       - name: Install dependencies
@@ -100,7 +104,7 @@ jobs:
       - name: Set up Python 3.12
         uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.13"
           cache: pip
 
       - name: Install dependencies
@@ -195,7 +199,7 @@ jobs:
       - name: Set up Python 3.12
         uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.13"
           cache: pip
 
       - name: Set up Node 22
