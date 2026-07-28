@@ -8,6 +8,7 @@ migration depends on it.
 import pytest
 
 from backend.reporting.section_data import (
+    Materiality,
     Meter,
     Narrative,
     SectionData,
@@ -74,3 +75,63 @@ def test_blocks_are_immutable():
     item = StatItem(label="Total", value="10")
     with pytest.raises(Exception):
         item.value = "20"  # frozen
+
+
+# ── Presentation contract (report-presentation) ───────────────────────────────
+
+
+def test_materiality_orders_lead_above_everything():
+    """The executive summary sorts by materiality, so the ordinal has to sort."""
+    assert Materiality.LEAD > Materiality.NOTABLE > Materiality.ROUTINE > Materiality.EMPTY
+
+
+def test_materiality_sorts_lead_first_when_reversed():
+    levels = [Materiality.ROUTINE, Materiality.LEAD, Materiality.EMPTY, Materiality.NOTABLE]
+    assert sorted(levels, reverse=True)[0] is Materiality.LEAD
+    assert sorted(levels, reverse=True)[-1] is Materiality.EMPTY
+
+
+def test_section_carries_takeaway_method_and_materiality():
+    section = SectionData(
+        key="authority_control",
+        title="Authority Control",
+        blocks=(),
+        takeaway="912 of 1,000 authority records confirmed; 88 await review",
+        method="Counts scoped to this domain and organization, as of the last resolution run.",
+        materiality=Materiality.LEAD,
+    )
+    assert section.takeaway.startswith("912 of 1,000")
+    assert "as of" in section.method
+    assert section.materiality is Materiality.LEAD
+
+
+def test_presentation_fields_default_so_unmigrated_collectors_still_construct():
+    """The eleven pre-contract collectors must keep working during migration.
+
+    Blank-rejection lands with task 3.7, when the defaults come off; asserting
+    it here would fail every collector that has not been migrated yet.
+    """
+    section = SectionData(key="entity_stats", title="Entity Statistics", blocks=())
+    assert section.takeaway == ""
+    assert section.method == ""
+    assert section.materiality is Materiality.ROUTINE
+
+
+def test_has_presentation_distinguishes_migrated_from_default():
+    bare = SectionData(key="k", title="T", blocks=())
+    assert bare.has_presentation is False
+
+    partial = SectionData(key="k", title="T", blocks=(), takeaway="Something happened")
+    assert partial.has_presentation is False, "a takeaway without a method is not the contract"
+
+    whitespace = SectionData(key="k", title="T", blocks=(), takeaway="  ", method="  ")
+    assert whitespace.has_presentation is False, "whitespace is not a disclosure"
+
+    full = SectionData(key="k", title="T", blocks=(), takeaway="A finding", method="A source")
+    assert full.has_presentation is True
+
+
+def test_presentation_fields_are_immutable():
+    section = SectionData(key="k", title="T", blocks=(), takeaway="A finding")
+    with pytest.raises(Exception):
+        section.takeaway = "something else"  # frozen

@@ -14,9 +14,9 @@ default: a takeaway is an assertion, and a wrong one is worse than silence.
 
 ## 2. Data contract
 
-- [ ] 2.1 Add `takeaway`, `materiality` and `method` to `SectionData` with temporary defaults so existing collectors keep constructing
-- [ ] 2.2 Define the materiality ordinal and its comparison semantics
-- [ ] 2.3 Extend `test_section_data.py` for the new fields, including rejection of blank takeaway and blank method
+- [x] 2.1 Add `takeaway`, `materiality` and `method` to `SectionData` with temporary defaults so existing collectors keep constructing
+- [x] 2.2 Define the materiality ordinal and its comparison semantics — `Materiality(IntEnum)`, higher is more material so `sorted(reverse=True)` leads
+- [x] 2.3 Extend `test_section_data.py` for the new fields — ordering, defaults, immutability, `has_presentation`. Blank-rejection deliberately deferred to 3.7: enforcing it now breaks all eleven un-migrated collectors, so it lands when the defaults come off
 
 ## 3. Collectors
 
