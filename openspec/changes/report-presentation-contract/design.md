@@ -1,7 +1,7 @@
 ## Context
 
 Reports are assembled by `report_builder.build()`, which runs a set of section
-builders and concatenates their output. Twelve of the thirteen public sections
+builders and concatenates their output. Eleven of the thirteen public sections
 already follow a data/presentation split introduced by `report-format-parity`:
 a `collect_<section>()` returns a `SectionData(key, title, blocks)`, and three
 renderers — `html_renderer`, `excel_renderer`, `pptx_renderer` — turn that into
@@ -13,9 +13,20 @@ every format already receives.
 
 Two facts constrain the work:
 
-- `agentic_trace` is the one section **without** a collector, and is also the one
-  section Excel and PPTX do not render (12/13 each). It is the exception in both
-  dimensions and needs an explicit decision rather than silent inconsistency.
+- Two sections have **no collector**, and they are irregular in different ways:
+
+  | section | collector | Excel | PPTX |
+  |---|---|---|---|
+  | `agentic_trace` | no | not rendered | not rendered |
+  | `topic_clusters` | no | **rendered** | **rendered** |
+
+  `agentic_trace` is simply outside the migration. `topic_clusters` is the
+  awkward one: Excel and PPTX declare support for a section that has no payload
+  to consume, which sits uneasily with the existing `report-format-parity`
+  requirement that renderers derive output solely from the section payload.
+  Whether those renderers special-case it or the support matrix overstates
+  reality must be established before either can carry presentation elements —
+  there is nothing to attach them to today.
 - HTML and PDF are the same document. A presentation element cannot be added for
   print without appearing on screen.
 
@@ -114,10 +125,13 @@ and pasted, which is exactly the path by which a proxy metric loses its caveat.
   review section by section, and treat unreviewed placeholder text as a blocking
   defect rather than a default.
 
-- **`agentic_trace` has no collector and no Excel/PPTX support.** → Decide
-  explicitly: migrate it to a collector as part of this change, or record it as a
-  declared exception with a reason. Not deciding leaves the one irregular section
-  irregular in a new way.
+- **Two sections have no collector, and one of them already claims Excel/PPTX
+  support.** `topic_clusters` is rendered by formats that, per the existing
+  parity requirement, should consume only a payload it does not produce — so
+  there is nothing to attach presentation elements to today. → Establish how
+  those renderers obtain it, then decide each section: migrate to a collector,
+  or record a declared exception with a reason. Not deciding leaves the
+  irregular sections irregular in a new way.
 
 - **Exhibit numbers shift between reports.** → Documented above; the section key
   is the stable identifier.
@@ -144,3 +158,5 @@ No data migration; nothing is persisted. Rollback is a revert.
    treatment, especially `impact_projection` and `hidden_patterns`, whose names
    promise more certainty than a derived figure may support.
 4. `agentic_trace` — migrate to a collector, or declare an exception.
+5. `topic_clusters` — how do Excel and PPTX render it today without a payload,
+   and does that path survive the presentation contract?
