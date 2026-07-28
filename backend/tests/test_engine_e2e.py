@@ -26,14 +26,14 @@ def engine_client():
     url = os.environ.get("UKIP_ENGINE_URL", "localhost:50051")
     client = EngineClient(grpc_url=url)
     yield client
-    asyncio.get_event_loop().run_until_complete(client.close())
+    asyncio.run(client.close())
 
 
 class TestE2EAuthorityDelegation:
     """10.1: Python backend delegates authority resolution to running engine."""
 
     def test_authority_resolution_returns_valid_format(self, engine_client):
-        resp = asyncio.get_event_loop().run_until_complete(
+        resp = asyncio.run(
             engine_client.process_authority(
                 field_name="author",
                 values=["John Smith", "García, José María"],
@@ -53,14 +53,14 @@ class TestE2EFallback:
 
         # Connect to a port where nothing is running
         client = EngineClient(grpc_url="localhost:59999")
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             client.process_authority(
                 field_name="author",
                 values=["John Smith"],
             )
         )
         assert result is None, "should return None for fallback"
-        asyncio.get_event_loop().run_until_complete(client.close())
+        asyncio.run(client.close())
 
 
 class TestBenchmarkAuthority:
@@ -70,7 +70,7 @@ class TestBenchmarkAuthority:
         values = [f"Author {i}" for i in range(1000)]
 
         start = time.perf_counter()
-        resp = asyncio.get_event_loop().run_until_complete(
+        resp = asyncio.run(
             engine_client.process_authority(
                 field_name="author",
                 values=values,
@@ -105,7 +105,7 @@ class TestBenchmarkDisambiguation:
         values = base_values + [v.lower() for v in base_values]
 
         start = time.perf_counter()
-        resp = asyncio.get_event_loop().run_until_complete(
+        resp = asyncio.run(
             engine_client.process_disambiguation(
                 field_name="brand",
                 values=values,

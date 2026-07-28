@@ -37,17 +37,48 @@ _INFRA_PREFIXES = ("/docs", "/redoc", "/openapi.json", "/static", "/embed", "/he
 
 
 def _app_routes() -> list[tuple[str, str]]:
-    """Every (method, route-template) pair registered on the application."""
+    """Every (method, route-template) pair registered on the application.
+
+    Walks nested routers rather than scanning ``app.routes`` once. FastAPI 0.140
+    stopped flattening included routers onto the application: each
+    ``include_router`` call leaves an ``_IncludedRouter`` wrapper that resolves
+    lazily, so a single-level scan finds the framework's own four routes and
+    none of ours. Request routing is unaffected — only introspection is — which
+    is why this surfaces as a test failure and not an outage.
+
+    Both shapes are handled so the check holds whichever version resolves;
+    verified to return identical tables on 0.135.1 and 0.140.0.
+    """
     pairs: list[tuple[str, str]] = []
-    for route in app.routes:
-        path = getattr(route, "path", None)
-        if not path:
-            continue
-        methods = getattr(route, "methods", None)
-        if not methods:  # WebSocket routes expose no methods
-            pairs.append(("GET", path))
-            continue
-        pairs.extend((method, path) for method in methods)
+
+    def walk(routes: object, prefix: str = "") -> None:
+        for route in routes:  # type: ignore[attr-defined]
+            include_context = getattr(route, "include_context", None)
+            if include_context is not None:  # FastAPI >= 0.140
+                walk(
+                    include_context.included_router.routes,
+                    prefix + (include_context.prefix or ""),
+                )
+                continue
+
+            path = getattr(route, "path", None)
+            methods = getattr(route, "methods", None)
+
+            # Mounts (and pre-0.140 nesting) carry their own children; their
+            # path is a prefix, not an endpoint.
+            nested = getattr(route, "routes", None)
+            if nested and path is not None and not methods:
+                walk(nested, prefix + path)
+                continue
+
+            if not path:
+                continue
+            if not methods:  # WebSocket routes expose no methods
+                pairs.append(("GET", prefix + path))
+                continue
+            pairs.extend((method, prefix + path) for method in methods)
+
+    walk(app.routes)
     return sorted(set(pairs))
 
 
