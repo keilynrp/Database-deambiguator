@@ -21,12 +21,18 @@ Two facts constrain the work:
   | `topic_clusters` | no | **rendered** | **rendered** |
 
   `agentic_trace` is simply outside the migration. `topic_clusters` is the
-  awkward one: Excel and PPTX declare support for a section that has no payload
-  to consume, which sits uneasily with the existing `report-format-parity`
-  requirement that renderers derive output solely from the section payload.
-  Whether those renderers special-case it or the support matrix overstates
-  reality must be established before either can carry presentation elements —
-  there is nothing to attach them to today.
+  awkward one, and task 3.3 established why: the matrix is truthful — all three
+  formats do render it — but each does so through a bespoke legacy writer that
+  issues its own `TopicAnalyzer().top_topics()` call, bypassing the payload the
+  parity requirement says renderers must derive output from.
+
+  They also disagree. HTML/PDF shows the top 15 under the heading "Topic
+  Clusters", PPTX the top 20 under "Top Concepts", Excel the top 50 on a sheet
+  called "Concepts". And all three call `top_topics` — most frequent concepts —
+  so the section key misdescribes what every implementation actually shows.
+
+  This makes migrating it a prerequisite rather than a choice: with three
+  divergent renderings there is no single payload for a takeaway to describe.
 - HTML and PDF are the same document. A presentation element cannot be added for
   print without appearing on screen.
 
@@ -125,13 +131,18 @@ and pasted, which is exactly the path by which a proxy metric loses its caveat.
   review section by section, and treat unreviewed placeholder text as a blocking
   defect rather than a default.
 
-- **Two sections have no collector, and one of them already claims Excel/PPTX
-  support.** `topic_clusters` is rendered by formats that, per the existing
-  parity requirement, should consume only a payload it does not produce — so
-  there is nothing to attach presentation elements to today. → Establish how
-  those renderers obtain it, then decide each section: migrate to a collector,
-  or record a declared exception with a reason. Not deciding leaves the
-  irregular sections irregular in a new way.
+- **`topic_clusters` renders differently in every format today** — 15, 20 and 50
+  rows under three different headings, from three writers that each query
+  directly. This is a pre-existing violation of the parity requirement, not
+  something this change introduces, but it blocks the change: a takeaway drawn
+  from what each format renders would state three different findings. →
+  Migrating it to a collector is a prerequisite (task 3.4), and the divergence
+  should be fixed deliberately rather than by silently adopting whichever limit
+  the collector happens to use — someone has to decide whether the answer is
+  15, 20 or 50.
+
+- **`agentic_trace` has no collector and no Excel/PPTX support.** → Decide
+  explicitly: migrate, or record a declared exception with a reason (task 3.5).
 
 - **Exhibit numbers shift between reports.** → Documented above; the section key
   is the stable identifier.
@@ -158,5 +169,25 @@ No data migration; nothing is persisted. Rollback is a revert.
    treatment, especially `impact_projection` and `hidden_patterns`, whose names
    promise more certainty than a derived figure may support.
 4. `agentic_trace` — migrate to a collector, or declare an exception.
-5. `topic_clusters` — how do Excel and PPTX render it today without a payload,
-   and does that path survive the presentation contract?
+5. ~~`topic_clusters` — how do Excel and PPTX render it today without a
+   payload?~~ **Answered (task 3.3).** The support matrix is truthful: all
+   three formats render it, each through a bespoke legacy writer that issues
+   its own `TopicAnalyzer().top_topics()` call. That violates the published
+   `report-format-parity` requirement that renderers derive output solely from
+   the section payload.
+
+   Worse, the three disagree:
+
+   | format | limit | heading shown |
+   |---|---|---|
+   | HTML/PDF | `top_n=15` | "Topic Clusters" |
+   | PPTX | `top_n=20` | "Top Concepts" |
+   | Excel | `top_n=50` | sheet "Concepts" |
+
+   And every implementation calls `top_topics` — most frequent concepts — not
+   clusters, so the section key misdescribes what all three actually show.
+
+   Consequence for this change: a takeaway written from what each format
+   renders would produce three different sentences. The section must be
+   migrated to a collector before it can carry the contract; there is no
+   single payload to describe today.

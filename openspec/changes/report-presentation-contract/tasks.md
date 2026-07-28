@@ -22,10 +22,12 @@ default: a takeaway is an assertion, and a wrong one is worse than silence.
 
 - [ ] 3.1 Populate the three fields in the 11 sections that already have a `collect_*`, one section per commit-sized step
 - [ ] 3.2 Add the empty/insufficient-data takeaway path per collector, and rank it below any section with a finding
-- [ ] 3.3 Establish how Excel and PPTX render `topic_clusters` today given it has no collector, and whether the support matrix overstates reality
-- [ ] 3.4 Decide `agentic_trace` and `topic_clusters`: migrate each to a collector, or record a declared exception with a reason
-- [ ] 3.5 Remove the temporary defaults from 2.1 so the type enforces the contract
-- [ ] 3.6 Per-section tests asserting the takeaway cites only figures the section renders, covering empty and boundary cases
+- [x] 3.3 Establish how Excel and PPTX render `topic_clusters` today given it has no collector, and whether the support matrix overstates reality — answered: three bespoke writers, three limits (15/20/50), all bypassing the payload
+- [ ] 3.4 Migrate `topic_clusters` to a collector — not optional after 3.3: three formats disagree on what the section shows, so there is no single payload for a takeaway to describe
+- [ ] 3.5 Decide `agentic_trace`: migrate to a collector, or record a declared exception with a reason
+- [ ] 3.6 Reconcile the section name with its content — all three implementations show most-frequent concepts, not clusters
+- [ ] 3.7 Remove the temporary defaults from 2.1 so the type enforces the contract
+- [ ] 3.8 Per-section tests asserting the takeaway cites only figures the section renders, covering empty and boundary cases
 
 ## 4. Assembly
 
