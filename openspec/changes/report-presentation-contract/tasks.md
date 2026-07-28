@@ -25,7 +25,7 @@ default: a takeaway is an assertion, and a wrong one is worse than silence.
 - [x] 3.3 Establish how Excel and PPTX render `topic_clusters` today given it has no collector, and whether the support matrix overstates reality — answered: three bespoke writers, three limits (15/20/50), all bypassing the payload
 - [x] 3.4 Migrate `topic_clusters` to a collector — done. One cap of 20 in the payload (no renderer truncates, so the payload limit is the universal limit and it has to be legible on a slide). Excel loses detail, 50 -> 20; raising it needs generic PPTX truncation, which is every section's problem, not this one's
 - [x] 3.5 Decide `agentic_trace` — migrated, not excepted. It maps cleanly onto Narrative blocks, and migrating fixed two live defects: it styled itself with `class="card"`/`class="muted"`, neither of which exists in the stylesheet, and carried a hard-coded Spanish paragraph in an English report
-- [ ] 3.6 Reconcile the section name with its content — all three implementations show most-frequent concepts, not clusters
+- [x] 3.6 Reconcile the section name with its content — display label only ("Topic Clusters" -> "Top Concepts"). The `topic_clusters` key is unchanged: it is in the vocabulary `GET /reports/sections` returns and the generated SDKs expose, so renaming it breaks callers for a tidiness gain
 - [ ] 3.7 Remove the temporary defaults from 2.1 so the type enforces the contract
 - [ ] 3.8 Per-section tests asserting the takeaway cites only figures the section renders, covering empty and boundary cases
 

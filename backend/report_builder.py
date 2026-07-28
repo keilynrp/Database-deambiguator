@@ -443,7 +443,7 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
     if not topics:
         return SectionData(
             key="topic_clusters",
-            title="Topic Clusters",
+            title="Top Concepts",
             blocks=(
                 Narrative(
                     heading="No concepts available",
@@ -467,7 +467,7 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
 
     return SectionData(
         key="topic_clusters",
-        title="Topic Clusters",
+        title="Top Concepts",
         blocks=(
             Table(
                 columns=("Concept", "Frequency", "Relative weight"),
@@ -1417,7 +1417,11 @@ SECTION_LABELS = {
     "institutional_benchmark": "Institutional Benchmark",
     "top_secondary_labels": "Top Secondary Labels / Classifications",
     "top_brands": "Top Secondary Labels / Classifications",
-    "topic_clusters": "Topic Clusters",
+    # Key stays `topic_clusters` — it is part of the vocabulary GET
+    # /reports/sections returns and the generated SDKs expose, so renaming it
+    # would break callers. The label says what the section actually shows
+    # (report-presentation 3.6): most frequent concepts, never clusters.
+    "topic_clusters": "Top Concepts",
     "harmonization_log": "Harmonization Log",
     "authority_control": "Authority Control",
     "collaboration_graph": "Collaboration Graph",

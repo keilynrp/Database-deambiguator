@@ -126,7 +126,7 @@ def test_report_survives_section_builder_returning_none(client, auth_headers):
 
     assert resp.status_code == 200
     # The healthy section still renders, the broken one degrades visibly.
-    assert "Topic Clusters" in resp.text
+    assert "Top Concepts" in resp.text
     assert "Entity Statistics" in resp.text
 
 
@@ -264,7 +264,13 @@ def test_excel_header_violet_fill(client, auth_headers):
 
 
 def test_excel_concepts_sheet_when_requested(client, auth_headers):
-    """Including 'topic_clusters' in sections must produce a 'Concepts' sheet."""
+    """Requesting 'topic_clusters' must produce its sheet in the workbook.
+
+    The sheet is named from the section payload's title rather than by a
+    bespoke writer, so it follows the label — "Top Concepts" since
+    report-presentation 3.6 relabelled it to say what it actually shows. The
+    request key is unchanged.
+    """
     payload = {
         "domain_id": "default",
         "sections": ["entity_stats", "topic_clusters"],
@@ -272,4 +278,4 @@ def test_excel_concepts_sheet_when_requested(client, auth_headers):
     resp = client.post("/exports/excel", json=payload, headers=auth_headers)
     assert resp.status_code == 200
     wb = openpyxl.load_workbook(io.BytesIO(resp.content))
-    assert "Concepts" in wb.sheetnames
+    assert "Top Concepts" in wb.sheetnames
