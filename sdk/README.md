@@ -165,22 +165,23 @@ versions (verified by regenerating twice and diffing). The Python generator's
 `ruff` cache (`sdk/python/.ruff_cache/`) is the one non-deterministic artifact
 and is git-ignored.
 
-### Python fidelity note
+### Python fidelity note — resolved
 
-FastAPI emits `-Input`/`-Output` schema variants for Pydantic models used as
-both request and response bodies. `openapi-python-client` collapses those to a
-single model name and skips the ones that collide, so three **internal
-domain-admin** models are omitted from the Python client and the
-`PATCH /domains/{domain_id}/epistemology` 200 response is untyped:
+Older FastAPI emitted `-Input`/`-Output` schema variants for Pydantic models
+used as both request and response bodies. `openapi-python-client` collapses
+those to one model name and skips the collisions, which left three internal
+domain-admin models (`DiscourseConfig`, `DomainSchema`, `EpistemologyConfig`)
+missing their `-Output` variant and the `PATCH /domains/{domain_id}/epistemology`
+200 response untyped.
 
-- `DiscourseConfig` (`-Output` variant)
-- `DomainSchema` (`-Output` variant)
-- `EpistemologyConfig` (`-Output` variant)
+This note used to recommend fixing it upstream in the FastAPI schema rather
+than hand-editing the client. That is effectively what happened: aligning the
+image and the lock (issue #201) moved the spec to FastAPI 0.140, which no
+longer splits those three models. The spec went from 192 schemas to 189 with
+**zero change to the 420 operations**, and the endpoint now returns
+`DomainSchema | HTTPValidationError | None` instead of `HTTPValidationError | None`.
 
-None are part of the supported public surface (`entities`, `analytics`,
-`search`, `ingestion`, `api-keys`, `widgets`), which generates in full. The
-**TypeScript** client has no such gap — `@hey-api/openapi-ts` keeps the
-`-Input`/`-Output` types separate, so all 420 operations are covered. If the
-Python gap ever matters, close it upstream by giving those models distinct
-`-Input`/`-Output` names in the FastAPI schema rather than by hand-editing the
-generated client.
+Both clients now cover the full surface. If a future model is used as both
+request and response body and FastAPI splits it again, the same collision can
+reappear — regenerate and check the diff for a newly untyped response rather
+than assuming parity holds.
