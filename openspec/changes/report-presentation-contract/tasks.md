@@ -5,12 +5,12 @@ the long pole. Draft from what each collector already computes, then review
 section by section. Unreviewed placeholder text is a blocking defect, not a
 default: a takeaway is an assertion, and a wrong one is worse than silence.
 
-- [ ] 1.1 Tabulate, per section, which figures its collector computes today — the raw material a takeaway can legally cite
-- [ ] 1.2 Draft takeaway phrasing for the 13 sections, citing only figures from 1.1
-- [ ] 1.3 Draft materiality thresholds per section, with the reasoning for each cut-off
-- [ ] 1.4 Draft the caveat per section; carry over the two known ones (NIF is a field-normalized proxy and not the JIF; works count is local and not the OpenAlex global figure)
-- [ ] 1.5 Give `impact_projection` and `hidden_patterns` extra scrutiny — both names promise more certainty than a derived figure may support
-- [ ] 1.6 Review 1.2–1.5 with the user, section by section; record decisions
+- [x] 1.1 Tabulate, per section, which figures its collector computes today — the raw material a takeaway can legally cite
+- [x] 1.2 Draft takeaway phrasing for the 13 sections, citing only figures from 1.1
+- [x] 1.3 Draft materiality thresholds per section, with the reasoning for each cut-off
+- [x] 1.4 Draft the caveat per section; carry over the two known ones (NIF is a field-normalized proxy and not the JIF; works count is local and not the OpenAlex global figure)
+- [x] 1.5 Give `impact_projection` and `hidden_patterns` extra scrutiny — both names promise more certainty than a derived figure may support
+- [ ] 1.6 Review 1.2–1.5 with the user, section by section; record decisions (draft in `editorial-draft.md`; 11 of 13 drafted, 2 blocked on 3.3/3.4)
 
 ## 2. Data contract
 
