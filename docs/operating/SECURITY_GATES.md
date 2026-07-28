@@ -150,43 +150,35 @@ linux/native optional deps). Exit condition: postcss ≥ 8.5.18.
 
 ### 7e. pip-audit baseline (`--ignore-vuln` flags in `.github/workflows/security.yml`)
 
-33 vulnerability IDs ignored at introduction. Owner: platform owner. SLA: next dependency-upgrade window (review by 2026-07-10). The 8 entries added 2026-06-18 (cryptography GHSA-537c-gmf6-5ccf; python-multipart CVE-2026-53538/53539/53540; starlette CVE-2026-48817/48818/54282/54283) are newly-disclosed CVEs in already-pinned deps — fix versions are known (see table) but starlette requires a major 0.52→1.x bump, deferred to the upgrade sprint. The 1 entry added 2026-07-07 (weasyprint CVE-2026-49452) is a newly-disclosed CVE in already-pinned weasyprint==68.1 with no fix version in the advisory DB yet (latest 69.0 not marked as fixed); revisit at the next upgrade window.
+**2 vulnerability IDs ignored** (down from 33). Owner: platform owner. SLA: next
+dependency-upgrade window (review by 2026-09-30).
+
+The previous baseline deferred most entries to "the upgrade sprint", noting in
+particular that the starlette CVEs needed a major 0.52 -> 1.x bump. That bump
+landed with #202, which aligned `requirements.lock` to the versions the backend
+image actually resolves. The upgrade reached or passed every fix version this
+table had recorded — starlette 0.52.1 -> 1.3.1, cryptography 46.0.5 -> 49.0.0,
+python-multipart 0.0.22 -> 0.0.32, weasyprint 68.1 -> 69.0 — so 31 entries were
+suppressing advisories that no longer apply and have been removed rather than
+carried forward.
+
+Verified empirically, not by reading the table: `pip-audit -r requirements.lock
+--disable-pip --no-deps` with **no** ignore flags reports exactly the two rows
+below, and with only these two it reports `No known vulnerabilities found, 2
+ignored`.
+
+Both remaining entries are recorded under the canonical IDs pip-audit emits.
+The old list used CVE aliases, which is why a 34-flag list could still be doing
+only two flags' worth of work — an alias that stops matching fails silently.
 
 | ID | Package (pinned) | Fix version if known | Review date |
 | --- | --- | --- | --- |
-| PYSEC-2026-25 | authlib==1.6.9 | unknown at introduction | 2026-07-10 |
-| PYSEC-2026-188 | authlib==1.6.9 | unknown at introduction | 2026-07-10 |
-| CVE-2026-45829 | chromadb==1.5.2 | unknown at introduction | 2026-07-10 |
-| PYSEC-2026-35 | cryptography==46.0.5 | unknown at introduction | 2026-07-10 |
-| PYSEC-2026-36 | cryptography==46.0.5 | unknown at introduction | 2026-07-10 |
-| CVE-2024-23342 | ecdsa==0.19.1 | unknown at introduction | 2026-07-10 |
-| CVE-2026-33936 | ecdsa==0.19.1 | unknown at introduction | 2026-07-10 |
-| CVE-2026-45409 | idna==3.11 | unknown at introduction | 2026-07-10 |
-| PYSEC-2026-87 | lxml==6.0.2 | unknown at introduction | 2026-07-10 |
-| CVE-2026-44307 | mako==1.3.10 | unknown at introduction | 2026-07-10 |
-| PYSEC-2026-165 | pillow==12.1.1 | unknown at introduction | 2026-07-10 |
-| CVE-2026-40192 | pillow==12.1.1 | unknown at introduction | 2026-07-10 |
-| CVE-2026-42309 | pillow==12.1.1 | unknown at introduction | 2026-07-10 |
-| CVE-2026-42310 | pillow==12.1.1 | unknown at introduction | 2026-07-10 |
-| CVE-2026-42311 | pillow==12.1.1 | unknown at introduction | 2026-07-10 |
-| CVE-2026-30922 | pyasn1==0.6.2 | unknown at introduction | 2026-07-10 |
-| CVE-2026-4539 | pygments==2.19.2 | unknown at introduction | 2026-07-10 |
-| CVE-2025-71176 | pytest==9.0.2 | unknown at introduction | 2026-07-10 |
-| CVE-2026-40347 | python-multipart==0.0.22 | unknown at introduction | 2026-07-10 |
-| CVE-2026-42561 | python-multipart==0.0.22 | unknown at introduction | 2026-07-10 |
-| CVE-2026-25645 | requests==2.32.5 | unknown at introduction | 2026-07-10 |
-| PYSEC-2026-161 | starlette==0.52.1 | unknown at introduction | 2026-07-10 |
-| PYSEC-2026-142 | urllib3==2.6.3 | unknown at introduction | 2026-07-10 |
-| PYSEC-2026-141 | urllib3==2.6.3 | unknown at introduction | 2026-07-10 |
-| GHSA-537c-gmf6-5ccf | cryptography==46.0.5 | 48.0.1 | 2026-07-10 |
-| CVE-2026-53540 | python-multipart==0.0.22 | 0.0.31 | 2026-07-10 |
-| CVE-2026-53539 | python-multipart==0.0.22 | 0.0.30 | 2026-07-10 |
-| CVE-2026-53538 | python-multipart==0.0.22 | 0.0.30 | 2026-07-10 |
-| CVE-2026-48818 | starlette==0.52.1 | 1.1.0 | 2026-07-10 |
-| CVE-2026-48817 | starlette==0.52.1 | 1.1.0 | 2026-07-10 |
-| CVE-2026-54283 | starlette==0.52.1 | 1.3.1 | 2026-07-10 |
-| CVE-2026-54282 | starlette==0.52.1 | 1.3.0 | 2026-07-10 |
-| CVE-2026-49452 | weasyprint==68.1 | unknown at introduction | 2026-07-10 |
+| PYSEC-2026-311 | chromadb==1.5.2 | none published | 2026-09-30 |
+| PYSEC-2026-1325 | ecdsa==0.19.2 | none published | 2026-09-30 |
+
+Note that `chromadb` is a lock-only entry: it constrains dev installs but is not
+among the 97 packages the backend image installs, so its advisory does not apply
+to the shipped artifact.
 
 ---
 
