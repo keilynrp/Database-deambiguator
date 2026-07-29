@@ -57,6 +57,8 @@ def test_section_data_carries_key_title_and_blocks():
     section = SectionData(
         key="entity_stats",
         title="Entity Statistics",
+        takeaway="10 entities recorded",
+        method="Counts scoped to this domain.",
         blocks=(
             StatGrid(items=(StatItem(label="Total", value="10"),)),
             Narrative(heading="Reading", paragraphs=("All good.",)),
@@ -68,7 +70,7 @@ def test_section_data_carries_key_title_and_blocks():
 
 def test_section_data_rejects_empty_key():
     with pytest.raises(ValueError):
-        SectionData(key="", title="X", blocks=())
+        SectionData(key="", title="X", takeaway="t", method="m", blocks=())
 
 
 def test_blocks_are_immutable():
@@ -105,33 +107,35 @@ def test_section_carries_takeaway_method_and_materiality():
     assert section.materiality is Materiality.LEAD
 
 
-def test_presentation_fields_default_so_unmigrated_collectors_still_construct():
-    """The eleven pre-contract collectors must keep working during migration.
+def test_takeaway_and_method_are_required():
+    """Task 3.7: the type enforces the contract, not a comment asking for it.
 
-    Blank-rejection lands with task 3.7, when the defaults come off; asserting
-    it here would fail every collector that has not been migrated yet.
+    They carried defaults during the migration so the eleven pre-contract
+    collectors could keep constructing. Now that every collector supplies real
+    values the defaults are gone, so a new section cannot be added without
+    saying what it shows and where the figures came from.
     """
-    section = SectionData(key="entity_stats", title="Entity Statistics", blocks=())
-    assert section.takeaway == ""
-    assert section.method == ""
+    with pytest.raises(TypeError):
+        SectionData(key="entity_stats", title="Entity Statistics", blocks=())
+
+
+def test_blank_takeaway_is_rejected():
+    with pytest.raises(ValueError, match="takeaway"):
+        SectionData(key="k", title="T", takeaway="   ", method="a source")
+
+
+def test_blank_method_is_rejected():
+    with pytest.raises(ValueError, match="method"):
+        SectionData(key="k", title="T", takeaway="a finding", method="  ")
+
+
+def test_materiality_keeps_its_default():
+    """Unlike the other two: "unremarkable" is an answer, blank is not."""
+    section = SectionData(key="k", title="T", takeaway="a finding", method="a source")
     assert section.materiality is Materiality.ROUTINE
 
 
-def test_has_presentation_distinguishes_migrated_from_default():
-    bare = SectionData(key="k", title="T", blocks=())
-    assert bare.has_presentation is False
-
-    partial = SectionData(key="k", title="T", blocks=(), takeaway="Something happened")
-    assert partial.has_presentation is False, "a takeaway without a method is not the contract"
-
-    whitespace = SectionData(key="k", title="T", blocks=(), takeaway="  ", method="  ")
-    assert whitespace.has_presentation is False, "whitespace is not a disclosure"
-
-    full = SectionData(key="k", title="T", blocks=(), takeaway="A finding", method="A source")
-    assert full.has_presentation is True
-
-
 def test_presentation_fields_are_immutable():
-    section = SectionData(key="k", title="T", blocks=(), takeaway="A finding")
+    section = SectionData(key="k", title="T", takeaway="A finding", method="A source", blocks=())
     with pytest.raises(Exception):
         section.takeaway = "something else"  # frozen
