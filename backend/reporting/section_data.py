@@ -117,6 +117,16 @@ class SectionData:
     #: section nobody has written yet.
     materiality: Materiality = Materiality.ROUTINE
 
+    #: Position within one rendered document, assigned at assembly rather than by
+    #: the collector: a collector cannot know it is Exhibit 4, because that
+    #: depends on which sections were selected and in what order, both of which
+    #: are request-scoped.
+    #:
+    #: NOT a cross-report identifier. Two reports of the same domain can number
+    #: the same section differently; `key` is what stays stable. None until
+    #: assembly assigns it.
+    exhibit: int | None = None
+
     def __post_init__(self) -> None:
         if not self.key.strip():
             raise ValueError("SectionData requires a non-empty key")

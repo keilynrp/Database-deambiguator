@@ -60,9 +60,9 @@ path that currently works.
 
 - [x] 4.1 Migrate `build()` from `SECTION_BUILDERS` to the collectors, carrying over the existing three-way signature dispatch
 - [x] 4.2 Keep the per-section error boundary: a collector that raises must still yield an error block rather than failing the whole report
-- [ ] 4.3 Add an `exhibit` ordinal to `SectionData`, assigned in `build()` after selection and before rendering
-- [ ] 4.4 Build the executive summary: every rendered section's takeaway, ordered by materiality, non-material ones de-emphasized
-- [ ] 4.5 Test that ordinals shift with section selection while section keys do not
+- [x] 4.3 Add an `exhibit` ordinal to `SectionData`, assigned in `build()` after selection and before rendering — numbered only once a section has collected, so an erroring section leaves no gap in the sequence
+- [x] 4.4 Build the executive summary — ordered by materiality, ties broken by exhibit order; built after the loop but inserted before it, since it cannot know the findings until every section has collected
+- [x] 4.5 Test that ordinals shift with section selection while section keys do not — plus gapless numbering, summary coverage, ordering, muting and escaping (`test_report_assembly.py`)
 - [x] 4.6 Diff the rendered HTML before and after the migration — byte-identical over all 13 sections once the two generation timestamps are normalised (14,699 bytes either way)
 - [x] 4.7 `SECTION_BUILDERS` is kept — the premise "once nothing reads it" was wrong. Seven call sites read it as the section *registry*, not as builders: four endpoints validate names against it, scheduled reports filter on it, and `format_support` derives `PUBLIC_SECTIONS` from it. Added a guard test so the two maps cannot drift apart
 
