@@ -25,6 +25,8 @@ SUPPORTED_BLOCKS: frozenset[type] = frozenset({StatGrid, Table, Narrative, Meter
 
 _INVALID_SHEET_CHARS = set(r"[]:*?/\\")
 _HEADER_FONT = Font(bold=True)
+_TAKEAWAY_FONT = Font(bold=True, size=12)
+_CAVEAT_FONT = Font(italic=True, size=9, color="FF6B7280")
 _WRAP = Alignment(wrap_text=True, vertical="top")
 
 
@@ -90,9 +92,45 @@ def _write_block(ws: Worksheet, block: Block, row: int) -> int:
     raise TypeError(f"Excel renderer cannot render {type(block).__name__}")
 
 
+def _write_caveat(ws: Worksheet, method: str, row: int) -> int:
+    cell = ws.cell(row=row, column=1, value=method)
+    cell.font = _CAVEAT_FONT
+    cell.alignment = _WRAP
+    return row + 1
+
+
 def render_excel(section: SectionData, wb: Workbook) -> Worksheet:
+    """One section as a worksheet, opening with its finding.
+
+    Where the disclosure goes depends on whether there is a table to attach it
+    to, and it goes in exactly one of the two places:
+
+      * **A table**, so the caveat sits on the row immediately above the header.
+        Excel is the format most often re-cut and pasted, and that is the path by
+        which a proxy metric loses the sentence saying it is a proxy — so the
+        warning has to be adjacent to the data rather than filed at the top of
+        the sheet where a copied range leaves it behind. Repeated per table: each
+        one is a separately copyable range.
+      * **No table**, so it goes under the takeaway. The disclosure is mandatory,
+        not conditional on which block types a section happens to use.
+
+    The workbook-level `Methodology` sheet lists both regardless — see the Excel
+    exporter. No exhibit ordinal: a workbook renders a different set of sections
+    than the document does, so numbering here would contradict the PDF of the
+    same generation (design decision 7). The sheet name is the reference.
+    """
     ws = wb.create_sheet(_safe_sheet_title(section.title, wb))
-    row = 1
+
+    takeaway = ws.cell(row=1, column=1, value=section.takeaway)
+    takeaway.font = _TAKEAWAY_FONT
+    takeaway.alignment = _WRAP
+    row = 3
+
+    if not any(isinstance(block, Table) for block in section.blocks):
+        row = _write_caveat(ws, section.method, row) + 1
+
     for block in section.blocks:
+        if isinstance(block, Table):
+            row = _write_caveat(ws, section.method, row)
         row = _write_block(ws, block, row)
     return ws

@@ -171,6 +171,57 @@ def test_excel_renderer_writes_all_block_types():
     assert "Coverage" in blob and "60%" in blob
 
 
+def _cell_column(ws, col: int = 1) -> list[str]:
+    return [str(c.value) for c in ws[chr(ord("A") + col - 1)] if c.value is not None]
+
+
+def test_excel_sheet_opens_with_the_finding():
+    import openpyxl
+    from backend.reporting.excel_renderer import render_excel
+
+    ws = render_excel(_every_block_section(), openpyxl.Workbook())
+
+    assert ws["A1"].value == "1,240 entities recorded, 60% enriched"
+    assert ws["A1"].font.bold
+
+
+def test_excel_carries_the_caveat_directly_above_each_table():
+    """5.3 — Excel is the format most often re-cut and pasted, and that is the
+    path by which a proxy metric loses its caveat. The disclosure sits on the
+    row immediately above the header, so it travels with the range."""
+    import openpyxl
+    from backend.reporting.excel_renderer import render_excel
+
+    ws = render_excel(_every_block_section(), openpyxl.Workbook())
+
+    header_row = next(
+        cell.row
+        for row in ws.iter_rows()
+        for cell in row
+        if cell.value == "Status"
+    )
+    above = ws.cell(row=header_row - 1, column=1).value
+    assert above and "Counts scoped to this domain" in above, above
+
+
+def test_excel_discloses_a_section_that_has_no_table():
+    """Nothing to attach the caveat to, so it goes under the finding — the
+    disclosure is mandatory, not conditional on the block types present."""
+    import openpyxl
+    from backend.reporting.excel_renderer import render_excel
+
+    section = SectionData(
+        key="k", title="Narrative Only",
+        takeaway="Three patterns detected",
+        method="Statistical co-occurrence within this corpus, not causation.",
+        blocks=(Narrative(heading="Reading", paragraphs=("A point.",)),),
+    )
+    ws = render_excel(section, openpyxl.Workbook())
+
+    blob = "\n".join(_cell_column(ws))
+    assert "not causation" in blob
+
+
 def test_excel_renderer_truncates_long_sheet_names():
     import openpyxl
     from backend.reporting.excel_renderer import render_excel

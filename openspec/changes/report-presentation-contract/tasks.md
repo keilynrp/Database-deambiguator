@@ -87,8 +87,34 @@ figures to read wrong:
     together renders the same section twice, as two differently-numbered
     exhibits, and states the same finding twice in the summary. Exhibit numbering
     is what makes this legible as a defect rather than mere repetition.
-- [ ] 5.2 Excel: `Methodology` sheet listing every exhibit's source and caveat
-- [ ] 5.3 Excel: caveat row directly above each section's table, so a copied range carries its warning
+- [x] 5.2 Excel: `Methodology` sheet listing every rendered section's finding and disclosure, keyed on the sheet name rather than an exhibit ordinal (design decision 7 — see below). Built after the section sheets and moved to position 2, behind `Summary`: the same shape as the HTML executive summary, and for the same reason
+- [x] 5.3 Excel: caveat row directly above each section's table, so a copied range carries its warning. Placement is one of two, never both: above each table where there is one (each table is a separately copyable range), or under the takeaway where there is none — the disclosure is mandatory, not conditional on which block types a section happens to use
+
+Two things 5.2 surfaced:
+
+  - **No exhibit ordinal in Excel or PPTX.** Recorded as design decision 7. The
+    three formats do not render the same set — `agentic_trace` is unsupported in
+    both, and the Excel exporter iterates its own collector map rather than the
+    requested order — so a workbook numbering its own exhibits would agree with
+    the PDF up to the first divergence and then be off by one for everything
+    after, silently, from the same request. In a workbook the sheet tab is how a
+    reader navigates and cites anyway.
+  - **`harmonization_log` was the one section outside the contract.** Its sheet
+    comes from a bespoke writer rather than the shared payload, so it never
+    entered the collected list and would have had no finding and no disclosure
+    while the parity map claims Excel renders it. Fixed by collecting its payload
+    for the Methodology row and the caveat row, without migrating the writer: its
+    sheet carries row ids, executed-at and reverted over up to 200 rows, and 3.4
+    already showed what migrating costs when the payload cap is lower than the
+    sheet's. Migrating it stays open under `report-format-parity`.
+
+Reading a workbook built from a deliberately singular dataset — one entity, one
+journal, one author, one operation — found **five more unconditional plurals**,
+in five separately-authored collectors, plus two verbs agreeing with the wrong
+count ("1 of 1 entity pass validation"). All are now routed through one
+`_plural()` helper. This is the same class of defect 5.1 found twice: the
+takeaway is a heading in HTML and the first row of a sheet in Excel, so a count
+of one is no longer buried in a summary list.
 - [ ] 5.4 PPTX: takeaway as slide title, method in slide footer, full caveat in speaker notes
 - [ ] 5.5 Verify the HTML view deliberately — HTML and PDF share one document, so nothing here can be scoped to print
 

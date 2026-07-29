@@ -337,6 +337,18 @@ footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e5e7eb;
 
 # ── Section builders ──────────────────────────────────────────────────────────
 
+def _plural(count: int, singular: str, plural: str | None = None) -> str:
+    """`3 patterns`, `1 pattern` — a count with a word that agrees with it.
+
+    Since 5.1 a takeaway is the section's heading in HTML/PDF and the first row
+    of its sheet in Excel, so "1 patterns detected" is no longer buried in a
+    summary list: it is the most prominent line the section has. Reading a real
+    report found five of these, in five separately-authored collectors, which is
+    what a helper is for.
+    """
+    return f"{count:,} {singular if count == 1 else (plural or singular + 's')}"
+
+
 def _entities_query(db: Session, domain_id: str, org_id: int | None):
     query = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
     if domain_id:
@@ -403,9 +415,16 @@ def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> "Se
         takeaway = "No entities in this domain yet."
         materiality = Materiality.EMPTY
     else:
+        # Both verbs agree with the count in front of them, not with `total`:
+        # the subject of "pass" is the valid count and the subject of "remain" is
+        # the pending one, so the two can disagree with each other in one
+        # sentence and still both be right.
+        valid = int(status_map.get("valid", 0))
         takeaway = (
-            f"{status_map.get('valid', 0):,} of {total:,} entities pass validation "
-            f"({valid_pct}%); {pending:,} remain unresolved"
+            f"{valid:,} of {_plural(total, 'entity', 'entities')} "
+            f"pass{'es' if valid == 1 else ''} validation "
+            f"({valid_pct}%); {pending:,} "
+            f"remain{'s' if pending == 1 else ''} unresolved"
         )
         materiality = (
             Materiality.LEAD if valid_pct < 85
@@ -548,7 +567,7 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
     return SectionData(
         takeaway=(
             f'"{rows[0][0]}" is the leading classification at {top_share}% of '
-            f"{classified:,} classified entities"
+            f"{_plural(classified, 'classified entity', 'classified entities')}"
             if rows else "No classified entities to report."
         ),
         method=(
@@ -709,8 +728,8 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
         title="Harmonization Log",
         blocks=(summary, table),
         takeaway=(
-            f"{len(logs):,} harmonization operation{'' if len(logs) == 1 else 's'} "
-            f"applied, most recently {rows[0][0]}"
+            f"{_plural(len(logs), 'harmonization operation')} applied, "
+            f"most recently {rows[0][0]}"
             if rows else "No harmonization operations have been applied."
         ),
         method=(
@@ -776,7 +795,7 @@ def collect_decision_recommendations(
     ))
     return SectionData(
         takeaway=(
-            f"{len(actions)} recommended actions, {high} of them high priority"
+            f"{_plural(len(actions), 'recommended action')}, {high} of them high priority"
             if actions else "No actions are being recommended from the current snapshot."
         ),
         method=(
@@ -950,7 +969,7 @@ def collect_hidden_patterns(
     ))
     return SectionData(
         takeaway=(
-            f"{len(patterns)} patterns detected; the strongest involves {rows[0][0]}"
+            f"{_plural(len(patterns), 'pattern')} detected; the strongest involves {rows[0][0]}"
             if rows else "No patterns detected in the current records."
         ),
         method=(
@@ -1082,7 +1101,7 @@ def collect_institutional_benchmark(
         blocks=(grid, reading, gap_table, rule_table),
         takeaway=(
             f"Benchmark readiness {readiness_pct}% — {passed_rules} of "
-            f"{total_rules} rules pass; status \"{status}\""
+            f"{_plural(total_rules, 'rule')} pass; status \"{status}\""
         ),
         method=(
             "Measured against the selected benchmark profile and comparison "
@@ -1411,8 +1430,8 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
             Narrative(heading="Reliability reading", paragraphs=tuple(reliability)),
         ),
         takeaway=(
-            f"{confirmed:,} of {total:,} authority records confirmed; "
-            f"{pending:,} await human review "
+            f"{confirmed:,} of {_plural(total, 'authority record')} confirmed; "
+            f"{pending:,} await{'s' if pending == 1 else ''} human review "
             f"(mean confidence {round(float(mean_confidence or 0) * 100)}%)"
         ),
         method=_AUTHORITY_METHOD,
@@ -1594,9 +1613,9 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
         title="Collaboration Graph",
         blocks=tuple(blocks),
         takeaway=(
-            f"{author_count:,} authors across {community_count:,} "
-            f"communit{'y' if community_count == 1 else 'ies'}, linked by "
-            f"{edge_count:,} collaboration{'' if edge_count == 1 else 's'}"
+            f"{_plural(author_count, 'author')} across "
+            f"{_plural(community_count, 'community', 'communities')}, linked by "
+            f"{_plural(edge_count, 'collaboration')}"
         ),
         method=_COLLAB_METHOD,
         materiality=Materiality.NOTABLE if community_count > 1 else Materiality.ROUTINE,
@@ -1733,7 +1752,7 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
         title="Journal Portfolio",
         blocks=(grid, table, note),
         takeaway=(
-            f"{total:,} journals in the portfolio; {doaj_pct}% listed in DOAJ "
+            f"{_plural(total, 'journal')} in the portfolio; {doaj_pct}% listed in DOAJ "
             f"and {with_apc:,} charging an APC"
         ),
         method=_JOURNAL_METHOD,

@@ -25,16 +25,22 @@ _HEADER_FONT = "FFFFFF"   # white
 _HEADER_FILL = PatternFill("solid", fgColor=_HEADER_FG)
 _HEADER_FONT_STYLE = Font(color=_HEADER_FONT, bold=True, size=11)
 _SUBHEADER_FONT = Font(bold=True, size=10)
+_WRAP_TOP = Alignment(wrap_text=True, vertical="top")
+_CAVEAT_FONT = Font(italic=True, size=9, color="FF6B7280")
 
 
-def _style_header_row(ws, cols: list[str]) -> None:
-    """Write and style a header row (row 1) with violet fill + white bold text."""
+def _style_header_row(ws, cols: list[str], row: int = 1) -> None:
+    """Write and style a header row with violet fill + white bold text.
+
+    `row` exists so a sheet can put a caveat line above its header (5.3) and
+    still freeze the header rather than the caveat.
+    """
     for col_idx, header in enumerate(cols, start=1):
-        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell = ws.cell(row=row, column=col_idx, value=header)
         cell.fill = _HEADER_FILL
         cell.font = _HEADER_FONT_STYLE
         cell.alignment = Alignment(horizontal="center", vertical="center")
-    ws.freeze_panes = "A2"
+    ws.freeze_panes = f"A{row + 1}"
 
 
 def _autofit(ws, min_width: int = 10, max_width: int = 50) -> None:
@@ -114,14 +120,33 @@ class EnterpriseExcelExporter:
             "journal_portfolio": report_builder.collect_journal_portfolio,
             "topic_clusters": report_builder.collect_topic_clusters,
         }
+        collected: list[tuple[str, object]] = []
         for section_id, collect in migrated_collectors.items():
             if section_id in requested:
-                render_excel(collect(db, domain_id, org_id), wb)
+                payload = collect(db, domain_id, org_id)
+                sheet = render_excel(payload, wb)
+                collected.append((sheet.title, payload))
 
         # ── Sheet 4: Harmonization Log ────────────────────────────────────────
-        if "harmonization_log" in sections:
+        # Still a bespoke writer: its sheet carries columns the collector's payload
+        # does not (row ids, executed-at, reverted) over up to 200 rows, and this
+        # change is not the place to trade that detail away — 3.4 already showed
+        # what migrating a section costs when the payload cap is lower than the
+        # sheet's. But the parity requirement applies to what a format *renders*,
+        # not to how it renders it, so the section's finding and disclosure are
+        # collected for the Methodology sheet either way. Migrating the writer
+        # itself remains open under report-format-parity.
+        if "harmonization_log" in requested:
+            payload = report_builder.collect_harmonization_log(db, domain_id, org_id)
             ws_harm = wb.create_sheet("Harmonization")
-            self._write_harmonization(ws_harm, db, org_id)
+            self._write_harmonization(ws_harm, db, org_id, caveat=payload.method)
+            collected.append((ws_harm.title, payload))
+
+        # Built after the section sheets and moved to the front — the same shape
+        # as the HTML executive summary, and for the same reason: it states what
+        # every section found and cannot know that until each has collected.
+        if collected:
+            self._write_methodology(wb, collected)
 
         if manual_sections:
             ws_notes = wb.create_sheet("Analyst Notes")
@@ -194,9 +219,18 @@ class EnterpriseExcelExporter:
 
         _autofit(ws)
 
-    def _write_harmonization(self, ws, db: Session, org_id: int | None) -> None:
+    def _write_harmonization(
+        self, ws, db: Session, org_id: int | None, caveat: str | None = None
+    ) -> None:
         headers = ["ID", "Step ID", "Step Name", "Records Updated", "Fields Modified", "Executed At", "Reverted"]
-        _style_header_row(ws, headers)
+        header_row = 1
+        if caveat:
+            # Directly above the header, so a copied range carries it (5.3).
+            cell = ws.cell(row=1, column=1, value=caveat)
+            cell.font = _CAVEAT_FONT
+            cell.alignment = _WRAP_TOP
+            header_row = 2
+        _style_header_row(ws, headers, row=header_row)
 
         rows = (
             self._harmonization_query(db, org_id)
@@ -204,7 +238,7 @@ class EnterpriseExcelExporter:
             .limit(200)
             .all()
         )
-        for row_idx, h in enumerate(rows, start=2):
+        for row_idx, h in enumerate(rows, start=header_row + 1):
             ws.cell(row=row_idx, column=1, value=h.id)
             ws.cell(row=row_idx, column=2, value=h.step_id)
             ws.cell(row=row_idx, column=3, value=h.step_name)
@@ -214,6 +248,34 @@ class EnterpriseExcelExporter:
             ws.cell(row=row_idx, column=7, value="Yes" if h.reverted else "No")
 
         _autofit(ws)
+
+    def _write_methodology(self, wb, collected: list[tuple[str, object]]) -> None:
+        """One row per rendered section: where to find it, what it found, and how.
+
+        Keyed on the sheet name rather than an exhibit ordinal. A workbook renders
+        a different set of sections than the document does — `agentic_trace` is
+        declared unsupported here, and this exporter iterates its own collector
+        map rather than the requested order — so a workbook numbering its own
+        exhibits would agree with the PDF up to the first divergence and then be
+        off by one for everything after, silently, from the same request. In a
+        workbook the sheet tab is how a reader navigates anyway (design
+        decision 7).
+
+        Placed second, behind Summary: a disclosure a reader has to hunt for at
+        the end of a twelve-tab workbook is one they will not read.
+        """
+        ws = wb.create_sheet("Methodology")
+        _style_header_row(ws, ["Sheet", "Finding", "Source & caveat"])
+
+        for row_idx, (sheet_name, payload) in enumerate(collected, start=2):
+            ws.cell(row=row_idx, column=1, value=sheet_name).font = _SUBHEADER_FONT
+            ws.cell(row=row_idx, column=2, value=payload.takeaway).alignment = _WRAP_TOP
+            ws.cell(row=row_idx, column=3, value=payload.method).alignment = _WRAP_TOP
+
+        ws.column_dimensions["A"].width = 26
+        ws.column_dimensions["B"].width = 52
+        ws.column_dimensions["C"].width = 96
+        wb.move_sheet(ws, offset=-(len(wb.sheetnames) - 2))
 
     def _write_manual_sections(self, ws, manual_sections: list[dict[str, str]]) -> None:
         headers = ["Section", "Analyst Text"]
