@@ -137,99 +137,14 @@ def generate_pptx(
         _add_text_box(slide, manual_content[:1800], Inches(0.75), Inches(0.9), Inches(11.8), Inches(5.6),
                       font_size=15, color=RGBColor(45, 55, 72))
 
-    # ── Slide 2: Entity Statistics ────────────────────────────────────────────
-    if "entity_stats" in sections:
-        total = entities_query.with_entities(func.count(models.RawEntity.id)).scalar() or 0
-        by_status = entities_query.with_entities(
-            models.RawEntity.validation_status,
-            func.count(models.RawEntity.id),
-        ).group_by(models.RawEntity.validation_status).all()
-        by_enrich = entities_query.with_entities(
-            models.RawEntity.enrichment_status,
-            func.count(models.RawEntity.id),
-        ).group_by(models.RawEntity.enrichment_status).all()
-        enrich_map = {r[0]: r[1] for r in by_enrich}
-        enriched = enrich_map.get("done", 0) + enrich_map.get("completed", 0)
-        enrich_pct = round(enriched / total * 100) if total else 0
-
-        slide = _add_slide(prs)
-        _add_header_bar(slide, accent, W)
-        _add_text_box(slide, "Entity Statistics", Inches(0.5), Inches(0.05), Inches(10), Inches(0.45),
-                      font_size=16, bold=True, color=RGBColor(255, 255, 255))
-
-        stats = [
-            ("Total Entities", f"{total:,}"),
-            ("Enriched", f"{enriched:,} ({enrich_pct}%)"),
-        ]
-        for i, (label, value) in enumerate(stats):
-            x = Inches(0.5 + i * 4.5)
-            box = slide.shapes.add_shape(1, x, Inches(0.8), Inches(3.8), Inches(1.4))
-            box.fill.solid()
-            box.fill.fore_color.rgb = RGBColor(245, 247, 255)
-            box.line.color.rgb = RGBColor(200, 210, 240)
-            _add_text_box(slide, label, x + Inches(0.15), Inches(0.85), Inches(3.5), Inches(0.4),
-                          font_size=10, color=RGBColor(100, 100, 140))
-            _add_text_box(slide, value, x + Inches(0.15), Inches(1.2), Inches(3.5), Inches(0.7),
-                          font_size=22, bold=True, color=RGBColor(30, 30, 80))
-
-        # Status breakdown list
-        _add_text_box(slide, "Validation Breakdown", Inches(0.5), Inches(2.5), Inches(12), Inches(0.35),
-                      font_size=12, bold=True, color=RGBColor(50, 50, 80))
-        for idx, (status, count) in enumerate(sorted(by_status, key=lambda x: -x[1])[:6]):
-            pct = round(count / total * 100) if total else 0
-            line = f"  {status or 'unknown'}:  {count:,}  ({pct}%)"
-            _add_text_box(slide, line, Inches(0.5), Inches(2.9 + idx * 0.45), Inches(12), Inches(0.4),
-                          font_size=11, color=RGBColor(60, 60, 80))
-
-    # ── Slide 3: Enrichment Coverage ──────────────────────────────────────────
-    if "enrichment_coverage" in sections:
-        total = entities_query.with_entities(func.count(models.RawEntity.id)).scalar() or 0
-        done = entities_query.with_entities(func.count(models.RawEntity.id))\
-            .filter(models.RawEntity.enrichment_status.in_(["done", "completed"])).scalar() or 0
-        avg_cit = entities_query.with_entities(func.avg(models.RawEntity.enrichment_citation_count))\
-            .filter(models.RawEntity.enrichment_status.in_(["done", "completed"])).scalar() or 0
-        top_entities = entities_query.with_entities(
-            models.RawEntity.primary_label,
-            models.RawEntity.enrichment_citation_count,
-        )\
-            .filter(models.RawEntity.enrichment_status.in_(["done", "completed"]))\
-            .order_by(models.RawEntity.enrichment_citation_count.desc()).limit(8).all()
-        pct = round(done / total * 100) if total else 0
-
-        slide = _add_slide(prs)
-        _add_header_bar(slide, accent, W)
-        _add_text_box(slide, "Enrichment Coverage", Inches(0.5), Inches(0.05), Inches(10), Inches(0.45),
-                      font_size=16, bold=True, color=RGBColor(255, 255, 255))
-        _add_text_box(slide, f"Coverage: {pct}%  |  Enriched: {done:,} of {total:,}  |  Avg citations: {round(avg_cit or 0):,}",
-                      Inches(0.5), Inches(0.75), Inches(12), Inches(0.4),
-                      font_size=13, color=RGBColor(50, 50, 90))
-        _add_text_box(slide, "Top Enriched Entities by Citations", Inches(0.5), Inches(1.3), Inches(12), Inches(0.35),
-                      font_size=12, bold=True, color=RGBColor(50, 50, 80))
-        for idx, (name, cit) in enumerate(top_entities):
-            line = f"  {name or '—'}  —  {(cit or 0):,} citations"
-            _add_text_box(slide, line, Inches(0.5), Inches(1.75 + idx * 0.45), Inches(12), Inches(0.4),
-                          font_size=11, color=RGBColor(60, 60, 80))
-
-    # ── Slide 4: Top Secondary Labels ─────────────────────────────────────────
-    if "top_secondary_labels" in sections:
-        rows_q = entities_query.with_entities(
-            models.RawEntity.secondary_label,
-            func.count(models.RawEntity.id).label("n"),
-        )\
-            .filter(models.RawEntity.secondary_label.isnot(None))\
-            .group_by(models.RawEntity.secondary_label)\
-            .order_by(func.count(models.RawEntity.id).desc()).limit(10).all()
-
-        slide = _add_slide(prs)
-        _add_header_bar(slide, accent, W)
-        _add_text_box(slide, "Top Secondary Labels / Classifications", Inches(0.5), Inches(0.05), Inches(10), Inches(0.45),
-                      font_size=16, bold=True, color=RGBColor(255, 255, 255))
-        total_b = sum(r[1] for r in rows_q)
-        for idx, (brand, count) in enumerate(rows_q):
-            pct = round(count / total_b * 100) if total_b else 0
-            line = f"  {idx+1}.  {brand or '—'}  —  {count:,}  ({pct}%)"
-            _add_text_box(slide, line, Inches(0.5), Inches(0.75 + idx * 0.52), Inches(12), Inches(0.45),
-                          font_size=12, color=RGBColor(40, 40, 80))
+    # entity_stats, enrichment_coverage and top_secondary_labels used to be
+    # hand-built slides here, each issuing its own queries. That made them the
+    # last three sections bypassing the shared payload in this format — the same
+    # violation 3.3 found in topic_clusters — so they carried no takeaway and no
+    # disclosure while the parity map claimed PPTX rendered them. They are in the
+    # migrated map below now. Migrating cost no detail: the payload is richer
+    # than all three were (four KPI cards rather than two, a Source column, 15
+    # rows rather than 10).
 
     # topic_clusters used to be a hand-built two-column slide here, titled "Top
     # Concepts" and fetching its own top_n=20 while Excel used 50 and HTML 15.
@@ -245,6 +160,9 @@ def generate_pptx(
     from backend import report_builder
     from backend.reporting.pptx_renderer import render_pptx
     migrated_collectors = {
+        "entity_stats": report_builder.collect_entity_stats,
+        "enrichment_coverage": report_builder.collect_enrichment_coverage,
+        "top_secondary_labels": report_builder.collect_top_secondary_labels,
         "impact_projection": report_builder.collect_impact_projection,
         "institutional_benchmark": report_builder.collect_institutional_benchmark,
         "hidden_patterns": report_builder.collect_hidden_patterns,

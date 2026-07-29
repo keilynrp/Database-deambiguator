@@ -45,13 +45,52 @@ def _text(slide, text, left, top, width, height, *, size=12, bold=False, color=_
     return box
 
 
-def _header(slide, title, accent, width):
-    bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, width, Inches(0.7))
+def _clip(text: str, limit: int = 165) -> str:
+    """Trim to a word boundary. The footer has one line; the notes have the rest."""
+    if len(text) <= limit:
+        return text
+    return text[:limit].rsplit(" ", 1)[0].rstrip(",;:") + " …"
+
+
+def _header(slide, section: SectionData, accent, width):
+    """Label as an eyebrow, takeaway as the title.
+
+    Same trade as HTML: the heading asserts the finding, and the dataset label
+    drops to secondary text rather than disappearing — a deck you cannot scan by
+    section name is worse than one that only names its sections.
+    """
+    bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, width, Inches(1.05))
     bar.fill.solid()
     bar.fill.fore_color.rgb = accent
     bar.line.fill.background()
-    _text(slide, title, Inches(0.5), Inches(0.05), Inches(11), Inches(0.5),
-          size=18, bold=True, color=RGBColor(0xFF, 0xFF, 0xFF))
+    # Not upper-cased, though the HTML eyebrow reads that way. CSS does it with
+    # `text-transform`, which leaves the text alone; PPTX has no equivalent, so
+    # upper-casing here would mean changing the string. The label is what every
+    # format's parity marker matches on — it is the section's name as published —
+    # so a decorative transform is not worth making it unmatchable.
+    _text(slide, section.title, Inches(0.5), Inches(0.06), Inches(11), Inches(0.28),
+          size=9, bold=True, color=RGBColor(0xD8, 0xDC, 0xF5))
+    _text(slide, section.takeaway, Inches(0.5), Inches(0.34), Inches(12.3), Inches(0.66),
+          size=15, bold=True, color=RGBColor(0xFF, 0xFF, 0xFF))
+
+
+def _disclose(slide, section: SectionData, height) -> None:
+    """Method in the slide footer, the whole of it in the speaker notes.
+
+    Both, not either: an audience reads the footer and a presenter reads the
+    notes, and the caveat cannot live in only one of those. The footer is clipped
+    to stay legible at 8pt; the notes are never clipped, which is what makes the
+    clipping safe.
+
+    Called for every slide of a section, including the ones a long section spills
+    onto — a slide is the unit that gets pulled out of a deck and pasted into
+    someone else's, so it has to carry its own disclosure.
+    """
+    _text(slide, _clip(section.method), Inches(0.5), height - Inches(0.42),
+          Inches(12.3), Inches(0.34), size=8, color=_MUTED)
+    slide.notes_slide.notes_text_frame.text = (
+        f"{section.title}\n\n{section.takeaway}\n\n{section.method}"
+    )
 
 
 def _render_stat_grid(slide, block: StatGrid, top: float) -> None:
@@ -106,18 +145,25 @@ def _render_meter(slide, block: Meter, top: float) -> None:
 
 
 def render_pptx(section: SectionData, prs: PresentationType, accent: RGBColor) -> list:
-    """Render one section as slides appended to `prs`. Returns the slides added."""
+    """Render one section as slides appended to `prs`. Returns the slides added.
+
+    No exhibit ordinal: a deck renders a different set of sections than the
+    document does, so numbering here would contradict the PDF of the same
+    generation (design decision 7). The slide title is the reference.
+    """
     slide = _blank_slide(prs)
     added = [slide]
-    _header(slide, section.title, accent, prs.slide_width)
+    _header(slide, section, accent, prs.slide_width)
 
-    top = 1.0
+    # The header grew a line for the eyebrow, and the footer now occupies the
+    # bottom of the slide, so blocks start lower and spill sooner.
+    top = 1.35
     for block in section.blocks:
-        if top > 6.3:  # spill onto a fresh slide
+        if top > 5.9:  # spill onto a fresh slide
             slide = _blank_slide(prs)
             added.append(slide)
-            _header(slide, section.title, accent, prs.slide_width)
-            top = 1.0
+            _header(slide, section, accent, prs.slide_width)
+            top = 1.35
         if isinstance(block, StatGrid):
             _render_stat_grid(slide, block, top)
             top += 1.6
@@ -132,4 +178,7 @@ def render_pptx(section: SectionData, prs: PresentationType, accent: RGBColor) -
             top += 1.0
         else:
             raise TypeError(f"PPTX renderer cannot render {type(block).__name__}")
+
+    for section_slide in added:
+        _disclose(section_slide, section, prs.slide_height)
     return added

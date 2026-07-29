@@ -115,7 +115,29 @@ count ("1 of 1 entity pass validation"). All are now routed through one
 `_plural()` helper. This is the same class of defect 5.1 found twice: the
 takeaway is a heading in HTML and the first row of a sheet in Excel, so a count
 of one is no longer buried in a summary list.
-- [ ] 5.4 PPTX: takeaway as slide title, method in slide footer, full caveat in speaker notes
+- [x] 5.4 PPTX: label as an eyebrow in the accent bar, takeaway as the slide title, method clipped in the slide footer, the whole of it in the speaker notes. Applied to **every** slide of a section, not just the first — a slide is the unit that gets pulled out of a deck and pasted into someone else's
+
+Three things 5.4 settled:
+
+  - **The last three sections bypassing the payload are gone.** `entity_stats`,
+    `enrichment_coverage` and `top_secondary_labels` still had hand-built slides
+    issuing their own queries — the same violation 3.3 found in `topic_clusters`,
+    so they carried no takeaway and no disclosure while the parity map claimed
+    PPTX rendered them. Migrated rather than supplemented (94 lines deleted), and
+    it cost no detail: the payload is richer than all three were — four KPI cards
+    rather than two, a `Source` column, 15 rows rather than 10.
+  - **The eyebrow is not upper-cased**, though the HTML one reads that way. CSS
+    does it with `text-transform`, which leaves the string alone; PPTX has no
+    equivalent, so upper-casing would mean changing the text — and the label is
+    what every format's parity marker matches on. Upper-casing it first broke 19
+    tests, including the whole `pptx:` half of the parity guard.
+  - **Sections spill onto a second slide sooner.** Usable vertical space dropped
+    from 5.3" to 4.55" once the header gained a line and the footer took the
+    bottom, so three sections now take two slides where they took one. That is
+    the cost of the contract, not a defect: the alternative is content sitting
+    underneath the disclosure. Blocks taller than one slide still overflow, which
+    is the generic PPTX truncation problem 3.4 already named as every section's
+    rather than any one section's.
 - [ ] 5.5 Verify the HTML view deliberately — HTML and PDF share one document, so nothing here can be scoped to print
 
 ## 6. Parity enforcement
