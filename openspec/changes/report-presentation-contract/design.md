@@ -77,6 +77,27 @@ Rejected — it puts editorial logic in three places and guarantees the formats
 eventually disagree. It also violates the separation `report-format-parity`
 already requires.
 
+### 3a. HTML/PDF assembly must move onto the collectors first
+
+Discovered while starting group 4. `build()` iterates `SECTION_BUILDERS`, whose
+entries return rendered HTML strings, so the function that assembles the
+document never holds a `SectionData`. An ordinal cannot be attached to a string
+that is already rendered, and an executive summary cannot be composed from
+thirteen fragments of markup.
+
+So exhibit numbering and the summary are blocked behind migrating HTML/PDF
+assembly to the collector map — the same move Excel and PPTX already made.
+HTML/PDF is the last format still assembled from string builders.
+
+This is cheaper than it sounds: all thirteen `_section_*` functions are already
+thin wrappers of the form `render_html(collect_*(...))`, so each collector is
+proven against the current HTML for its own section. What is unproven is the
+*assembly*, which is why the group ends with a before/after diff of a rendered
+report rather than trusting the per-section evidence.
+
+The dispatch carries over unchanged — collectors come in three signature shapes
+and `build()` already branches on exactly those for the string builders.
+
 ### 3. Exhibit numbers are assigned at assembly, not by collectors
 
 A collector cannot know it is Exhibit 4: numbering depends on which sections were

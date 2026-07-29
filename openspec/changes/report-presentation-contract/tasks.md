@@ -31,9 +31,40 @@ default: a takeaway is an assertion, and a wrong one is worse than silence.
 
 ## 4. Assembly
 
-- [ ] 4.1 Assign exhibit ordinals in `build()` after section selection
-- [ ] 4.2 Build the executive summary: every rendered section's takeaway, ordered by materiality, non-material ones de-emphasized
-- [ ] 4.3 Test that ordinals shift with section selection while section keys do not
+Scope discovered while starting 4.1, and larger than the original wording
+implied. `build()` iterates `SECTION_BUILDERS`, which returns **rendered HTML
+strings** — it never holds a `SectionData`. Neither an exhibit ordinal nor an
+executive summary can be produced from a string that has already been rendered,
+so this group is not "add numbering": it is migrating HTML/PDF assembly from
+the builder map to the collector map, which is what the Excel and PPTX
+exporters already did.
+
+HTML/PDF is the last format still assembled from string builders. This is the
+remaining piece of the strangler `unify-report-format-coverage` began.
+
+What makes it tractable: all 13 `_section_*` functions are already thin
+wrappers of the form `render_html(collect_*(...))`, so the collectors are
+proven against the current HTML output. What carries over is the dispatch —
+collectors come in three signature shapes, and `build()` already branches on
+exactly those today for the string builders:
+
+  - `(db, domain_id, org_id)` — most sections
+  - `(db, domain_id, org_id, benchmark_org)` — decision_recommendations,
+    impact_projection, hidden_patterns
+  - `(db, domain_id, org_id, benchmark_profile_id, benchmark_org)` —
+    institutional_benchmark
+
+Risk worth naming: HTML/PDF is the most-used output and the one just confirmed
+working in production by exporting a real report. This refactor touches the
+path that currently works.
+
+- [x] 4.1 Migrate `build()` from `SECTION_BUILDERS` to the collectors, carrying over the existing three-way signature dispatch
+- [x] 4.2 Keep the per-section error boundary: a collector that raises must still yield an error block rather than failing the whole report
+- [x] 4.3 Add an `exhibit` ordinal to `SectionData`, assigned in `build()` after selection and before rendering — numbered only once a section has collected, so an erroring section leaves no gap in the sequence
+- [x] 4.4 Build the executive summary — ordered by materiality, ties broken by exhibit order; built after the loop but inserted before it, since it cannot know the findings until every section has collected
+- [x] 4.5 Test that ordinals shift with section selection while section keys do not — plus gapless numbering, summary coverage, ordering, muting and escaping (`test_report_assembly.py`)
+- [x] 4.6 Diff the rendered HTML before and after the migration — byte-identical over all 13 sections once the two generation timestamps are normalised (14,699 bytes either way)
+- [x] 4.7 `SECTION_BUILDERS` is kept — the premise "once nothing reads it" was wrong. Seven call sites read it as the section *registry*, not as builders: four endpoints validate names against it, scheduled reports filter on it, and `format_support` derives `PUBLIC_SECTIONS` from it. Added a guard test so the two maps cannot drift apart
 
 ## 5. Renderers
 
