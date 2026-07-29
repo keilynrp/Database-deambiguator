@@ -27,7 +27,7 @@ default: a takeaway is an assertion, and a wrong one is worse than silence.
 - [x] 3.5 Decide `agentic_trace` — migrated, not excepted. It maps cleanly onto Narrative blocks, and migrating fixed two live defects: it styled itself with `class="card"`/`class="muted"`, neither of which exists in the stylesheet, and carried a hard-coded Spanish paragraph in an English report
 - [x] 3.6 Reconcile the section name with its content — display label only ("Topic Clusters" -> "Top Concepts"). The `topic_clusters` key is unchanged: it is in the vocabulary `GET /reports/sections` returns and the generated SDKs expose, so renaming it breaks callers for a tidiness gain
 - [x] 3.7 Remove the temporary defaults so the type enforces the contract — `takeaway` and `method` are now required and validated non-blank; `materiality` keeps its default because "unremarkable" is an answer while a blank takeaway is an unwritten section
-- [ ] 3.8 Per-section tests asserting the takeaway cites only figures the section renders, covering empty and boundary cases — still open; 3.7 enforces presence, not truthfulness
+- [x] 3.8 Per-section tests asserting the takeaway cites only figures the section renders — needed populated fixtures to mean anything: against the default empty database every section returns its empty-state takeaway, cites nothing, and passes. Populating it immediately surfaced a real violation in `top_secondary_labels`
 
 ## 4. Assembly
 

@@ -488,25 +488,38 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         .group_by(models.RawEntity.secondary_label)\
         .order_by(func.count(models.RawEntity.id).desc()).limit(15).all()
     max_n = rows_q[0][1] if rows_q else 1
+    # Two different percentages, previously both called "Share": the bar is drawn
+    # relative to the largest label (so the top row is always 100%), while the
+    # finding a reader cares about is each label's share of all classified
+    # entities. Naming them apart, and rendering the second, is what lets the
+    # takeaway cite a figure the reader can actually check — "Relative weight"
+    # matches what topic_clusters already calls the same device.
+    classified_total = sum(r[1] for r in rows_q) or 1
     rows = tuple(
-        (r[0], f"{r[1]:,}", f"{round(r[1] / max_n * 100)}%")
+        (
+            r[0],
+            f"{r[1]:,}",
+            f"{round(r[1] / classified_total * 100)}%",
+            f"{round(r[1] / max_n * 100)}%",
+        )
         for r in rows_q
     )
-    table = Table(columns=("Label", "Entities", "Share"), rows=rows, bar_column=2)
+    table = Table(
+        columns=("Label", "Entities", "Share of classified", "Relative weight"),
+        rows=rows,
+        bar_column=3,
+    )
     from backend.reporting.section_data import Materiality
 
-    def _n(cell) -> int:
-        try:
-            return int(str(cell).replace(",", ""))
-        except (TypeError, ValueError):
-            return 0
-
-    classified = sum(_n(r[1]) for r in rows)
-    top_share = round(_n(rows[0][1]) / classified * 100) if rows and classified else 0
+    # Read back from the rendered rows rather than recomputing: the takeaway may
+    # only cite figures the section shows, and reading the same cells the reader
+    # sees is what makes that true by construction rather than by coincidence.
+    classified = classified_total if rows_q else 0
+    top_share = int(rows[0][2].rstrip("%")) if rows else 0
     return SectionData(
         takeaway=(
-            f"The top {len(rows)} classifications cover {classified:,} classified "
-            f"entities; the leading one holds {top_share}%"
+            f'"{rows[0][0]}" is the leading classification at {top_share}% of '
+            f"{classified:,} classified entities"
             if rows else "No classified entities to report."
         ),
         method=(
