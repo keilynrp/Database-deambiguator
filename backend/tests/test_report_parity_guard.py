@@ -44,7 +44,7 @@ _MARKERS: dict[str, dict[str, str]] = {
         "institutional_benchmark": "Institutional Benchmark",  # migrated (phase 3.6)
         "hidden_patterns": "Hidden Patterns",  # migrated (phase 3.8)
         "decision_recommendations": "Suggested Next Actions",  # migrated (phase 3.9)
-        "topic_clusters": "Concepts",
+        "topic_clusters": "Top Concepts",  # migrated 3.4, relabelled 3.6
         "harmonization_log": "Harmonization",
         "authority_control": "Authority Control",  # extend-report-module-coverage
         "collaboration_graph": "Collaboration Graph",
@@ -54,7 +54,7 @@ _MARKERS: dict[str, dict[str, str]] = {
         "entity_stats": "Entity Statistics",
         "enrichment_coverage": "Enrichment Coverage",
         "top_secondary_labels": "Top Secondary Labels",
-        "topic_clusters": "Top Concepts",
+        "topic_clusters": "Top Concepts",  # migrated 3.4, relabelled 3.6
         # migrated (phase 3): rendered via the shared payload + render_pptx
         "impact_projection": "Impact Projection",
         "institutional_benchmark": "Institutional Benchmark",
