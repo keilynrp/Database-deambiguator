@@ -146,6 +146,47 @@ def populated_records(db_session):
     return db_session
 
 
+@pytest.fixture
+def populated_enriched(db_session):
+    """Enriched entities carrying concepts, which is what the derived sections need.
+
+    topic_clusters, hidden_patterns and decision_recommendations do not read
+    tables directly — they go through TopicAnalyzer, PatternDiscoveryService and
+    AnalyticsService, which all key off enrichment. Seeding rows alone leaves
+    them empty, which is why they went unchecked until a production report
+    exposed three violations between them.
+    """
+    import json
+
+    concepts = (
+        ["Computer science"] * 12
+        + ["Political science"] * 7
+        + ["Open science"] * 5
+        + ["Biology"] * 3
+    )
+    for i, concept in enumerate(concepts):
+        db_session.add(
+            models.RawEntity(
+                primary_label=f"Paper {i}",
+                domain="default",
+                source="test",
+                validation_status="valid",
+                enrichment_status="completed",
+                enrichment_citation_count=10 + i,
+                enrichment_concepts=json.dumps([concept, "Shared topic"]),
+            )
+        )
+    db_session.commit()
+    return db_session
+
+
+#: Sections whose figures come from analyzers rather than from a table read.
+_DERIVED = [
+    "topic_clusters",
+    "hidden_patterns",
+    "decision_recommendations",
+]
+
 _DATA_BEARING = [
     "entity_stats",
     "enrichment_coverage",
@@ -240,4 +281,29 @@ def test_record_backed_sections_actually_cite_something(populated_records, key):
     assert _figures(section.takeaway), (
         f"{key}: takeaway cites no figures on populated data, so the check "
         f"above proves nothing: {section.takeaway!r}"
+    )
+
+
+@pytest.mark.parametrize("key", _DERIVED)
+def test_derived_takeaway_cites_only_rendered_figures(populated_enriched, key):
+    """The three sections a production report caught asserting unrendered figures.
+
+    topic_clusters cited a share of the top N while its table rendered weight
+    relative to the leader; the other two cited counts that appeared nowhere.
+    """
+    section = _collect(populated_enriched, key)
+    orphans = _figures(section.takeaway) - _rendered_figures(section)
+    assert not orphans, (
+        f"{key}: takeaway cites {sorted(orphans)}, which the section does not "
+        f"render. takeaway={section.takeaway!r} "
+        f"rendered={sorted(_rendered_figures(section))}"
+    )
+
+
+@pytest.mark.parametrize("key", _DERIVED)
+def test_derived_sections_actually_cite_something(populated_enriched, key):
+    section = _collect(populated_enriched, key)
+    assert _figures(section.takeaway), (
+        f"{key}: cites no figures on enriched data, so the check above proves "
+        f"nothing: {section.takeaway!r}"
     )

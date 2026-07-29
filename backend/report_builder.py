@@ -606,8 +606,17 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
     lead = topics[0]
     lead_share = round(lead["count"] / total * 100) if total else 0
 
+    # Two percentages, as in top_secondary_labels: the bar is drawn against the
+    # most frequent concept (so the top row is always 100%), while the figure the
+    # takeaway cites is each concept's share of the top N. Rendering only the
+    # first left the sentence's number nowhere a reader could check it.
     rows = tuple(
-        (t["concept"], f'{t["count"]:,}', f'{round(t["count"] / max_count * 100)}%')
+        (
+            t["concept"],
+            f'{t["count"]:,}',
+            f'{round(t["count"] / total * 100)}%',
+            f'{round(t["count"] / max_count * 100)}%',
+        )
         for t in topics
     )
 
@@ -616,14 +625,14 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
         title="Top Concepts",
         blocks=(
             Table(
-                columns=("Concept", "Frequency", "Relative weight"),
+                columns=("Concept", "Frequency", "Share of top", "Relative weight"),
                 rows=rows,
-                bar_column=2,
+                bar_column=3,
             ),
         ),
         takeaway=(
-            f'"{lead["concept"]}" is the most frequent concept, accounting for '
-            f'{lead_share}% of the top {len(topics)}'
+            f'"{rows[0][0]}" is the most frequent concept, accounting for '
+            f'{rows[0][2]} of the top {len(topics)}'
         ),
         method=method,
         # Concentration is the finding worth reading; an even spread is not.
@@ -729,6 +738,12 @@ def collect_decision_recommendations(
         1 for a in actions
         if str(a.get("priority", "")).lower() in {"high", "critical"}
     )
+    from backend.reporting.section_data import StatGrid, StatItem
+
+    action_summary = StatGrid(items=(
+        StatItem(label="Recommended Actions", value=f"{len(actions):,}"),
+        StatItem(label="High Priority", value=f"{high:,}", sub="of those actions"),
+    ))
     return SectionData(
         takeaway=(
             f"{len(actions)} recommended actions, {high} of them high priority"
@@ -746,7 +761,7 @@ def collect_decision_recommendations(
         ),
         key="decision_recommendations",
         title="Suggested Next Actions",
-        blocks=(table,),
+        blocks=(action_summary, table),
     )
 
 
@@ -896,6 +911,13 @@ def collect_hidden_patterns(
     )
     from backend.reporting.section_data import Materiality
 
+    from backend.reporting.section_data import StatGrid, StatItem
+
+    # The count leads the takeaway, so it has to be visible: checking the
+    # sentence should not mean counting table rows.
+    pattern_summary = StatGrid(items=(
+        StatItem(label="Patterns Detected", value=f"{len(patterns):,}"),
+    ))
     return SectionData(
         takeaway=(
             f"{len(patterns)} patterns detected; the strongest involves {rows[0][0]}"
@@ -911,7 +933,7 @@ def collect_hidden_patterns(
         materiality=Materiality.NOTABLE if patterns else Materiality.EMPTY,
         key="hidden_patterns",
         title="Hidden Patterns",
-        blocks=(reading, table),
+        blocks=(pattern_summary, reading, table),
     )
 
 
