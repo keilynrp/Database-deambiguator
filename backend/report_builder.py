@@ -488,25 +488,38 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         .group_by(models.RawEntity.secondary_label)\
         .order_by(func.count(models.RawEntity.id).desc()).limit(15).all()
     max_n = rows_q[0][1] if rows_q else 1
+    # Two different percentages, previously both called "Share": the bar is drawn
+    # relative to the largest label (so the top row is always 100%), while the
+    # finding a reader cares about is each label's share of all classified
+    # entities. Naming them apart, and rendering the second, is what lets the
+    # takeaway cite a figure the reader can actually check — "Relative weight"
+    # matches what topic_clusters already calls the same device.
+    classified_total = sum(r[1] for r in rows_q) or 1
     rows = tuple(
-        (r[0], f"{r[1]:,}", f"{round(r[1] / max_n * 100)}%")
+        (
+            r[0],
+            f"{r[1]:,}",
+            f"{round(r[1] / classified_total * 100)}%",
+            f"{round(r[1] / max_n * 100)}%",
+        )
         for r in rows_q
     )
-    table = Table(columns=("Label", "Entities", "Share"), rows=rows, bar_column=2)
+    table = Table(
+        columns=("Label", "Entities", "Share of classified", "Relative weight"),
+        rows=rows,
+        bar_column=3,
+    )
     from backend.reporting.section_data import Materiality
 
-    def _n(cell) -> int:
-        try:
-            return int(str(cell).replace(",", ""))
-        except (TypeError, ValueError):
-            return 0
-
-    classified = sum(_n(r[1]) for r in rows)
-    top_share = round(_n(rows[0][1]) / classified * 100) if rows and classified else 0
+    # Read back from the rendered rows rather than recomputing: the takeaway may
+    # only cite figures the section shows, and reading the same cells the reader
+    # sees is what makes that true by construction rather than by coincidence.
+    classified = classified_total if rows_q else 0
+    top_share = int(rows[0][2].rstrip("%")) if rows else 0
     return SectionData(
         takeaway=(
-            f"The top {len(rows)} classifications cover {classified:,} classified "
-            f"entities; the leading one holds {top_share}%"
+            f'"{rows[0][0]}" is the leading classification at {top_share}% of '
+            f"{classified:,} classified entities"
             if rows else "No classified entities to report."
         ),
         method=(
@@ -593,8 +606,17 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
     lead = topics[0]
     lead_share = round(lead["count"] / total * 100) if total else 0
 
+    # Two percentages, as in top_secondary_labels: the bar is drawn against the
+    # most frequent concept (so the top row is always 100%), while the figure the
+    # takeaway cites is each concept's share of the top N. Rendering only the
+    # first left the sentence's number nowhere a reader could check it.
     rows = tuple(
-        (t["concept"], f'{t["count"]:,}', f'{round(t["count"] / max_count * 100)}%')
+        (
+            t["concept"],
+            f'{t["count"]:,}',
+            f'{round(t["count"] / total * 100)}%',
+            f'{round(t["count"] / max_count * 100)}%',
+        )
         for t in topics
     )
 
@@ -603,14 +625,14 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
         title="Top Concepts",
         blocks=(
             Table(
-                columns=("Concept", "Frequency", "Relative weight"),
+                columns=("Concept", "Frequency", "Share of top", "Relative weight"),
                 rows=rows,
-                bar_column=2,
+                bar_column=3,
             ),
         ),
         takeaway=(
-            f'"{lead["concept"]}" is the most frequent concept, accounting for '
-            f'{lead_share}% of the top {len(topics)}'
+            f'"{rows[0][0]}" is the most frequent concept, accounting for '
+            f'{rows[0][2]} of the top {len(topics)}'
         ),
         method=method,
         # Concentration is the finding worth reading; an even spread is not.
@@ -646,12 +668,17 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
         columns=("Step", "Records Updated", "Status", "Executed"),
         rows=rows,
     )
-    from backend.reporting.section_data import Materiality
+    from backend.reporting.section_data import Materiality, StatGrid, StatItem
 
+    # The count leads the takeaway, so it belongs on the page: a reader should
+    # not have to count table rows to check the sentence above them.
+    summary = StatGrid(items=(
+        StatItem(label="Operations Applied", value=f"{len(logs):,}", sub="most recent first"),
+    ))
     return SectionData(
         key="harmonization_log",
         title="Harmonization Log",
-        blocks=(table,),
+        blocks=(summary, table),
         takeaway=(
             f"{len(logs)} harmonization operations applied, most recently {rows[0][0]}"
             if rows else "No harmonization operations have been applied."
@@ -711,6 +738,12 @@ def collect_decision_recommendations(
         1 for a in actions
         if str(a.get("priority", "")).lower() in {"high", "critical"}
     )
+    from backend.reporting.section_data import StatGrid, StatItem
+
+    action_summary = StatGrid(items=(
+        StatItem(label="Recommended Actions", value=f"{len(actions):,}"),
+        StatItem(label="High Priority", value=f"{high:,}", sub="of those actions"),
+    ))
     return SectionData(
         takeaway=(
             f"{len(actions)} recommended actions, {high} of them high priority"
@@ -728,7 +761,7 @@ def collect_decision_recommendations(
         ),
         key="decision_recommendations",
         title="Suggested Next Actions",
-        blocks=(table,),
+        blocks=(action_summary, table),
     )
 
 
@@ -878,6 +911,13 @@ def collect_hidden_patterns(
     )
     from backend.reporting.section_data import Materiality
 
+    from backend.reporting.section_data import StatGrid, StatItem
+
+    # The count leads the takeaway, so it has to be visible: checking the
+    # sentence should not mean counting table rows.
+    pattern_summary = StatGrid(items=(
+        StatItem(label="Patterns Detected", value=f"{len(patterns):,}"),
+    ))
     return SectionData(
         takeaway=(
             f"{len(patterns)} patterns detected; the strongest involves {rows[0][0]}"
@@ -893,7 +933,7 @@ def collect_hidden_patterns(
         materiality=Materiality.NOTABLE if patterns else Materiality.EMPTY,
         key="hidden_patterns",
         title="Hidden Patterns",
-        blocks=(reading, table),
+        blocks=(pattern_summary, reading, table),
     )
 
 
@@ -1118,10 +1158,18 @@ def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "S
             )
         )
 
+    # Same reason as harmonization_log: the takeaway rolls the per-trace tool
+    # lists up into a distinct count, which appears nowhere unless stated.
+    from backend.reporting.section_data import StatGrid, StatItem
+
+    summary = StatGrid(items=(
+        StatItem(label="Saved Answers", value=f"{len(traces):,}"),
+        StatItem(label="Distinct Tools", value=f"{len(tools_seen):,}", sub="across those answers"),
+    ))
     return SectionData(
         key="agentic_trace",
         title="Agentic Research Trace",
-        blocks=tuple(blocks),
+        blocks=(summary, *blocks),
         takeaway=(
             f"{len(traces)} saved agentic answer{'s' if len(traces) != 1 else ''} "
             f"in this brief, drawing on {len(tools_seen) or 'no'} distinct tool"
@@ -1334,7 +1382,8 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
         ),
         takeaway=(
             f"{confirmed:,} of {total:,} authority records confirmed; "
-            f"{pending:,} await human review (mean confidence {mean_confidence:.2f})"
+            f"{pending:,} await human review "
+            f"(mean confidence {round(float(mean_confidence or 0) * 100)}%)"
         ),
         method=_AUTHORITY_METHOD,
         # A backlog larger than the confirmed set is the finding, not a footnote.

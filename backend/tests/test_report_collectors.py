@@ -168,12 +168,20 @@ def test_collect_top_secondary_labels_returns_share_table(db_session):
     assert section.title == "Top Secondary Labels / Classifications"
 
     table = next(b for b in section.blocks if isinstance(b, Table))
-    assert table.columns == ("Label", "Entities", "Share")
-    assert table.bar_column == 2
-    # sorted by count desc; the top label draws a full-width bar
-    assert table.rows[0] == ("Clinical Trial", "5", "100%")
+    # Two percentages, deliberately named apart. "Share of classified" is the
+    # figure the takeaway cites, so a reader can check it; "Relative weight" is
+    # the bar, drawn against the largest label, which is why the top row is
+    # always 100% and cannot serve as a finding.
+    assert table.columns == ("Label", "Entities", "Share of classified", "Relative weight")
+    assert table.bar_column == 3
+
+    # 5 + 3 + 1 = 9 classified entities.
+    assert table.rows[0] == ("Clinical Trial", "5", "56%", "100%")  # 5/9, 5/5
     review = next(r for r in table.rows if r[0] == "Review")
-    assert review == ("Review", "3", "60%")   # round(3 / 5 * 100)
+    assert review == ("Review", "3", "33%", "60%")                  # 3/9, 3/5
+
+    # The cited figure appears in the table the reader is looking at.
+    assert "56%" in section.takeaway
 
 
 def test_collect_top_secondary_labels_empty(db_session):
