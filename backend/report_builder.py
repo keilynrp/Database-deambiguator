@@ -314,7 +314,35 @@ def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> "Se
         rows=rows,
         bar_column=2,
     )
-    return SectionData(key="entity_stats", title="Entity Statistics", blocks=(grid, table))
+    from backend.reporting.section_data import Materiality
+
+    pending = status_map.get("pending", 0)
+    if not total:
+        takeaway = "No entities in this domain yet."
+        materiality = Materiality.EMPTY
+    else:
+        takeaway = (
+            f"{status_map.get('valid', 0):,} of {total:,} entities pass validation "
+            f"({valid_pct}%); {pending:,} remain unresolved"
+        )
+        materiality = (
+            Materiality.LEAD if valid_pct < 85
+            else Materiality.NOTABLE if pending
+            else Materiality.ROUTINE
+        )
+
+    return SectionData(
+        key="entity_stats",
+        title="Entity Statistics",
+        blocks=(grid, table),
+        takeaway=takeaway,
+        method=(
+            "Counts are scoped to this domain and organization. \"Valid\" is the "
+            "record's validation status flag, not an assessment of the data's "
+            "quality — a record can be structurally valid and still be wrong."
+        ),
+        materiality=materiality,
+    )
 
 
 def _section_entity_stats(db: Session, domain_id: str, org_id: int | None) -> str:
@@ -357,7 +385,34 @@ def collect_enrichment_coverage(db: Session, domain_id: str, org_id: int | None)
         for r in top
     )
     table = Table(columns=("Entity", "Citations", "Source"), rows=rows)
-    return SectionData(key="enrichment_coverage", title="Enrichment Coverage", blocks=(grid, table))
+    from backend.reporting.section_data import Materiality
+
+    if not total:
+        takeaway = "No entities to enrich in this domain yet."
+        materiality = Materiality.EMPTY
+    else:
+        takeaway = (
+            f"Enrichment covers {pct}% of records ({completed:,} of {total:,}); "
+            f"mean citation count {round(avg_cit or 0):,}"
+        )
+        materiality = (
+            Materiality.LEAD if pct < 60
+            else Materiality.NOTABLE if pct < 85
+            else Materiality.ROUTINE
+        )
+
+    return SectionData(
+        key="enrichment_coverage",
+        title="Enrichment Coverage",
+        blocks=(grid, table),
+        takeaway=takeaway,
+        method=(
+            "The mean is taken over enriched records only, so records never "
+            "enriched do not pull it down: it describes the enriched subset, not "
+            "the portfolio. Citation counts are as of the last enrichment run."
+        ),
+        materiality=materiality,
+    )
 
 
 def _section_enrichment_coverage(db: Session, domain_id: str, org_id: int | None) -> str:
@@ -385,7 +440,32 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         for r in rows_q
     )
     table = Table(columns=("Label", "Entities", "Share"), rows=rows, bar_column=2)
+    from backend.reporting.section_data import Materiality
+
+    def _n(cell) -> int:
+        try:
+            return int(str(cell).replace(",", ""))
+        except (TypeError, ValueError):
+            return 0
+
+    classified = sum(_n(r[1]) for r in rows)
+    top_share = round(_n(rows[0][1]) / classified * 100) if rows and classified else 0
     return SectionData(
+        takeaway=(
+            f"The top {len(rows)} classifications cover {classified:,} classified "
+            f"entities; the leading one holds {top_share}%"
+            if rows else "No classified entities to report."
+        ),
+        method=(
+            "The denominator is classified entities only: unclassified records "
+            "are excluded and do not show up as a gap. High concentration may "
+            "reflect the classifier's coverage rather than the portfolio's shape."
+        ),
+        materiality=(
+            Materiality.NOTABLE if top_share > 60
+            else Materiality.ROUTINE if rows
+            else Materiality.EMPTY
+        ),
         key="top_secondary_labels",
         title="Top Secondary Labels / Classifications",
         blocks=(table,),
@@ -513,7 +593,22 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
         columns=("Step", "Records Updated", "Status", "Executed"),
         rows=rows,
     )
-    return SectionData(key="harmonization_log", title="Harmonization Log", blocks=(table,))
+    from backend.reporting.section_data import Materiality
+
+    return SectionData(
+        key="harmonization_log",
+        title="Harmonization Log",
+        blocks=(table,),
+        takeaway=(
+            f"{len(logs)} harmonization operations applied, most recently {rows[0][0]}"
+            if rows else "No harmonization operations have been applied."
+        ),
+        method=(
+            "Records operations that were applied, not proposed or rejected. "
+            "It shows what changed, not what was reviewed."
+        ),
+        materiality=Materiality.ROUTINE if rows else Materiality.EMPTY,
+    )
 
 
 def _section_harmonization_log(db: Session, domain_id: str, org_id: int | None) -> str:
@@ -557,7 +652,27 @@ def collect_decision_recommendations(
         columns=("Priority", "Category", "Recommendation", "Detail", "Evidence"),
         rows=rows,
     )
+    from backend.reporting.section_data import Materiality
+
+    high = sum(
+        1 for a in actions
+        if str(a.get("priority", "")).lower() in {"high", "critical"}
+    )
     return SectionData(
+        takeaway=(
+            f"{len(actions)} recommended actions, {high} of them high priority"
+            if actions else "No actions are being recommended from the current snapshot."
+        ),
+        method=(
+            "Heuristics derived from the current snapshot, not a ranked plan. "
+            "They reflect what the data suggests, not institutional priority, "
+            "and carry no estimate of effort."
+        ),
+        materiality=(
+            Materiality.LEAD if high
+            else Materiality.NOTABLE if actions
+            else Materiality.EMPTY
+        ),
         key="decision_recommendations",
         title="Suggested Next Actions",
         blocks=(table,),
@@ -633,7 +748,21 @@ def collect_impact_projection(
             ("Concentration", "concentration"),
         )
     )
+    from backend.reporting.section_data import Materiality
+
+    spread = (p90 or 0) - (p10 or 0)
     return SectionData(
+        takeaway=f"Projected impact {score}/100, probable range {p10}-{p90}",
+        method=(
+            "A Monte Carlo projection over the current records, not an "
+            "observation. The range is the projection's own uncertainty: a wide "
+            "range means the model cannot distinguish outcomes, not that impact "
+            "is variable. This section's name promises more certainty than the "
+            "figure supports."
+        ),
+        # Never LEAD. A wide range is low information, and letting it head the
+        # summary sells uncertainty as a finding.
+        materiality=Materiality.NOTABLE if spread <= 30 else Materiality.ROUTINE,
         key="impact_projection",
         title="Impact Projection",
         blocks=(grid, interpretation, *meters),
@@ -694,7 +823,21 @@ def collect_hidden_patterns(
         rows=rows,
         bar_column=5,
     )
+    from backend.reporting.section_data import Materiality
+
     return SectionData(
+        takeaway=(
+            f"{len(patterns)} patterns detected; the strongest involves {rows[0][0]}"
+            if rows else "No patterns detected in the current records."
+        ),
+        method=(
+            "Statistical co-occurrence within this corpus, not causation, and "
+            "sensitive to corpus size: a small corpus produces spurious "
+            "associations. Treat these as prompts to investigate, not findings."
+        ),
+        # Capped below LEAD unconditionally: the section name invites a causal
+        # reading its method cannot support.
+        materiality=Materiality.NOTABLE if patterns else Materiality.EMPTY,
         key="hidden_patterns",
         title="Hidden Patterns",
         blocks=(reading, table),
@@ -808,10 +951,23 @@ def collect_institutional_benchmark(
             for rule in rules
         ),
     )
+    from backend.reporting.section_data import Materiality
+
     return SectionData(
         key="institutional_benchmark",
         title="Institutional Benchmark",
         blocks=(grid, reading, gap_table, rule_table),
+        takeaway=(
+            f"Benchmark readiness {readiness_pct}% — {passed_rules} of "
+            f"{total_rules} rules pass; status \"{status}\""
+        ),
+        method=(
+            "Measured against the selected benchmark profile and comparison "
+            "organization. Readiness describes conformance to that profile's "
+            "rules, not standing among peers — a high score means the rules are "
+            "satisfied, not that the institution leads its field."
+        ),
+        materiality=Materiality.LEAD if status != "ready" else Materiality.NOTABLE,
     )
 
 
@@ -930,6 +1086,27 @@ def _section_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> s
 
 
 # ── Authority / coauthorship / journals (extend-report-module-coverage) ──────
+#: Shared by both return paths of collect_authority_control so the empty case
+#: discloses the same thing as the populated one.
+_JOURNAL_METHOD = (
+    "NIF is a field-normalized two-year mean citedness computed from OpenAlex: "
+    "an open proxy, NOT the Journal Impact Factor, and not comparable to a "
+    "published JIF. The works count behind it is local to this corpus, not "
+    "OpenAlex's global figure for the journal. DOAJ and APC status are as of "
+    "the last journal sync."
+)
+_COLLAB_METHOD = (
+    "Co-authorship is derived from local records, and author identities are "
+    "derived rather than canonical, so one person can appear more than once. "
+    "Community detection returns one partition among several possible ones."
+)
+_AUTHORITY_METHOD = (
+    "Mean confidence is the matcher's own score, not agreement with a human "
+    "reviewer. Records awaiting review are unvalidated, so they contribute to "
+    "the mean without anyone having confirmed them. The conflicts table lists "
+    "the worst offenders, not the whole review queue."
+)
+
 # Explicit cap on the conflicts table: a brief lists the worst offenders, it is
 # not an export of the review queue (production holds ~9.4k pending records).
 _AUTHORITY_CONFLICT_LIMIT = 10
@@ -984,7 +1161,16 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
     if not total:
         # Absence of authority data is NOT evidence of clean identity
         # resolution. Saying "no conflicts" here would be a false reassurance.
+        from backend.reporting.section_data import Materiality
+
         return SectionData(
+            takeaway=(
+                "No authority records exist for this workspace; identity "
+                "resolution has not been run over it. This is not a finding of "
+                "zero conflicts."
+            ),
+            method=_AUTHORITY_METHOD,
+            materiality=Materiality.EMPTY,
             key="authority_control",
             title="Authority Control",
             blocks=(
@@ -1082,6 +1268,8 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
             "the records that were processed."
         )
 
+    from backend.reporting.section_data import Materiality
+
     return SectionData(
         key="authority_control",
         title="Authority Control",
@@ -1090,6 +1278,17 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
             distribution,
             conflicts_table,
             Narrative(heading="Reliability reading", paragraphs=tuple(reliability)),
+        ),
+        takeaway=(
+            f"{confirmed:,} of {total:,} authority records confirmed; "
+            f"{pending:,} await human review (mean confidence {mean_confidence:.2f})"
+        ),
+        method=_AUTHORITY_METHOD,
+        # A backlog larger than the confirmed set is the finding, not a footnote.
+        materiality=(
+            Materiality.LEAD if pending > confirmed
+            else Materiality.NOTABLE if pending
+            else Materiality.ROUTINE
         ),
     )
 
@@ -1129,7 +1328,12 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
     ).scalar() or 0
 
     if not author_count:
+        from backend.reporting.section_data import Materiality
+
         return SectionData(
+            takeaway="No co-authorship graph has been computed for this domain.",
+            method=_COLLAB_METHOD,
+            materiality=Materiality.EMPTY,
             key="collaboration_graph",
             title="Collaboration Graph",
             blocks=(
@@ -1251,10 +1455,18 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
                 ),
             ))
 
+    from backend.reporting.section_data import Materiality
+
     return SectionData(
         key="collaboration_graph",
         title="Collaboration Graph",
         blocks=tuple(blocks),
+        takeaway=(
+            f"{author_count:,} authors across {community_count:,} communities, "
+            f"linked by {edge_count:,} collaborations"
+        ),
+        method=_COLLAB_METHOD,
+        materiality=Materiality.NOTABLE if community_count > 1 else Materiality.ROUTINE,
     )
 
 
@@ -1297,7 +1509,12 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
     total = query.with_entities(func.count(models.JournalMetric.id)).scalar() or 0
 
     if not total:
+        from backend.reporting.section_data import Materiality
+
         return SectionData(
+            takeaway="No journal metrics have been collected for this domain.",
+            method=_JOURNAL_METHOD,
+            materiality=Materiality.EMPTY,
             key="journal_portfolio",
             title="Journal Portfolio",
             blocks=(
@@ -1376,10 +1593,18 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
         ),
     )
 
+    from backend.reporting.section_data import Materiality
+
     return SectionData(
         key="journal_portfolio",
         title="Journal Portfolio",
         blocks=(grid, table, note),
+        takeaway=(
+            f"{total:,} journals in the portfolio; {doaj_pct}% listed in DOAJ "
+            f"and {with_apc:,} charging an APC"
+        ),
+        method=_JOURNAL_METHOD,
+        materiality=Materiality.NOTABLE if doaj_pct < 50 else Materiality.ROUTINE,
     )
 
 
