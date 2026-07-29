@@ -129,7 +129,11 @@ def collect_stakeholder_reading(
 
     benchmark_status = benchmark.get("status", "watch")
     readiness_pct = round(float(benchmark.get("readiness_pct") or 0))
-    quality_avg = round(float(quality.get("average") or 0))
+    # `quality.average` is a 0–1 fraction (its own distribution buckets at 0.7 /
+    # 0.3 say so), and both figures below render it as a percentage. Without the
+    # scaling a real average of 0.82 was reported as "quality 1%" — every other
+    # consumer of this field multiplies: impact_projection and both dashboards.
+    quality_avg = round(float(quality.get("average") or 0) * 100)
     coverage_pct = round(float(kpis.get("enrichment_pct") or 0))
     impact_score = round(float(impact_projection.get("score") or 0))
     impact_range = impact_projection.get("range") or {}
@@ -231,6 +235,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 section { margin-bottom: 40px; }
 section h2 { font-size: 17px; font-weight: 600; color: #1d4ed8; margin-bottom: 16px;
              padding-bottom: 8px; border-bottom: 1px solid #dbeafe; }
+/* The eyebrow above a section heading: exhibit ordinal + dataset label. The
+   heading itself states the finding, so the label sits here — quieter, but still
+   there, because a report you cannot scan by section name is worse than one that
+   only names its sections. */
+.exhibit-label { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                 letter-spacing: .06em; color: #6b7280; margin-bottom: 6px; }
+.exhibit-label .ord { color: #1d4ed8; font-variant-numeric: tabular-nums; }
+/* Source, as-of date and caveat, under the figures they qualify. */
+.method { margin-top: 14px; padding-top: 10px; border-top: 1px dashed #e5e7eb;
+          font-size: 11px; color: #6b7280; line-height: 1.6; }
+.summary-list { list-style: none; padding-left: 0; }
+.summary-list li { padding: 7px 0; border-bottom: 1px solid #f3f4f6; line-height: 1.6; }
+.summary-list li:last-child { border-bottom: none; }
+.summary-list .ord { color: #1d4ed8; font-weight: 600;
+                     font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Computed, and unremarkable. De-emphasized rather than dropped: that a section
+   ran and found nothing is itself information. */
+.summary-list li.muted,
+.summary-list li.muted .ord { color: #9ca3af; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 16px; }
 .stat-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; }
 .stat-card .label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; }
@@ -295,6 +318,12 @@ footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e5e7eb;
      read badly when split. */
   section        { break-inside: auto; margin-bottom: 32px; }
   section h2     { break-after: avoid; }
+  /* The eyebrow is a label for what follows; stranded at a page bottom it
+     labels nothing. The method qualifies the figures above it, so it has to
+     land on the page that carries them. */
+  .exhibit-label { break-after: avoid; }
+  .method        { break-before: avoid; break-inside: avoid; }
+  .summary-list li { break-inside: avoid; }
   thead          { display: table-header-group; }
   tr             { break-inside: avoid; }
   .stat-card,
@@ -680,7 +709,8 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
         title="Harmonization Log",
         blocks=(summary, table),
         takeaway=(
-            f"{len(logs)} harmonization operations applied, most recently {rows[0][0]}"
+            f"{len(logs):,} harmonization operation{'' if len(logs) == 1 else 's'} "
+            f"applied, most recently {rows[0][0]}"
             if rows else "No harmonization operations have been applied."
         ),
         method=(
@@ -1564,8 +1594,9 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
         title="Collaboration Graph",
         blocks=tuple(blocks),
         takeaway=(
-            f"{author_count:,} authors across {community_count:,} communities, "
-            f"linked by {edge_count:,} collaborations"
+            f"{author_count:,} authors across {community_count:,} "
+            f"communit{'y' if community_count == 1 else 'ies'}, linked by "
+            f"{edge_count:,} collaboration{'' if edge_count == 1 else 's'}"
         ),
         method=_COLLAB_METHOD,
         materiality=Materiality.NOTABLE if community_count > 1 else Materiality.ROUTINE,
@@ -1787,12 +1818,10 @@ def _executive_summary(collected: list) -> str:
 
     items = []
     for section in ranked:
-        muted = section.materiality <= Materiality.ROUTINE
-        style = ' style="color:#9ca3af"' if muted else ""
+        muted = ' class="muted"' if section.materiality <= Materiality.ROUTINE else ""
         items.append(
-            f"<li{style}>"
-            f'<span style="font-variant-numeric:tabular-nums">'
-            f"Exhibit {section.exhibit}</span> &nbsp;·&nbsp; "
+            f"<li{muted}>"
+            f'<span class="ord">Exhibit {section.exhibit}</span>&nbsp;·&nbsp;'
             f"{escape(section.takeaway)}"
             f"</li>"
         )
@@ -1800,7 +1829,7 @@ def _executive_summary(collected: list) -> str:
     return (
         "<section>"
         "<h2>Executive Summary</h2>"
-        f'<ul style="line-height:1.9;padding-left:18px">{"".join(items)}</ul>'
+        f'<ul class="summary-list">{"".join(items)}</ul>'
         "</section>"
     )
 

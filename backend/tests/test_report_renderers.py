@@ -68,6 +68,65 @@ def test_html_renderer_emits_existing_css_classes():
     assert "Coverage" in html and "60%" in html
 
 
+def test_html_renderer_leads_with_the_takeaway_not_the_label():
+    """The heading states the finding; the dataset label drops to secondary text.
+
+    Both are present — a report a reader cannot scan by section name is worse
+    than one that only names its sections — but the assertion is what leads.
+    """
+    from backend.reporting.html_renderer import render_html
+
+    html = render_html(_every_block_section())
+
+    assert "<h2>1,240 entities recorded, 60% enriched</h2>" in html
+    assert "<h2>Demo Section</h2>" not in html, "the label is still the heading"
+    assert "Demo Section" in html, "the label has to remain findable"
+
+
+def test_html_renderer_states_the_method_for_every_section():
+    from backend.reporting.html_renderer import render_html
+
+    html = render_html(_every_block_section())
+
+    assert 'class="method"' in html
+    assert "Counts scoped to this domain, as of the last run." in html
+
+
+def test_html_renderer_shows_the_exhibit_ordinal_assembly_assigned():
+    from dataclasses import replace
+
+    from backend.reporting.html_renderer import render_html
+
+    html = render_html(replace(_every_block_section(), exhibit=3))
+
+    assert "Exhibit 3" in html
+
+
+def test_html_renderer_omits_the_ordinal_for_an_unnumbered_section():
+    """A section rendered outside assembly has no ordinal, and must not invent
+    one or leak the absent value."""
+    from backend.reporting.html_renderer import render_html
+
+    html = render_html(_every_block_section())  # exhibit is None
+
+    assert "Exhibit" not in html
+    assert "None" not in html
+
+
+def test_html_renderer_escapes_the_takeaway_and_method():
+    """Both are prose assembled from record values, so both can carry markup."""
+    from backend.reporting.html_renderer import render_html
+
+    html = render_html(SectionData(
+        key="x", title="T",
+        takeaway="<script>alert(1)</script> & up",
+        method="Source: <b>upstream</b> & local",
+    ))
+
+    assert "<script>" not in html and "<b>" not in html
+    assert "&lt;script&gt;" in html and "&amp;" in html
+
+
 def test_html_renderer_escapes_data():
     from backend.reporting.html_renderer import render_html
 

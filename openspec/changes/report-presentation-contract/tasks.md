@@ -68,7 +68,25 @@ path that currently works.
 
 ## 5. Renderers
 
-- [ ] 5.1 HTML/PDF: exhibit ordinal, takeaway as the heading with the dataset label as secondary text, method footer, executive summary
+- [x] 5.1 HTML/PDF: exhibit ordinal, takeaway as the heading with the dataset label as secondary text, method footer, executive summary. The section shell is now eyebrow (`Exhibit N · Label`) → `<h2>` takeaway → blocks → `<p class="method">`; the summary moved off inline styles onto the stylesheet. Reading a populated 13-section report found three defects the change had just promoted into headings — see below
+
+Three defects surfaced by putting the takeaway in the `<h2>`. All were
+pre-existing and all were invisible while the takeaway only appeared in a
+summary list; none would have been caught by a fixture, because each needs real
+figures to read wrong:
+
+  - `stakeholder_reading` rendered `quality.average` — a 0–1 fraction — as a
+    percentage without scaling, reporting **"quality 1%"** for a real average of
+    0.82. Every other consumer of that field multiplies by 100
+    (`impact_projection`, both dashboards). Fixed, with a regression test.
+  - `"1 harmonization operations applied"` and `"linked by 1 collaborations"` —
+    unconditional plurals, now in the most prominent line of their sections.
+  - **Not fixed, needs a decision:** `build()` is the only renderer that does not
+    run its section list through `canonical_sections()`. Excel and PPTX both do.
+    Requesting `top_secondary_labels` and its deprecated alias `top_brands`
+    together renders the same section twice, as two differently-numbered
+    exhibits, and states the same finding twice in the summary. Exhibit numbering
+    is what makes this legible as a defect rather than mere repetition.
 - [ ] 5.2 Excel: `Methodology` sheet listing every exhibit's source and caveat
 - [ ] 5.3 Excel: caveat row directly above each section's table, so a copied range carries its warning
 - [ ] 5.4 PPTX: takeaway as slide title, method in slide footer, full caveat in speaker notes
