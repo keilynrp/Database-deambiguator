@@ -659,12 +659,17 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
         columns=("Step", "Records Updated", "Status", "Executed"),
         rows=rows,
     )
-    from backend.reporting.section_data import Materiality
+    from backend.reporting.section_data import Materiality, StatGrid, StatItem
 
+    # The count leads the takeaway, so it belongs on the page: a reader should
+    # not have to count table rows to check the sentence above them.
+    summary = StatGrid(items=(
+        StatItem(label="Operations Applied", value=f"{len(logs):,}", sub="most recent first"),
+    ))
     return SectionData(
         key="harmonization_log",
         title="Harmonization Log",
-        blocks=(table,),
+        blocks=(summary, table),
         takeaway=(
             f"{len(logs)} harmonization operations applied, most recently {rows[0][0]}"
             if rows else "No harmonization operations have been applied."
@@ -1131,10 +1136,18 @@ def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "S
             )
         )
 
+    # Same reason as harmonization_log: the takeaway rolls the per-trace tool
+    # lists up into a distinct count, which appears nowhere unless stated.
+    from backend.reporting.section_data import StatGrid, StatItem
+
+    summary = StatGrid(items=(
+        StatItem(label="Saved Answers", value=f"{len(traces):,}"),
+        StatItem(label="Distinct Tools", value=f"{len(tools_seen):,}", sub="across those answers"),
+    ))
     return SectionData(
         key="agentic_trace",
         title="Agentic Research Trace",
-        blocks=tuple(blocks),
+        blocks=(summary, *blocks),
         takeaway=(
             f"{len(traces)} saved agentic answer{'s' if len(traces) != 1 else ''} "
             f"in this brief, drawing on {len(tools_seen) or 'no'} distinct tool"
@@ -1347,7 +1360,8 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
         ),
         takeaway=(
             f"{confirmed:,} of {total:,} authority records confirmed; "
-            f"{pending:,} await human review (mean confidence {mean_confidence:.2f})"
+            f"{pending:,} await human review "
+            f"(mean confidence {round(float(mean_confidence or 0) * 100)}%)"
         ),
         method=_AUTHORITY_METHOD,
         # A backlog larger than the confirmed set is the finding, not a footnote.

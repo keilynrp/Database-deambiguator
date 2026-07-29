@@ -81,10 +81,84 @@ def populated(db_session):
     return db_session
 
 
+@pytest.fixture
+def populated_records(db_session):
+    """The sections backed by their own tables rather than by RawEntity.
+
+    Separate from `populated` because these need no entities at all, and mixing
+    them would make a failure ambiguous about which seed caused it.
+    """
+    import json
+    from datetime import datetime, timezone
+
+    # 7 authority records: 4 confirmed, 3 pending, so the backlog is a real
+    # figure and confirmed != pending.
+    for i in range(7):
+        db_session.add(
+            models.AuthorityRecord(
+                field_name="author",
+                original_value=f"Author {i}",
+                authority_source="test",
+                authority_id=f"A{i}",
+                canonical_label=f"Canonical {i}",
+                confidence=0.9 if i < 4 else 0.4,
+                status="confirmed" if i < 4 else "pending",
+            )
+        )
+
+    # 5 journals: 3 in DOAJ, 2 charging an APC.
+    for i in range(5):
+        db_session.add(
+            models.JournalMetric(
+                issn_l=f"1234-000{i}",
+                display_name=f"Journal {i}",
+                two_yr_mean_citedness=1.5 + i,
+                is_in_doaj=i < 3,
+                apc_usd=1200 if i >= 3 else None,
+            )
+        )
+
+    for i in range(4):
+        db_session.add(
+            models.HarmonizationLog(
+                step_id=f"step-{i}",
+                step_name=f"Normalise field {i}",
+                records_updated=10 * (i + 1),
+                executed_at=datetime.now(timezone.utc),
+            )
+        )
+
+    db_session.add(
+        models.AnalysisContext(
+            domain_id="default",
+            label="agentic-chat:What is the coverage?",
+            context_snapshot=json.dumps(
+                {
+                    "question": "What is the coverage?",
+                    "answer": "Coverage is 55%.",
+                    "trace": {"tools_used": ["search", "analytics"]},
+                    "sources": [{"label": "Entity 1"}],
+                }
+            ),
+        )
+    )
+    db_session.commit()
+    return db_session
+
+
 _DATA_BEARING = [
     "entity_stats",
     "enrichment_coverage",
     "top_secondary_labels",
+]
+
+#: Sections seeded from their own tables. Kept as a separate list so a missing
+#: fixture surfaces as a failure here rather than as a silently skipped section.
+_RECORD_BACKED = [
+    "authority_control",
+    "journal_portfolio",
+    "harmonization_log",
+    "agentic_trace",
 ]
 
 
@@ -146,3 +220,24 @@ def test_share_of_classified_is_rendered_not_only_asserted(populated):
     assert table.rows[0][weight_idx] == "100%"
     assert table.rows[0][share_idx] != "100%"
     assert table.rows[0][share_idx].rstrip("%") in section.takeaway
+
+
+@pytest.mark.parametrize("key", _RECORD_BACKED)
+def test_record_backed_takeaway_cites_only_rendered_figures(populated_records, key):
+    section = _collect(populated_records, key)
+    orphans = _figures(section.takeaway) - _rendered_figures(section)
+    assert not orphans, (
+        f"{key}: takeaway cites {sorted(orphans)}, which the section does not "
+        f"render, so a reader cannot check it. "
+        f"takeaway={section.takeaway!r} "
+        f"rendered={sorted(_rendered_figures(section))}"
+    )
+
+
+@pytest.mark.parametrize("key", _RECORD_BACKED)
+def test_record_backed_sections_actually_cite_something(populated_records, key):
+    section = _collect(populated_records, key)
+    assert _figures(section.takeaway), (
+        f"{key}: takeaway cites no figures on populated data, so the check "
+        f"above proves nothing: {section.takeaway!r}"
+    )
