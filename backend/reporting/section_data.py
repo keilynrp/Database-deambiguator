@@ -97,18 +97,24 @@ class Materiality(IntEnum):
 class SectionData:
     key: str
     title: str
-    blocks: tuple[Block, ...] = field(default_factory=tuple)
 
     #: What the section's data shows, as a statement rather than a label.
     #: Produced by the collector alongside the figures it describes, never
     #: composed by a renderer — see report-presentation.
-    takeaway: str = ""
+    takeaway: str
 
     #: Where the data came from, as-of when, and any caveat needed to read the
-    #: figures correctly. Mandatory in the finished contract: a section with no
-    #: caveat still states its source and as-of date.
-    method: str = ""
+    #: figures correctly. A section with no caveat still states its source and
+    #: as-of date: making this optional would let the sections that most need a
+    #: caveat be the ones that omit it, because their author sits closest to the
+    #: data and is least likely to see the ambiguity.
+    method: str
 
+    blocks: tuple[Block, ...] = field(default_factory=tuple)
+
+    #: Defaulted, unlike takeaway and method. Every section has a level —
+    #: "unremarkable" is an answer — whereas a blank takeaway or method is a
+    #: section nobody has written yet.
     materiality: Materiality = Materiality.ROUTINE
 
     def __post_init__(self) -> None:
@@ -116,19 +122,17 @@ class SectionData:
             raise ValueError("SectionData requires a non-empty key")
         if not self.title.strip():
             raise ValueError("SectionData requires a non-empty title")
-
-    # `takeaway` and `method` default to "" and are NOT yet validated as
-    # non-empty. Enforcing that now would break the eleven collectors that
-    # predate this contract, all at once. The defaults come off — and the
-    # emptiness check goes in above — once every collector supplies real
-    # values, at which point the type enforces the contract instead of this
-    # comment asking for it. Tracked as task 3.7.
-
-    @property
-    def has_presentation(self) -> bool:
-        """Whether this section already carries its presentation contract.
-
-        Lets callers and tests distinguish a migrated section from one still
-        running on defaults, without inspecting the strings themselves.
-        """
-        return bool(self.takeaway.strip()) and bool(self.method.strip())
+        # Required since task 3.7, once every collector supplied real values.
+        # The type now enforces the presentation contract rather than a comment
+        # asking for it: a new section cannot be added without stating what it
+        # shows and where the figures came from.
+        if not self.takeaway.strip():
+            raise ValueError(
+                f"SectionData({self.key!r}) requires a non-empty takeaway — "
+                "state what the section shows, not what it is called"
+            )
+        if not self.method.strip():
+            raise ValueError(
+                f"SectionData({self.key!r}) requires a non-empty method — "
+                "state the source and as-of date even when there is no caveat"
+            )

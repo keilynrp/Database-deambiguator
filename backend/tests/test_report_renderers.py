@@ -24,6 +24,8 @@ def _every_block_section() -> SectionData:
     return SectionData(
         key="demo",
         title="Demo Section",
+        takeaway="1,240 entities recorded, 60% enriched",
+        method="Counts scoped to this domain, as of the last run.",
         blocks=(
             StatGrid(items=(
                 StatItem(label="Total", value="1,240"),
@@ -71,6 +73,7 @@ def test_html_renderer_escapes_data():
 
     section = SectionData(
         key="x", title="T",
+        takeaway="a finding", method="a source",
         blocks=(StatGrid(items=(StatItem(label="<script>", value="a&b"),)),),
     )
     html = render_html(section)
@@ -115,7 +118,7 @@ def test_excel_renderer_truncates_long_sheet_names():
 
     long_title = "A very long section title that exceeds the Excel limit"
     wb = openpyxl.Workbook()
-    ws = render_excel(SectionData(key="k", title=long_title, blocks=()), wb)
+    ws = render_excel(SectionData(key="k", title=long_title, takeaway="t", method="m", blocks=()), wb)
     assert len(ws.title) <= 31
 
 
@@ -124,7 +127,7 @@ def test_excel_renderer_sanitizes_invalid_sheet_chars():
     from backend.reporting.excel_renderer import render_excel
 
     wb = openpyxl.Workbook()
-    ws = render_excel(SectionData(key="k", title="A/B:C*?[D]", blocks=()), wb)
+    ws = render_excel(SectionData(key="k", title="A/B:C*?[D]", takeaway="t", method="m", blocks=()), wb)
     assert not (set(ws.title) & set(r"[]:*?/\\"))
 
 
@@ -183,7 +186,7 @@ def test_pptx_renderer_draws_a_bar_shape_for_meter():
     prs = _P()
     prs.slide_width = Inches(13.33)
     prs.slide_height = Inches(7.5)
-    section = SectionData(key="k", title="Only Meter", blocks=(Meter(label="Coverage", pct=42),))
+    section = SectionData(key="k", title="Only Meter", takeaway="t", method="m", blocks=(Meter(label="Coverage", pct=42),))
     render_pptx(section, prs, RGBColor(0x63, 0x66, 0xF1))
 
     auto_shapes = [

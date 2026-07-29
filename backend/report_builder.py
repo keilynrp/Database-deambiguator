@@ -182,7 +182,22 @@ def collect_stakeholder_reading(
     paragraphs.append(f'Narrative goal: {stakeholder["narrative_goal"]}')
 
     reading = Narrative(heading=stakeholder["label"], paragraphs=tuple(paragraphs))
-    return SectionData(key="stakeholder_reading", title="Stakeholder Reading", blocks=(reading,))
+    return SectionData(
+        key="stakeholder_reading",
+        title="Stakeholder Reading",
+        blocks=(reading,),
+        takeaway=(
+            f'Framed for {stakeholder["label"]}: benchmark readiness '
+            f"{readiness_pct}%, quality {quality_avg}%, enrichment coverage "
+            f"{coverage_pct}%"
+        ),
+        method=(
+            "An interpretive framing of figures reported elsewhere in this "
+            "brief, written for a chosen audience — it introduces no new data. "
+            "The stance it takes follows the benchmark status, so a change of "
+            "audience changes the emphasis but not the underlying numbers."
+        ),
+    )
 
 
 def _section_stakeholder_reading(
