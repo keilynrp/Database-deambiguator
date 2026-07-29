@@ -188,3 +188,25 @@ def test_support_map_covers_every_public_section_key():
     for fmt, sections in format_support.SECTION_FORMAT_SUPPORT.items():
         unknown = sections - set(format_support.PUBLIC_SECTIONS)
         assert not unknown, f"{fmt} claims unknown sections: {unknown}"
+
+
+def test_builder_and_collector_maps_cannot_drift():
+    """The two section maps must stay key-identical.
+
+    SECTION_BUILDERS is no longer what build() assembles from — SECTION_COLLECTORS
+    is — but it remains the section registry: four export endpoints validate
+    requested names against it, scheduled reports filter on it, and
+    format_support derives PUBLIC_SECTIONS from it.
+
+    So a section added to one map and not the other would either be requestable
+    and unrenderable, or renderable and rejected as unknown. This session has
+    already paid for two maps drifting apart in exactly this way.
+    """
+    from backend import report_builder
+
+    builders = set(report_builder.SECTION_BUILDERS)
+    collectors = set(report_builder.SECTION_COLLECTORS)
+    assert builders == collectors, (
+        f"only in SECTION_BUILDERS: {sorted(builders - collectors)}; "
+        f"only in SECTION_COLLECTORS: {sorted(collectors - builders)}"
+    )

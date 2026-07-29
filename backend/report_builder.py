@@ -1685,6 +1685,36 @@ SECTION_BUILDERS = {
     "journal_portfolio": _section_journal_portfolio,
 }
 
+#: Collectors that take `benchmark_org` in addition to the common three.
+#: `institutional_benchmark` takes `benchmark_profile_id` as well and is handled
+#: separately; keeping the shapes named rather than inline stops the dispatch
+#: from being copied out of step in a fourth place.
+_BENCHMARK_ORG_SECTIONS = frozenset(
+    {"decision_recommendations", "impact_projection", "hidden_patterns"}
+)
+
+#: What `build()` assembles from. Mirrors SECTION_BUILDERS key for key, including
+#: the deprecated `top_brands` alias, but yields SectionData rather than markup —
+#: which is what lets assembly attach exhibit ordinals and compose an executive
+#: summary. SECTION_BUILDERS is retained for callers that still want a single
+#: section as HTML.
+SECTION_COLLECTORS = {
+    "entity_stats": collect_entity_stats,
+    "enrichment_coverage": collect_enrichment_coverage,
+    "decision_recommendations": collect_decision_recommendations,
+    "impact_projection": collect_impact_projection,
+    "hidden_patterns": collect_hidden_patterns,
+    "agentic_trace": collect_agentic_trace,
+    "institutional_benchmark": collect_institutional_benchmark,
+    "top_secondary_labels": collect_top_secondary_labels,
+    "top_brands": collect_top_secondary_labels,
+    "topic_clusters": collect_topic_clusters,
+    "harmonization_log": collect_harmonization_log,
+    "authority_control": collect_authority_control,
+    "collaboration_graph": collect_collaboration_graph,
+    "journal_portfolio": collect_journal_portfolio,
+}
+
 SECTION_LABELS = {
     "entity_stats": "Entity Statistics",
     "enrichment_coverage": "Enrichment Coverage",
@@ -1775,20 +1805,31 @@ def build(
         )
         if manual_html:
             body_sections.append(manual_html)
+    # Assembly runs on the collectors, not the string builders. HTML/PDF was the
+    # last format still assembling from rendered markup, which is why exhibit
+    # ordinals and the executive summary could not be built: this function never
+    # held a SectionData to attach them to. Excel and PPTX already work this way.
+    #
+    # Output is intended to be byte-identical to the builder path — every
+    # `_section_*` was already a thin `render_html(collect_*(...))` wrapper, so
+    # this removes one level of indirection rather than changing what renders.
+    from backend.reporting.html_renderer import render_html
+
     for sec in sections:
-        builder = SECTION_BUILDERS.get(sec)
-        if builder:
+        collect = SECTION_COLLECTORS.get(sec)
+        if collect:
             try:
+                # Three signature shapes, unchanged from the builder dispatch.
                 if sec == "institutional_benchmark":
-                    rendered = builder(db, domain_id, org_id, benchmark_profile_id, benchmark_org)
-                elif sec in {"decision_recommendations", "impact_projection", "hidden_patterns"}:
-                    rendered = builder(db, domain_id, org_id, benchmark_org)
+                    payload = collect(db, domain_id, org_id, benchmark_profile_id, benchmark_org)
+                elif sec in _BENCHMARK_ORG_SECTIONS:
+                    payload = collect(db, domain_id, org_id, benchmark_org)
                 else:
-                    rendered = builder(db, domain_id, org_id)
-                if not isinstance(rendered, str):
-                    raise TypeError(f"section builder returned {type(rendered).__name__}, expected str")
-                body_sections.append(rendered)
+                    payload = collect(db, domain_id, org_id)
+                body_sections.append(render_html(payload))
             except Exception as exc:
+                # Per-section error boundary: one failing collector degrades its
+                # own section, it does not take the report down.
                 body_sections.append(f'<section><h2>{SECTION_LABELS.get(sec, sec)}</h2>'
                                      f'<p style="color:#ef4444">Error building section: {exc}</p></section>')
 
