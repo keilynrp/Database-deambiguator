@@ -138,13 +138,75 @@ Three things 5.4 settled:
     underneath the disclosure. Blocks taller than one slide still overflow, which
     is the generic PPTX truncation problem 3.4 already named as every section's
     rather than any one section's.
-- [ ] 5.5 Verify the HTML view deliberately — HTML and PDF share one document, so nothing here can be scoped to print
+- [x] 5.5 Verify the HTML view deliberately — done in a real browser (Chrome via the repo's own Playwright install) at 1280 / 768 / 390, reading the rendered document rather than the markup
+
+What was checked, and what it found:
+
+  - **Every emitted class is actually styled**, confirmed against computed style
+    rather than against the stylesheet source: eyebrow 11px uppercase `#6b7280`
+    with 0.66px tracking, ordinal `#1d4ed8` tabular-nums, method 11px `#6b7280`
+    over a dashed rule, muted summary entries `#9ca3af` against `#111827`.
+  - **Reading order holds in all 14 sections at every width** — eyebrow above
+    heading, method below the blocks, nothing overlapping.
+  - **No horizontal body scroll at 1280 or 768.** At 390 there is, and it is
+    entirely pre-existing: every overflowing element is a `<table>`, `<tr>`,
+    `<td>` or bar cell at the table's min-content width of 520px. None of the
+    elements this change added appear in the overflow set. Not fixed here on
+    purpose — wrapping tables in an `overflow-x: auto` container is the standard
+    fix on screen but would clip them in the PDF, since the two share one
+    document. That is precisely the hazard this task exists to name, so it needs
+    its own change rather than a hurried one.
+  - The duplicate-alias defect is **visible to a reader** in the summary:
+    Exhibits 8 and 9 state the same finding. Still open for a decision.
 
 ## 6. Parity enforcement
 
-- [ ] 6.1 Extend the format-support matrix to cover presentation elements as a dimension
-- [ ] 6.2 Parity test: a format that renders a section must emit its takeaway and disclosure
-- [ ] 6.3 Confirm a format that declares a section unsupported is exempt, and that existing omitted-section reporting is unchanged
+- [x] 6.1 Extend the format-support matrix to cover presentation elements as a dimension — `PRESENTATION_SUPPORT` alongside `SECTION_FORMAT_SUPPORT`, plus `REQUIRED_PRESENTATION_ELEMENTS` and a `carries()` helper. Section coverage is a ratchet a format may sit below; presentation coverage is not, so `takeaway` and `method` are not declarable as unsupported and a test constrains the declaration itself. `exhibit` is HTML/PDF only, per decision 7. The placement per format is documented as a table in the module
+- [x] 6.2 Parity test: a format that renders a section must emit its takeaway and disclosure — 52 (format × section) combos, compared against the payload the collector produced rather than hard-coded strings, so editing a takeaway does not mean editing the test
+- [x] 6.3 A format that declares a section unsupported is exempt — and the exemption means the section is *absent*, not present-without-its-statements, which would be the worst of both. `unsupported_sections()` still names it; the omission contract in `test_report_omissions` is untouched
+
+**The gate was written wrong first, and mutation testing is what said so.**
+Version one asserted the takeaway and method appeared *anywhere in the output*. It
+passed immediately over all 52 combos, having verified almost nothing: six
+deliberate breakages were introduced and **four went undetected**.
+
+The cause is one mistake with three faces — the whole-output search is satisfied
+by the roll-up, not the section:
+
+  - HTML: the **executive summary** already carries every takeaway, so a section
+    titled with its label instead of its finding still passed.
+  - Excel: the **`Methodology` sheet** already carries every method, so deleting
+    the caveat above every table still passed — even though the published
+    scenario says the caveat must appear adjacent to the table "**not only** in a
+    separate sheet".
+  - PPTX: the **speaker notes** carry both, so a slide titled with its label
+    still passed.
+
+Rewritten to assert **placement**, with one extractor per format reading the
+section's own rendering — the `<section>` element, the section's worksheet, the
+section's slides — and returning per-slot values so a failure names the slot. All
+six mutations are now caught, and the mutation harness is kept in the change
+directory rather than thrown away.
+
+Two things the strengthened gate then found, both in work already called done:
+
+  - **Excel's `Harmonization` sheet stated its caveat and no finding.** 5.2 wired
+    the disclosure into the hand-written sheet and forgot the takeaway. The sheet
+    now opens with the finding, caveat below it, header below that — the same
+    shape every migrated sheet has.
+  - Two of my own extractor heuristics were wrong in instructive ways. Locating
+    the table header by the payload's first column name fails on the one sheet
+    whose hand-written columns differ from its payload's; and detecting "this
+    sheet has a table" by looking for a row two-or-more cells wide reads a
+    `StatGrid` row (label, value, sub) as a table, then demands adjacency of
+    sections that have no table to be adjacent to. Locate from the caveat
+    downward; decide from the payload, which knows.
+
+Also extracted `report_builder.collect_section()` — the three-way collector
+signature dispatch, previously inline in `build()`. The test needs it to know what
+a section's takeaway *should* be, and a dispatch duplicated into a test drifts
+exactly the way task 4.7 already recorded two section maps drifting: silently, and
+in the direction of the test agreeing with itself.
 
 ## 7. Verification
 

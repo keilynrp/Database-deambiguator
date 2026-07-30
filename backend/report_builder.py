@@ -1814,6 +1814,35 @@ SECTION_COLLECTORS = {
     "journal_portfolio": collect_journal_portfolio,
 }
 
+def collect_section(
+    db: Session,
+    section: str,
+    domain_id: str,
+    org_id: int | None = None,
+    benchmark_profile_id: str | None = None,
+    benchmark_org: models.Organization | None = None,
+):
+    """Collect one section's payload, resolving its collector signature.
+
+    Collectors come in three shapes and the caller cannot know which without
+    consulting this dispatch. Extracted from `build()` so there is exactly one
+    copy of it: this codebase has already paid for two section maps drifting
+    apart (task 4.7), and a dispatch duplicated into a test drifts the same way —
+    silently, and in the direction of the test agreeing with itself.
+
+    Returns None for an unknown section rather than raising, so a caller
+    iterating a requested list can skip what it does not recognise.
+    """
+    collect = SECTION_COLLECTORS.get(section)
+    if collect is None:
+        return None
+    if section == "institutional_benchmark":
+        return collect(db, domain_id, org_id, benchmark_profile_id, benchmark_org)
+    if section in _BENCHMARK_ORG_SECTIONS:
+        return collect(db, domain_id, org_id, benchmark_org)
+    return collect(db, domain_id, org_id)
+
+
 def _executive_summary(collected: list) -> str:
     """Every collected section's takeaway, ordered by materiality.
 
@@ -1959,16 +1988,13 @@ def build(
     exhibit_no = 0
 
     for sec in sections:
-        collect = SECTION_COLLECTORS.get(sec)
-        if collect:
+        if sec in SECTION_COLLECTORS:
             try:
-                # Three signature shapes, unchanged from the builder dispatch.
-                if sec == "institutional_benchmark":
-                    payload = collect(db, domain_id, org_id, benchmark_profile_id, benchmark_org)
-                elif sec in _BENCHMARK_ORG_SECTIONS:
-                    payload = collect(db, domain_id, org_id, benchmark_org)
-                else:
-                    payload = collect(db, domain_id, org_id)
+                payload = collect_section(
+                    db, sec, domain_id, org_id,
+                    benchmark_profile_id=benchmark_profile_id,
+                    benchmark_org=benchmark_org,
+                )
                 # Numbered only once a section has actually collected, so a
                 # section that errors below does not consume an ordinal and
                 # leave a gap in the sequence a reader would notice.

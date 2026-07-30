@@ -160,10 +160,12 @@ def test_the_bespoke_harmonization_sheet_is_covered_too(db_session):
     assert "Harmonization" in listed
 
     ws = wb["Harmonization"]
-    assert ws["A2"].value == "ID", "the header should have moved down for the caveat"
-    assert "were applied, not proposed" in str(ws["A1"].value), ws["A1"].value
+    # Same shape every migrated sheet has: finding, caveat, then the header.
+    assert "harmonization operation" in str(ws["A1"].value), ws["A1"].value
+    assert "were applied, not proposed" in str(ws["A2"].value), ws["A2"].value
+    assert ws["A3"].value == "ID", "the header should sit below both"
     # Freezing the caveat instead of the header would scroll the columns away.
-    assert ws.freeze_panes == "A3"
+    assert ws.freeze_panes == "A4"
 
 
 #: The plural nouns these sections count. Spelled out rather than matched by

@@ -27,6 +27,7 @@ _HEADER_FONT_STYLE = Font(color=_HEADER_FONT, bold=True, size=11)
 _SUBHEADER_FONT = Font(bold=True, size=10)
 _WRAP_TOP = Alignment(wrap_text=True, vertical="top")
 _CAVEAT_FONT = Font(italic=True, size=9, color="FF6B7280")
+_TAKEAWAY_FONT = Font(bold=True, size=12)
 
 
 def _style_header_row(ws, cols: list[str], row: int = 1) -> None:
@@ -139,7 +140,7 @@ class EnterpriseExcelExporter:
         if "harmonization_log" in requested:
             payload = report_builder.collect_harmonization_log(db, domain_id, org_id)
             ws_harm = wb.create_sheet("Harmonization")
-            self._write_harmonization(ws_harm, db, org_id, caveat=payload.method)
+            self._write_harmonization(ws_harm, db, org_id, payload=payload)
             collected.append((ws_harm.title, payload))
 
         # Built after the section sheets and moved to the front — the same shape
@@ -220,16 +221,28 @@ class EnterpriseExcelExporter:
         _autofit(ws)
 
     def _write_harmonization(
-        self, ws, db: Session, org_id: int | None, caveat: str | None = None
+        self, ws, db: Session, org_id: int | None, payload=None
     ) -> None:
+        """The one section sheet still written by hand rather than from the payload.
+
+        It keeps its own writer for the detail the payload lacks (row ids,
+        executed-at, reverted, up to 200 rows), but it does not get to keep its
+        own presentation: the sheet opens with the section's finding and carries
+        its caveat directly above the header, exactly as `render_excel` does for
+        every migrated section. 6.2 caught this sheet stating its caveat and no
+        finding — 5.2 wired the disclosure here and forgot the takeaway.
+        """
         headers = ["ID", "Step ID", "Step Name", "Records Updated", "Fields Modified", "Executed At", "Reverted"]
         header_row = 1
-        if caveat:
+        if payload is not None:
+            takeaway = ws.cell(row=1, column=1, value=payload.takeaway)
+            takeaway.font = _TAKEAWAY_FONT
+            takeaway.alignment = _WRAP_TOP
             # Directly above the header, so a copied range carries it (5.3).
-            cell = ws.cell(row=1, column=1, value=caveat)
-            cell.font = _CAVEAT_FONT
-            cell.alignment = _WRAP_TOP
-            header_row = 2
+            caveat = ws.cell(row=2, column=1, value=payload.method)
+            caveat.font = _CAVEAT_FONT
+            caveat.alignment = _WRAP_TOP
+            header_row = 3
         _style_header_row(ws, headers, row=header_row)
 
         rows = (
