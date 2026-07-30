@@ -57,6 +57,11 @@ services:
       JWT_SECRET_KEY:     ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
       ENCRYPTION_KEY:     ${ENCRYPTION_KEY:-}
       ALLOWED_ORIGINS:    ${ALLOWED_ORIGINS:-http://localhost:3004}
+      # Both are read by the embed snippet builder (_resolve_bases in
+      # routers/widgets.py). Without them app_base falls back to the API origin,
+      # so the iframe snippet targets :8000 — the backend — instead of the app.
+      FRONTEND_URL:       ${FRONTEND_URL:-http://localhost:3004}
+      UKIP_PUBLIC_API_URL: ${UKIP_PUBLIC_API_URL:-http://localhost:8000}
       SESSION_SECRET_KEY: ${SESSION_SECRET_KEY:-changeit}
       LOG_LEVEL:          ${LOG_LEVEL:-INFO}
       ENGINE_GRPC_URL:    ${ENGINE_GRPC_URL:-ukip-engine:50051}
@@ -110,6 +115,13 @@ services:
       - ukip-backend
     environment:
       NEXT_PUBLIC_API_URL: ${DOCKER_FRONTEND_API_URL:-http://ukip-backend:8000}
+      # Server-side base for middleware.ts, which fetches the widget config to
+      # build frame-ancestors. Distinct from NEXT_PUBLIC_API_URL because that one
+      # must be reachable from the *browser* while this one is resolved inside the
+      # container. Falling back to the browser-facing value makes the middleware
+      # fail closed to frame-ancestors 'none' whenever the two differ, which is
+      # every local setup where the browser talks to a published port.
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://ukip-backend:8000}
     ports:
       - "3004:3004"
 

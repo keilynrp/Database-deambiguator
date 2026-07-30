@@ -1,0 +1,35 @@
+# Task 4.4 override — supplies the two vars local docker-compose.yml does not
+# declare, and points the browser-facing API base at the host port.
+#
+# Kept out of the repo on purpose: it exists to run one verification, and the
+# missing declarations are a finding to report, not something to paper over by
+# editing the compose file under test.
+services:
+  ukip-backend:
+    # Run the working tree rather than a rebuilt image. The backend image is 3 GB
+    # and rebuilding it transfers a 584 MB context; for a verification run the
+    # source is what matters. State this when reporting: the container is running
+    # local code, not a released artefact.
+    volumes:
+      - ./backend:/app/backend
+    environment:
+      # Without these, _resolve_bases falls back to request.base_url for the API
+      # and then app_base falls back to api_base — so the iframe snippet would
+      # target the backend on :8000 rather than the app on :3004.
+      FRONTEND_URL: http://localhost:3004
+      UKIP_PUBLIC_API_URL: http://localhost:8000
+      # The customer page is served from :8899. It is deliberately absent here:
+      # a real embedder is never in ALLOWED_ORIGINS.
+      ALLOWED_ORIGINS: http://localhost:3004,http://127.0.0.1:3004
+
+  ukip-frontend:
+    environment:
+      # Browser-facing base — must be reachable from the host, since the embed
+      # page is a client component.
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      # Server-side base for middleware.ts, which fetches the widget config to
+      # build frame-ancestors. Read by the code, declared in no compose file:
+      # without it API_BASE falls back to the browser-facing URL, which inside
+      # the container resolves to nothing, and the middleware fails closed to
+      # frame-ancestors 'none' — i.e. the iframe snippet cannot be framed.
+      BACKEND_INTERNAL_URL: http://ukip-backend:8000

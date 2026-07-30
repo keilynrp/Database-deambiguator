@@ -98,3 +98,67 @@ the iframe exists.
 `_get_active_widget` looks up by `public_token` with no rate limiting, so the
 token space is enumerable in principle (UUID4 — 122 bits, not realistically
 enumerable, but unthrottled). Out of scope; noted for the record.
+
+## Decision 5: `/embed/{token}/*` emits its own CORS header, derived from the widget
+
+Added 2026-07-30, after the task 4.4 live check found the JS snippet blocked on
+every third-party origin. The global CORS middleware answers from
+`ALLOWED_ORIGINS`, which lists UKIP's own app origins — and a real embedder is
+never in it. So the endpoint returns 200 with no `Access-Control-Allow-Origin`
+and the browser discards the body: "Widget unavailable", on every customer site,
+including one whose widget names that exact origin in `allowed_origins`.
+
+The two public embed endpoints therefore set the header themselves, from the
+widget's own `allowed_origins`:
+
+| Widget `allowed_origins` | Response |
+|---|---|
+| `*` | `Access-Control-Allow-Origin: *` |
+| a list, request `Origin` in it | `Access-Control-Allow-Origin: <that origin>` + `Vary: Origin` |
+| a list, request `Origin` not in it | 403, as today; no ACAO |
+
+`Vary: Origin` is not decoration. The reflected form varies by request, and
+there is a Redis cache and potentially a CDN in front; without it one customer's
+`Access-Control-Allow-Origin` can be served to another customer. The literal `*`
+case needs no `Vary` because it does not vary.
+
+No `Access-Control-Allow-Credentials`. There is no cookie and no session token
+in this exchange, and `*` with credentials is invalid anyway.
+
+**Why this is not a loosening.** CORS governs browser-mediated cross-origin
+*reads*. These two endpoints are already unauthenticated and public: `curl`
+retrieves them today, from anywhere, with no header at all. Emitting ACAO
+therefore grants a browser exactly what every non-browser client already has,
+and withholding it protects nothing while breaking the only documented use of
+the feature. The credential here is the `public_token` in the path — that was
+already the stated contract.
+
+Two facts settle it rather than merely support it:
+
+- The existing origin check is `if origin and origin not in allowed` — a request
+  that simply **omits** `Origin` passes. Every non-browser client omits it. So
+  the check was never an access boundary; it is a browser-facing policy.
+- `API.md`, written in task 4.2 of this same change, already states that
+  the token is the credential and that `allowed_origins` does **not** restrict
+  data retrieval, and calls the Origin check "a courtesy filter, not a boundary:
+  non-browser clients simply omit the header". Decision 5 makes the code agree
+  with the contract we published, rather than the reverse.
+
+The alternative of widening the global `ALLOWED_ORIGINS` was rejected: it would
+expose the entire API — `/entities`, `/reports`, `/admin/*` — to every customer
+origin, not the two public embed routes, and would require a production env
+change per customer.
+
+## Decision 6: `/embed` is a public route in the app shell, not only in the headers
+
+The same live check found the iframe form broken for a second, independent
+reason: `LayoutContent` allowlists exactly two paths that may render without a
+session (`/login`, `/catalogs/*`). `/embed/{token}` is neither, so an anonymous
+visitor is redirected to `/login` — which correctly denies framing, so the
+customer's iframe shows a broken document.
+
+`/embed/` joins that allowlist. The framing headers were only ever half the
+answer: a route may be exempt from `X-Frame-Options` and still be unreachable
+without a session. Nothing in the change checked the anonymous case, because the
+redirect is client-side — the server serves the embed document with a 200, so
+every response-level assertion passes.

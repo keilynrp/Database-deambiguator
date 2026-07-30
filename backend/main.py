@@ -473,6 +473,37 @@ app.add_middleware(
     expose_headers=["X-Total-Count", "X-UKIP-Report-Omitted-Sections"],
 )
 
+class EmbedCorsMiddleware(BaseHTTPMiddleware):
+    """Finishes the per-widget CORS policy the embed routes start.
+
+    The routes set ``Access-Control-Allow-Origin`` from the widget's own
+    ``allowed_origins`` (see ``_apply_embed_cors``). They cannot finish the job:
+    CORSMiddleware sits outside them and does an unconditional
+    ``headers.update(simple_headers)`` on every request carrying an Origin, which
+    re-adds ``Access-Control-Allow-Credentials: true`` from the global config.
+
+    On a public, unauthenticated endpoint that header is wrong — there is no
+    cookie or session in the exchange — and combined with a wildcard origin it is
+    invalid, so browsers reject any credentialed request anyway. This middleware
+    is registered after CORSMiddleware, which makes it the outer of the two, so
+    its response pass runs last and can remove it.
+
+    Scoped by the marker the routes set rather than by path matching, so it
+    cannot drift out of step with the routes it corrects.
+    """
+
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response = await call_next(request)
+        # MutableHeaders has no pop(); del is the only removal it offers.
+        if widgets.EMBED_CORS_MARKER in response.headers:
+            del response.headers[widgets.EMBED_CORS_MARKER]
+            if "Access-Control-Allow-Credentials" in response.headers:
+                del response.headers["Access-Control-Allow-Credentials"]
+        return response
+
+
+app.add_middleware(EmbedCorsMiddleware)
+
 from starlette.middleware.sessions import SessionMiddleware
 app.add_middleware(
     SessionMiddleware,

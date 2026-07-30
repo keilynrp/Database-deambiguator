@@ -139,3 +139,112 @@ class TestConfigExposesAllowedOrigins:
         response = client.get(f"/embed/{created['public_token']}/config")
         assert response.status_code == 200
         assert response.json()["allowed_origins"] == "https://cliente.example.com"
+
+
+# ── CORS: the JS snippet runs on the customer's origin ────────────────────────
+
+class TestEmbedCors:
+    """A public embed endpoint must tell the browser a third party may read it.
+
+    Spec: design decision 5. The task 4.4 live check found the JS snippet dead on
+    every customer site: CORS answers from the global ALLOWED_ORIGINS, which lists
+    UKIP's own app origins, so the endpoint returned 200 with no ACAO and the
+    browser discarded the body. This is not a loosening — `curl` already reads
+    these endpoints from anywhere, so the header grants a browser only what every
+    other client has. The credential is the token in the path.
+    """
+
+    CUSTOMER = "https://cliente.example.com"
+    OTHER = "https://otro-cliente.example.com"
+
+    @pytest.fixture()
+    def open_widget(self, client, auth_headers) -> str:
+        created = client.post(
+            "/widgets",
+            json={
+                "name": "Open Embed",
+                "widget_type": "entity_stats",
+                "config": {},
+                "allowed_origins": "*",
+            },
+            headers=auth_headers,
+        )
+        assert created.status_code == 201, created.text
+        return created.json()["public_token"]
+
+    @pytest.fixture()
+    def restricted_widget(self, client, auth_headers) -> str:
+        created = client.post(
+            "/widgets",
+            json={
+                "name": "Restricted Embed",
+                "widget_type": "entity_stats",
+                "config": {},
+                "allowed_origins": self.CUSTOMER,
+            },
+            headers=auth_headers,
+        )
+        assert created.status_code == 201, created.text
+        return created.json()["public_token"]
+
+    def test_open_widget_allows_any_origin(self, client, open_widget):
+        response = client.get(
+            f"/embed/{open_widget}/data", headers={"Origin": self.CUSTOMER}
+        )
+        assert response.status_code == 200, response.text
+        assert response.headers.get("access-control-allow-origin") == "*"
+
+    def test_open_widget_needs_no_vary(self, client, open_widget):
+        """A literal `*` does not vary, so it is safe (and cheaper) to cache."""
+        response = client.get(
+            f"/embed/{open_widget}/data", headers={"Origin": self.CUSTOMER}
+        )
+        assert "origin" not in (response.headers.get("vary", "").lower())
+
+    def test_restricted_widget_reflects_its_own_origin(
+        self, client, restricted_widget
+    ):
+        response = client.get(
+            f"/embed/{restricted_widget}/data", headers={"Origin": self.CUSTOMER}
+        )
+        assert response.status_code == 200, response.text
+        assert response.headers.get("access-control-allow-origin") == self.CUSTOMER
+
+    def test_restricted_widget_varies_on_origin(self, client, restricted_widget):
+        """Without Vary, a cache or CDN serves one customer's ACAO to another."""
+        response = client.get(
+            f"/embed/{restricted_widget}/data", headers={"Origin": self.CUSTOMER}
+        )
+        assert "origin" in response.headers.get("vary", "").lower()
+
+    def test_a_disallowed_origin_is_still_refused(self, client, restricted_widget):
+        """The existing 403 stands; CORS does not widen who may read."""
+        response = client.get(
+            f"/embed/{restricted_widget}/data", headers={"Origin": self.OTHER}
+        )
+        assert response.status_code == 403
+        assert response.headers.get("access-control-allow-origin") is None
+
+    def test_never_allows_credentials(self, client, open_widget):
+        """No cookie or session is involved, and `*` with credentials is invalid."""
+        response = client.get(
+            f"/embed/{open_widget}/data", headers={"Origin": self.CUSTOMER}
+        )
+        assert response.headers.get("access-control-allow-credentials") is None
+
+    def test_config_endpoint_carries_the_same_policy(self, client, restricted_widget):
+        """The middleware fetches /config server-side, but a browser may too."""
+        response = client.get(
+            f"/embed/{restricted_widget}/config", headers={"Origin": self.CUSTOMER}
+        )
+        assert response.status_code == 200, response.text
+        assert response.headers.get("access-control-allow-origin") == self.CUSTOMER
+
+    def test_snippet_endpoint_is_not_given_cors(self, client, open_widget):
+        """The snippet is for an operator to copy out of the UKIP UI, not for a
+        customer page to fetch. Scope stays as narrow as the use."""
+        response = client.get(
+            f"/embed/{open_widget}/snippet", headers={"Origin": self.CUSTOMER}
+        )
+        assert response.status_code == 200
+        assert response.headers.get("access-control-allow-origin") is None
