@@ -210,7 +210,55 @@ in the direction of the test agreeing with itself.
 
 ## 7. Verification
 
-- [ ] 7.1 Render a real report in all four formats and read them as a reader would
-- [ ] 7.2 Confirm the PDF's executive summary and exhibits survive pagination — this change lands on top of the paged-layout fix
-- [ ] 7.3 Full backend suite
-- [ ] 7.4 Re-read every takeaway against its rendered section, checking for claims the data does not support
+- [x] 7.1 Render a report in all four formats and read them as a reader would — HTML in Chrome at three widths, a 15-tab workbook twice (populated and deliberately singular), a 17-slide deck, and the PDF rasterised and read page by page
+- [x] 7.2 Confirm the PDF's executive summary and exhibits survive pagination — they do; see below, including the measurement that was wrong the first time
+- [x] 7.3 Full backend suite
+- [x] 7.4 Re-read every takeaway against its rendered section — 13 sections audited against the numbers their own blocks render; one real violation found and fixed
+
+### 7.2 — pagination
+
+Rendered through WeasyPrint 69 inside the shipped backend image, the only place
+its native runtime loads. (A local image predating PR #200 does not load it at
+all, which is a stale image rather than a live defect — that PR is what installed
+the pango trio.)
+
+  - The **executive summary is complete on one page**, all 13 exhibits, under the
+    running header, with `2 / 11` in the corner.
+  - **`.exhibit-label { break-after: avoid }` works**: an eyebrow at a page bottom
+    keeps its heading.
+  - **Zero caveats separated from their own content.**
+
+That last one was measured wrong first. The initial check compared each method's
+page against its *section's heading* page and reported four violations — but a
+section longer than a page legitimately spans pages, and a caveat sharing a page
+with its section's spilled-over table is adjacent to the figures it qualifies. The
+right question is whether a caveat sits on a page carrying none of its own
+section's content; asked that way, the answer is none of the fourteen. The
+`break-before: avoid` rule is doing its job.
+
+**One real print defect found and fixed.** The KPI cards rendered one per
+full-width row in the PDF while forming a proper row on screen. Measured rather
+than guessed: WeasyPrint 69 *does* support CSS Grid, but not
+`repeat(auto-fill, minmax(…))` or `auto-fit` — both put every card on its own row,
+while explicit `repeat(4, 1fr)` lays out one row correctly. The print fallback is
+a table row rather than explicit columns, because sections carry two, three or
+four cards and a fixed four-column grid would leave a two-card section at quarter
+width; a table distributes across however many there are. Report went 11 pages to
+10. Legitimately print-scoped: it compensates for an engine limitation, not a
+design decision, and the screen keeps its responsive grid.
+
+### 7.4 — takeaways re-read
+
+One real violation, and it is the same class 3.8 exists to prevent:
+`top_secondary_labels` cited "N classified entities" while rendering only the
+per-label counts, so a reader had to add up the rows to check the sentence above
+them. Fixed by rendering the denominator — a `Classified Entities` card, the same
+remedy as `harmonization_log`'s `Operations Applied`.
+
+**The 3.8 test did not catch it, and the reason is worth keeping.** With the
+`populated` fixture the total was 40, and Beta's relative weight was 10/25 = 40% —
+so the cited figure "appeared" in the rendered set by coincidence and the
+assertion passed on the strength of an accident in the data. The fixture is now
+24/9/7, which produces no percentage equal to the total, and removing the new card
+makes the test fail where before it passed. A truthfulness check over bare numbers
+is only as strong as the fixture's freedom from collisions.

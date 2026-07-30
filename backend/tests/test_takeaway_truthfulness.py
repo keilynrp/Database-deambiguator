@@ -63,13 +63,21 @@ def populated(db_session):
     """Enough data that the metric-bearing sections have something to report.
 
     Deliberately uneven: 30 of 40 valid, 22 enriched, and three classifications
-    at 25/10/5 so concentration is a real figure rather than a tie.
+    at 24/9/7 so concentration is a real figure rather than a tie.
+
+    The split used to be 25/10/5, and that made this fixture complicit in a
+    defect it was meant to catch. `top_secondary_labels` cited "40 classified
+    entities" while rendering only the per-label counts — but 10/25 is 40%, so
+    the total coincided with an unrelated relative-weight cell and the assertion
+    below passed on the strength of that accident. 24/9/7 produces no percentage
+    equal to 40, so a takeaway citing a figure the section does not render fails
+    here rather than slipping through (task 7.4).
     """
     for i in range(40):
         db_session.add(
             models.RawEntity(
                 primary_label=f"Entity {i}",
-                secondary_label="Alpha" if i < 25 else "Beta" if i < 35 else "Gamma",
+                secondary_label="Alpha" if i < 24 else "Beta" if i < 33 else "Gamma",
                 domain="default",
                 source="test",
                 validation_status="valid" if i < 30 else "pending",

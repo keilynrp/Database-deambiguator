@@ -329,6 +329,23 @@ footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e5e7eb;
   .stat-card,
   .callout,
   .analyst-note  { break-inside: avoid; }
+
+  /* WeasyPrint 69 does support CSS Grid, but not `repeat(auto-fill, minmax(…))`
+     — measured, not assumed: with auto-fill or auto-fit every card lands on its
+     own row at full width, while explicit `repeat(4, 1fr)` lays out one row
+     correctly. So the KPI grid was degrading to one full-width card per line in
+     the PDF only, which is most of why an eleven-page report was eleven pages.
+
+     The fallback is a table row rather than explicit columns, because the column
+     count is not fixed: sections carry two, three or four cards, and
+     `repeat(4, 1fr)` would leave a two-card section at quarter width. A table
+     distributes across however many cards there are, and WeasyPrint's table
+     layout is its strongest.
+
+     Print-scoped legitimately: this compensates for an engine limitation, not a
+     design decision. On screen the responsive grid is correct and stays. */
+  .grid          { display: table; width: 100%; border-spacing: 8px 0; }
+  .stat-card     { display: table-cell; }
   p, td          { orphans: 3; widows: 3; }
 
   footer { margin-top: 24px; }
@@ -557,13 +574,31 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         rows=rows,
         bar_column=3,
     )
-    from backend.reporting.section_data import Materiality
+    from backend.reporting.section_data import Materiality, StatGrid, StatItem
 
     # Read back from the rendered rows rather than recomputing: the takeaway may
     # only cite figures the section shows, and reading the same cells the reader
     # sees is what makes that true by construction rather than by coincidence.
     classified = classified_total if rows_q else 0
     top_share = int(rows[0][2].rstrip("%")) if rows else 0
+
+    # The denominator belongs on the page. Task 7.4 caught the takeaway citing
+    # "N classified entities" while the section rendered only the per-label counts
+    # — a reader had to add up the rows to check the sentence above them. Same
+    # reasoning, and the same remedy, as the "Operations Applied" card in
+    # harmonization_log.
+    #
+    # The truthfulness test did not catch it: with its fixture the total (40)
+    # happened to equal an unrelated relative-weight cell (10/25 = 40%), so the
+    # assertion was satisfied by a coincidence of the data rather than by the
+    # section rendering its own denominator.
+    totals = StatGrid(items=(
+        StatItem(
+            label="Classified Entities",
+            value=f"{classified:,}",
+            sub=f"across {_plural(len(rows_q), 'label')}",
+        ),
+    ))
     return SectionData(
         takeaway=(
             f'"{rows[0][0]}" is the leading classification at {top_share}% of '
@@ -582,7 +617,7 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         ),
         key="top_secondary_labels",
         title="Top Secondary Labels / Classifications",
-        blocks=(table,),
+        blocks=(totals, table),
     )
 
 
