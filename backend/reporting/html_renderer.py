@@ -1,9 +1,12 @@
 """HTML renderer over the section payload (unify-report-format-coverage,
 phase 2).
 
-Emits the same CSS classes the hand-written `_section_*` builders use today
-(`grid`, `stat-card`, `callout`, `bar-wrap`, …) so a migrated section is visually
-identical to its predecessor. All data is HTML-escaped.
+Block markup uses the same CSS classes the hand-written `_section_*` builders
+did (`grid`, `stat-card`, `callout`, `bar-wrap`, …), so a section's *contents*
+are unchanged by migration. The section shell around them is not: since
+report-presentation 5.1 it carries the presentation contract — an exhibit
+eyebrow, the takeaway as the heading, and a method footer. All data is
+HTML-escaped.
 """
 from __future__ import annotations
 
@@ -93,6 +96,41 @@ def _render_block(block: Block) -> str:
     raise TypeError(f"HTML renderer cannot render {type(block).__name__}")
 
 
+def _exhibit_label(section: SectionData) -> str:
+    """The eyebrow above the heading: which exhibit this is, and of what.
+
+    The dataset label lives here rather than in the heading because the heading
+    now states the finding. Losing the label entirely would cost the reader the
+    ability to scan a report by section, which is what the label was for.
+
+    `exhibit` is None whenever a section is rendered outside document assembly —
+    a collector cannot know its own ordinal — so the prefix is conditional while
+    the label is not.
+    """
+    label = escape(section.title)
+    if section.exhibit is None:
+        return f'<div class="exhibit-label">{label}</div>'
+    return (
+        '<div class="exhibit-label">'
+        f'<span class="ord">Exhibit {section.exhibit}</span>'
+        f"&nbsp;·&nbsp;{label}"
+        "</div>"
+    )
+
+
 def render_html(section: SectionData) -> str:
+    """One section as a self-contained document exhibit.
+
+    The shape carries the presentation contract: the ordinal identifies the
+    exhibit, the heading asserts the finding, the label stays available as
+    secondary text, and the method footer travels underneath so a reader who
+    quotes a figure out of the section can still see what it is.
+    """
     body = "".join(_render_block(block) for block in section.blocks)
-    return f"<section>\n    <h2>{escape(section.title)}</h2>\n    {body}\n</section>"
+    return (
+        "<section>\n    "
+        + _exhibit_label(section)
+        + f"\n    <h2>{escape(section.takeaway)}</h2>\n    "
+        + body
+        + f'\n    <p class="method">{escape(section.method)}</p>\n</section>'
+    )

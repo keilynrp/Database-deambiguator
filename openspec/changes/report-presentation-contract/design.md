@@ -139,6 +139,37 @@ Neither is a document, so each needs a placement rather than a rendering:
 The Excel decision is the one that matters: it is the format most often re-cut
 and pasted, which is exactly the path by which a proxy metric loses its caveat.
 
+### 7. Exhibit ordinals stay out of Excel and PPTX
+
+Decided while starting 5.2. The design above said the Methodology sheet lists
+"every exhibit", which assumed Excel could carry the same ordinals the document
+does. It cannot, and inventing its own would be worse than having none.
+
+The three formats do not render the same set. `agentic_trace` is declared
+unsupported in Excel and PPTX, and the Excel exporter iterates its own collector
+map rather than the requested order. So a workbook that numbered its own
+exhibits would agree with the PDF up to the first section the PDF renders and it
+does not, then be off by one for everything after — silently, in the same
+generation, from the same request.
+
+Three options, one chosen:
+
+| | consequence |
+|---|---|
+| each format numbers its own | "Exhibit 4" means different sections in the PDF and the workbook of one generation, and nothing warns the reader |
+| ordinals shared over the requested list | agrees with the PDF, but the workbook skips numbers it cannot explain — and 4.3 removed gaps deliberately, because a reader notices them |
+| **no ordinal outside the document** | Excel keys on the sheet name, PPTX on the slide title |
+
+The last one is chosen, and it is not merely the least bad: in a workbook the
+sheet tab *is* how a reader navigates and cites. Nobody says "exhibit 4 of the
+spreadsheet". The ordinal was introduced to reference a position in a paged
+document, and Excel and PPTX are not paged documents — which is the same reason
+Decision 6 gave them placements rather than renderings.
+
+The published requirement already says an ordinal is a within-document
+reference and the section `key` is the stable identifier. This keeps that true
+across formats instead of only across reports.
+
 ## Risks / Trade-offs
 
 - **A generated sentence can state something false.** A takeaway is derived text

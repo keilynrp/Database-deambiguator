@@ -129,7 +129,11 @@ def collect_stakeholder_reading(
 
     benchmark_status = benchmark.get("status", "watch")
     readiness_pct = round(float(benchmark.get("readiness_pct") or 0))
-    quality_avg = round(float(quality.get("average") or 0))
+    # `quality.average` is a 0–1 fraction (its own distribution buckets at 0.7 /
+    # 0.3 say so), and both figures below render it as a percentage. Without the
+    # scaling a real average of 0.82 was reported as "quality 1%" — every other
+    # consumer of this field multiplies: impact_projection and both dashboards.
+    quality_avg = round(float(quality.get("average") or 0) * 100)
     coverage_pct = round(float(kpis.get("enrichment_pct") or 0))
     impact_score = round(float(impact_projection.get("score") or 0))
     impact_range = impact_projection.get("range") or {}
@@ -231,6 +235,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 section { margin-bottom: 40px; }
 section h2 { font-size: 17px; font-weight: 600; color: #1d4ed8; margin-bottom: 16px;
              padding-bottom: 8px; border-bottom: 1px solid #dbeafe; }
+/* The eyebrow above a section heading: exhibit ordinal + dataset label. The
+   heading itself states the finding, so the label sits here — quieter, but still
+   there, because a report you cannot scan by section name is worse than one that
+   only names its sections. */
+.exhibit-label { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                 letter-spacing: .06em; color: #6b7280; margin-bottom: 6px; }
+.exhibit-label .ord { color: #1d4ed8; font-variant-numeric: tabular-nums; }
+/* Source, as-of date and caveat, under the figures they qualify. */
+.method { margin-top: 14px; padding-top: 10px; border-top: 1px dashed #e5e7eb;
+          font-size: 11px; color: #6b7280; line-height: 1.6; }
+.summary-list { list-style: none; padding-left: 0; }
+.summary-list li { padding: 7px 0; border-bottom: 1px solid #f3f4f6; line-height: 1.6; }
+.summary-list li:last-child { border-bottom: none; }
+.summary-list .ord { color: #1d4ed8; font-weight: 600;
+                     font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Computed, and unremarkable. De-emphasized rather than dropped: that a section
+   ran and found nothing is itself information. */
+.summary-list li.muted,
+.summary-list li.muted .ord { color: #9ca3af; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 16px; }
 .stat-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; }
 .stat-card .label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #6b7280; }
@@ -295,11 +318,34 @@ footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e5e7eb;
      read badly when split. */
   section        { break-inside: auto; margin-bottom: 32px; }
   section h2     { break-after: avoid; }
+  /* The eyebrow is a label for what follows; stranded at a page bottom it
+     labels nothing. The method qualifies the figures above it, so it has to
+     land on the page that carries them. */
+  .exhibit-label { break-after: avoid; }
+  .method        { break-before: avoid; break-inside: avoid; }
+  .summary-list li { break-inside: avoid; }
   thead          { display: table-header-group; }
   tr             { break-inside: avoid; }
   .stat-card,
   .callout,
   .analyst-note  { break-inside: avoid; }
+
+  /* WeasyPrint 69 does support CSS Grid, but not `repeat(auto-fill, minmax(…))`
+     — measured, not assumed: with auto-fill or auto-fit every card lands on its
+     own row at full width, while explicit `repeat(4, 1fr)` lays out one row
+     correctly. So the KPI grid was degrading to one full-width card per line in
+     the PDF only, which is most of why an eleven-page report was eleven pages.
+
+     The fallback is a table row rather than explicit columns, because the column
+     count is not fixed: sections carry two, three or four cards, and
+     `repeat(4, 1fr)` would leave a two-card section at quarter width. A table
+     distributes across however many cards there are, and WeasyPrint's table
+     layout is its strongest.
+
+     Print-scoped legitimately: this compensates for an engine limitation, not a
+     design decision. On screen the responsive grid is correct and stays. */
+  .grid          { display: table; width: 100%; border-spacing: 8px 0; }
+  .stat-card     { display: table-cell; }
   p, td          { orphans: 3; widows: 3; }
 
   footer { margin-top: 24px; }
@@ -307,6 +353,18 @@ footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e5e7eb;
 """
 
 # ── Section builders ──────────────────────────────────────────────────────────
+
+def _plural(count: int, singular: str, plural: str | None = None) -> str:
+    """`3 patterns`, `1 pattern` — a count with a word that agrees with it.
+
+    Since 5.1 a takeaway is the section's heading in HTML/PDF and the first row
+    of its sheet in Excel, so "1 patterns detected" is no longer buried in a
+    summary list: it is the most prominent line the section has. Reading a real
+    report found five of these, in five separately-authored collectors, which is
+    what a helper is for.
+    """
+    return f"{count:,} {singular if count == 1 else (plural or singular + 's')}"
+
 
 def _entities_query(db: Session, domain_id: str, org_id: int | None):
     query = scope_query_to_org(db.query(models.RawEntity), models.RawEntity, org_id)
@@ -374,9 +432,16 @@ def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> "Se
         takeaway = "No entities in this domain yet."
         materiality = Materiality.EMPTY
     else:
+        # Both verbs agree with the count in front of them, not with `total`:
+        # the subject of "pass" is the valid count and the subject of "remain" is
+        # the pending one, so the two can disagree with each other in one
+        # sentence and still both be right.
+        valid = int(status_map.get("valid", 0))
         takeaway = (
-            f"{status_map.get('valid', 0):,} of {total:,} entities pass validation "
-            f"({valid_pct}%); {pending:,} remain unresolved"
+            f"{valid:,} of {_plural(total, 'entity', 'entities')} "
+            f"pass{'es' if valid == 1 else ''} validation "
+            f"({valid_pct}%); {pending:,} "
+            f"remain{'s' if pending == 1 else ''} unresolved"
         )
         materiality = (
             Materiality.LEAD if valid_pct < 85
@@ -509,17 +574,35 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         rows=rows,
         bar_column=3,
     )
-    from backend.reporting.section_data import Materiality
+    from backend.reporting.section_data import Materiality, StatGrid, StatItem
 
     # Read back from the rendered rows rather than recomputing: the takeaway may
     # only cite figures the section shows, and reading the same cells the reader
     # sees is what makes that true by construction rather than by coincidence.
     classified = classified_total if rows_q else 0
     top_share = int(rows[0][2].rstrip("%")) if rows else 0
+
+    # The denominator belongs on the page. Task 7.4 caught the takeaway citing
+    # "N classified entities" while the section rendered only the per-label counts
+    # — a reader had to add up the rows to check the sentence above them. Same
+    # reasoning, and the same remedy, as the "Operations Applied" card in
+    # harmonization_log.
+    #
+    # The truthfulness test did not catch it: with its fixture the total (40)
+    # happened to equal an unrelated relative-weight cell (10/25 = 40%), so the
+    # assertion was satisfied by a coincidence of the data rather than by the
+    # section rendering its own denominator.
+    totals = StatGrid(items=(
+        StatItem(
+            label="Classified Entities",
+            value=f"{classified:,}",
+            sub=f"across {_plural(len(rows_q), 'label')}",
+        ),
+    ))
     return SectionData(
         takeaway=(
             f'"{rows[0][0]}" is the leading classification at {top_share}% of '
-            f"{classified:,} classified entities"
+            f"{_plural(classified, 'classified entity', 'classified entities')}"
             if rows else "No classified entities to report."
         ),
         method=(
@@ -534,7 +617,7 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         ),
         key="top_secondary_labels",
         title="Top Secondary Labels / Classifications",
-        blocks=(table,),
+        blocks=(totals, table),
     )
 
 
@@ -680,7 +763,8 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
         title="Harmonization Log",
         blocks=(summary, table),
         takeaway=(
-            f"{len(logs)} harmonization operations applied, most recently {rows[0][0]}"
+            f"{_plural(len(logs), 'harmonization operation')} applied, "
+            f"most recently {rows[0][0]}"
             if rows else "No harmonization operations have been applied."
         ),
         method=(
@@ -746,7 +830,7 @@ def collect_decision_recommendations(
     ))
     return SectionData(
         takeaway=(
-            f"{len(actions)} recommended actions, {high} of them high priority"
+            f"{_plural(len(actions), 'recommended action')}, {high} of them high priority"
             if actions else "No actions are being recommended from the current snapshot."
         ),
         method=(
@@ -920,7 +1004,7 @@ def collect_hidden_patterns(
     ))
     return SectionData(
         takeaway=(
-            f"{len(patterns)} patterns detected; the strongest involves {rows[0][0]}"
+            f"{_plural(len(patterns), 'pattern')} detected; the strongest involves {rows[0][0]}"
             if rows else "No patterns detected in the current records."
         ),
         method=(
@@ -1052,7 +1136,7 @@ def collect_institutional_benchmark(
         blocks=(grid, reading, gap_table, rule_table),
         takeaway=(
             f"Benchmark readiness {readiness_pct}% — {passed_rules} of "
-            f"{total_rules} rules pass; status \"{status}\""
+            f"{_plural(total_rules, 'rule')} pass; status \"{status}\""
         ),
         method=(
             "Measured against the selected benchmark profile and comparison "
@@ -1381,8 +1465,8 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
             Narrative(heading="Reliability reading", paragraphs=tuple(reliability)),
         ),
         takeaway=(
-            f"{confirmed:,} of {total:,} authority records confirmed; "
-            f"{pending:,} await human review "
+            f"{confirmed:,} of {_plural(total, 'authority record')} confirmed; "
+            f"{pending:,} await{'s' if pending == 1 else ''} human review "
             f"(mean confidence {round(float(mean_confidence or 0) * 100)}%)"
         ),
         method=_AUTHORITY_METHOD,
@@ -1564,8 +1648,9 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
         title="Collaboration Graph",
         blocks=tuple(blocks),
         takeaway=(
-            f"{author_count:,} authors across {community_count:,} communities, "
-            f"linked by {edge_count:,} collaborations"
+            f"{_plural(author_count, 'author')} across "
+            f"{_plural(community_count, 'community', 'communities')}, linked by "
+            f"{_plural(edge_count, 'collaboration')}"
         ),
         method=_COLLAB_METHOD,
         materiality=Materiality.NOTABLE if community_count > 1 else Materiality.ROUTINE,
@@ -1702,7 +1787,7 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
         title="Journal Portfolio",
         blocks=(grid, table, note),
         takeaway=(
-            f"{total:,} journals in the portfolio; {doaj_pct}% listed in DOAJ "
+            f"{_plural(total, 'journal')} in the portfolio; {doaj_pct}% listed in DOAJ "
             f"and {with_apc:,} charging an APC"
         ),
         method=_JOURNAL_METHOD,
@@ -1764,6 +1849,35 @@ SECTION_COLLECTORS = {
     "journal_portfolio": collect_journal_portfolio,
 }
 
+def collect_section(
+    db: Session,
+    section: str,
+    domain_id: str,
+    org_id: int | None = None,
+    benchmark_profile_id: str | None = None,
+    benchmark_org: models.Organization | None = None,
+):
+    """Collect one section's payload, resolving its collector signature.
+
+    Collectors come in three shapes and the caller cannot know which without
+    consulting this dispatch. Extracted from `build()` so there is exactly one
+    copy of it: this codebase has already paid for two section maps drifting
+    apart (task 4.7), and a dispatch duplicated into a test drifts the same way —
+    silently, and in the direction of the test agreeing with itself.
+
+    Returns None for an unknown section rather than raising, so a caller
+    iterating a requested list can skip what it does not recognise.
+    """
+    collect = SECTION_COLLECTORS.get(section)
+    if collect is None:
+        return None
+    if section == "institutional_benchmark":
+        return collect(db, domain_id, org_id, benchmark_profile_id, benchmark_org)
+    if section in _BENCHMARK_ORG_SECTIONS:
+        return collect(db, domain_id, org_id, benchmark_org)
+    return collect(db, domain_id, org_id)
+
+
 def _executive_summary(collected: list) -> str:
     """Every collected section's takeaway, ordered by materiality.
 
@@ -1787,12 +1901,10 @@ def _executive_summary(collected: list) -> str:
 
     items = []
     for section in ranked:
-        muted = section.materiality <= Materiality.ROUTINE
-        style = ' style="color:#9ca3af"' if muted else ""
+        muted = ' class="muted"' if section.materiality <= Materiality.ROUTINE else ""
         items.append(
-            f"<li{style}>"
-            f'<span style="font-variant-numeric:tabular-nums">'
-            f"Exhibit {section.exhibit}</span> &nbsp;·&nbsp; "
+            f"<li{muted}>"
+            f'<span class="ord">Exhibit {section.exhibit}</span>&nbsp;·&nbsp;'
             f"{escape(section.takeaway)}"
             f"</li>"
         )
@@ -1800,7 +1912,7 @@ def _executive_summary(collected: list) -> str:
     return (
         "<section>"
         "<h2>Executive Summary</h2>"
-        f'<ul style="line-height:1.9;padding-left:18px">{"".join(items)}</ul>'
+        f'<ul class="summary-list">{"".join(items)}</ul>'
         "</section>"
     )
 
@@ -1911,16 +2023,13 @@ def build(
     exhibit_no = 0
 
     for sec in sections:
-        collect = SECTION_COLLECTORS.get(sec)
-        if collect:
+        if sec in SECTION_COLLECTORS:
             try:
-                # Three signature shapes, unchanged from the builder dispatch.
-                if sec == "institutional_benchmark":
-                    payload = collect(db, domain_id, org_id, benchmark_profile_id, benchmark_org)
-                elif sec in _BENCHMARK_ORG_SECTIONS:
-                    payload = collect(db, domain_id, org_id, benchmark_org)
-                else:
-                    payload = collect(db, domain_id, org_id)
+                payload = collect_section(
+                    db, sec, domain_id, org_id,
+                    benchmark_profile_id=benchmark_profile_id,
+                    benchmark_org=benchmark_org,
+                )
                 # Numbered only once a section has actually collected, so a
                 # section that errors below does not consume an ordinal and
                 # leave a gap in the sequence a reader would notice.

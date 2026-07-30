@@ -22,7 +22,7 @@ def _entries(summary_html: str) -> list[tuple[bool, str]]:
     for item in re.findall(r"<li[^>]*>.*?</li>", summary_html, re.S):
         opening = item.split(">", 1)[0]
         text = re.sub(r"<[^>]+>", "", item).replace("&nbsp;", " ")
-        out.append(("color:#9ca3af" in opening, " ".join(text.split())))
+        out.append(("muted" in opening, " ".join(text.split())))
     return out
 
 
@@ -68,6 +68,46 @@ def test_ordinals_shift_with_selection_but_keys_do_not(client, auth_headers):
     # The key is unchanged in both, which is the point of the contrast.
     assert "harmonization_log" in alone or "Harmonization" in alone
     assert "harmonization_log" in preceded or "Harmonization" in preceded
+
+
+def test_the_ordinal_the_summary_cites_is_findable_on_the_section(client, auth_headers):
+    """An exhibit number a reader cannot locate in the body is a dead reference."""
+    html = _generate(client, auth_headers, ["entity_stats", "harmonization_log"])
+    summary = _summary(html)
+    body = html.replace(summary, "")
+
+    for ordinal in (1, 2):
+        assert f"Exhibit {ordinal}" in summary
+        assert f"Exhibit {ordinal}" in body, (
+            f"the summary cites Exhibit {ordinal} but no section announces it"
+        )
+
+
+# ── Method disclosure ─────────────────────────────────────────────────────────
+
+
+def test_every_rendered_section_discloses_its_method(client, auth_headers):
+    """Mandatory, not conditional: one disclosure per rendered section."""
+    requested = ["entity_stats", "harmonization_log", "topic_clusters"]
+    html = _generate(client, auth_headers, requested)
+    body = html.replace(_summary(html), "")
+
+    # +1 for the stakeholder lens, which is rendered ahead of the exhibits and
+    # carries the same contract.
+    assert body.count('class="method"') == len(requested) + 1
+
+
+def test_presentation_elements_are_styled():
+    """A class no stylesheet rule matches renders as unstyled text.
+
+    Task 3.5 found exactly that in production: a section styled itself with
+    `class="card"` and `class="muted"`, neither of which the stylesheet defined.
+    Emitting a class is only half of adding a presentation element.
+    """
+    from backend.report_builder import _CSS
+
+    for cls in ("exhibit-label", "method", "summary-list", "muted"):
+        assert f".{cls}" in _CSS, f"{cls} is emitted but never styled"
 
 
 # ── Executive summary ─────────────────────────────────────────────────────────

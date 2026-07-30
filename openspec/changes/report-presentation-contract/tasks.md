@@ -68,21 +68,197 @@ path that currently works.
 
 ## 5. Renderers
 
-- [ ] 5.1 HTML/PDF: exhibit ordinal, takeaway as the heading with the dataset label as secondary text, method footer, executive summary
-- [ ] 5.2 Excel: `Methodology` sheet listing every exhibit's source and caveat
-- [ ] 5.3 Excel: caveat row directly above each section's table, so a copied range carries its warning
-- [ ] 5.4 PPTX: takeaway as slide title, method in slide footer, full caveat in speaker notes
-- [ ] 5.5 Verify the HTML view deliberately — HTML and PDF share one document, so nothing here can be scoped to print
+- [x] 5.1 HTML/PDF: exhibit ordinal, takeaway as the heading with the dataset label as secondary text, method footer, executive summary. The section shell is now eyebrow (`Exhibit N · Label`) → `<h2>` takeaway → blocks → `<p class="method">`; the summary moved off inline styles onto the stylesheet. Reading a populated 13-section report found three defects the change had just promoted into headings — see below
+
+Three defects surfaced by putting the takeaway in the `<h2>`. All were
+pre-existing and all were invisible while the takeaway only appeared in a
+summary list; none would have been caught by a fixture, because each needs real
+figures to read wrong:
+
+  - `stakeholder_reading` rendered `quality.average` — a 0–1 fraction — as a
+    percentage without scaling, reporting **"quality 1%"** for a real average of
+    0.82. Every other consumer of that field multiplies by 100
+    (`impact_projection`, both dashboards). Fixed, with a regression test.
+  - `"1 harmonization operations applied"` and `"linked by 1 collaborations"` —
+    unconditional plurals, now in the most prominent line of their sections.
+  - **Not fixed, needs a decision:** `build()` is the only renderer that does not
+    run its section list through `canonical_sections()`. Excel and PPTX both do.
+    Requesting `top_secondary_labels` and its deprecated alias `top_brands`
+    together renders the same section twice, as two differently-numbered
+    exhibits, and states the same finding twice in the summary. Exhibit numbering
+    is what makes this legible as a defect rather than mere repetition.
+- [x] 5.2 Excel: `Methodology` sheet listing every rendered section's finding and disclosure, keyed on the sheet name rather than an exhibit ordinal (design decision 7 — see below). Built after the section sheets and moved to position 2, behind `Summary`: the same shape as the HTML executive summary, and for the same reason
+- [x] 5.3 Excel: caveat row directly above each section's table, so a copied range carries its warning. Placement is one of two, never both: above each table where there is one (each table is a separately copyable range), or under the takeaway where there is none — the disclosure is mandatory, not conditional on which block types a section happens to use
+
+Two things 5.2 surfaced:
+
+  - **No exhibit ordinal in Excel or PPTX.** Recorded as design decision 7. The
+    three formats do not render the same set — `agentic_trace` is unsupported in
+    both, and the Excel exporter iterates its own collector map rather than the
+    requested order — so a workbook numbering its own exhibits would agree with
+    the PDF up to the first divergence and then be off by one for everything
+    after, silently, from the same request. In a workbook the sheet tab is how a
+    reader navigates and cites anyway.
+  - **`harmonization_log` was the one section outside the contract.** Its sheet
+    comes from a bespoke writer rather than the shared payload, so it never
+    entered the collected list and would have had no finding and no disclosure
+    while the parity map claims Excel renders it. Fixed by collecting its payload
+    for the Methodology row and the caveat row, without migrating the writer: its
+    sheet carries row ids, executed-at and reverted over up to 200 rows, and 3.4
+    already showed what migrating costs when the payload cap is lower than the
+    sheet's. Migrating it stays open under `report-format-parity`.
+
+Reading a workbook built from a deliberately singular dataset — one entity, one
+journal, one author, one operation — found **five more unconditional plurals**,
+in five separately-authored collectors, plus two verbs agreeing with the wrong
+count ("1 of 1 entity pass validation"). All are now routed through one
+`_plural()` helper. This is the same class of defect 5.1 found twice: the
+takeaway is a heading in HTML and the first row of a sheet in Excel, so a count
+of one is no longer buried in a summary list.
+- [x] 5.4 PPTX: label as an eyebrow in the accent bar, takeaway as the slide title, method clipped in the slide footer, the whole of it in the speaker notes. Applied to **every** slide of a section, not just the first — a slide is the unit that gets pulled out of a deck and pasted into someone else's
+
+Three things 5.4 settled:
+
+  - **The last three sections bypassing the payload are gone.** `entity_stats`,
+    `enrichment_coverage` and `top_secondary_labels` still had hand-built slides
+    issuing their own queries — the same violation 3.3 found in `topic_clusters`,
+    so they carried no takeaway and no disclosure while the parity map claimed
+    PPTX rendered them. Migrated rather than supplemented (94 lines deleted), and
+    it cost no detail: the payload is richer than all three were — four KPI cards
+    rather than two, a `Source` column, 15 rows rather than 10.
+  - **The eyebrow is not upper-cased**, though the HTML one reads that way. CSS
+    does it with `text-transform`, which leaves the string alone; PPTX has no
+    equivalent, so upper-casing would mean changing the text — and the label is
+    what every format's parity marker matches on. Upper-casing it first broke 19
+    tests, including the whole `pptx:` half of the parity guard.
+  - **Sections spill onto a second slide sooner.** Usable vertical space dropped
+    from 5.3" to 4.55" once the header gained a line and the footer took the
+    bottom, so three sections now take two slides where they took one. That is
+    the cost of the contract, not a defect: the alternative is content sitting
+    underneath the disclosure. Blocks taller than one slide still overflow, which
+    is the generic PPTX truncation problem 3.4 already named as every section's
+    rather than any one section's.
+- [x] 5.5 Verify the HTML view deliberately — done in a real browser (Chrome via the repo's own Playwright install) at 1280 / 768 / 390, reading the rendered document rather than the markup
+
+What was checked, and what it found:
+
+  - **Every emitted class is actually styled**, confirmed against computed style
+    rather than against the stylesheet source: eyebrow 11px uppercase `#6b7280`
+    with 0.66px tracking, ordinal `#1d4ed8` tabular-nums, method 11px `#6b7280`
+    over a dashed rule, muted summary entries `#9ca3af` against `#111827`.
+  - **Reading order holds in all 14 sections at every width** — eyebrow above
+    heading, method below the blocks, nothing overlapping.
+  - **No horizontal body scroll at 1280 or 768.** At 390 there is, and it is
+    entirely pre-existing: every overflowing element is a `<table>`, `<tr>`,
+    `<td>` or bar cell at the table's min-content width of 520px. None of the
+    elements this change added appear in the overflow set. Not fixed here on
+    purpose — wrapping tables in an `overflow-x: auto` container is the standard
+    fix on screen but would clip them in the PDF, since the two share one
+    document. That is precisely the hazard this task exists to name, so it needs
+    its own change rather than a hurried one.
+  - The duplicate-alias defect is **visible to a reader** in the summary:
+    Exhibits 8 and 9 state the same finding. Still open for a decision.
 
 ## 6. Parity enforcement
 
-- [ ] 6.1 Extend the format-support matrix to cover presentation elements as a dimension
-- [ ] 6.2 Parity test: a format that renders a section must emit its takeaway and disclosure
-- [ ] 6.3 Confirm a format that declares a section unsupported is exempt, and that existing omitted-section reporting is unchanged
+- [x] 6.1 Extend the format-support matrix to cover presentation elements as a dimension — `PRESENTATION_SUPPORT` alongside `SECTION_FORMAT_SUPPORT`, plus `REQUIRED_PRESENTATION_ELEMENTS` and a `carries()` helper. Section coverage is a ratchet a format may sit below; presentation coverage is not, so `takeaway` and `method` are not declarable as unsupported and a test constrains the declaration itself. `exhibit` is HTML/PDF only, per decision 7. The placement per format is documented as a table in the module
+- [x] 6.2 Parity test: a format that renders a section must emit its takeaway and disclosure — 52 (format × section) combos, compared against the payload the collector produced rather than hard-coded strings, so editing a takeaway does not mean editing the test
+- [x] 6.3 A format that declares a section unsupported is exempt — and the exemption means the section is *absent*, not present-without-its-statements, which would be the worst of both. `unsupported_sections()` still names it; the omission contract in `test_report_omissions` is untouched
+
+**The gate was written wrong first, and mutation testing is what said so.**
+Version one asserted the takeaway and method appeared *anywhere in the output*. It
+passed immediately over all 52 combos, having verified almost nothing: six
+deliberate breakages were introduced and **four went undetected**.
+
+The cause is one mistake with three faces — the whole-output search is satisfied
+by the roll-up, not the section:
+
+  - HTML: the **executive summary** already carries every takeaway, so a section
+    titled with its label instead of its finding still passed.
+  - Excel: the **`Methodology` sheet** already carries every method, so deleting
+    the caveat above every table still passed — even though the published
+    scenario says the caveat must appear adjacent to the table "**not only** in a
+    separate sheet".
+  - PPTX: the **speaker notes** carry both, so a slide titled with its label
+    still passed.
+
+Rewritten to assert **placement**, with one extractor per format reading the
+section's own rendering — the `<section>` element, the section's worksheet, the
+section's slides — and returning per-slot values so a failure names the slot. All
+six mutations are now caught, and the mutation harness is kept in the change
+directory rather than thrown away.
+
+Two things the strengthened gate then found, both in work already called done:
+
+  - **Excel's `Harmonization` sheet stated its caveat and no finding.** 5.2 wired
+    the disclosure into the hand-written sheet and forgot the takeaway. The sheet
+    now opens with the finding, caveat below it, header below that — the same
+    shape every migrated sheet has.
+  - Two of my own extractor heuristics were wrong in instructive ways. Locating
+    the table header by the payload's first column name fails on the one sheet
+    whose hand-written columns differ from its payload's; and detecting "this
+    sheet has a table" by looking for a row two-or-more cells wide reads a
+    `StatGrid` row (label, value, sub) as a table, then demands adjacency of
+    sections that have no table to be adjacent to. Locate from the caveat
+    downward; decide from the payload, which knows.
+
+Also extracted `report_builder.collect_section()` — the three-way collector
+signature dispatch, previously inline in `build()`. The test needs it to know what
+a section's takeaway *should* be, and a dispatch duplicated into a test drifts
+exactly the way task 4.7 already recorded two section maps drifting: silently, and
+in the direction of the test agreeing with itself.
 
 ## 7. Verification
 
-- [ ] 7.1 Render a real report in all four formats and read them as a reader would
-- [ ] 7.2 Confirm the PDF's executive summary and exhibits survive pagination — this change lands on top of the paged-layout fix
-- [ ] 7.3 Full backend suite
-- [ ] 7.4 Re-read every takeaway against its rendered section, checking for claims the data does not support
+- [x] 7.1 Render a report in all four formats and read them as a reader would — HTML in Chrome at three widths, a 15-tab workbook twice (populated and deliberately singular), a 17-slide deck, and the PDF rasterised and read page by page
+- [x] 7.2 Confirm the PDF's executive summary and exhibits survive pagination — they do; see below, including the measurement that was wrong the first time
+- [x] 7.3 Full backend suite
+- [x] 7.4 Re-read every takeaway against its rendered section — 13 sections audited against the numbers their own blocks render; one real violation found and fixed
+
+### 7.2 — pagination
+
+Rendered through WeasyPrint 69 inside the shipped backend image, the only place
+its native runtime loads. (A local image predating PR #200 does not load it at
+all, which is a stale image rather than a live defect — that PR is what installed
+the pango trio.)
+
+  - The **executive summary is complete on one page**, all 13 exhibits, under the
+    running header, with `2 / 11` in the corner.
+  - **`.exhibit-label { break-after: avoid }` works**: an eyebrow at a page bottom
+    keeps its heading.
+  - **Zero caveats separated from their own content.**
+
+That last one was measured wrong first. The initial check compared each method's
+page against its *section's heading* page and reported four violations — but a
+section longer than a page legitimately spans pages, and a caveat sharing a page
+with its section's spilled-over table is adjacent to the figures it qualifies. The
+right question is whether a caveat sits on a page carrying none of its own
+section's content; asked that way, the answer is none of the fourteen. The
+`break-before: avoid` rule is doing its job.
+
+**One real print defect found and fixed.** The KPI cards rendered one per
+full-width row in the PDF while forming a proper row on screen. Measured rather
+than guessed: WeasyPrint 69 *does* support CSS Grid, but not
+`repeat(auto-fill, minmax(…))` or `auto-fit` — both put every card on its own row,
+while explicit `repeat(4, 1fr)` lays out one row correctly. The print fallback is
+a table row rather than explicit columns, because sections carry two, three or
+four cards and a fixed four-column grid would leave a two-card section at quarter
+width; a table distributes across however many there are. Report went 11 pages to
+10. Legitimately print-scoped: it compensates for an engine limitation, not a
+design decision, and the screen keeps its responsive grid.
+
+### 7.4 — takeaways re-read
+
+One real violation, and it is the same class 3.8 exists to prevent:
+`top_secondary_labels` cited "N classified entities" while rendering only the
+per-label counts, so a reader had to add up the rows to check the sentence above
+them. Fixed by rendering the denominator — a `Classified Entities` card, the same
+remedy as `harmonization_log`'s `Operations Applied`.
+
+**The 3.8 test did not catch it, and the reason is worth keeping.** With the
+`populated` fixture the total was 40, and Beta's relative weight was 10/25 = 40% —
+so the cited figure "appeared" in the rendered set by coincidence and the
+assertion passed on the strength of an accident in the data. The fixture is now
+24/9/7, which produces no percentage equal to the total, and removing the new card
+makes the test fail where before it passed. A truthfulness check over bare numbers
+is only as strong as the fixture's freedom from collisions.

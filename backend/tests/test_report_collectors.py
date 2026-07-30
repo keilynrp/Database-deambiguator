@@ -14,6 +14,18 @@ from backend.reporting.section_data import (
 )
 
 
+def _labelled(label: str) -> str:
+    """Where a section's dataset label sits now.
+
+    It used to be the `<h2>`. report-presentation 5.1 gave the heading to the
+    section's finding and demoted the label to the exhibit eyebrow, so these
+    tests still pin that the label is rendered and findable — what changed is
+    which element carries it. A section rendered outside document assembly has
+    no ordinal, so the eyebrow is the label alone.
+    """
+    return f'<div class="exhibit-label">{label}</div>'
+
+
 def _seed(db) -> None:
     rows = [
         ("valid", "completed"),
@@ -69,7 +81,7 @@ def test_migrated_entity_stats_html_preserves_structure(db_session):
     _seed(db_session)
     html = report_builder._section_entity_stats(db_session, "default", None)
 
-    assert "<h2>Entity Statistics</h2>" in html
+    assert _labelled("Entity Statistics") in html
     assert html.count('class="stat-card"') == 4          # the four KPI cards
     for label in ("Total Entities", "Valid", "Pending", "Enriched"):
         assert label in html
@@ -135,7 +147,7 @@ def test_migrated_enrichment_coverage_html_preserves_structure(db_session):
     _seed_enriched(db_session)
     html = report_builder._section_enrichment_coverage(db_session, "default", None)
 
-    assert "<h2>Enrichment Coverage</h2>" in html
+    assert _labelled("Enrichment Coverage") in html
     assert html.count('class="stat-card"') == 2      # Coverage + Avg Citations
     for label in ("Coverage", "Avg Citations"):
         assert label in html
@@ -198,7 +210,7 @@ def test_migrated_top_secondary_labels_html_preserves_structure(db_session):
     _seed_labels(db_session)
     html = report_builder._section_top_brands(db_session, "default", None)
 
-    assert "<h2>Top Secondary Labels / Classifications</h2>" in html
+    assert _labelled("Top Secondary Labels / Classifications") in html
     for col in ("Label", "Entities", "Share"):
         assert col in html
     assert 'class="bar-wrap"' in html and 'class="bar"' in html
@@ -254,7 +266,7 @@ def test_migrated_impact_projection_html_preserves_structure(db_session):
     _seed_snapshot(db_session)
     html = report_builder._section_impact_projection(db_session, "default", None)
 
-    assert "<h2>Impact Projection</h2>" in html
+    assert _labelled("Impact Projection") in html
     assert html.count('class="stat-card"') == 3        # the three KPI cards only
     assert 'class="callout"' in html and "Executive interpretation" in html
     for driver in ("Coverage", "Quality", "Citation signal", "Concentration"):
@@ -282,7 +294,7 @@ def test_collect_decision_recommendations_returns_priority_table(db_session):
 def test_migrated_decision_recommendations_html_preserves_structure(db_session):
     _seed_snapshot(db_session)
     html = report_builder._section_decision_recommendations(db_session, "default", None)
-    assert "<h2>Suggested Next Actions</h2>" in html
+    assert _labelled("Suggested Next Actions") in html
     for col in ("Priority", "Category", "Recommendation", "Detail", "Evidence"):
         assert col in html
 
@@ -308,7 +320,7 @@ def test_collect_hidden_patterns_returns_reading_and_impact_table(db_session):
 def test_migrated_hidden_patterns_html_preserves_structure(db_session):
     _seed_snapshot(db_session)
     html = report_builder._section_hidden_patterns(db_session, "default", None)
-    assert "<h2>Hidden Patterns</h2>" in html
+    assert _labelled("Hidden Patterns") in html
     assert 'class="callout"' in html and "Executive reading" in html
     assert 'class="bar-wrap"' in html and 'class="bar"' in html
 
@@ -334,7 +346,7 @@ def test_collect_institutional_benchmark_returns_kpis_reading_and_tables(db_sess
 def test_migrated_institutional_benchmark_html_preserves_structure(db_session):
     _seed_snapshot(db_session)
     html = report_builder._section_institutional_benchmark(db_session, "default", None)
-    assert "<h2>Institutional Benchmark</h2>" in html
+    assert _labelled("Institutional Benchmark") in html
     assert html.count('class="stat-card"') == 3
     assert 'class="callout"' in html and "Executive reading" in html
     for col in ("Gap", "Priority", "Evidence", "Rule", "Observed", "Threshold", "Interpretation"):
@@ -377,7 +389,7 @@ def test_collect_harmonization_log_empty(db_session):
 def test_migrated_harmonization_log_html_preserves_structure(db_session):
     _seed_harmonization(db_session)
     html = report_builder._section_harmonization_log(db_session, "default", None)
-    assert "<h2>Harmonization Log</h2>" in html
+    assert _labelled("Harmonization Log") in html
     for col in ("Step", "Records Updated", "Status", "Executed"):
         assert col in html
     assert "Normalize labels" in html
@@ -401,6 +413,24 @@ def test_collect_stakeholder_reading_returns_narrative(db_session):
     assert "Narrative goal:" in joined
 
 
+def test_stakeholder_reading_reports_quality_on_a_percentage_scale(db_session):
+    """`quality.average` is a 0–1 fraction; this section renders it as a percent.
+
+    Unscaled, the fixture's real average of 0.8 was reported as "quality 1%" —
+    a wrong figure, and since 5.1 promoted the takeaway to the section heading,
+    a wrong figure in the most prominent line of the first section.
+    """
+    _seed_snapshot(db_session)
+    section = report_builder.collect_stakeholder_reading(db_session, "default", None)
+
+    assert "quality 80%" in section.takeaway, section.takeaway
+    joined = " ".join(
+        b.paragraphs and " ".join(b.paragraphs) or ""
+        for b in section.blocks if isinstance(b, Narrative)
+    )
+    assert "average quality is 80%" in joined
+
+
 def test_migrated_stakeholder_reading_html_preserves_structure(db_session):
     """HTML builder delegates to the collector + renderer. The section still
     renders as a callout under the Stakeholder Reading heading; the attention-
@@ -408,6 +438,6 @@ def test_migrated_stakeholder_reading_html_preserves_structure(db_session):
     _seed_snapshot(db_session)
     html = report_builder._section_stakeholder_reading(db_session, "default", None)
 
-    assert "<h2>Stakeholder Reading</h2>" in html
+    assert _labelled("Stakeholder Reading") in html
     assert 'class="callout"' in html
     assert "benchmark readiness" in html

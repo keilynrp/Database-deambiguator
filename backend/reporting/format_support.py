@@ -65,9 +65,54 @@ SECTION_FORMAT_SUPPORT: dict[str, frozenset[str]] = {
 }
 
 
+# ── Presentation elements (report-presentation 6.1) ──────────────────────────
+#
+# Section coverage answers "does this format render this section". It does not
+# answer "does it render the statements that make the section's figures
+# readable", which is a second dimension: a format could render every section
+# and still ship a table with no finding above it and no caveat below.
+#
+# Where each element lands, per format:
+#
+#   | element  | html / pdf                  | excel                        | pptx                          |
+#   |----------|-----------------------------|------------------------------|-------------------------------|
+#   | takeaway | the section `<h2>`          | row 1 of the section's sheet | the slide title               |
+#   | method   | `<p class="method">` footer | above each table, and the    | slide footer (clipped) and    |
+#   |          |                             | `Methodology` sheet          | speaker notes (in full)       |
+#   | exhibit  | the eyebrow, `Exhibit N ·`  | — see below                  | — see below                   |
+
+PRESENTATION_ELEMENTS: tuple[str, ...] = ("takeaway", "method", "exhibit")
+
+#: Not declarable as unsupported. A format that renders a section at all must
+#: carry these: the published requirement is that no format "may declare these
+#: elements unsupported while rendering the section they describe". The point of
+#: naming them here is that the *declaration* below is itself constrained — a
+#: future format cannot opt out by omitting them from its entry.
+REQUIRED_PRESENTATION_ELEMENTS: frozenset[str] = frozenset({"takeaway", "method"})
+
+#: Which presentation elements each format carries.
+#:
+#: `exhibit` is deliberately HTML/PDF only (design decision 7). An ordinal is a
+#: within-document reference, and Excel and PPTX are not paged documents: they
+#: also render a different *set* of sections than the document does, so an
+#: ordinal assigned here would disagree with the PDF of the same generation
+#: without saying so. Their reference is the sheet tab and the slide title.
+PRESENTATION_SUPPORT: dict[str, frozenset[str]] = {
+    "html": frozenset({"takeaway", "method", "exhibit"}),
+    "pdf": frozenset({"takeaway", "method", "exhibit"}),
+    "excel": frozenset({"takeaway", "method"}),
+    "pptx": frozenset({"takeaway", "method"}),
+}
+
+
 def supports(export_format: str, section: str) -> bool:
     """Whether `export_format` renders `section` today."""
     return section in SECTION_FORMAT_SUPPORT.get(export_format, frozenset())
+
+
+def carries(export_format: str, element: str) -> bool:
+    """Whether `export_format` renders presentation `element`."""
+    return element in PRESENTATION_SUPPORT.get(export_format, frozenset())
 
 
 def unsupported_sections(export_format: str, sections: list[str]) -> list[str]:

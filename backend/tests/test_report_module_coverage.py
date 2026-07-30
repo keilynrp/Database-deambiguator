@@ -380,13 +380,31 @@ def test_journal_bayes_never_renders_without_its_interval(db_session):
 
 
 def test_journal_nif_labelled_as_field_normalized_not_jif(db_session):
-    """4.5 — NIF is labelled a field-normalized open proxy, never a JIF."""
+    """4.5 — NIF is labelled a field-normalized open proxy, never a JIF.
+
+    This used to ban the string outright. It cannot any more: since the method
+    footer renders inside the section (report-presentation 5.1), the section
+    carries a disclosure the contract *requires* — "a proxy metric names what it
+    is not" — and naming what it is not means writing the term.
+
+    So the assertion tests the intent instead of the string: every mention of the
+    better-known measure must sit in a negation. A bare mention would be exactly
+    the claim the ban was there to prevent.
+    """
     _seed_journals(db_session)
     html = report_builder._section_journal_portfolio(db_session, "default", None)
     lower = html.lower()
     assert "field-normalized" in lower
-    assert "impact factor" not in lower or "not a journal impact factor" in lower
-    assert "jif" not in lower.replace("verify", "")   # no stray "JIF" claim
+
+    for term in ("impact factor", "jif"):
+        start = 0
+        while (idx := lower.find(term, start)) != -1:
+            preceding = lower[max(0, idx - 70):idx]
+            assert "not" in preceding, (
+                f"{term!r} is stated affirmatively of this figure: "
+                f"...{preceding}[{term}]..."
+            )
+            start = idx + len(term)
 
 
 def test_journal_works_2yr_labelled_local(db_session):

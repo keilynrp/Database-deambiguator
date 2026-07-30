@@ -68,6 +68,65 @@ def test_html_renderer_emits_existing_css_classes():
     assert "Coverage" in html and "60%" in html
 
 
+def test_html_renderer_leads_with_the_takeaway_not_the_label():
+    """The heading states the finding; the dataset label drops to secondary text.
+
+    Both are present — a report a reader cannot scan by section name is worse
+    than one that only names its sections — but the assertion is what leads.
+    """
+    from backend.reporting.html_renderer import render_html
+
+    html = render_html(_every_block_section())
+
+    assert "<h2>1,240 entities recorded, 60% enriched</h2>" in html
+    assert "<h2>Demo Section</h2>" not in html, "the label is still the heading"
+    assert "Demo Section" in html, "the label has to remain findable"
+
+
+def test_html_renderer_states_the_method_for_every_section():
+    from backend.reporting.html_renderer import render_html
+
+    html = render_html(_every_block_section())
+
+    assert 'class="method"' in html
+    assert "Counts scoped to this domain, as of the last run." in html
+
+
+def test_html_renderer_shows_the_exhibit_ordinal_assembly_assigned():
+    from dataclasses import replace
+
+    from backend.reporting.html_renderer import render_html
+
+    html = render_html(replace(_every_block_section(), exhibit=3))
+
+    assert "Exhibit 3" in html
+
+
+def test_html_renderer_omits_the_ordinal_for_an_unnumbered_section():
+    """A section rendered outside assembly has no ordinal, and must not invent
+    one or leak the absent value."""
+    from backend.reporting.html_renderer import render_html
+
+    html = render_html(_every_block_section())  # exhibit is None
+
+    assert "Exhibit" not in html
+    assert "None" not in html
+
+
+def test_html_renderer_escapes_the_takeaway_and_method():
+    """Both are prose assembled from record values, so both can carry markup."""
+    from backend.reporting.html_renderer import render_html
+
+    html = render_html(SectionData(
+        key="x", title="T",
+        takeaway="<script>alert(1)</script> & up",
+        method="Source: <b>upstream</b> & local",
+    ))
+
+    assert "<script>" not in html and "<b>" not in html
+    assert "&lt;script&gt;" in html and "&amp;" in html
+
+
 def test_html_renderer_escapes_data():
     from backend.reporting.html_renderer import render_html
 
@@ -110,6 +169,57 @@ def test_excel_renderer_writes_all_block_types():
     assert "Executive reading" in blob and "First point." in blob
     # Meter → percentage cell
     assert "Coverage" in blob and "60%" in blob
+
+
+def _cell_column(ws, col: int = 1) -> list[str]:
+    return [str(c.value) for c in ws[chr(ord("A") + col - 1)] if c.value is not None]
+
+
+def test_excel_sheet_opens_with_the_finding():
+    import openpyxl
+    from backend.reporting.excel_renderer import render_excel
+
+    ws = render_excel(_every_block_section(), openpyxl.Workbook())
+
+    assert ws["A1"].value == "1,240 entities recorded, 60% enriched"
+    assert ws["A1"].font.bold
+
+
+def test_excel_carries_the_caveat_directly_above_each_table():
+    """5.3 — Excel is the format most often re-cut and pasted, and that is the
+    path by which a proxy metric loses its caveat. The disclosure sits on the
+    row immediately above the header, so it travels with the range."""
+    import openpyxl
+    from backend.reporting.excel_renderer import render_excel
+
+    ws = render_excel(_every_block_section(), openpyxl.Workbook())
+
+    header_row = next(
+        cell.row
+        for row in ws.iter_rows()
+        for cell in row
+        if cell.value == "Status"
+    )
+    above = ws.cell(row=header_row - 1, column=1).value
+    assert above and "Counts scoped to this domain" in above, above
+
+
+def test_excel_discloses_a_section_that_has_no_table():
+    """Nothing to attach the caveat to, so it goes under the finding — the
+    disclosure is mandatory, not conditional on the block types present."""
+    import openpyxl
+    from backend.reporting.excel_renderer import render_excel
+
+    section = SectionData(
+        key="k", title="Narrative Only",
+        takeaway="Three patterns detected",
+        method="Statistical co-occurrence within this corpus, not causation.",
+        blocks=(Narrative(heading="Reading", paragraphs=("A point.",)),),
+    )
+    ws = render_excel(section, openpyxl.Workbook())
+
+    blob = "\n".join(_cell_column(ws))
+    assert "not causation" in blob
 
 
 def test_excel_renderer_truncates_long_sheet_names():
