@@ -16,7 +16,7 @@ import json
 import logging
 import os
 import secrets
-from datetime import datetime, timezone
+from datetime import timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path
@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from backend import models
 from backend.auth import get_current_user
 from backend.database import get_db
+from backend.models import utc_now_naive
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +68,13 @@ def verify_api_key(raw_key: str, db: Session) -> Optional[models.ApiKey]:
     )
     if not key_record:
         return None
-    if key_record.expires_at and key_record.expires_at < datetime.now(timezone.utc):
+    # `expires_at` is a naive column (models.ApiKey), so it must be compared
+    # against naive UTC. Comparing it with an aware `datetime.now(timezone.utc)`
+    # raises TypeError and surfaces as a 500 on every authenticated request —
+    # issue #215.
+    if key_record.expires_at and key_record.expires_at < utc_now_naive():
         return None
-    key_record.last_used_at = datetime.now(timezone.utc)
+    key_record.last_used_at = utc_now_naive()
     try:
         db.commit()
     except Exception:
@@ -147,8 +152,7 @@ def create_api_key(
 
     expires_at = None
     if payload.expires_days:
-        from datetime import timedelta
-        expires_at = datetime.now(timezone.utc) + timedelta(days=payload.expires_days)
+        expires_at = utc_now_naive() + timedelta(days=payload.expires_days)
 
     key_record = models.ApiKey(
         user_id=current_user.id,
@@ -158,7 +162,7 @@ def create_api_key(
         scopes=json.dumps(payload.scopes),
         expires_at=expires_at,
         is_active=True,
-        created_at=datetime.now(timezone.utc),
+        created_at=utc_now_naive(),
     )
     db.add(key_record)
     db.commit()
