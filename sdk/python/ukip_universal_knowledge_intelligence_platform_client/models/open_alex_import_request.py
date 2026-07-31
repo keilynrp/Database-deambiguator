@@ -19,15 +19,16 @@ T = TypeVar("T", bound="OpenAlexImportRequest")
 class OpenAlexImportRequest:
     """
     Attributes:
+        domain (str): Registered domain the imported records are filed under. Required: this is written once at ingest
+            and cannot be changed afterwards.
         query (str):
-        domain (str | Unset):  Default: 'science'.
         filters (None | OpenAlexImportRequestFiltersType0 | Unset):
         limit (int | Unset):  Default: 100.
         preview (bool | Unset):  Default: False.
     """
 
+    domain: str
     query: str
-    domain: str | Unset = "science"
     filters: None | OpenAlexImportRequestFiltersType0 | Unset = UNSET
     limit: int | Unset = 100
     preview: bool | Unset = False
@@ -36,9 +37,9 @@ class OpenAlexImportRequest:
     def to_dict(self) -> dict[str, Any]:
         from ..models.open_alex_import_request_filters_type_0 import OpenAlexImportRequestFiltersType0
 
-        query = self.query
-
         domain = self.domain
+
+        query = self.query
 
         filters: dict[str, Any] | None | Unset
         if isinstance(self.filters, Unset):
@@ -56,11 +57,10 @@ class OpenAlexImportRequest:
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
+                "domain": domain,
                 "query": query,
             }
         )
-        if domain is not UNSET:
-            field_dict["domain"] = domain
         if filters is not UNSET:
             field_dict["filters"] = filters
         if limit is not UNSET:
@@ -75,9 +75,9 @@ class OpenAlexImportRequest:
         from ..models.open_alex_import_request_filters_type_0 import OpenAlexImportRequestFiltersType0
 
         d = dict(src_dict)
-        query = d.pop("query")
+        domain = d.pop("domain")
 
-        domain = d.pop("domain", UNSET)
+        query = d.pop("query")
 
         def _parse_filters(data: object) -> None | OpenAlexImportRequestFiltersType0 | Unset:
             if data is None:
@@ -101,8 +101,8 @@ class OpenAlexImportRequest:
         preview = d.pop("preview", UNSET)
 
         open_alex_import_request = cls(
-            query=query,
             domain=domain,
+            query=query,
             filters=filters,
             limit=limit,
             preview=preview,
