@@ -385,7 +385,7 @@ class TestImportEndpoints:
 
             resp = client.post(
                 "/import/openalex",
-                json={"query": "knowledge management", "limit": 10},
+                json={"query": "knowledge management", "limit": 10, "domain": "science"},
                 headers=auth_headers,
             )
 
@@ -406,7 +406,7 @@ class TestImportEndpoints:
 
             resp = client.post(
                 "/import/pubmed",
-                json={"query": "knowledge transfer", "limit": 10},
+                json={"query": "knowledge transfer", "limit": 10, "domain": "science"},
                 headers=auth_headers,
             )
 
@@ -417,7 +417,7 @@ class TestImportEndpoints:
     def test_pubmed_limit_over_500_rejected(self, client, auth_headers):
         resp = client.post(
             "/import/pubmed",
-            json={"query": "test", "limit": 600},
+            json={"query": "test", "limit": 600, "domain": "science"},
             headers=auth_headers,
         )
         assert resp.status_code == 422
@@ -439,7 +439,7 @@ class TestImportEndpoints:
 
             resp = client.post(
                 "/import/openalex",
-                json={"query": "test", "limit": 5},
+                json={"query": "test", "limit": 5, "domain": "science"},
                 headers=auth_headers,
             )
 

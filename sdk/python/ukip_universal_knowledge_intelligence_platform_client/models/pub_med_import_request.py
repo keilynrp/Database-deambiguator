@@ -15,22 +15,23 @@ T = TypeVar("T", bound="PubMedImportRequest")
 class PubMedImportRequest:
     """
     Attributes:
+        domain (str): Registered domain the imported records are filed under. Required: this is written once at ingest
+            and cannot be changed afterwards.
         query (str):
-        domain (str | Unset):  Default: 'science'.
         limit (int | Unset):  Default: 100.
         preview (bool | Unset):  Default: False.
     """
 
+    domain: str
     query: str
-    domain: str | Unset = "science"
     limit: int | Unset = 100
     preview: bool | Unset = False
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        query = self.query
-
         domain = self.domain
+
+        query = self.query
 
         limit = self.limit
 
@@ -40,11 +41,10 @@ class PubMedImportRequest:
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
+                "domain": domain,
                 "query": query,
             }
         )
-        if domain is not UNSET:
-            field_dict["domain"] = domain
         if limit is not UNSET:
             field_dict["limit"] = limit
         if preview is not UNSET:
@@ -55,17 +55,17 @@ class PubMedImportRequest:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        query = d.pop("query")
+        domain = d.pop("domain")
 
-        domain = d.pop("domain", UNSET)
+        query = d.pop("query")
 
         limit = d.pop("limit", UNSET)
 
         preview = d.pop("preview", UNSET)
 
         pub_med_import_request = cls(
-            query=query,
             domain=domain,
+            query=query,
             limit=limit,
             preview=preview,
         )

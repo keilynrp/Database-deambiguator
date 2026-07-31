@@ -164,19 +164,34 @@ def _must_be_registered_domain(value: str) -> str:
 
 RegisteredDomain = Annotated[str, AfterValidator(_must_be_registered_domain)]
 
+#: Why ``domain`` is required rather than defaulted.
+#:
+#: It defaulted to ``"science"``, so a caller that never considered the field
+#: got a permanent answer to a question they did not know was being asked —
+#: which is the failure the field was added to prevent, not a mitigation of it.
+#: ``RawEntity.domain`` is write-once and no re-filing path exists, so a wrong
+#: value costs a delete-and-reimport. A 422 costs one line in the request.
+_DOMAIN_FIELD = Field(
+    ...,
+    description=(
+        "Registered domain the imported records are filed under. Required: this "
+        "is written once at ingest and cannot be changed afterwards."
+    ),
+)
+
 
 class OpenAlexImportRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=500)
     limit: int = Field(default=100, ge=1, le=1000)
     filters: Optional[Dict[str, str]] = None
-    domain: RegisteredDomain = Field(default="science")
+    domain: RegisteredDomain = _DOMAIN_FIELD
     preview: bool = False
 
 
 class PubMedImportRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=500)
     limit: int = Field(default=100, ge=1, le=500)
-    domain: RegisteredDomain = Field(default="science")
+    domain: RegisteredDomain = _DOMAIN_FIELD
     preview: bool = False
 
 

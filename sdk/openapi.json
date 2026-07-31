@@ -6277,7 +6277,7 @@
       "OpenAlexImportRequest": {
         "properties": {
           "domain": {
-            "default": "science",
+            "description": "Registered domain the imported records are filed under. Required: this is written once at ingest and cannot be changed afterwards.",
             "title": "Domain",
             "type": "string"
           },
@@ -6315,7 +6315,8 @@
           }
         },
         "required": [
-          "query"
+          "query",
+          "domain"
         ],
         "title": "OpenAlexImportRequest",
         "type": "object"
@@ -6778,7 +6779,7 @@
       "PubMedImportRequest": {
         "properties": {
           "domain": {
-            "default": "science",
+            "description": "Registered domain the imported records are filed under. Required: this is written once at ingest and cannot be changed afterwards.",
             "title": "Domain",
             "type": "string"
           },
@@ -6802,7 +6803,8 @@
           }
         },
         "required": [
-          "query"
+          "query",
+          "domain"
         ],
         "title": "PubMedImportRequest",
         "type": "object"

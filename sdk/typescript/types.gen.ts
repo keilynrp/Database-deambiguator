@@ -3329,8 +3329,10 @@ export type ObservationInput = {
 export type OpenAlexImportRequest = {
     /**
      * Domain
+     *
+     * Registered domain the imported records are filed under. Required: this is written once at ingest and cannot be changed afterwards.
      */
-    domain?: string;
+    domain: string;
     /**
      * Filters
      */
@@ -3612,8 +3614,10 @@ export type ProfileUpdate = {
 export type PubMedImportRequest = {
     /**
      * Domain
+     *
+     * Registered domain the imported records are filed under. Required: this is written once at ingest and cannot be changed afterwards.
      */
-    domain?: string;
+    domain: string;
     /**
      * Limit
      */
