@@ -1,9 +1,21 @@
 /**
  * Guards the target domain of API-based scientific imports.
  *
- * The regression this replaces: both tabs posted `{ query, limit }` with no
- * `domain`, so the backend default ("science") swallowed every import and there
- * was no way to file records anywhere else from the UI.
+ * The first regression: both tabs posted `{ query, limit }` with no `domain`,
+ * so the backend default ("science") swallowed every import and there was no
+ * way to file records anywhere else from the UI.
+ *
+ * Adding the picker did not end that story. It arrived pre-set to "science" on
+ * the reasoning that an operator who ignores it should get the old behaviour —
+ * which is precisely the old bug, now retail instead of wholesale. An operator
+ * imported clinical trials, never looked at the picker, and the records landed
+ * in Science exactly as before. The picker had bought an audit trail, not a
+ * different outcome.
+ *
+ * So the domain is now an unanswered question: nothing is pre-selected and the
+ * import cannot start until someone answers it. `domain` is written once at
+ * ingest and no re-filing path exists, which makes one extra click far cheaper
+ * than the delete-and-reimport it prevents.
  */
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -98,14 +110,35 @@ async function openTab(name: RegExp) {
 }
 
 describe("PubMed tab", () => {
-  test("sends the default science domain when the picker is untouched", async () => {
+  test("pre-selects no domain, so the question stays visibly unanswered", async () => {
+    renderPage();
+    await openTab(/^PubMed$/);
+
+    expect(screen.getByLabelText(/Target domain/i)).toHaveValue("");
+  });
+
+  test("an untouched picker blocks the import instead of defaulting to science", async () => {
     renderPage();
     const user = await openTab(/^PubMed$/);
 
     await user.type(screen.getByPlaceholderText(/systematic review/i), "oncology");
-    await user.click(screen.getByRole("button", { name: /Import from PubMed/i }));
+    const submit = screen.getByRole("button", { name: /Import from PubMed/i });
+    expect(submit).toBeDisabled();
 
-    await waitFor(() => expect(postedBody("/import/pubmed").domain).toBe("science"));
+    await user.click(submit);
+    expect(
+      vi.mocked(apiFetch).mock.calls.filter(([path]) => path === "/import/pubmed")
+    ).toHaveLength(0);
+  });
+
+  test("choosing a domain releases the import", async () => {
+    renderPage();
+    const user = await openTab(/^PubMed$/);
+
+    await user.type(screen.getByPlaceholderText(/systematic review/i), "oncology");
+    await user.selectOptions(screen.getByLabelText(/Target domain/i), "healthcare");
+
+    expect(screen.getByRole("button", { name: /Import from PubMed/i })).toBeEnabled();
   });
 
   test("sends the domain chosen in the picker", async () => {
@@ -141,13 +174,17 @@ describe("OpenAlex tab", () => {
     await waitFor(() => expect(postedBody("/import/openalex").domain).toBe("healthcare"));
   });
 
-  test("sends the default science domain when the picker is untouched", async () => {
+  test("an untouched picker blocks the import instead of defaulting to science", async () => {
     renderPage();
     const user = await openTab(/^OpenAlex$/);
 
     await user.type(screen.getByPlaceholderText(/knowledge management/i), "bibliometrics");
-    await user.click(screen.getByRole("button", { name: /Import from OpenAlex/i }));
+    const submit = screen.getByRole("button", { name: /Import from OpenAlex/i });
+    expect(submit).toBeDisabled();
 
-    await waitFor(() => expect(postedBody("/import/openalex").domain).toBe("science"));
+    await user.click(submit);
+    expect(
+      vi.mocked(apiFetch).mock.calls.filter(([path]) => path === "/import/openalex")
+    ).toHaveLength(0);
   });
 });
