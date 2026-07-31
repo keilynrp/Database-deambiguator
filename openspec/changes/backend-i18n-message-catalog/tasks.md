@@ -1,9 +1,24 @@
 ## 1. Inventory
 
-- [ ] 1.1 Enumerate every candidate user-facing string literal in `backend/` (excluding `tests/`, `alembic/`), recording file, line and text
-- [ ] 1.2 Classify each candidate by hand as `label`, `operator-message`, `email`, `analysis-prose`, or `false-positive`; docstrings such as "Cramér's V" and "English and Spanish names" are false positives, not work
-- [ ] 1.3 Commit the classified inventory to the change directory as the migration's worklist, with per-category counts — the two heuristic counts (96/17, 71/16) disagree and neither is trustworthy as a plan
+- [x] 1.1 Enumerate every candidate user-facing string literal in `backend/` (excluding `tests/`, `alembic/`), recording file, line and text — 127 candidates, extractor kept at `extract_candidates.js`
+- [x] 1.2 Classify each candidate by hand as `label`, `operator-message`, `email`, `analysis-prose`, or `false-positive` — see `inventory.md`
+- [x] 1.3 Commit the classified inventory to the change directory as the migration's worklist, with per-category counts
 - [ ] 1.4 Confirm with the product owner that everything classified `analysis-prose` is staying English, since that is the boundary the whole scope rests on
+
+Two findings from 1.2 change the plan; both are recorded in `inventory.md`:
+
+- **`analysis-prose` means convert to English, not skip.** Those 22 strings are Spanish today, so honouring "analysis stays English" is work, not an exemption. The exact string reported in #209 is one of them, which makes the headline bug fixable independently of the catalog — see phase 1b.
+- **14 Spanish strings must be preserved verbatim.** `field_correspondence.py` and `backfill_canonical_id_entity_type.py` hold input-matching aliases that let users upload Spanish spreadsheets. Migrating them would break Spanish CSV imports. Both earlier counts included them.
+
+## 1b. Fix the reported symptom first
+
+Independent of the catalog, and shippable on its own.
+
+- [ ] 1b.1 Write a failing test asserting no Spanish appears in an English-generated report's Hidden Patterns section
+- [ ] 1b.2 Convert the 10 `services/pattern_discovery.py` strings to English, preserving every interpolation argument
+- [ ] 1b.3 Convert the 10 `services/impact_projection.py` strings to English
+- [ ] 1b.4 Convert `services/researcher_topic_analytics.py` lines 276 and 278
+- [ ] 1b.5 Generate a real report and read it — this defect was found by reading output, not by a test
 
 ## 2. Catalog projection
 
