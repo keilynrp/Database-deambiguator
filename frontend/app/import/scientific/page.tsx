@@ -49,28 +49,29 @@ async function readJsonOrThrow<T>(response: Response): Promise<T> {
 
 /* ── Target domain selection ─────────────────────────────────────────── */
 
-const DEFAULT_IMPORT_DOMAIN = "science";
-
 /**
  * Holds the domain the imported records will be filed under.
  *
- * Defaults to `science` — the same value the backend has always applied when
- * the field is omitted — so an operator who ignores the picker gets exactly
- * the behaviour they got before it existed. The active workspace domain is
- * deliberately NOT used as the default: silently redirecting an import based
- * on which workspace happens to be selected is how records end up somewhere
- * nobody expects.
+ * There is deliberately no default. This picker first shipped pre-set to
+ * `science`, so that an operator who ignored it got the behaviour they had
+ * before it existed — but that behaviour was the bug it was built to fix, and
+ * an ignored picker reproduced it one import at a time. `domain` is written
+ * once at ingest and nothing can re-file a record afterwards, so an unanswered
+ * question must block the import rather than answer itself.
+ *
+ * The active workspace domain is not used either: silently routing an import
+ * by whichever workspace happens to be open is the same failure wearing a
+ * more plausible disguise.
+ *
+ * Empty string means unanswered.
  */
 function useImportDomain() {
   const { domains } = useDomain();
-  // `null` means "operator has not chosen"; the effective value is derived so
-  // the picker stays correct while /domains is still loading.
-  const [chosen, setChosen] = useState<string | null>(null);
+  const [chosen, setChosen] = useState("");
 
-  const fallback = domains.some((d) => d.id === DEFAULT_IMPORT_DOMAIN)
-    ? DEFAULT_IMPORT_DOMAIN
-    : domains[0]?.id ?? DEFAULT_IMPORT_DOMAIN;
-  const domain = chosen && domains.some((d) => d.id === chosen) ? chosen : fallback;
+  // A choice only counts while it still exists in the registry — a domain can
+  // be deleted between selection and submit.
+  const domain = domains.some((d) => d.id === chosen) ? chosen : "";
 
   return { domain, setDomain: setChosen, domains };
 }
@@ -99,16 +100,18 @@ function DomainPicker({
       hint={
         selected?.description
           ? `${selected.primary_entity} — ${selected.description}`
-          : tr("page.import.api.domain_hint", "Imported records are filed under this domain.")
+          : tr(
+              "page.import.api.domain_hint",
+              "Choose where these records are filed. This cannot be changed later."
+            )
       }
     >
-      {domains.length === 0 ? (
-        <option value={value}>{value}</option>
-      ) : (
-        domains.map((d) => (
-          <option key={d.id} value={d.id}>{d.name}</option>
-        ))
-      )}
+      <option value="">
+        {tr("page.import.api.domain_placeholder", "Select a domain…")}
+      </option>
+      {domains.map((d) => (
+        <option key={d.id} value={d.id}>{d.name}</option>
+      ))}
     </Select>
   );
 }
@@ -315,7 +318,7 @@ function OpenAlexTab() {
           <DomainPicker value={domain} onChange={setDomain} domains={domains} disabled={loading} />
           <button
             onClick={handleImport}
-            disabled={loading || !keyword}
+            disabled={loading || !keyword || !domain}
             className="w-full rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium py-2 px-4 transition-colors"
           >
             {loading
@@ -452,7 +455,7 @@ function PubMedTab() {
           <DomainPicker value={domain} onChange={setDomain} domains={domains} disabled={loading} />
           <button
             onClick={handleImport}
-            disabled={loading || !query}
+            disabled={loading || !query || !domain}
             className="w-full rounded-md bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm font-medium py-2 px-4 transition-colors"
           >
             {loading
