@@ -2812,6 +2812,10 @@ export type ImportJobResponse = {
  */
 export type ImportStatusResponse = {
     /**
+     * Error
+     */
+    error?: string | null;
+    /**
      * Job Id
      */
     job_id: string;

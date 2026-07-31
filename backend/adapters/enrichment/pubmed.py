@@ -40,6 +40,11 @@ class PubMedAdapter(BaseScientometricAdapter):
         self._api_key: Optional[str] = os.environ.get("NCBI_API_KEY") or None
         # Polite rate: 3 req/s without key, 10 req/s with key
         self._delay = 1 / 10 if self._api_key else 1 / 3
+        # Set when a call fails and the failure is swallowed into an empty
+        # result. The enrichment worker wants that degradation and ignores this;
+        # the bulk import path reads it so a provider outage is not reported as
+        # a successful import of zero records — issue #217.
+        self.last_error: Optional[str] = None
 
     @property
     def is_active(self) -> bool:
@@ -67,16 +72,19 @@ class PubMedAdapter(BaseScientometricAdapter):
             time.sleep(self._delay)
         except Exception as exc:
             logger.warning("PubMed eSearch error: %s", exc)
+            self.last_error = f"eSearch request failed: {type(exc).__name__}"
             return []
 
         if resp.status_code != 200:
             logger.warning("PubMed eSearch returned HTTP %s", resp.status_code)
+            self.last_error = f"eSearch returned HTTP {resp.status_code}"
             return []
 
         try:
             root = ET.fromstring(resp.text)
         except ET.ParseError as exc:
             logger.warning("PubMed eSearch XML parse error: %s", exc)
+            self.last_error = "eSearch returned unreadable XML"
             return []
 
         return [el.text for el in root.findall(".//IdList/Id") if el.text]
@@ -97,10 +105,12 @@ class PubMedAdapter(BaseScientometricAdapter):
             time.sleep(self._delay)
         except Exception as exc:
             logger.warning("PubMed eFetch error: %s", exc)
+            self.last_error = f"eFetch request failed: {type(exc).__name__}"
             return ""
 
         if resp.status_code != 200:
             logger.warning("PubMed eFetch returned HTTP %s", resp.status_code)
+            self.last_error = f"eFetch returned HTTP {resp.status_code}"
             return ""
 
         return resp.text
@@ -198,6 +208,7 @@ class PubMedAdapter(BaseScientometricAdapter):
             root = ET.fromstring(xml_text)
         except ET.ParseError as exc:
             logger.warning("PubMed eFetch XML parse error: %s", exc)
+            self.last_error = "eFetch returned unreadable XML"
             return []
 
         records: List[EnrichedRecord] = []
@@ -238,6 +249,7 @@ class PubMedAdapter(BaseScientometricAdapter):
         Caps at 500 records regardless of the requested limit.
         """
         limit = min(limit, _MAX_LIMIT)
+        self.last_error = None
 
         pmids = self._esearch(query, limit)
         if not pmids:

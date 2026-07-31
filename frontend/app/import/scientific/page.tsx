@@ -30,6 +30,9 @@ type ImportStatusResponse = {
   progress: number;
   records_inserted: number;
   total: number;
+  /** Operator-facing reason. Present on failure, and on a completed job that
+   *  imported nothing or was cut short by a provider error. */
+  error?: string | null;
 };
 
 async function readJsonOrThrow<T>(response: Response): Promise<T> {
@@ -126,6 +129,9 @@ function ImportProgressBar({
   const [progress, setProgress] = useState(0);
   const [inserted, setInserted] = useState(0);
   const [total, setTotal] = useState(0);
+  // A completed job can still carry a note: zero matches, or a provider error
+  // that cut the run short. Neither is a failure, and neither should be silent.
+  const [notice, setNotice] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -141,10 +147,13 @@ function ImportProgressBar({
 
         if (data.status === "done") {
           if (intervalRef.current) clearInterval(intervalRef.current);
+          setNotice(data.error ?? null);
           onComplete(data.records_inserted);
         } else if (data.status === "failed") {
           if (intervalRef.current) clearInterval(intervalRef.current);
-          onError(tr("page.import.api.error.job_failed", "Import job failed"));
+          // The server's reason is operator-facing text, already sanitised.
+          // Fall back only when it did not send one.
+          onError(data.error || tr("page.import.api.error.job_failed", "Import job failed"));
         }
       } catch {
         if (intervalRef.current) clearInterval(intervalRef.current);
@@ -171,6 +180,11 @@ function ImportProgressBar({
           style={{ width: `${pct}%` }}
         />
       </div>
+      {notice && (
+        <p role="status" className="text-xs text-amber-700 dark:text-amber-300">
+          {notice}
+        </p>
+      )}
     </div>
   );
 }

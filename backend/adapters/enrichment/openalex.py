@@ -395,6 +395,7 @@ class OpenAlexAdapter(BaseScientometricAdapter):
 
         collected: List[EnrichedRecord] = []
         cursor = "*"
+        self.last_error = None
 
         while len(collected) < limit:
             per_page = min(self._BULK_PAGE_SIZE, limit - len(collected))
@@ -409,10 +410,15 @@ class OpenAlexAdapter(BaseScientometricAdapter):
 
             try:
                 response = self.client.get(self.BASE_URL, params=params)
-            except Exception:
+            except Exception as exc:
+                # Swallowed so callers degrade rather than crash, but recorded:
+                # an empty or truncated result must not read as a clean success
+                # to the bulk import path — issue #217.
+                self.last_error = f"request failed: {type(exc).__name__}"
                 break
 
             if response.status_code != 200:
+                self.last_error = f"returned HTTP {response.status_code}"
                 break
 
             body = response.json()
