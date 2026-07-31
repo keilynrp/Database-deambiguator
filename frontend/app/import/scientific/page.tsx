@@ -4,6 +4,8 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAssistantContextRegistration } from "@/app/contexts/AssistantContext";
 import { useLanguage } from "@/app/contexts/LanguageContext";
+import { useDomain, type DomainSchema } from "@/app/contexts/DomainContext";
+import { Select } from "../../components/ui";
 
 /* ── Shared types ────────────────────────────────────────────────────── */
 
@@ -40,6 +42,72 @@ async function readJsonOrThrow<T>(response: Response): Promise<T> {
     throw new Error(detail);
   }
   return payload as T;
+}
+
+/* ── Target domain selection ─────────────────────────────────────────── */
+
+const DEFAULT_IMPORT_DOMAIN = "science";
+
+/**
+ * Holds the domain the imported records will be filed under.
+ *
+ * Defaults to `science` — the same value the backend has always applied when
+ * the field is omitted — so an operator who ignores the picker gets exactly
+ * the behaviour they got before it existed. The active workspace domain is
+ * deliberately NOT used as the default: silently redirecting an import based
+ * on which workspace happens to be selected is how records end up somewhere
+ * nobody expects.
+ */
+function useImportDomain() {
+  const { domains } = useDomain();
+  // `null` means "operator has not chosen"; the effective value is derived so
+  // the picker stays correct while /domains is still loading.
+  const [chosen, setChosen] = useState<string | null>(null);
+
+  const fallback = domains.some((d) => d.id === DEFAULT_IMPORT_DOMAIN)
+    ? DEFAULT_IMPORT_DOMAIN
+    : domains[0]?.id ?? DEFAULT_IMPORT_DOMAIN;
+  const domain = chosen && domains.some((d) => d.id === chosen) ? chosen : fallback;
+
+  return { domain, setDomain: setChosen, domains };
+}
+
+function DomainPicker({
+  value,
+  onChange,
+  domains,
+  disabled,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+  domains: DomainSchema[];
+  disabled?: boolean;
+}) {
+  const { t } = useLanguage();
+  const tr = (key: string, fb: string) => { const v = t(key); return v === key ? fb : v; };
+  const selected = domains.find((d) => d.id === value);
+
+  return (
+    <Select
+      label={tr("page.import.api.domain_label", "Target domain")}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled || domains.length === 0}
+      hint={
+        selected?.description
+          ? `${selected.primary_entity} — ${selected.description}`
+          : tr("page.import.api.domain_hint", "Imported records are filed under this domain.")
+      }
+    >
+      {domains.length === 0 ? (
+        <option value={value}>{value}</option>
+      ) : (
+        domains.map((d) => (
+          <option key={d.id} value={d.id}>{d.name}</option>
+        ))
+      )}
+    </Select>
+  );
 }
 
 /* ── Progress Bar component ──────────────────────────────────────────── */
@@ -122,6 +190,7 @@ function OpenAlexTab() {
   const [imported, setImported] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { domain, setDomain, domains } = useImportDomain();
 
   const handleImport = async () => {
     setLoading(true);
@@ -133,7 +202,7 @@ function OpenAlexTab() {
 
       const resp = await apiFetch("/import/openalex", {
         method: "POST",
-        body: JSON.stringify({ query: keyword, limit, filters }),
+        body: JSON.stringify({ query: keyword, limit, filters, domain }),
       });
       const data = await readJsonOrThrow<ImportJobResponse>(resp);
       setJobId(data.job_id);
@@ -229,6 +298,7 @@ function OpenAlexTab() {
               <span>10</span><span>500</span><span>1,000</span>
             </div>
           </div>
+          <DomainPicker value={domain} onChange={setDomain} domains={domains} disabled={loading} />
           <button
             onClick={handleImport}
             disabled={loading || !keyword}
@@ -287,6 +357,7 @@ function PubMedTab() {
   const [imported, setImported] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { domain, setDomain, domains } = useImportDomain();
 
   const handleImport = async () => {
     setLoading(true);
@@ -294,7 +365,7 @@ function PubMedTab() {
     try {
       const resp = await apiFetch("/import/pubmed", {
         method: "POST",
-        body: JSON.stringify({ query, limit }),
+        body: JSON.stringify({ query, limit, domain }),
       });
       const data = await readJsonOrThrow<ImportJobResponse>(resp);
       setJobId(data.job_id);
@@ -364,6 +435,7 @@ function PubMedTab() {
               <span>10</span><span>250</span><span>500</span>
             </div>
           </div>
+          <DomainPicker value={domain} onChange={setDomain} domains={domains} disabled={loading} />
           <button
             onClick={handleImport}
             disabled={loading || !query}
