@@ -69,8 +69,11 @@ class EntityRelationship(Base):
 
     id          = Column(Integer, primary_key=True, index=True)
     org_id      = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
-    source_id   = Column(Integer, ForeignKey("raw_entities.id"), index=True)
-    target_id   = Column(Integer, ForeignKey("raw_entities.id"), index=True)
+    # Derived graph edges: the coauthorship and semantic-keyword engines rewrite
+    # these, so they follow the entity out. Without ondelete the entity itself
+    # becomes undeletable — issue #216.
+    source_id   = Column(Integer, ForeignKey("raw_entities.id", ondelete="CASCADE"), index=True)
+    target_id   = Column(Integer, ForeignKey("raw_entities.id", ondelete="CASCADE"), index=True)
     relation_type = Column(String, index=True)  # cites | authored-by | belongs-to | related-to
     weight      = Column(Float, default=1.0)
     notes       = Column(Text, nullable=True)
@@ -124,7 +127,12 @@ class HarmonizationChangeRecord(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     log_id = Column(Integer, ForeignKey("harmonization_logs.id"), index=True)
-    record_id = Column(Integer, ForeignKey("raw_entities.id"), index=True)
+    # Audit history: SET NULL rather than CASCADE. This row records who changed
+    # which field from what to what, and deleting the entity is precisely what
+    # someone erasing that trail would do. The reference goes; the evidence
+    # stays. Every reader filters by log_id, and the undo path already guards
+    # with `if entity:`, so a null reference is safe — issue #216.
+    record_id = Column(Integer, ForeignKey("raw_entities.id", ondelete="SET NULL"), index=True)
     field = Column(String)
     old_value = Column(Text, nullable=True)
     new_value = Column(Text, nullable=True)
