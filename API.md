@@ -690,6 +690,18 @@ retrieval. What it does control:
 - **Browser fetches** — `/embed/{token}/data` rejects browser requests whose
   `Origin` header is not listed. This is a courtesy filter, not a boundary:
   non-browser clients simply omit the header.
+- **CORS** — the same two public endpoints (`/config` and `/data`) answer with
+  their own `Access-Control-Allow-Origin` derived from `allowed_origins`: `*`
+  when the widget is `*`, otherwise the requesting origin plus `Vary: Origin`.
+  They never send `Access-Control-Allow-Credentials`, because no cookie or
+  session is involved. `/snippet` gets no CORS header — an operator copies it
+  out of the UKIP UI, a customer page never fetches it.
+
+  Without this the JS snippet cannot work anywhere: the global CORS config lists
+  UKIP's own origins, so a customer's browser discards an otherwise valid 200 and
+  the widget renders "Widget unavailable". This grants a browser only what `curl`
+  already has, which is why it is consistent with "the token is the credential"
+  rather than an exception to it.
 
 Treat the token like a public URL: rotate it (delete + recreate the widget) if
 it leaks somewhere you did not intend.

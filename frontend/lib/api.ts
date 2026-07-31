@@ -12,10 +12,13 @@ export const API_BASE =
     ? DIRECT_URL          // server-side: call backend directly
     : "/api/backend";     // browser: route through Next.js proxy (same-origin)
 
+import { isPublicRoute } from "./publicRoutes";
+
 /**
  * Authenticated fetch wrapper.
  * - Reads the Bearer token from localStorage (key: "ukip_token") and attaches it.
- * - On HTTP 401, clears the stored token and redirects to /login.
+ * - On HTTP 401, clears the stored token and redirects to /login — but only on a
+ *   page that requires a session. See the note on the 401 branch below.
  */
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = typeof window !== "undefined" ? localStorage.getItem("ukip_token") : null;
@@ -41,12 +44,22 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
     throw new Error(`Cannot connect to backend at ${API_BASE}. Is the server running?`);
   }
 
-  if (response.status === 401 && typeof window !== "undefined") {
+  // A 401 means "this page needs a session it does not have" — on a page that
+  // needs one. On a public page it means a background provider call (branding,
+  // enrichment stats) was answered for an anonymous visitor, which is expected
+  // and not a reason to navigate anywhere.
+  //
+  // Without this guard the assignment below is a hard navigation that no route
+  // guard can veto: it is why /embed/{token} bounced to /login even after the
+  // shell allowlisted it, and why a customer's iframe showed a broken document.
+  // /catalogs/{slug} had the same hole.
+  if (
+    response.status === 401 &&
+    typeof window !== "undefined" &&
+    !isPublicRoute(window.location.pathname)
+  ) {
     localStorage.removeItem("ukip_token");
-    // Avoid redirect loop if already on /login
-    if (!window.location.pathname.startsWith("/login")) {
-      window.location.href = "/login";
-    }
+    window.location.href = "/login";
   }
 
   return response;

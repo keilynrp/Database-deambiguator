@@ -212,6 +212,13 @@ services:
         condition: service_healthy
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.ukip.inbounduxd.com}
+      # middleware.ts fetches /embed/{token}/config server-side to build
+      # frame-ancestors. Declared explicitly so that call stays on the internal
+      # network: without it API_BASE falls back to NEXT_PUBLIC_API_URL and the
+      # request leaves the network and comes back through the public hostname,
+      # which works only while egress and public DNS both do — and fails closed
+      # to frame-ancestors 'none' the moment either does not.
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://ukip-backend:8000}
     expose:
       - "3004"
 

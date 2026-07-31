@@ -323,8 +323,51 @@ def _record_view(w: models.EmbedWidget, db: Session) -> None:
     db.commit()
 
 
+#: Marks a response as an embed response, for the middleware in main.py that
+#: strips the global ``Access-Control-Allow-Credentials`` afterwards. The header
+#: cannot be removed here: CORSMiddleware runs outside the route and does an
+#: unconditional ``headers.update(simple_headers)`` on every request carrying an
+#: Origin, so whatever the route sets it re-adds. Removed before the response
+#: leaves, so no client ever sees it.
+EMBED_CORS_MARKER = "X-UKIP-Embed-CORS"
+
+
+def _apply_embed_cors(response: Response, w: models.EmbedWidget, request: Request) -> None:
+    """Emit the widget's own CORS policy on a public embed endpoint.
+
+    The global CORS middleware answers from ``ALLOWED_ORIGINS`` — UKIP's own app
+    origins — and a real embedder is never in that list, so without this the
+    browser discards a 200 and the customer's page reads "Widget unavailable".
+
+    This grants a browser exactly what every other client already has: these
+    endpoints are unauthenticated and public, and ``curl`` reads them from
+    anywhere with no Origin header at all. The credential is the token in the
+    path. See design decision 5 in the change.
+    """
+    response.headers[EMBED_CORS_MARKER] = "1"
+
+    allowed = (w.allowed_origins or "*").strip()
+    if allowed == "*":
+        # A literal wildcard does not vary, so it stays cacheable.
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        return
+
+    origin = request.headers.get("origin", "")
+    permitted = [o.strip() for o in allowed.split(",") if o.strip()]
+    if origin and origin in permitted:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        # Mandatory: the value varies by request, and there is a cache in front.
+        # Without it one customer's ACAO can be served to another customer.
+        response.headers.append("Vary", "Origin")
+
+
 @router.get("/embed/{token}/config")
-def embed_config(token: str, db: Session = Depends(get_db)):
+def embed_config(
+    token: str,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
     """Public — returns widget metadata (name, type, config) without auth.
 
     ``allowed_origins`` is included so the frontend embed page can emit its
@@ -332,6 +375,7 @@ def embed_config(token: str, db: Session = Depends(get_db)):
     *frame* the widget, and the widget is public to anyone holding the token.
     """
     w = _get_active_widget(token, db)
+    _apply_embed_cors(response, w, request)
     return {
         "name": w.name,
         "widget_type": w.widget_type,
@@ -341,19 +385,28 @@ def embed_config(token: str, db: Session = Depends(get_db)):
 
 
 @router.get("/embed/{token}/data")
-def embed_data(token: str, request: Request, db: Session = Depends(get_db)):
+def embed_data(
+    token: str,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
     """
     Public — returns live widget data without auth.
     Validates Origin header against allowed_origins when not '*'.
     """
     w = _get_active_widget(token, db)
 
-    # Origin check
+    # Origin check. Note what this is and is not: a request that omits Origin
+    # passes, and every non-browser client omits it. So this is a browser-facing
+    # policy, not an access boundary — the token is the credential.
     if w.allowed_origins and w.allowed_origins.strip() != "*":
         origin = request.headers.get("origin", "")
         allowed = [o.strip() for o in w.allowed_origins.split(",") if o.strip()]
         if origin and origin not in allowed:
             raise HTTPException(status_code=403, detail="Origin not allowed")
+
+    _apply_embed_cors(response, w, request)
 
     cfg = json.loads(w.config or "{}")
     provider = _DATA_PROVIDERS.get(w.widget_type)

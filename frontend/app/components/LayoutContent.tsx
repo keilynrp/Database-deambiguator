@@ -9,6 +9,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useAssistant } from "../contexts/AssistantContext";
 import { AppShell, PageShell } from "./layout";
 import { UKIPAssistantPanel } from "./ukip";
+import { isPublicRoute, isStandaloneRoute } from "../../lib/publicRoutes";
 
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
   const { collapsed } = useSidebar();
@@ -17,15 +18,18 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const router = useRouter();
 
-  const isLoginPage = pathname === "/login";
-  const isPublicCatalogRoute = pathname.startsWith("/catalogs/") && pathname !== "/catalogs";
+  // Both allowlists live in lib/publicRoutes so they are named, tested things.
+  // /embed/{token} was missing from the inline version, which is why an
+  // anonymous visitor to a customer's iframe landed on /login.
+  const isPublic = isPublicRoute(pathname);
+  const isStandalone = isStandaloneRoute(pathname);
 
   useEffect(() => {
     if (!hydrated) return;
-    if (!isAuthenticated && !isLoginPage && !isPublicCatalogRoute) {
+    if (!isAuthenticated && !isPublic) {
       router.replace("/login");
     }
-  }, [hydrated, isAuthenticated, isLoginPage, isPublicCatalogRoute, router]);
+  }, [hydrated, isAuthenticated, isPublic, router]);
 
   // Block ALL rendering until auth state is resolved from localStorage.
   // Server renders null, client hydration also renders null (hydrated starts false),
@@ -34,12 +38,14 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     return null;
   }
 
-  // Login page renders without the shell (no sidebar / header)
-  if (isLoginPage) {
+  // Login and embed pages render without the shell (no sidebar / header). For an
+  // embed this holds even with a session: the document gets framed at 480x320 by
+  // a third party, and the operator previewing it must see what the customer sees.
+  if (isStandalone) {
     return <>{children}</>;
   }
 
-  if (isPublicCatalogRoute && !isAuthenticated) {
+  if (isPublic && !isAuthenticated) {
     return <>{children}</>;
   }
 
