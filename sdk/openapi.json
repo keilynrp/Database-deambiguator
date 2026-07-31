@@ -5334,6 +5334,17 @@
       },
       "ImportStatusResponse": {
         "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
           "job_id": {
             "title": "Job Id",
             "type": "string"

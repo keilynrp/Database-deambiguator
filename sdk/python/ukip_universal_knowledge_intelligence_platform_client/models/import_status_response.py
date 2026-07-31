@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -17,6 +17,7 @@ class ImportStatusResponse:
     Attributes:
         job_id (str):
         status (str):
+        error (None | str | Unset):
         progress (float | Unset):  Default: 0.0.
         records_inserted (int | Unset):  Default: 0.
         total (int | Unset):  Default: 0.
@@ -24,6 +25,7 @@ class ImportStatusResponse:
 
     job_id: str
     status: str
+    error: None | str | Unset = UNSET
     progress: float | Unset = 0.0
     records_inserted: int | Unset = 0
     total: int | Unset = 0
@@ -33,6 +35,12 @@ class ImportStatusResponse:
         job_id = self.job_id
 
         status = self.status
+
+        error: None | str | Unset
+        if isinstance(self.error, Unset):
+            error = UNSET
+        else:
+            error = self.error
 
         progress = self.progress
 
@@ -48,6 +56,8 @@ class ImportStatusResponse:
                 "status": status,
             }
         )
+        if error is not UNSET:
+            field_dict["error"] = error
         if progress is not UNSET:
             field_dict["progress"] = progress
         if records_inserted is not UNSET:
@@ -64,6 +74,15 @@ class ImportStatusResponse:
 
         status = d.pop("status")
 
+        def _parse_error(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        error = _parse_error(d.pop("error", UNSET))
+
         progress = d.pop("progress", UNSET)
 
         records_inserted = d.pop("records_inserted", UNSET)
@@ -73,6 +92,7 @@ class ImportStatusResponse:
         import_status_response = cls(
             job_id=job_id,
             status=status,
+            error=error,
             progress=progress,
             records_inserted=records_inserted,
             total=total,
