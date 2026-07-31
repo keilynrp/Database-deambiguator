@@ -3,22 +3,28 @@
 - [x] 1.1 Enumerate every candidate user-facing string literal in `backend/` (excluding `tests/`, `alembic/`), recording file, line and text — 127 candidates, extractor kept at `extract_candidates.js`
 - [x] 1.2 Classify each candidate by hand as `label`, `operator-message`, `email`, `analysis-prose`, or `false-positive` — see `inventory.md`
 - [x] 1.3 Commit the classified inventory to the change directory as the migration's worklist, with per-category counts
-- [ ] 1.4 Confirm with the product owner that everything classified `analysis-prose` is staying English, since that is the boundary the whole scope rests on
+- [x] 1.4 Confirm with the product owner that everything classified `analysis-prose` is staying English, since that is the boundary the whole scope rests on — **answered 2026-07-31: only 6 of the 22 stay English.** The other 16 interpolate nothing and are localised like any other label
 
-Two findings from 1.2 change the plan; both are recorded in `inventory.md`:
+Three findings from 1.2 change the plan; all are recorded in `inventory.md`:
 
-- **`analysis-prose` means convert to English, not skip.** Those 22 strings are Spanish today, so honouring "analysis stays English" is work, not an exemption. The exact string reported in #209 is one of them, which makes the headline bug fixable independently of the catalog — see phase 1b.
+- **`analysis-prose` means convert to English, not skip.** Those strings are Spanish today, so honouring "analysis stays English" is work, not an exemption. The exact string reported in #209 is one of them, which makes the headline bug fixable independently of the catalog — see phase 1b.
 - **14 Spanish strings must be preserved verbatim.** `field_correspondence.py` and `backfill_canonical_id_entity_type.py` hold input-matching aliases that let users upload Spanish spreadsheets. Migrating them would break Spanish CSV imports. Both earlier counts included them.
+- **The `analysis-prose` boundary was drawn by module, not by property.** Asking 1.4 forced a reading of all 22 strings, and only 6 embed English data — the condition the "stays English" argument actually rests on. The other 16 are fixed sentences that were classified together merely for sharing a file. They move to the catalog (phase 6), and phase 1b shrinks accordingly.
 
 ## 1b. Fix the reported symptom first
 
 Independent of the catalog, and shippable on its own.
 
+Scope is the **6 data-composing strings only** (see inventory correction 3). The 16 static
+sentences that used to sit in this phase are catalog work and moved to phase 6 — converting
+them to English here would be writing text this change then replaces.
+
 - [ ] 1b.1 Write a failing test asserting no Spanish appears in an English-generated report's Hidden Patterns section
-- [ ] 1b.2 Convert the 10 `services/pattern_discovery.py` strings to English, preserving every interpolation argument
-- [ ] 1b.3 Convert the 10 `services/impact_projection.py` strings to English
-- [ ] 1b.4 Convert `services/researcher_topic_analytics.py` lines 276 and 278
-- [ ] 1b.5 Generate a real report and read it — this defect was found by reading output, not by a test
+- [ ] 1b.2 Convert the 4 composed `services/pattern_discovery.py` strings to English, preserving every interpolation argument
+- [ ] 1b.3 Convert `services/researcher_topic_analytics.py` lines 276 and 278
+- [ ] 1b.4 Generate a real report and read it — this defect was found by reading output, not by a test
+
+`services/impact_projection.py` is deliberately absent: all ten of its strings are static, so it contributes nothing here and appears in phase 6 instead.
 
 ## 2. Catalog projection
 
@@ -55,8 +61,8 @@ Ordered by count so the largest surfaces land first; each module is independentl
 - [ ] 6.1 `services/domain_neutral_labels.py`
 - [ ] 6.2 `services/audience_presets.py`
 - [ ] 6.3 `enrichment_worker.py`
-- [ ] 6.4 `services/impact_projection.py`
-- [ ] 6.5 `services/pattern_discovery.py` — labels only; the composed pattern sentences stay English
+- [ ] 6.4 `services/impact_projection.py` — all 10 strings, including the static recommendations reclassified in correction 3
+- [ ] 6.5 `services/pattern_discovery.py` — the 6 static strings; the 4 composed sentences were converted to English in 1b and take no key
 - [ ] 6.6 `services/field_correspondence.py`
 - [ ] 6.7 `routers/dashboards.py`, `analyzers/correlation.py`, `services/researcher_topic_analytics.py`
 - [ ] 6.8 Remaining single-string modules from the inventory
