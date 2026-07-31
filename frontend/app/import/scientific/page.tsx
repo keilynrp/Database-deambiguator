@@ -181,7 +181,7 @@ function ImportProgressBar({
         />
       </div>
       {notice && (
-        <p role="status" className="text-xs text-amber-700 dark:text-amber-300">
+        <p role="status" className="text-xs text-[var(--ukip-warning)]">
           {notice}
         </p>
       )}
