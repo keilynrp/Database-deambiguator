@@ -10,10 +10,10 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Dict, List, Optional
+from typing import Annotated, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend import models
@@ -21,6 +21,7 @@ from backend.adapters.enrichment.openalex import OpenAlexAdapter
 from backend.adapters.enrichment.pubmed import PubMedAdapter
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
+from backend.schema_registry import registry
 from backend.schemas_enrichment import EnrichedRecord
 from backend.tenant_access import persisted_org_id, resolve_request_org_id
 
@@ -146,18 +147,36 @@ def _ingest_records(
 # ---------------------------------------------------------------------------
 
 
+def _must_be_registered_domain(value: str) -> str:
+    """Reject domains the schema registry does not know about.
+
+    ``RawEntity.domain`` is written verbatim from the payload and never
+    re-derived, so an unvalidated value silently produces records that no
+    schema, facet, dashboard, or report can reach.
+    """
+    if registry.get_domain(value) is None:
+        available = ", ".join(sorted(registry.domains)) or "(none registered)"
+        raise ValueError(
+            f"Unknown domain {value!r}. Available domains: {available}."
+        )
+    return value
+
+
+RegisteredDomain = Annotated[str, AfterValidator(_must_be_registered_domain)]
+
+
 class OpenAlexImportRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=500)
     limit: int = Field(default=100, ge=1, le=1000)
     filters: Optional[Dict[str, str]] = None
-    domain: str = Field(default="science")
+    domain: RegisteredDomain = Field(default="science")
     preview: bool = False
 
 
 class PubMedImportRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=500)
     limit: int = Field(default=100, ge=1, le=500)
-    domain: str = Field(default="science")
+    domain: RegisteredDomain = Field(default="science")
     preview: bool = False
 
 
