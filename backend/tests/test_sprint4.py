@@ -48,12 +48,20 @@ def test_top_k_100_is_rejected():
 
 # ── database.py env var wiring ────────────────────────────────────────────────
 
-def test_test_env_uses_sqlite_but_production_default_is_postgres():
-    """In the test env the module URL is SQLite (conftest sets DATABASE_URL),
-    but the production default (no DATABASE_URL) is now PostgreSQL."""
+def test_test_env_follows_db_mode_but_production_default_is_postgres():
+    """The test URL follows UKIP_DB_MODE; the production default is PostgreSQL.
+
+    The first assertion used to hardcode `"sqlite" in ...`, so running the suite
+    against PostgreSQL — the dialect production actually uses — failed here.
+    The claim worth keeping is that the *default* (no DATABASE_URL) is Postgres.
+    """
+    import os
+
     from backend import database
     from backend.db_config import default_database_url
-    assert "sqlite" in database.SQLALCHEMY_DATABASE_URL  # test env
+
+    expected = "postgresql" if os.environ.get("UKIP_DB_MODE", "sqlite").lower() == "postgres" else "sqlite"
+    assert expected in database.SQLALCHEMY_DATABASE_URL
     assert default_database_url().startswith("postgresql")  # production default
 
 

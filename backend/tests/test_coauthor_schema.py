@@ -15,7 +15,11 @@ def db():
     # The conftest uses StaticPool (single shared connection), so we must
     # restore the default OFF state after the test to avoid affecting other
     # tests that depend on relaxed FK behavior during cleanup.
-    s.execute(text("PRAGMA foreign_keys=ON"))
+    # PostgreSQL enforces them natively and rejects PRAGMA outright, so the
+    # workaround is applied only where it is needed.
+    is_sqlite = s.bind.dialect.name == "sqlite"
+    if is_sqlite:
+        s.execute(text("PRAGMA foreign_keys=ON"))
     try:
         yield s
     finally:
@@ -35,8 +39,9 @@ def db():
             s.commit()
         except Exception:
             s.rollback()
-        s.execute(text("PRAGMA foreign_keys=OFF"))
-        s.commit()
+        if is_sqlite:
+            s.execute(text("PRAGMA foreign_keys=OFF"))
+            s.commit()
         s.close()
 
 
