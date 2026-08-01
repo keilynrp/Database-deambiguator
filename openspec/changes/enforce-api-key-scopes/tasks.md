@@ -94,8 +94,59 @@ change):
 
 ## 6. Rollout (operator, post-merge — not part of the PR)
 
-- [ ] 6.1 Deploy with the flag at `0`.
-- [ ] 6.2 Observe ≥7 days; query audit for `api_key.scope_violation`.
-- [ ] 6.3 Contact owners of any violating key; widen the key's scopes or fix the
-      integration.
+- [x] 6.1 Deploy with the flag at `0`. Confirmed live: `/health.features`
+      reports `api_key_scopes_enforced: false`.
+- [x] 6.2 Observe ≥7 days; query audit for `api_key.scope_violation`.
+      Closed by positive control rather than by waiting, because waiting could
+      not have produced an answer — see below.
+- [x] 6.3 Contact owners of any violating key; widen the key's scopes or fix
+      the integration. Vacuous: there are no violating keys.
 - [ ] 6.4 Flip `UKIP_API_KEY_SCOPES_ENFORCED=1`; confirm `/health.features`.
+      Operator decision. Evidence is complete and the residual risk is named
+      under "Residual risk" below.
+
+### What 6.2 actually found (2026-08-01)
+
+`scripts/check_api_key_scope_violations.py` reported **no violations**. That
+result on its own is not a green light: an empty window has three possible
+causes, and querying the audit cannot tell them apart.
+
+1. no key was used outside its scopes — the hoped-for reading
+2. no key was used at all
+3. the recording path is broken and would never have written anything
+
+Cause 2 was confirmed against the production database:
+
+```
+keys_total_all: 3      ever_used: 0        (of the active keys)
+   keys_active: 1   used_last_7d: 0
+                 most_recent_use: 2026-07-31 04:38   (an inactive key)
+```
+
+The single active key has **never been used**. So no amount of further waiting
+would have produced an observation: there was no traffic to observe.
+
+Cause 3 was then ruled out with a positive control (`--probe`): a throwaway
+read-scoped key made one write attempt, the expected
+`api_key.scope_violation` was recorded (`required=write granted=['read']
+enforced=False`), and the key was revoked. The mechanism works in production.
+
+With causes 2 and 3 both settled, the empty window means what it appears to
+mean.
+
+### Residual risk
+
+The one active key grants `read, write` but not `admin`. If its owner intends
+to call an administrative route (`/users`, `/organizations`, `/stores`,
+`/webhooks`, `/workflows`, `/ops`, `/settings/auth`), flipping the flag turns
+that into a 403. The key has never been used, so its intent is unknowable from
+here. This is small, but it is the whole of what 6.4 risks.
+
+### Gap found while doing this
+
+There is no admin-wide API key listing endpoint: `GET /api-keys` filters by
+`user_id == current_user.id`, so not even a `super_admin` can enumerate other
+users' keys over the API. Answering "was there traffic?" globally required a
+direct database query. It happened not to matter here — all three keys belong
+to the authenticating user, so the partial view was the whole view — but that
+was luck, not design.
