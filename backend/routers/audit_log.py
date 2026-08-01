@@ -8,7 +8,7 @@ import csv
 import io
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -54,7 +54,10 @@ def _base_query(
 ):
     q = db.query(models.AuditLog)
     if action:
-        q = q.filter(models.AuditLog.action == action.upper())
+        # Case-insensitive: most actions are upper case (CREATE, ASSISTANT_ACTION)
+        # but not all — `api_key.scope_violation` is written lower case, and
+        # upper-casing the argument made it permanently unfindable.
+        q = q.filter(func.lower(models.AuditLog.action) == action.lower())
     if resource_type:
         q = q.filter(models.AuditLog.entity_type == resource_type)
     if username:
@@ -156,15 +159,25 @@ def audit_stats(
         .all()
     ]
 
-    # Last 7 days — daily counts
-    from sqlalchemy import text as _text
-    daily_rows = db.execute(_text(
-        "SELECT DATE(created_at) AS day, COUNT(*) AS cnt "
-        "FROM audit_logs "
-        "WHERE created_at >= DATE('now', '-6 days') "
-        "GROUP BY day ORDER BY day"
-    )).fetchall()
-    last_7_days = [{"date": str(r[0]), "count": r[1]} for r in daily_rows]
+    # Last 7 days — daily counts.
+    # Built from ORM constructs rather than raw SQL: the previous literal used
+    # SQLite-only date arithmetic (`DATE('now', '-6 days')`) and was a 500 on the
+    # PostgreSQL production runs. `func.date()` is valid on both dialects.
+    cutoff = (
+        datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0, tzinfo=None
+        )
+        - timedelta(days=6)
+    )
+    day = func.date(models.AuditLog.created_at)
+    daily_rows = (
+        db.query(day.label("day"), func.count(models.AuditLog.id).label("cnt"))
+        .filter(models.AuditLog.created_at >= cutoff)
+        .group_by(day)
+        .order_by(day)
+        .all()
+    )
+    last_7_days = [{"date": str(r.day), "count": r.cnt} for r in daily_rows]
 
     return {
         "total":       total,
