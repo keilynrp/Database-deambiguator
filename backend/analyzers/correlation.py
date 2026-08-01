@@ -9,6 +9,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from sqlalchemy import text
 
 from backend.database import engine
 from backend.schema_registry import registry
@@ -123,7 +124,11 @@ class CorrelationAnalyzer:
             sql = f"SELECT {cols_sql} FROM raw_entities"  # noqa: S608
             if where_clauses:
                 sql += " WHERE " + " AND ".join(where_clauses)
-            df = pd.read_sql(sql, conn, params=params)
+            # text() so SQLAlchemy compiles the :named params for the active
+            # dialect. Passed as a bare string, pandas hands it to the DBAPI
+            # unchanged: ":name" is SQLite's native paramstyle and binds, while
+            # psycopg2 wants "%(name)s" and reports a syntax error at the colon.
+            df = pd.read_sql(text(sql), conn, params=params)
 
         n_entities = len(df)
 

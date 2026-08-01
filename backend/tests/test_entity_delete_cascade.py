@@ -39,7 +39,11 @@ from backend.database import SessionLocal
 @pytest.fixture
 def fk_db():
     s = SessionLocal()
-    s.execute(text("PRAGMA foreign_keys=ON"))
+    # The pragma is a SQLite workaround, so only SQLite gets it: PostgreSQL
+    # enforces foreign keys natively and rejects `PRAGMA` as a syntax error.
+    is_sqlite = s.bind.dialect.name == "sqlite"
+    if is_sqlite:
+        s.execute(text("PRAGMA foreign_keys=ON"))
     try:
         yield s
     finally:
@@ -51,8 +55,9 @@ def fk_db():
             s.commit()
         except Exception:
             s.rollback()
-        s.execute(text("PRAGMA foreign_keys=OFF"))
-        s.commit()
+        if is_sqlite:
+            s.execute(text("PRAGMA foreign_keys=OFF"))
+            s.commit()
         s.close()
 
 
@@ -70,6 +75,10 @@ def _entity(db, label: str) -> models.RawEntity:
 def test_foreign_keys_are_actually_enforced(fk_db):
     """Guard the guard. If this fails, every assertion below is vacuous and the
     suite is silently not testing foreign keys at all."""
+    if fk_db.bind.dialect.name != "sqlite":
+        # PostgreSQL enforces foreign keys unconditionally; there is no switch
+        # to read back, and nothing to guard against.
+        pytest.skip("foreign keys are always enforced on this dialect")
     result = fk_db.execute(text("PRAGMA foreign_keys")).scalar()
     assert result == 1, "FK enforcement is off — the cascade assertions prove nothing"
 

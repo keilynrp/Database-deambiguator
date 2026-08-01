@@ -1,7 +1,11 @@
 """
 Sprint 94 — PostgreSQL Hardening tests.
 
-All tests run against the in-memory SQLite DB (standard UKIP test practice).
+Tests run against whichever dialect `UKIP_DB_MODE` selects — in-memory SQLite by
+default, PostgreSQL in CI and when checking production parity. The dialect
+assertions below follow that setting instead of assuming SQLite, which is the
+whole point of a hardening suite.
+
 They verify:
   - database.py sets correct engine kwargs per dialect
   - search.py dialect flag is derived correctly
@@ -22,13 +26,22 @@ from fastapi.testclient import TestClient
 from backend import models
 from backend.database import SQLALCHEMY_DATABASE_URL
 
+# Which dialect this run is meant to exercise. Mirrors conftest.
+_EXPECT_POSTGRES = os.environ.get("UKIP_DB_MODE", "sqlite").lower() == "postgres"
+
 
 # ── 1. Database engine configuration ─────────────────────────────────────────
 
 class TestDatabaseConfig:
-    def test_sqlite_url_detected(self):
-        """Test DB starts as sqlite in test env."""
-        assert SQLALCHEMY_DATABASE_URL.startswith("sqlite")
+    def test_url_matches_the_configured_dialect(self):
+        """The module URL follows UKIP_DB_MODE rather than being assumed SQLite.
+
+        This asserted `startswith("sqlite")` unconditionally, which encoded the
+        very assumption we are trying to remove: it fails against PostgreSQL for
+        being right about the dialect.
+        """
+        expected = "postgresql" if _EXPECT_POSTGRES else "sqlite"
+        assert SQLALCHEMY_DATABASE_URL.startswith(expected)
 
     def test_pg_url_branch_in_database_py(self):
         """database.py source must contain pool_size / pool_pre_ping for PG branch."""
@@ -37,20 +50,30 @@ class TestDatabaseConfig:
         assert "pool_pre_ping" in src
         assert "check_same_thread" in src  # SQLite branch also present
 
-    def test_sqlite_no_pool_kwargs(self):
-        """SQLite branch uses connect_args, not pool_size."""
-        # If we're here, the test DB is sqlite — just verify the module flag
-        from backend.database import SQLALCHEMY_DATABASE_URL as url
-        is_sqlite = url.startswith("sqlite")
-        assert is_sqlite  # tests always use sqlite
+    def test_engine_pooling_matches_the_dialect(self):
+        """SQLite gets connect_args and no pool sizing; PostgreSQL gets the pool.
+
+        The old version asserted only `url.startswith("sqlite")` — a restatement
+        of its own premise that never looked at the engine it claimed to check.
+        """
+        from backend.database import engine
+
+        if _EXPECT_POSTGRES:
+            assert engine.pool.size() > 0
+        else:
+            # SQLite pools carry no configurable size; the branch sets
+            # connect_args={"check_same_thread": False} instead.
+            assert engine.dialect.name == "sqlite"
+            assert "check_same_thread" in str(engine.dialect.create_connect_args(engine.url))
 
 
 # ── 2. Search router dialect flag ─────────────────────────────────────────────
 
 class TestSearchDialect:
-    def test_is_sqlite_flag_true_in_tests(self):
+    def test_is_sqlite_flag_agrees_with_the_url(self):
+        """The router's dialect flag must track the URL, either way."""
         from backend.routers.search import _IS_SQLITE
-        assert _IS_SQLITE is True  # tests run on sqlite
+        assert _IS_SQLITE is (not _EXPECT_POSTGRES)
 
     def test_fts_query_produces_quoted_tokens(self):
         from backend.routers.search import _fts_query

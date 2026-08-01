@@ -74,8 +74,15 @@ def override_get_db():
 
 # ── Create tables ───────────────────────────────────────────────────────────
 if _IS_POSTGRES:
-    # Drop all existing tables and recreate for a clean slate each test run.
-    models.Base.metadata.drop_all(bind=test_engine)
+    # Clean slate each run. Drop the *schema*, not the tables: `organizations`
+    # and `users` reference each other, and `metadata.drop_all()` cannot order
+    # the DROPs around that cycle — it raises CircularDependencyError before a
+    # single test runs, so the suite only ever worked against a brand-new
+    # database. CI got one per run and never noticed; locally it made the whole
+    # PostgreSQL mode single-shot.
+    with test_engine.begin() as _reset_conn:
+        _reset_conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+        _reset_conn.execute(text("CREATE SCHEMA public"))
 
 models.Base.metadata.create_all(bind=test_engine)
 
