@@ -214,9 +214,11 @@ _ensure_test_admin()
 #           *read* scope (`scope_query_to_org`) and never writes it to a column,
 #           so materialising it here masks no production constraint issue; the
 #           journal-scope test does write it, which PostgreSQL then checks.
-#   99999 — "not the editor's org" in the background-job tenant tests; the point
-#           is that it is a *different* tenant, which still has to exist for the
-#           foreign key to accept the row
+# 99999 is deliberately NOT seeded: `test_sprint85` asserts that fetching and
+# switching to org 99999 returns 404, so it has to stay nonexistent. Seeding it
+# turned those two into 200s — caught only by the full suite, after the affected
+# files alone had gone green. A test needing "a different tenant" must use a
+# seeded id; the background-job tenant tests now use 42.
 #
 # The grep below must include the minus sign — a first pass matched `[0-9]+`
 # only, missed -1, and left exactly one test failing.
@@ -224,7 +226,7 @@ _ensure_test_admin()
 # A test that introduces a new literal org id must add it here. That coupling is
 # the price of not rewriting 41 call sites; the alternative is a fixture per
 # file, which duplicates this list eight times instead.
-_CANONICAL_ORG_IDS = (-1, 0, 1, 2, 5, 7, 9, 12, 42, 99, 99999)
+_CANONICAL_ORG_IDS = (-1, 0, 1, 2, 5, 7, 9, 12, 42, 99)
 _ORG_OWNER_USERNAME = "canonical-org-owner"
 
 

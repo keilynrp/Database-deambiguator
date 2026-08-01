@@ -77,7 +77,7 @@ def test_completed_job_is_not_redelivered(db_session):
 # ── 5.2 cross-tenant, replay, error-metadata isolation ──────────────────────
 
 def test_cross_tenant_job_is_not_visible(client, editor_headers, db_session):
-    job = _enqueue(db_session, key="foreign", org_id=99999)  # not the editor's org
+    job = _enqueue(db_session, key="foreign", org_id=42)  # a real tenant, not the editor's
     # Read path: tenant scoping hides the foreign job entirely.
     assert client.get(f"/jobs/{job.job_id}", headers=editor_headers).status_code == 404
     # Mutating path: denied (403 by role or 404 by scope) — either way, no transition.
