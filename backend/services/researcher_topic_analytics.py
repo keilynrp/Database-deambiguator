@@ -273,9 +273,9 @@ def _executive_summary(
         "total_citations": total_citations,
         "top_researcher": top,
         "headline": (
-            f"{top['name']} lidera la evidencia sobre {topic} con score {top['topic_score']}."
+            f"{top['name']} leads the evidence on {topic} with score {top['topic_score']}."
             if top
-            else f"No hay suficiente evidencia para mapear investigadores sobre {topic}."
+            else f"Not enough evidence to map researchers on {topic}."
         ),
         "stakeholder_value": (
             "Mapa accionable de expertos y colaboraciones listo para briefing."

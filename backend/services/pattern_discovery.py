@@ -172,7 +172,7 @@ class PatternDiscoveryService:
             patterns.append({
                 "id": f"semantic_cluster:{cls._slug(concept)}",
                 "type": "semantic_cluster",
-                "label": f"Concentración temática: {concept}",
+                "label": f"Thematic concentration: {concept}",
                 "confidence": cls._confidence(score),
                 "impact_score": score,
                 "evidence": f"{count:,} registros comparten este concepto dentro del portafolio analizado.",
@@ -212,7 +212,7 @@ class PatternDiscoveryService:
             "label": "Output de impacto atípico",
             "confidence": cls._confidence(score),
             "impact_score": score,
-            "evidence": f"{lead.primary_label or 'Este registro'} supera claramente la línea base de citas del portafolio ({citations:,} citas).",
+            "evidence": f"{lead.primary_label or 'This record'} clearly exceeds the portfolio citation baseline ({citations:,} citations).",
             "entities": [cls._entity_ref(lead)],
             "recommended_action": "Usarlo como ancla del brief y revisar manualmente su contexto institucional.",
         }]
@@ -263,7 +263,7 @@ class PatternDiscoveryService:
             "label": "Dependencia fuerte de una fuente",
             "confidence": cls._confidence(score),
             "impact_score": score,
-            "evidence": f"{provider} concentra {round(share * 100)}% de los registros analizados.",
+            "evidence": f"{provider} accounts for {round(share * 100)}% of the records analysed.",
             "entities": [],
             "recommended_action": "Comparar con fuentes complementarias para reducir sesgo de cobertura.",
         }]
@@ -335,7 +335,7 @@ class PatternDiscoveryService:
             "label": "Entidad puente en el grafo",
             "confidence": cls._confidence(score),
             "impact_score": score,
-            "evidence": f"{leader.primary_label or 'Esta entidad'} concentra {leader_degree} relaciones; la relación dominante es {dominant_relation}.",
+            "evidence": f"{leader.primary_label or 'This entity'} concentrates {leader_degree} relationships; the dominant relation is {dominant_relation}.",
             "entities": [cls._entity_ref(leader)],
             "recommended_action": "Inspeccionar esta entidad como puente entre comunidades, autores o temas.",
         }]

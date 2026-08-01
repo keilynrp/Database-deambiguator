@@ -19,10 +19,31 @@ Scope is the **6 data-composing strings only** (see inventory correction 3). The
 sentences that used to sit in this phase are catalog work and moved to phase 6 — converting
 them to English here would be writing text this change then replaces.
 
-- [ ] 1b.1 Write a failing test asserting no Spanish appears in an English-generated report's Hidden Patterns section
-- [ ] 1b.2 Convert the 4 composed `services/pattern_discovery.py` strings to English, preserving every interpolation argument
-- [ ] 1b.3 Convert `services/researcher_topic_analytics.py` lines 276 and 278
-- [ ] 1b.4 Generate a real report and read it — this defect was found by reading output, not by a test
+- [x] 1b.1 Failing test written first — `test_report_language_hidden_patterns.py`, 6 tests, one per
+      composed string, RED 6/6 before the conversions. **Scoped to the composed strings, not the
+      section.** The task as written ("no Spanish appears in the section") is a phase-6 assertion:
+      the static sentences in the same modules are still Spanish by design until 6.4–6.7, so that
+      test would be red for reasons this phase does not own. It belongs at 6.9 and is noted there.
+- [x] 1b.2 Converted the 4 composed `services/pattern_discovery.py` strings, every interpolation
+      argument preserved: semantic cluster label (175), impact-outlier evidence (215), provider-gap
+      evidence (266), collaboration-bridge evidence (338).
+- [x] 1b.3 Converted `services/researcher_topic_analytics.py` 276 and 278 (both branches of the
+      headline conditional).
+- [x] 1b.4 Rendered the real section and read it. **The headline symptom is gone** —
+      `Concentración temática: knowledge graph` now reads `Thematic concentration: knowledge graph`.
+
+Two things the reading showed that the tests did not:
+
+- **1b makes the mixing more visible before phase 6 removes it.** A single table row now reads
+  `Output de impacto atípico | Graph Learning for Research Intelligence clearly exceeds the
+  portfolio citation baseline (420 citations). | Usarlo como ancla del brief…` — Spanish label,
+  English evidence, Spanish action. That is the correct intermediate state and it is defensible
+  (the sentence quoting English data is the one that had to change first), but it is worse-looking
+  than before and should not surprise anyone reviewing a report between 1b and phase 6.
+- **`collect_hidden_patterns` caps at `limit=6`, so `collaboration_bridge` never reaches the
+  report** with this fixture — six higher-scoring patterns crowd it out. Its string was still
+  converted, and the test exercises it at `limit=12`. Worth confirming in phase 6 whether that cap
+  is intended, since a pattern type that can never render is a separate question from language.
 
 `services/impact_projection.py` is deliberately absent: all ten of its strings are static, so it contributes nothing here and appears in phase 6 instead.
 
@@ -67,6 +88,7 @@ Ordered by count so the largest surfaces land first; each module is independentl
 - [ ] 6.7 `routers/dashboards.py`, `analyzers/correlation.py`, `services/researcher_topic_analytics.py`
 - [ ] 6.8 Remaining single-string modules from the inventory
 - [ ] 6.9 Verify no user-facing Spanish literal remains outside the catalog, using the classified inventory rather than the regex
+- [ ] 6.10 Add the section-wide assertion deferred from 1b.1: an English-generated report's Hidden Patterns section contains no Spanish at all. Only meaningful once 6.4–6.7 have landed
 
 ## 7. Email
 
