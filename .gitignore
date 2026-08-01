@@ -105,3 +105,7 @@ htmlcov/
 # Rust Engine
 # =========================
 engine/target/
+
+# Staging area for scripts/generate-sdk-clients.sh. Removed on exit; ignored so
+# an interrupted run cannot leave an untracked directory that looks like drift.
+.sdk-staging/
