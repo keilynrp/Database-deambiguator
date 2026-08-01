@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from datetime import datetime, timezone
 from typing import Any, Literal
 
@@ -22,6 +21,40 @@ from backend.tenant_access import persisted_org_id, scope_query_to_org
 logger = logging.getLogger(__name__)
 
 ChatMode = Literal["auto", "rag", "nlq", "hybrid"]
+ResolvedMode = Literal["rag", "nlq", "hybrid", "unclear"]
+
+# The fixed vocabulary the classifier may answer with. Anything outside it is
+# discarded rather than mapped onto a mode by accident — a provider is free to
+# invent a label, and an unrecognised one must not silently become a retrieval
+# strategy.
+_INTENT_VOCABULARY = frozenset({"aggregate", "evidence", "exploration"})
+
+# Issue #227: this used to be three regexes of Spanish keywords. An English
+# question matched none of them and fell through to `rag`, so an aggregate
+# question got answered by semantic retrieval over documents — fluently, and
+# with no signal that it had been misrouted. Adding an English column would
+# have left the third language broken the same way, so the question is put to
+# the LLM already present in the request path instead. Nothing here reads the
+# question's words, which is what makes it language-agnostic.
+_INTENT_CLASSIFIER_PROMPT = """You label a research question with the kinds of \
+retrieval that can answer it. Reply with JSON only, no prose:
+
+{"intents": ["aggregate", "evidence", "exploration"]}
+
+Use only these labels, and include every one that applies:
+
+- "aggregate": asks for counts, totals, rates, averages, distributions, \
+rankings or breakdowns — answerable by querying structured data.
+- "evidence": asks which records, sources, papers or documents support \
+something, or asks why/how something is the case.
+- "exploration": asks for patterns, gaps, risks, impact, recommendations or \
+briefing material that requires interpretation.
+
+The question may be in any language; label its intent, not its language.
+
+If the question fits none of these — it is unintelligible, or asks for \
+something this system does not retrieve — reply {"intents": []}. Do not guess: \
+an empty list is a valid and useful answer."""
 
 
 class AgenticChatRequest(BaseModel):
@@ -48,10 +81,14 @@ class AgenticResearchChatService:
         current_user: models.User,
         org_id: int | None,
     ) -> dict[str, Any]:
-        mode_used = cls._resolve_mode(payload.question, payload.mode)
+        # The integration is resolved before the mode because the mode now
+        # depends on it: `auto` asks the provider to classify the question.
+        integration = _get_active_integration(db)
+        mode_used, mode_resolution = cls._resolve_mode(
+            payload.question, payload.mode, integration
+        )
         scope = cls._scope_payload(payload)
         context = cls._build_context_blocks(db, payload, org_id)
-        integration = _get_active_integration(db)
 
         rag_result: dict[str, Any] | None = None
         nlq_result: dict[str, Any] | None = None
@@ -79,6 +116,7 @@ class AgenticResearchChatService:
         trace = cls._build_trace(
             payload=payload,
             mode_used=mode_used,
+            mode_resolution=mode_resolution,
             rag_result=rag_result,
             nlq_result=nlq_result,
             context=context,
@@ -118,29 +156,80 @@ class AgenticResearchChatService:
             "entity_id": payload.entity_id,
         }
 
-    @staticmethod
-    def _resolve_mode(question: str, requested_mode: ChatMode) -> Literal["rag", "nlq", "hybrid"]:
-        if requested_mode != "auto":
-            return "hybrid" if requested_mode == "hybrid" else requested_mode
+    @classmethod
+    def _classify_intents(cls, question: str, integration) -> tuple[set[str], str]:
+        """Ask the active provider which kinds of retrieval fit *question*.
 
-        q = question.lower()
-        aggregate_intent = re.search(
-            r"\b(cuant|cu[aá]nt|distribuci[oó]n|porcentaje|tasa|promedio|top|ranking|por dominio|por proveedor)\b",
-            q,
-        )
-        evidence_intent = re.search(
-            r"\b(evidencia|fuente|registro|paper|articulo|cuales|cu[aá]les|por qu[eé]|explica)\b",
-            q,
-        )
-        exploration_intent = re.search(
-            r"\b(patron|patr[oó]n|brecha|riesgo|impacto|recomendaci[oó]n|stakeholder|brief)\b",
-            q,
-        )
-        if aggregate_intent and (evidence_intent or exploration_intent):
-            return "hybrid"
-        if aggregate_intent:
-            return "nlq"
-        return "hybrid" if exploration_intent else "rag"
+        Returns the recognised intents and how the answer was reached, so the
+        caller can tell "the model found no intent" (a judgement about the
+        question) apart from "we could not ask" (a state of the deployment).
+        Those two deserve different behaviour and used to be indistinguishable.
+        """
+        adapter = rag_engine._build_adapter(integration)
+        if adapter is None:
+            return set(), "no_classifier"
+
+        raw = adapter.chat(
+            system_prompt=_INTENT_CLASSIFIER_PROMPT,
+            user_query=question,
+            context_chunks=[],
+        ).strip()
+        if raw.startswith("```"):
+            parts = raw.split("```")
+            raw = parts[1] if len(parts) > 1 else raw
+            if raw.startswith("json"):
+                raw = raw[4:]
+        try:
+            parsed = json.loads(raw.strip())
+            labels = parsed["intents"]
+        except (ValueError, TypeError, KeyError) as exc:
+            # A reply we cannot read is not evidence that the question had no
+            # intent, so it must not be reported as an empty classification.
+            logger.warning("Agentic chat intent classifier returned unparseable JSON: %s", exc)
+            return set(), "classifier_error"
+
+        if not isinstance(labels, list):
+            logger.warning("Agentic chat intent classifier returned a non-list 'intents'")
+            return set(), "classifier_error"
+        return {str(label) for label in labels} & _INTENT_VOCABULARY, "llm"
+
+    @classmethod
+    def _resolve_mode(
+        cls, question: str, requested_mode: ChatMode, integration
+    ) -> tuple[ResolvedMode, str]:
+        """Pick the retrieval mode, and report how the choice was made.
+
+        The mapping below is the one the keyword table implemented, minus its
+        final `else rag`. That fallback is the defect in #227: a question the
+        resolver could not read became a confident answer of the wrong shape.
+        An unresolved question now says so.
+        """
+        if requested_mode != "auto":
+            return requested_mode, "explicit"
+
+        try:
+            intents, resolution = cls._classify_intents(question, integration)
+        except Exception as exc:
+            logger.warning("Agentic chat intent classification failed: %s", exc)
+            intents, resolution = set(), "classifier_error"
+
+        if resolution != "llm":
+            # We could not ask. Widening to `hybrid` runs both branches instead
+            # of quietly re-picking the old default; it costs a second retrieval
+            # rather than an answer of the wrong kind.
+            return "hybrid", resolution
+
+        aggregate = "aggregate" in intents
+        interpretive = intents & {"evidence", "exploration"}
+        if aggregate and interpretive:
+            return "hybrid", resolution
+        if aggregate:
+            return "nlq", resolution
+        if "exploration" in intents:
+            return "hybrid", resolution
+        if "evidence" in intents:
+            return "rag", resolution
+        return "unclear", resolution
 
     @classmethod
     def _build_context_blocks(
@@ -308,10 +397,24 @@ class AgenticResearchChatService:
         context: dict[str, Any],
         errors: list[str],
     ) -> str:
+        summary = context["blocks"].get("scope_summary", {})
+
+        if mode_used == "unclear":
+            # Saying nothing useful is the correct answer here. The alternative
+            # — the behaviour this replaced — was to retrieve documents anyway
+            # and present whatever came back as if it answered the question.
+            return (
+                "No pude determinar que tipo de pregunta es esta, asi que no la "
+                "respondi en lugar de arriesgar una respuesta con la forma "
+                "equivocada. Reformulala pidiendo explicitamente lo que "
+                "necesitas — un conteo o distribucion, la evidencia que sostiene "
+                "algo, o un analisis de patrones y brechas — o fija el modo "
+                "(nlq, rag o hybrid) en la consulta."
+            )
+
         rag_answer = (rag_result or {}).get("answer")
         nlq_translated = (nlq_result or {}).get("translated")
         nlq_result_data = (nlq_result or {}).get("result")
-        summary = context["blocks"].get("scope_summary", {})
 
         parts: list[str] = []
         if rag_answer:
@@ -358,6 +461,7 @@ class AgenticResearchChatService:
     def _build_trace(
         payload: AgenticChatRequest,
         mode_used: str,
+        mode_resolution: str,
         rag_result: dict[str, Any] | None,
         nlq_result: dict[str, Any] | None,
         context: dict[str, Any],
@@ -367,6 +471,11 @@ class AgenticResearchChatService:
         return {
             "rag_used": mode_used in {"rag", "hybrid"},
             "nlq_used": mode_used in {"nlq", "hybrid"},
+            # How the mode was chosen. Without this a `hybrid` answer produced
+            # because no classifier was reachable is indistinguishable from one
+            # the classifier actually asked for — the kind of silent difference
+            # that let #227 live in production.
+            "mode_resolution": mode_resolution,
             "tools_used": (rag_result or {}).get("tools_used", []),
             "context_blocks": list(context["blocks"].keys()),
             "iterations": (rag_result or {}).get("iterations", 0),
