@@ -59,7 +59,16 @@ fi
 # it. It is removed on exit, success or failure.
 STAGING_NAME=".sdk-staging"
 STAGING="$ROOT/$STAGING_NAME"
-cleanup_staging() { rm -rf "$STAGING"; }
+cleanup_staging() {
+  [ -d "$STAGING" ] || return 0
+  rm -rf "$STAGING" 2>/dev/null && return 0
+  # A generator that failed before the chown below leaves root-owned output the
+  # host cannot remove. Without this fallback the promise that a failure leaves
+  # the tree unchanged would be broken by the cleanup itself — an undeletable
+  # .sdk-staging is exactly the kind of leftover that later reads as drift.
+  MSYS_NO_PATHCONV=1 docker run --rm -v "${HOST_ROOT}:/w" "$PYTHON_IMAGE" \
+    rm -rf "/w/${STAGING_NAME}" >/dev/null 2>&1 || true
+}
 trap cleanup_staging EXIT
 rm -rf "$STAGING"
 mkdir -p "$STAGING"
@@ -83,6 +92,22 @@ MSYS_NO_PATHCONV=1 docker run --rm -v "${HOST_ROOT}:/w" -w /w "$PYTHON_IMAGE" sh
     --overwrite \
     --meta setup
 "
+
+# ── Hand the staging tree back to the invoking user ──────────────────────────
+# Both generators run as root inside their container, so on Linux the staging
+# tree comes back owned by root. That matters for the swap below and is easy to
+# miss: moving a *directory* into a new parent needs write permission on the
+# directory itself, because its `..` entry is rewritten. A root-owned
+# `.sdk-staging/typescript` therefore cannot be `mv`d by an unprivileged user,
+# and the swap fails with EACCES.
+#
+# Invisible on Windows — Docker Desktop ignores Unix ownership on bind mounts,
+# so a local run succeeds either way. This only shows up on Linux CI.
+#
+# `chown` has to happen inside a container: the host user cannot chown files it
+# does not own. Reuses an image already pulled above, so it costs no download.
+MSYS_NO_PATHCONV=1 docker run --rm -v "${HOST_ROOT}:/w" -w /w "$PYTHON_IMAGE" \
+  chown -R "$(id -u):$(id -g)" "/w/${STAGING_NAME}"
 
 # The Python generator runs ruff, which leaves a non-deterministic on-disk cache.
 # It is not part of the client and must never be committed (it breaks the
