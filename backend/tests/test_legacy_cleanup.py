@@ -3,10 +3,29 @@ from backend import models
 from backend.scripts.cleanup_legacy_coauthor import run
 
 
+def _entities(db, n=2):
+    """Create the entities the relationships point at.
+
+    These used to hardcode `source_id=1, target_id=2` with no rows behind them.
+    SQLite does not enforce foreign keys by default so the inserts succeeded;
+    PostgreSQL rejects them, which is also what production would do.
+    """
+    rows = [
+        models.RawEntity(primary_label=f"Entity {i}", domain="science", source="test")
+        for i in range(n)
+    ]
+    db.add_all(rows)
+    db.commit()
+    for row in rows:
+        db.refresh(row)
+    return rows
+
+
 def test_cleanup_deletes_only_coauthor_rows(db):
-    db.add(models.EntityRelationship(source_id=1, target_id=1, relation_type="CO_AUTHOR",
+    a, b = _entities(db)
+    db.add(models.EntityRelationship(source_id=a.id, target_id=a.id, relation_type="CO_AUTHOR",
                                      notes="a||b", weight=1.0))
-    db.add(models.EntityRelationship(source_id=1, target_id=2, relation_type="REFERENCES",
+    db.add(models.EntityRelationship(source_id=a.id, target_id=b.id, relation_type="REFERENCES",
                                      notes="ref", weight=1.0))
     db.commit()
 
@@ -17,7 +36,8 @@ def test_cleanup_deletes_only_coauthor_rows(db):
 
 
 def test_cleanup_dry_run_counts_without_deleting(db):
-    db.add(models.EntityRelationship(source_id=1, target_id=1, relation_type="CO_AUTHOR",
+    (a,) = _entities(db, n=1)
+    db.add(models.EntityRelationship(source_id=a.id, target_id=a.id, relation_type="CO_AUTHOR",
                                      notes="a||b", weight=1.0))
     db.commit()
     n = run(db, dry_run=True)

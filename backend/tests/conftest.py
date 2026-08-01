@@ -192,6 +192,96 @@ with TestingSessionLocal() as _seed_db:
 _ensure_test_admin()
 
 
+# ── Canonical tenants ───────────────────────────────────────────────────────
+# Tests across the suite scope rows with small literal org ids (`org_id=1`,
+# `org=2`) without creating the tenant. SQLite does not enforce foreign keys by
+# default, so those rows inserted happily; PostgreSQL rejects them and 95
+# violations surfaced across eight constraints the first time the suite was run
+# against the dialect production uses.
+#
+# Seeding the tenants those literals refer to fixes the cause rather than each
+# call site. Nothing in the suite queries or counts Organization, so
+# materialising them changes no existing assertion.
+#
+# The set is measured, not guessed — a first attempt at range(1, 11) missed
+# `org_id=12` and failed. Regenerate with:
+#
+#   grep -rhoE "org_id=-?[0-9]+|org=-?[0-9]+" backend/tests/ | grep -oE "\-?[0-9]+$" | sort -nu
+#
+# Three entries look like sentinels and still need to exist:
+#   0     — "legacy/global scope" in the analyzer suites, a real scope value
+#   -1    — `tenant_access.LEGACY_GLOBAL_ORG_ID`. Production uses it only as a
+#           *read* scope (`scope_query_to_org`) and never writes it to a column,
+#           so materialising it here masks no production constraint issue; the
+#           journal-scope test does write it, which PostgreSQL then checks.
+#   99999 — "not the editor's org" in the background-job tenant tests; the point
+#           is that it is a *different* tenant, which still has to exist for the
+#           foreign key to accept the row
+#
+# The grep below must include the minus sign — a first pass matched `[0-9]+`
+# only, missed -1, and left exactly one test failing.
+#
+# A test that introduces a new literal org id must add it here. That coupling is
+# the price of not rewriting 41 call sites; the alternative is a fixture per
+# file, which duplicates this list eight times instead.
+_CANONICAL_ORG_IDS = (-1, 0, 1, 2, 5, 7, 9, 12, 42, 99, 99999)
+_ORG_OWNER_USERNAME = "canonical-org-owner"
+
+
+def _seed_canonical_orgs(db) -> None:
+    """(Re)create the canonical tenants on *db*, leaving existing rows alone.
+
+    Called from `_reset_test_state` as well as at import: that reset truncates
+    `organizations`, so seeding only once at import would last exactly until the
+    first test that uses the `db_session` fixture.
+    """
+    # A dedicated owner, deliberately not the super_admin: the bootstrap tests
+    # delete every super_admin row, and an organization owning one would block
+    # that delete on `organizations_owner_id_fkey`. This user is not a
+    # super_admin and no test deletes it. Nothing in the suite counts users.
+    owner = (
+        db.query(models.User)
+        .filter(models.User.username == _ORG_OWNER_USERNAME)
+        .first()
+    )
+    if owner is None:
+        owner = models.User(
+            username=_ORG_OWNER_USERNAME,
+            password_hash=_hash_pw("canonical-org-owner-not-for-login"),
+            role="viewer",
+            is_active=False,
+        )
+        db.add(owner)
+        db.commit()
+        db.refresh(owner)
+
+    existing = {row.id for row in db.query(models.Organization.id).all()}
+    missing = [org_id for org_id in _CANONICAL_ORG_IDS if org_id not in existing]
+    if not missing:
+        return
+    for org_id in missing:
+        db.add(models.Organization(
+            id=org_id,
+            name=f"Test Org {org_id}",
+            slug=f"test-org-{org_id}",
+            owner_id=owner.id,
+            is_active=True,
+        ))
+    db.commit()
+    if _IS_POSTGRES:
+        # Explicit ids bypass the sequence, so a later insert that omits id
+        # would collide on the primary key. SQLite has no such sequence.
+        db.execute(text(
+            "SELECT setval('organizations_id_seq', "
+            "(SELECT COALESCE(MAX(id), 1) FROM organizations))"
+        ))
+        db.commit()
+
+
+with TestingSessionLocal() as _org_seed_db:
+    _seed_canonical_orgs(_org_seed_db)
+
+
 @pytest.fixture(scope="session")
 def client():
     """FastAPI test client with test DB."""
@@ -415,6 +505,11 @@ def _reset_test_state(db):
             _delete_test_table(db, table)
         db.execute(text("UPDATE users SET org_id = NULL"))
         db.commit()
+
+    # `organizations` is in _TABLES_TO_CLEAN, so the tenants tests scope rows to
+    # have just been deleted. Put them back before the next test runs, or every
+    # `org_id=<n>` insert violates its foreign key on PostgreSQL.
+    _seed_canonical_orgs(db)
 
 
 def _join_webhook_dispatch_threads() -> None:
