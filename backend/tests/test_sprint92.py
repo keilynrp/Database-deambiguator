@@ -50,7 +50,17 @@ def _make_entity(db, label="TestEntity", enrichment_status="completed", enrichme
     return e
 
 
-def _make_workflow(db, trigger="manual", conditions=None, actions=None, user_id=1):
+def _make_workflow(db, trigger="manual", conditions=None, actions=None, user_id=None):
+    if user_id is None:
+        # `created_by` is a real foreign key. This defaulted to a literal 1,
+        # which was the seeded admin's id right up until the bootstrap suite
+        # started successfully deleting and recreating that row — the
+        # replacement gets a fresh serial id, and 1 stops existing. SQLite did
+        # not enforce the constraint, so the stale literal went unnoticed;
+        # PostgreSQL rejects it with `workflows_created_by_fkey`.
+        #
+        # Ask the database which user exists rather than naming one.
+        user_id = db.query(models.User.id).order_by(models.User.id).limit(1).scalar()
     wf = models.Workflow(
         name="Test Workflow",
         trigger_type=trigger,

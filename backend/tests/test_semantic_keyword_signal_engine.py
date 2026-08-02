@@ -128,6 +128,13 @@ def test_keyword_signal_preview_does_not_persist(client, auth_headers, db_sessio
 
 
 def test_graph_materialize_returns_keyword_signal_summary(client, auth_headers, db_session):
+    # `import_batch_id` is a real foreign key. The literal below used to point
+    # at nothing, which SQLite accepted and PostgreSQL rejects. Created here
+    # rather than seeded centrally like the canonical org ids: the suite does
+    # assert on how import batches group, so materialising extra ones could
+    # move an assertion that has nothing to do with this test.
+    db_session.add(models.ImportBatch(id=778, domain_id="graph_semantic", source_type="upload"))
+    db_session.flush()
     entity = models.RawEntity(
         primary_label="Graph Signal Record",
         domain="graph_semantic",

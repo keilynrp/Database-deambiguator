@@ -413,6 +413,25 @@ _TABLES_TO_CLEAN = [
     "workflows",
     "catalog_portals",
     "import_batches",
+    # ── Children of `users` ──────────────────────────────────────────────
+    # `users` is excluded below, but the bootstrap tests delete every
+    # super_admin row directly. Any child row left behind by an earlier test
+    # blocks that delete on PostgreSQL, which enforces the foreign key SQLite
+    # ignores — and it fails in the bootstrap test, on a table that test never
+    # touched.
+    #
+    # This list is the complete set, derived from the schema rather than from
+    # whichever constraint a traceback happened to name: fixing
+    # `password_reset_tokens` alone just moved the failure to `api_keys`.
+    # `test_conftest_cleanup_coverage.py` asserts the set stays complete, so a
+    # new table with a user FK fails there instead of somewhere unrelated.
+    "api_keys",
+    "embed_widgets",
+    "field_correspondence_rules",
+    "mapping_suggestions",
+    "password_reset_tokens",
+    "source_profiles",
+    "user_dashboards",
     "organization_members",
     "organizations",
     "entity_relationships",
@@ -512,6 +531,20 @@ def _reset_test_state(db):
     # have just been deleted. Put them back before the next test runs, or every
     # `org_id=<n>` insert violates its foreign key on PostgreSQL.
     _seed_canonical_orgs(db)
+
+    # Same reasoning, for the same reason, about a row this function does *not*
+    # delete: the bootstrap suite deletes every super_admin to prove bootstrap
+    # recreates it. Until the cleanup list was completed, PostgreSQL refused
+    # those deletes on a child-row foreign key — so the suite's admin survived
+    # by accident, and later tests that reference it kept working by accident
+    # too. Fixing the cleanup let the deletes through and broke them
+    # (`workflows_created_by_fkey`, avatar lookups, upload ownership).
+    #
+    # Restoring the admin here rather than in each affected test keeps the
+    # invariant where the rest of the reset lives: after this function returns,
+    # the deterministic accounts exist. `auth_token` also calls it, which was
+    # enough only while nothing actually managed to delete the row.
+    _ensure_test_admin()
 
 
 def _join_webhook_dispatch_threads() -> None:

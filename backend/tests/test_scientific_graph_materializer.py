@@ -266,6 +266,12 @@ def test_entity_graph_diagnostics_explains_materializable_record(client, auth_he
 
 
 def test_relationship_suggestions_use_shared_concepts(client, auth_headers, db_session):
+    # Every other test in this file gets its batch id from a real
+    # `_create_science_batch`; these two literals were the exception and
+    # pointed at no row. PostgreSQL enforces the foreign key that SQLite
+    # ignored, so the batch has to exist.
+    db_session.add(models.ImportBatch(id=91, domain_id="suggestions", source_type="upload"))
+    db_session.flush()
     source = models.RawEntity(
         primary_label="Source Graph Paper",
         domain="suggestions",
