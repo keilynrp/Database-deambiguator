@@ -2824,6 +2824,10 @@ export type ImportStatusResponse = {
      */
     progress?: number;
     /**
+     * Query Translation
+     */
+    query_translation?: string | null;
+    /**
      * Records Inserted
      */
     records_inserted?: number;
@@ -2835,6 +2839,10 @@ export type ImportStatusResponse = {
      * Total
      */
     total?: number;
+    /**
+     * Warning
+     */
+    warning?: string | null;
 };
 
 /**

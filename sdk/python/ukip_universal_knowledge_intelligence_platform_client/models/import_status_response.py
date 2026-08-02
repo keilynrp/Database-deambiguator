@@ -19,16 +19,20 @@ class ImportStatusResponse:
         status (str):
         error (None | str | Unset):
         progress (float | Unset):  Default: 0.0.
+        query_translation (None | str | Unset):
         records_inserted (int | Unset):  Default: 0.
         total (int | Unset):  Default: 0.
+        warning (None | str | Unset):
     """
 
     job_id: str
     status: str
     error: None | str | Unset = UNSET
     progress: float | Unset = 0.0
+    query_translation: None | str | Unset = UNSET
     records_inserted: int | Unset = 0
     total: int | Unset = 0
+    warning: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -44,9 +48,21 @@ class ImportStatusResponse:
 
         progress = self.progress
 
+        query_translation: None | str | Unset
+        if isinstance(self.query_translation, Unset):
+            query_translation = UNSET
+        else:
+            query_translation = self.query_translation
+
         records_inserted = self.records_inserted
 
         total = self.total
+
+        warning: None | str | Unset
+        if isinstance(self.warning, Unset):
+            warning = UNSET
+        else:
+            warning = self.warning
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -60,10 +76,14 @@ class ImportStatusResponse:
             field_dict["error"] = error
         if progress is not UNSET:
             field_dict["progress"] = progress
+        if query_translation is not UNSET:
+            field_dict["query_translation"] = query_translation
         if records_inserted is not UNSET:
             field_dict["records_inserted"] = records_inserted
         if total is not UNSET:
             field_dict["total"] = total
+        if warning is not UNSET:
+            field_dict["warning"] = warning
 
         return field_dict
 
@@ -85,17 +105,37 @@ class ImportStatusResponse:
 
         progress = d.pop("progress", UNSET)
 
+        def _parse_query_translation(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        query_translation = _parse_query_translation(d.pop("query_translation", UNSET))
+
         records_inserted = d.pop("records_inserted", UNSET)
 
         total = d.pop("total", UNSET)
+
+        def _parse_warning(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        warning = _parse_warning(d.pop("warning", UNSET))
 
         import_status_response = cls(
             job_id=job_id,
             status=status,
             error=error,
             progress=progress,
+            query_translation=query_translation,
             records_inserted=records_inserted,
             total=total,
+            warning=warning,
         )
 
         import_status_response.additional_properties = d

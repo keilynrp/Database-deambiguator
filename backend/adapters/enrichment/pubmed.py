@@ -45,6 +45,23 @@ class PubMedAdapter(BaseScientometricAdapter):
         # the bulk import path reads it so a provider outage is not reported as
         # a successful import of zero records — issue #217.
         self.last_error: Optional[str] = None
+        # eSearch answers with more than ids: it reports the query it actually
+        # ran, and whether it had to drop part of the one we sent — issue #229.
+        # Kept apart on purpose, because they answer different questions:
+        #
+        #   last_query_translation  what PubMed ran. Always differs cosmetically
+        #                           (MeSH expansion, [All Fields]), so it is
+        #                           diagnostic material for the trace, never a
+        #                           signal on its own.
+        #   last_query_notes        advisories where PubMed corrected the query
+        #                           without changing its intent.
+        #   last_warning            PubMed dropped or ignored part of the query,
+        #                           so the results answer a narrower question
+        #                           than the one asked. This is the only one
+        #                           worth putting in front of an operator.
+        self.last_query_translation: Optional[str] = None
+        self.last_query_notes: Optional[str] = None
+        self.last_warning: Optional[str] = None
 
     @property
     def is_active(self) -> bool:
@@ -87,7 +104,61 @@ class PubMedAdapter(BaseScientometricAdapter):
             self.last_error = "eSearch returned unreadable XML"
             return []
 
+        self._read_advisories(root)
         return [el.text for el in root.findall(".//IdList/Id") if el.text]
+
+    #: Elements where PubMed reports it **dropped or ignored** part of the
+    #: query. These change which records come back, so the operator is looking
+    #: at the answer to a narrower question than the one they asked.
+    _DROPPED_ELEMENTS = (
+        ("ErrorList/PhraseNotFound", "not found and dropped"),
+        ("ErrorList/FieldNotFound", "unknown field tag"),
+        ("WarningList/QuotedPhraseNotFound", "quoted phrase not found"),
+        ("WarningList/PhraseIgnored", "ignored"),
+    )
+
+    def _read_advisories(self, root) -> None:
+        """Record what eSearch says about the query it ran.
+
+        Deliberately does not warn on `QueryTranslation` differing from the
+        term we sent. PubMed rewrites every query — expanding to MeSH terms,
+        appending `[All Fields]` — so a warning derived from that difference
+        would fire on every search, and a warning that always fires is one
+        nobody reads. The provider already distinguishes "I normalised this"
+        from "I threw this away"; this relays that distinction rather than
+        inventing one.
+        """
+        self.last_query_translation = None
+        self.last_query_notes = None
+        self.last_warning = None
+
+        translation = root.findtext(".//QueryTranslation")
+        if translation and translation.strip():
+            self.last_query_translation = translation.strip()
+
+        notes = [
+            el.text.strip()
+            for el in root.findall(".//OutputMessage")
+            if el.text and el.text.strip()
+        ]
+        if notes:
+            self.last_query_notes = "; ".join(notes)
+
+        dropped: list[str] = []
+        for path, reason in self._DROPPED_ELEMENTS:
+            for el in root.findall(f".//{path}"):
+                term = (el.text or "").strip().strip('"')
+                if term:
+                    dropped.append(f"{term} ({reason})")
+
+        if dropped:
+            # Name the terms. "Part of your query was ignored" is not something
+            # an operator can act on; which part is.
+            self.last_warning = (
+                "PubMed did not run your query as written. Dropped or ignored: "
+                + "; ".join(dropped)
+                + ". The results reflect the remaining terms only."
+            )
 
     # ------------------------------------------------------------------
     # eFetch: fetch MEDLINE XML for a batch of PMIDs
