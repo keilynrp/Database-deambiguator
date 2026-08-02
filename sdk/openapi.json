@@ -5354,6 +5354,17 @@
             "title": "Progress",
             "type": "number"
           },
+          "query_translation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Translation"
+          },
           "records_inserted": {
             "default": 0,
             "title": "Records Inserted",
@@ -5367,6 +5378,17 @@
             "default": 0,
             "title": "Total",
             "type": "integer"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
           }
         },
         "required": [

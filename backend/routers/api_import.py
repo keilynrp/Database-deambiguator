@@ -208,6 +208,14 @@ class ImportStatusResponse(BaseModel):
     records_inserted: int = 0
     total: int = 0
     error: Optional[str] = None
+    # Issue #229. `warning` is deliberately separate from `error`: the import
+    # succeeded, it just succeeded for a narrower query than the operator wrote,
+    # and reporting that as a failure would be its own kind of lie.
+    # `query_translation` is what the provider actually ran — always available
+    # when reported, because "what exactly ran?" is a question asked after the
+    # fact, not one the operator knows to ask up front.
+    warning: Optional[str] = None
+    query_translation: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -246,6 +254,25 @@ _PARTIAL_RESULT = (
     "The provider failed part-way, so fewer records were imported than requested. "
     "Re-run the import to collect the rest."
 )
+
+
+def _record_provider_advisories(job_id: str, adapter) -> None:
+    """Carry what the provider said about the query onto the job — issue #229.
+
+    Never touches `error` or `status`. A dropped term is not a failed import:
+    records came back and are worth keeping. What the operator cannot otherwise
+    discover is that they answer a narrower question than the one asked.
+
+    Adapters that report nothing (every provider but PubMed today) are the
+    normal case, so missing attributes are absence, not error.
+    """
+    warning = getattr(adapter, "last_warning", None)
+    translation = getattr(adapter, "last_query_translation", None)
+    if warning:
+        logger.warning("import job %s: provider rewrote the query: %s", job_id, warning)
+        _update_job(job_id, warning=warning)
+    if translation:
+        _update_job(job_id, query_translation=translation)
 
 
 def _abort_on_swallowed_provider_error(job_id: str, adapter, records, provider: str) -> bool:
@@ -321,6 +348,7 @@ def _run_openalex_import(
     try:
         adapter = OpenAlexAdapter()
         records = adapter.search_bulk(query, filters=filters, limit=limit)
+        _record_provider_advisories(job_id, adapter)
         if _abort_on_swallowed_provider_error(job_id, adapter, records, "OpenAlex"):
             return
         _update_job(job_id, total=len(records), progress=0.5)
@@ -352,6 +380,7 @@ def _run_pubmed_import(
     try:
         adapter = PubMedAdapter()
         records = adapter.search_bulk(query, limit=limit)
+        _record_provider_advisories(job_id, adapter)
         if _abort_on_swallowed_provider_error(job_id, adapter, records, "PubMed"):
             return
         _update_job(job_id, total=len(records), progress=0.5)
@@ -469,4 +498,6 @@ def import_status(
         records_inserted=job.get("records_inserted", 0),
         total=job.get("total", 0),
         error=job.get("error"),
+        warning=job.get("warning"),
+        query_translation=job.get("query_translation"),
     )
