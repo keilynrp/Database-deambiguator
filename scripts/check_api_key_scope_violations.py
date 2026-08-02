@@ -150,20 +150,63 @@ def _parse_ts(value: str | None) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
-def _report(items: list[dict]) -> int:
+#: Probe keys are named with this prefix so their own violations can be told
+#: apart from an integrator's. Without that, `--probe` pollutes the very
+#: measurement this script exists to make: the synthetic violation it creates
+#: is counted as a real one, and the operator is advised to contact the owner
+#: of a key the script made up.
+_PROBE_KEY_NAME_PREFIX = "scope-probe "
+
+
+def _enforcement_enabled(base_url: str) -> bool | None:
+    """Whether the deployment is enforcing scopes. None when unreadable.
+
+    Read so the verdict below can describe the deployment as it is. A verdict
+    hardcoded for warn mode tells an operator not to flip a flag that is
+    already flipped, which is worse than saying nothing.
+    """
+    try:
+        health = _request(f"{base_url}/health")
+        return bool(health.get("features", {}).get("api_key_scopes_enforced"))
+    except SystemExit:
+        return None
+
+
+def _probe_key_prefixes(keys: list[dict]) -> set[str]:
+    return {
+        k["key_prefix"]
+        for k in keys
+        if (k.get("name") or "").startswith(_PROBE_KEY_NAME_PREFIX) and k.get("key_prefix")
+    }
+
+
+def _report(items: list[dict], probe_prefixes: set[str] = frozenset(), enforced: bool | None = None) -> int:
     # ASCII only from here down: this output is meant to be pasted into a
     # ticket, and a Windows console will mangle anything else.
+    mode = {True: "ENFORCING", False: "warn mode", None: "mode unknown"}[enforced]
     print(f"\n{'=' * 68}")
-    print("  api_key.scope_violation - warn-mode observation window")
+    print(f"  api_key.scope_violation - observation window ({mode})")
     print(f"{'=' * 68}\n")
+
+    probe_items = [i for i in items if (i.get("details") or {}).get("key_prefix") in probe_prefixes]
+    items = [i for i in items if i not in probe_items]
+    if probe_items:
+        print(f"  Ignoring {len(probe_items)} violation(s) from this script's own")
+        print("  --probe keys. They are synthetic and say nothing about integrators.\n")
 
     if not items:
         print("  No violations recorded.\n")
         print("  Read this carefully before treating it as a green light: an empty")
         print("  result means either that no key was ever used outside its scopes,")
         print("  or that no scoped key was used at all. Those are very different")
-        print("  situations and this query cannot tell them apart. Confirm there")
-        print("  was real API-key traffic in the window before flipping the flag.\n")
+        print("  situations and this query cannot tell them apart.")
+        if enforced:
+            print("\n  Enforcement is already ON, so this says no caller has been")
+            print("  refused - not that none would be. A key that is never used")
+            print("  cannot violate anything.\n")
+        else:
+            print("  Confirm there was real API-key traffic in the window before")
+            print("  flipping the flag.\n")
         return 0
 
     timestamps = sorted(t for t in (_parse_ts(i.get("created_at")) for i in items) if t)
@@ -194,7 +237,9 @@ def _report(items: list[dict]) -> int:
         print("\n  !! Some events have enforced=true - the flag is already ON for")
         print("     those, and they were real 403s, not warnings.")
 
-    print("\n  Keys that would start getting 403s (task 6.3 - contact these owners):")
+    heading = ("Keys currently BEING REFUSED (403)" if enforced
+               else "Keys that would start getting 403s")
+    print(f"\n  {heading} - contact these owners:")
     for prefix, count in by_prefix.most_common():
         granted = ", ".join(sorted(granted_by_prefix.get(prefix, set()))) or "(none)"
         print(f"    {prefix:<20} {count:>5} event(s)   granted: {granted}")
@@ -207,9 +252,18 @@ def _report(items: list[dict]) -> int:
     for endpoint, count in by_endpoint.most_common(15):
         print(f"    {endpoint:<50} {count:>5}")
 
-    print("\n  Verdict: do NOT flip UKIP_API_KEY_SCOPES_ENFORCED to 1 until every")
-    print("  key above has had its scopes widened or its caller fixed. Flipping")
-    print("  now turns each of these into a live 403 for a real integrator.\n")
+    if enforced:
+        print("\n  Verdict: enforcement is ALREADY ON, so these are live 403s a real")
+        print("  caller is getting right now, not a forecast. Widen the key's scopes")
+        print("  or fix the integration - or set UKIP_API_KEY_SCOPES_ENFORCED=0 to")
+        print("  return to warn mode while you do.\n")
+    elif enforced is False:
+        print("\n  Verdict: do NOT flip UKIP_API_KEY_SCOPES_ENFORCED to 1 until every")
+        print("  key above has had its scopes widened or its caller fixed. Flipping")
+        print("  now turns each of these into a live 403 for a real integrator.\n")
+    else:
+        print("\n  Verdict withheld: could not read /health, so the enforcement state")
+        print("  is unknown and any recommendation here would be a guess.\n")
     return 1
 
 
@@ -326,9 +380,10 @@ def main() -> int:
 
     token = _login(base_url, args.username, password)
     del password
+    enforced = _enforcement_enabled(base_url)
     items = _fetch_violations(base_url, token)
     keys = _fetch_own_keys(base_url, token)
-    exit_code = _report(items)
+    exit_code = _report(items, _probe_key_prefixes(keys), enforced)
     _report_traffic(keys)
     if args.probe:
         exit_code = _probe(base_url, token) or exit_code

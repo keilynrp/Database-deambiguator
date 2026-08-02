@@ -101,9 +101,27 @@ change):
       not have produced an answer — see below.
 - [x] 6.3 Contact owners of any violating key; widen the key's scopes or fix
       the integration. Vacuous: there are no violating keys.
-- [ ] 6.4 Flip `UKIP_API_KEY_SCOPES_ENFORCED=1`; confirm `/health.features`.
-      Operator decision. Evidence is complete and the residual risk is named
-      under "Residual risk" below.
+- [x] 6.4 Flip `UKIP_API_KEY_SCOPES_ENFORCED=1`; confirm `/health.features`.
+      Done 2026-08-01. Operator flipped the value in Dokploy and redeployed;
+      the flag is read at call time, but the process still needs the new
+      environment, so the redeploy is required.
+
+      `/health` confirms the value changed:
+
+          version: 6c904982
+          api_key_scopes_enforced: True    (was False minutes earlier)
+          database: ok | cache: redis reachable
+
+      That is not sufficient on its own — it shows a flag changed, not that
+      the application refuses anything. `--probe` shows the refusal:
+
+          2. DELETE /entities/999999999 with a read-scoped key -> HTTP 403
+          3. required=write granted=['read'] enforced=True
+          4. Probe key id=5: revoked
+
+      403 where the same probe returned 404 hours earlier, under warn mode.
+      Enforcement is live and observability survives it: the violation is
+      still written to the audit, now with `enforced=true`.
 
 ### What 6.2 actually found (2026-08-01)
 
