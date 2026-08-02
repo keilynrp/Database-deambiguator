@@ -11,6 +11,8 @@ Verifies that the Alembic setup is correct:
 import os
 import subprocess
 import sys
+import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -20,14 +22,70 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PYTHON = sys.executable
 
 
-def _alembic(*args: str) -> subprocess.CompletedProcess:
-    """Run an alembic CLI command in the project root."""
+def _alembic(*args: str, db_url: str | None = None) -> subprocess.CompletedProcess:
+    """Run an alembic CLI command in the project root.
+
+    `db_url` overrides DATABASE_URL for the subprocess only.
+    """
+    env = None
+    if db_url is not None:
+        env = {**os.environ, "DATABASE_URL": db_url}
     return subprocess.run(
         [PYTHON, "-m", "alembic", *args],
         cwd=str(PROJECT_ROOT),
         capture_output=True,
         text=True,
+        env=env,
     )
+
+
+@contextmanager
+def _scratch_database():
+    """Yield a URL for an empty database, or None when there is nothing to do.
+
+    On SQLite every alembic subprocess gets its own in-memory database, so
+    `upgrade head` always runs against an empty schema and this is unnecessary
+    — the test works as written.
+
+    On PostgreSQL the subprocess connects to the *same* database conftest has
+    already populated with `create_all()`. Nothing stamped `alembic_version`,
+    so alembic starts from zero and migration 0001 fails with
+    `relation "users" already exists`. That says nothing about the migrations;
+    it says the test shared a database with the fixture that set it up.
+
+    Running against a scratch database restores what the test means to assert,
+    and strengthens it: on PostgreSQL it now really applies every migration
+    from nothing, which is what a deploy does.
+    """
+    url = os.environ.get("DATABASE_URL", "")
+    if not url.startswith("postgresql"):
+        yield None
+        return
+
+    import psycopg2
+    from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+
+    scratch = f"ukip_alembic_{uuid.uuid4().hex[:12]}"
+    admin_url = url.rsplit("/", 1)[0] + "/postgres"
+    dsn = admin_url.replace("postgresql+psycopg2://", "postgresql://")
+
+    conn = psycopg2.connect(dsn)
+    conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f'CREATE DATABASE "{scratch}"')
+        yield url.rsplit("/", 1)[0] + "/" + scratch
+    finally:
+        with conn.cursor() as cur:
+            # Terminate stragglers first: a leftover connection makes DROP
+            # DATABASE fail and the scratch database would accumulate.
+            cur.execute(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = %s AND pid <> pg_backend_pid()",
+                (scratch,),
+            )
+            cur.execute(f'DROP DATABASE IF EXISTS "{scratch}"')
+        conn.close()
 
 
 class TestAlembicSetup:
@@ -89,10 +147,11 @@ class TestAlembicCLI:
 
     def test_upgrade_head_is_idempotent(self):
         """Running upgrade head twice must succeed with no errors."""
-        r1 = _alembic("upgrade", "head")
-        assert r1.returncode == 0, r1.stderr
-        r2 = _alembic("upgrade", "head")
-        assert r2.returncode == 0, r2.stderr
+        with _scratch_database() as scratch_url:
+            r1 = _alembic("upgrade", "head", db_url=scratch_url)
+            assert r1.returncode == 0, r1.stderr
+            r2 = _alembic("upgrade", "head", db_url=scratch_url)
+            assert r2.returncode == 0, r2.stderr
 
     def test_alembic_db_is_at_head_revision(self):
         """DB must be stamped at the head revision.

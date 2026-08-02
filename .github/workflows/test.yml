@@ -183,6 +183,26 @@ jobs:
           PYTHONPATH: .
         run: python scripts/ci_lifespan_smoke.py
 
+      - name: Run the backend suite against PostgreSQL
+        # Issue #234: until this step existed, CI ran `backend/tests/` on SQLite
+        # only and the jobs above validated migrations and startup — nothing
+        # else. Production is PostgreSQL, so dialect-specific SQL shipped
+        # unseen. Two live 500s reached production that way and both were
+        # invisible to a fully green suite:
+        #
+        #   /audit-log/stats               — DATE('now', '-6 days') is SQLite-only (#236)
+        #   /analyzers/correlation/{id}    — :named params never bound by psycopg2 (#237)
+        #
+        # No coverage flags here on purpose: the SQLite matrix above already
+        # gates coverage, and running it twice would double the wall clock to
+        # measure the same lines. This job answers a different question — does
+        # the SQL run at all on the dialect production uses.
+        #
+        # DATABASE_URL and UKIP_DB_MODE come from the prepare step via $GITHUB_ENV.
+        env:
+          UKIP_SKIP_STARTUP_SIDE_EFFECTS: "1"
+        run: pytest backend/tests/ --tb=short -q
+
   # ── Generated SDK client smoke tests (live) ───────────────────────────────
   # Exercises sdk/typescript and sdk/python against a real running backend:
   # authenticate, list entities, get a typed result, and (with enforcement on)

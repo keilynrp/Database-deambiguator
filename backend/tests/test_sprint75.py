@@ -55,10 +55,25 @@ def _make_edge(db, src: int, tgt: int, rel: str = "cites", weight: float = 1.0):
 
 @pytest.fixture
 def graph_db(db_session):
-    """Seed: 3 entities (2 science, 1 default) + 2 edges."""
+    """Seed: 3 entities (2 science, 1 default) + 2 edges.
+
+    The `flush()` is load-bearing, not tidiness. `models.py` declares no
+    `relationship()` anywhere, so SQLAlchemy's unit of work has no dependency
+    processor telling it that `entity_relationships` rows need their
+    `raw_entities` rows first. The topological sort people expect here applies
+    to `create_all()`, not to INSERT ordering inside a flush — so with entities
+    and edges pending together, the edges can go first.
+
+    SQLite does not enforce foreign keys, so this never mattered there. On
+    PostgreSQL it is a ForeignKeyViolation at fixture setup. The application
+    code gets this right on its own (`graph_materializer._get_or_create_node`
+    flushes the node before any edge references it); only the fixtures relied
+    on the dialect being permissive.
+    """
     _make_entity(db_session, 1001, "Paper A", domain="science")
     _make_entity(db_session, 1002, "Paper B", domain="science")
     _make_entity(db_session, 1003, "Widget X", domain="default")
+    db_session.flush()
     _make_edge(db_session, 1001, 1002, rel="cites", weight=2.0)
     _make_edge(db_session, 1002, 1003, rel="related-to", weight=1.0)
     db_session.commit()

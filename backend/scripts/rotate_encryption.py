@@ -13,6 +13,7 @@ import argparse
 import logging
 import os
 import sys
+from contextlib import contextmanager
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -25,20 +26,48 @@ logger = logging.getLogger(__name__)
 _ADVISORY_LOCK_KEY = 0x55_4B_49_50_17  # "UKIP" + 0x17 (EPIC-017)
 
 
-def _try_advisory_lock(db: Session) -> bool:
-    """Postgres advisory lock; no-op True on SQLite (tests).
+@contextmanager
+def _advisory_lock(db: Session):
+    """Hold the run lock on a connection of our own. Yields whether we got it.
 
-    Use db.get_bind() (robust) rather than db.bind, which can be None on sessions
-    that resolve their bind at query time.
+    A session-level advisory lock belongs to the *connection* that took it, and
+    a Session hands its connection back to the pool when it commits.
+    `run_reencryption` commits in the middle of its work, so taking and
+    releasing the lock through the Session can run `pg_advisory_unlock` on a
+    different connection than the one holding it. The unlock then silently does
+    nothing — it returns false — and the lock outlives the run on a pooled
+    connection. The next run refuses to start, reporting a concurrent run that
+    does not exist.
+
+    Whether the pool hands back the same connection depends on how busy it is,
+    which is why this reproduced only under load and never in isolation.
+
+    Taking the lock on a dedicated connection removes the question: the same
+    connection takes it, holds it across the commit, and releases it. Closing
+    that connection would release the lock anyway, so the unlock is belt and
+    braces rather than the only guarantee.
+
+    Uses db.get_bind() (robust) rather than db.bind, which can be None on
+    sessions that resolve their bind at query time. No-ops to True on SQLite,
+    which has no advisory locks and no concurrent runs to guard against.
     """
-    if db.get_bind().dialect.name != "postgresql":
-        return True
-    return bool(db.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": _ADVISORY_LOCK_KEY}).scalar())
+    bind = db.get_bind()
+    if bind.dialect.name != "postgresql":
+        yield True
+        return
 
-
-def _release_advisory_lock(db: Session) -> None:
-    if db.get_bind().dialect.name == "postgresql":
-        db.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": _ADVISORY_LOCK_KEY})
+    conn = bind.connect()
+    acquired = False
+    try:
+        acquired = bool(
+            conn.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": _ADVISORY_LOCK_KEY}).scalar()
+        )
+        yield acquired
+    finally:
+        if acquired:
+            conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": _ADVISORY_LOCK_KEY})
+            conn.commit()
+        conn.close()
 
 
 def run_reencryption(db: Session, *, operator: str, dry_run: bool) -> dict:
@@ -47,10 +76,10 @@ def run_reencryption(db: Session, *, operator: str, dry_run: bool) -> dict:
     if not sr.encryption_retiring_keys_present():
         logger.info("No ENCRYPTION_KEYS_RETIRING configured — nothing to re-encrypt.")
 
-    if not _try_advisory_lock(db):
-        raise SystemExit("Another re-encryption run is in progress (advisory lock held).")
+    with _advisory_lock(db) as acquired:
+        if not acquired:
+            raise SystemExit("Another re-encryption run is in progress (advisory lock held).")
 
-    try:
         rows = 0
         for model, column in sr.ENCRYPTED_COLUMNS:
             for obj in db.query(model).all():
@@ -77,8 +106,6 @@ def run_reencryption(db: Session, *, operator: str, dry_run: bool) -> dict:
             notes="eager re-encryption",
         )
         return {"rows_reencrypted": rows, "dry_run": False}
-    finally:
-        _release_advisory_lock(db)
 
 
 def main(argv=None) -> int:
