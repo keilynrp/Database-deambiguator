@@ -64,9 +64,17 @@ Two things the reading showed that the tests did not:
 
 ## 4. Parity gate
 
-- [ ] 4.1 Extend the translation parity gate to the backend projection; assert it fails on an EN-only key and on an ES-only key
-- [ ] 4.2 Mutation-check the gate: introduce a one-sided key and confirm CI actually goes red — a gate that passes when written has proven nothing
-- [ ] 4.3 Document in the gate itself that it verifies presence, not translation quality
+**There is no parity gate to extend.** Verified 2026-08-02: nothing in `.github/workflows/`,
+`frontend/package.json`, `frontend/scripts/` or `frontend/__tests__/` checks EN/ES parity, and
+`LanguageContext.tsx` casts the catalog to `Record<Language, Record<string, string>>`, so the
+type system does not check it either. The two sides are at exact parity today (3,402 keys each,
+zero one-sided, zero duplicates) purely by discipline. This phase writes the gate.
+
+- [ ] 4.1 Write the parity gate over the **frontend** catalog first — it is the source the backend projects from, and gating only the projection would move the failure upstream rather than prevent it
+- [ ] 4.2 Extend the same gate to the backend projection; assert it fails on an EN-only key and on an ES-only key
+- [ ] 4.3 Mutation-check the gate: introduce a one-sided key on each side and confirm CI actually goes red — a gate that passes when written has proven nothing
+- [ ] 4.4 Confirm the gate is green against the catalog as it stands, so it lands enforcing rather than with a baseline of existing violations
+- [ ] 4.5 Document in the gate itself that it verifies presence, not translation quality
 
 ## 5. Locale resolution
 
