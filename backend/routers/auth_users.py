@@ -398,7 +398,12 @@ def list_users(
     _: models.User = Depends(require_role("super_admin")),
 ):
     """List all users. Requires super_admin."""
-    return db.query(models.User).offset(skip).limit(limit).all()
+    # Ordered by id: LIMIT/OFFSET with no ORDER BY has no defined window.
+    # PostgreSQL may return rows in physical heap order, which shifts whenever a
+    # row is updated or re-inserted, so a client paging through the list can see
+    # one user twice and never see another. Kept out of the docstring because
+    # FastAPI publishes that as the endpoint description in the OpenAPI contract.
+    return db.query(models.User).order_by(models.User.id).offset(skip).limit(limit).all()
 
 
 @router.post("/users", response_model=schemas.UserResponse, status_code=201, tags=["users"])
