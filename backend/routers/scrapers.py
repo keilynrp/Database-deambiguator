@@ -144,7 +144,9 @@ def list_scrapers(
     q = scope_query_to_org(db.query(models.WebScraperConfig), models.WebScraperConfig, org_id)
     if active_only:
         q = q.filter(models.WebScraperConfig.is_active == True)  # noqa: E712
-    items = q.offset(skip).limit(limit).all()
+    # Ordered by id: LIMIT/OFFSET with no ORDER BY slices an undefined order,
+    # so paging can repeat one config and skip another.
+    items = q.order_by(models.WebScraperConfig.id).offset(skip).limit(limit).all()
     return [_serialize(c) for c in items]
 
 

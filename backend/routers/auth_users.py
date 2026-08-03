@@ -397,8 +397,14 @@ def list_users(
     db: Session = Depends(get_db),
     _: models.User = Depends(require_role("super_admin")),
 ):
-    """List all users. Requires super_admin."""
-    return db.query(models.User).offset(skip).limit(limit).all()
+    """List all users. Requires super_admin.
+
+    Ordered by id because `LIMIT`/`OFFSET` without an `ORDER BY` has no defined
+    window — PostgreSQL may return rows in physical heap order, which shifts
+    whenever a row is updated or re-inserted, so a client paging through the
+    list can see one user twice and never see another.
+    """
+    return db.query(models.User).order_by(models.User.id).offset(skip).limit(limit).all()
 
 
 @router.post("/users", response_model=schemas.UserResponse, status_code=201, tags=["users"])
