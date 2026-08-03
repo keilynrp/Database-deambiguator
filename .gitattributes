@@ -18,3 +18,14 @@ sdk/openapi.json text eol=lf
 # Pin the whole generated tree to LF on every platform.
 sdk/typescript/** text eol=lf
 sdk/python/** text eol=lf
+
+# Generated i18n projection. The drift gate compares the committed files byte
+# for byte against freshly generated ones, and the generator emits LF. Same trap
+# as sdk/openapi.json above: a Windows checkout (core.autocrlf=true) rewrites
+# them to CRLF, so the gate reports drift that regenerating cannot fix, because
+# the regenerated LF file is converted straight back on the next checkout.
+backend/i18n/*.json text eol=lf
+
+# The generator itself is read on Linux CI and Windows alike; keep it LF so the
+# file it writes and the file it compares are produced the same way everywhere.
+scripts/generate-i18n-projection.mjs text eol=lf

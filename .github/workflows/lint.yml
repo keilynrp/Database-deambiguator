@@ -64,6 +64,37 @@ jobs:
       - name: Check the committed SDK clients match sdk/openapi.json
         run: bash scripts/generate-sdk-clients.sh --check
 
+  # ── i18n catalog projection drift (blocking) ──────────────────────────────
+  # frontend/app/i18n/translations.ts is the single definition of every
+  # user-facing string; backend/i18n/catalog.*.json is a generated mirror the
+  # backend loads. A stale mirror serves text the product no longer says, and
+  # says it only on server-rendered surfaces (PDF, PPTX, Excel, email) where
+  # nobody is looking. This job fails the PR that edited the catalog without
+  # regenerating. `--check` also regenerates twice and compares, so a
+  # non-deterministic generator fails here rather than flapping later.
+  i18n-projection-drift:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # The generator parses the catalog with the TypeScript compiler's own
+      # AST, and typescript is a frontend dependency.
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --prefer-offline
+
+      - name: Check the committed i18n projection matches the frontend catalog
+        run: node scripts/generate-i18n-projection.mjs --check
+
   # ── Domain scope contract lint (blocking) ─────────────────────────────────
   domain-scope-lint:
     runs-on: ubuntu-latest

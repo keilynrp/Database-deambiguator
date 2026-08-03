@@ -49,10 +49,20 @@ Two things the reading showed that the tests did not:
 
 ## 2. Catalog projection
 
-- [ ] 2.1 Add a script that emits a JSON projection of `frontend/app/i18n/translations.ts`, one object per language
-- [ ] 2.2 Commit the generated projection under `backend/i18n/`
-- [ ] 2.3 Test: regenerating the projection from an unchanged source produces a byte-identical file (deterministic ordering)
-- [ ] 2.4 CI gate: fail when the committed projection differs from a fresh regeneration
+- [x] 2.1 `scripts/generate-i18n-projection.mjs` emits one JSON file per language. Parsed with the **TypeScript compiler's AST**, not a regex: the catalog holds apostrophes (`Cramér's V`), arrows (`Análisis completo →`) and interpolation braces (`{platform}`), and a regex over quoted strings gets those subtly wrong — a defect nobody notices until a reader does. Spot-checked all four forms survive.
+- [x] 2.2 Committed as `backend/i18n/catalog.en.json` and `catalog.es.json` — **3402 keys each**, matching the source exactly. `backend/i18n/__init__.py` exposes `CATALOG_DIR`, `LANGUAGES`, `DEFAULT_LANGUAGE` only; lookup arrives in phase 3.
+- [x] 2.3 Determinism is enforced **inside the generator** rather than by a test. `--check` renders twice and compares before comparing to the committed file, so every CI run proves it. A pytest that shells out to Node would skip wherever Node is absent, and a gate that silently skips is a gate that cannot fail — see 4.3.
+- [x] 2.4 CI gate `i18n-projection-drift` in `.github/workflows/lint.yml`, blocking. Given its own job rather than folded into `frontend-lint-repo`, which is `continue-on-error: true` and would have made the gate advisory without saying so.
+
+Mutation-checked, since a gate that passes when written has proven nothing:
+
+| mutation | pytest | `--check` |
+|---|---|---|
+| keys unsorted | fails `test_keys_are_sorted` | exit 1 |
+| one key dropped | fails `test_every_key_in_the_source_survives_the_projection` | exit 1 |
+| unmodified | 7 passed | exit 0 |
+
+`test_i18n_catalog_projection.py` counts keys **off `translations.ts` directly**, not off the generator's output — a generator that drops keys and a test reading only that generator's output would agree with each other and both be wrong.
 
 ## 3. Catalog module
 
