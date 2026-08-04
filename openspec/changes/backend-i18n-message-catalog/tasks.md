@@ -66,11 +66,28 @@ Mutation-checked, since a gate that passes when written has proven nothing:
 
 ## 3. Catalog module
 
-- [ ] 3.1 Write failing tests for lookup: existing key in EN, same key in ES, absent key
-- [ ] 3.2 Implement the catalog loader and `translate(key, lang, **params)`
-- [ ] 3.3 Test: an absent key returns the key itself, logs a warning, and does not raise
-- [ ] 3.4 Test: interpolation parameters survive in both languages, and interpolated values are not translated
-- [ ] 3.5 Test: a key lacking a surface prefix (`report.`, `email.`, `validation.`) is rejected
+- [x] 3.1 Tests written first, RED on a missing module — `test_i18n_translate.py`, 22 tests. Exercised against an **injected** fixture catalog: the backend's own `report.`/`email.`/`validation.` keys do not exist yet (they arrive in phases 6–7), and asserting on frontend keys would test a lookup the backend must never perform. One test reads the real projection, to prove the loader points at the file phase 2 committed.
+- [x] 3.2 `backend/i18n/catalog.py` — `translate(key, language=None, **params)`, `lru_cache`d per-language loader.
+- [x] 3.3 Absent key returns the key, logs a warning, does not raise. **A key present only in EN serves EN rather than the raw key** — one-sided keys are a phase-4 CI failure, not a runtime crash.
+- [x] 3.4 Interpolation mirrors the frontend's `replaceAll`, deliberately **not** `str.format`: format raises on an unsupplied placeholder and chokes on any catalog string holding a literal brace. An unsupplied placeholder stays visible — a cosmetic defect, where failing report generation would be an outage. Interpolated values are inserted verbatim, verified with a value that is itself a catalog key.
+- [x] 3.5 A key with no surface prefix raises `ValueError`. Deliberately different from a missing key: a malformed key is a **call-site defect**, deterministic and caught by any test on that path, whereas a missing key is data and degrades. Rendering `nav.home` into a PDF would put a sidebar label in a report.
+
+Mutation-checked, 5 mutations, all caught:
+
+| mutation | caught by |
+|---|---|
+| prefix guard removed | `test_a_key_without_a_surface_prefix_is_rejected` |
+| missing key raises | `test_every_declared_surface_prefix_is_accepted` |
+| missing-key warning silenced | `test_absent_key_logs_a_warning` |
+| `str.format` instead of replace | `test_a_missing_parameter_is_left_visible_rather_than_raising` |
+| language resolver deleted | `test_an_unsupported_language_resolves_to_the_default` |
+
+⚠️ **The last one initially passed with the resolver deleted** — 20/20 green against
+broken code. Asserting that `translate(..., "fr")` returns English does not test language
+resolution: with the resolver gone the lookup misses in the empty `fr` catalog and the
+*missing-key* path serves English anyway, so the test was satisfied by a mechanism it did
+not name. Rewritten to assert on `_resolve_language` directly and on a warning that says
+"unsupported", which is distinct from the missing-key warning that also names a language.
 
 ## 4. Parity gate
 
