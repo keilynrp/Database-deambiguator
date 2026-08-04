@@ -20,86 +20,21 @@
  * that flaps is a gate the team learns to ignore.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const SOURCE = join(ROOT, "frontend", "app", "i18n", "translations.ts");
-const OUT_DIR = join(ROOT, "backend", "i18n");
+import {
+  PROJECTION_DIR as OUT_DIR,
+  extractCatalogs as readSource,
+  fail as failWith,
+} from "./lib/i18n-catalog.mjs";
 
 const CHECK_ONLY = process.argv.includes("--check");
 
-// TypeScript is a frontend dependency, not a repo-root one.
-const require = createRequire(join(ROOT, "frontend", "package.json"));
-const ts = require("typescript");
+/** @type {(message: string) => never} */
+const fail = (message) => failWith("i18n-projection", message);
 
-function fail(message) {
-  console.error(`[i18n-projection] ${message}`);
-  process.exit(1);
-}
-
-/** Read `export const translations = { en: {...}, es: {...} }` off the AST. */
-function extractCatalogs() {
-  if (!existsSync(SOURCE)) fail(`source catalog not found at ${SOURCE}`);
-
-  const source = ts.createSourceFile(
-    SOURCE,
-    readFileSync(SOURCE, "utf8"),
-    ts.ScriptTarget.Latest,
-    /* setParentNodes */ true,
-  );
-
-  let translations = null;
-  source.forEachChild((node) => {
-    if (!ts.isVariableStatement(node)) return;
-    for (const decl of node.declarationList.declarations) {
-      if (ts.isIdentifier(decl.name) && decl.name.text === "translations") {
-        translations = decl.initializer;
-      }
-    }
-  });
-
-  if (!translations || !ts.isObjectLiteralExpression(translations)) {
-    fail("could not find `export const translations = { ... }` in the source");
-  }
-
-  const catalogs = {};
-  for (const languageProp of translations.properties) {
-    if (!ts.isPropertyAssignment(languageProp)) {
-      fail("a language entry is not a plain property — spreads are not supported");
-    }
-    const language = propertyName(languageProp.name);
-    if (!ts.isObjectLiteralExpression(languageProp.initializer)) {
-      fail(`the '${language}' entry is not an object literal`);
-    }
-
-    const entries = {};
-    for (const entry of languageProp.initializer.properties) {
-      if (!ts.isPropertyAssignment(entry)) {
-        fail(`'${language}' contains an entry that is not a key: value pair`);
-      }
-      const key = propertyName(entry.name);
-      if (!ts.isStringLiteral(entry.initializer) && !ts.isNoSubstitutionTemplateLiteral(entry.initializer)) {
-        fail(`'${language}.${key}' is not a plain string literal`);
-      }
-      if (key in entries) {
-        fail(`'${language}.${key}' is defined twice in the source catalog`);
-      }
-      // `.text` is the *cooked* value: escapes already resolved, quotes gone.
-      entries[key] = entry.initializer.text;
-    }
-    catalogs[language] = entries;
-  }
-
-  return catalogs;
-}
-
-function propertyName(name) {
-  if (ts.isIdentifier(name)) return name.text;
-  if (ts.isStringLiteral(name)) return name.text;
-  fail("a computed or numeric property name appears in the catalog");
-}
+/** The AST reader is shared with the parity gate so both see one catalog. */
+const extractCatalogs = () => readSource(fail);
 
 /** Sorted keys and a trailing newline: the file has to diff cleanly. */
 function render(entries) {

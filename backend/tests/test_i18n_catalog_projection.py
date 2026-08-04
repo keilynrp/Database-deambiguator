@@ -57,6 +57,38 @@ class TestProjectionShape:
         assert all(k.strip() for k in catalog), "the projection contains a blank key"
 
 
+class TestParity:
+    """A second reading of the parity contract, from the backend's side.
+
+    `scripts/check-i18n-parity.mjs` is the gate; this is not a substitute for
+    it, because it cannot see `translations.ts` (the source) and the gate can.
+    It exists because the projection is what the backend actually loads, and a
+    one-sided key there is a report rendering a bare key to a reader. Catching
+    that in the suite everyone runs is worth the overlap.
+    """
+
+    def test_english_and_spanish_hold_the_same_keys(self):
+        english, spanish = set(_load("en")), set(_load("es"))
+
+        missing_es = sorted(english - spanish)
+        missing_en = sorted(spanish - english)
+        assert not missing_es and not missing_en, (
+            f"{len(missing_es)} key(s) absent from Spanish (e.g. {missing_es[:3]}), "
+            f"{len(missing_en)} absent from English (e.g. {missing_en[:3]})"
+        )
+
+    def test_parity_is_checked_against_more_than_a_count(self):
+        """Equal totals are not parity — two catalogs can differ key for key.
+
+        Asserting `len(en) == len(es)` would pass while every key differed, so
+        the test above compares sets. This one pins that intent so a future
+        simplification to a length check is a deliberate act, not a slip.
+        """
+        english, spanish = set(_load("en")), set(_load("es"))
+
+        assert english == spanish
+
+
 class TestProjectionMatchesSource:
     def test_every_key_in_the_source_survives_the_projection(self):
         """The projection is a mirror, not a subset.

@@ -97,11 +97,25 @@ not name. Rewritten to assert on `_resolve_language` directly and on a warning t
 type system does not check it either. The two sides are at exact parity today (3,402 keys each,
 zero one-sided, zero duplicates) purely by discipline. This phase writes the gate.
 
-- [ ] 4.1 Write the parity gate over the **frontend** catalog first — it is the source the backend projects from, and gating only the projection would move the failure upstream rather than prevent it
-- [ ] 4.2 Extend the same gate to the backend projection; assert it fails on an EN-only key and on an ES-only key
-- [ ] 4.3 Mutation-check the gate: introduce a one-sided key on each side and confirm CI actually goes red — a gate that passes when written has proven nothing
-- [ ] 4.4 Confirm the gate is green against the catalog as it stands, so it lands enforcing rather than with a baseline of existing violations
-- [ ] 4.5 Document in the gate itself that it verifies presence, not translation quality
+- [x] 4.1 `scripts/check-i18n-parity.mjs` checks the **frontend** catalog. The AST reader was first extracted to `scripts/lib/i18n-catalog.mjs`, shared with the generator — parsing the catalog twice, two different ways, is how two gates end up vouching for different files.
+- [x] 4.2 The same gate checks the backend projection, and `test_i18n_catalog_projection.py::TestParity` checks it again from the suite. Overlap is deliberate: the projection is what the backend loads, and a one-sided key there is a report rendering a bare key to a reader.
+- [x] 4.3 Mutation-checked, **4/4 caught**, both directions × both surfaces. Each failure names the key and the missing language.
+- [x] 4.4 Green against the catalog as it stands (`en=3402 es=3402`, zero one-sided) — it lands enforcing rather than grandfathering violations.
+- [x] 4.5 Stated in the script's own header, in its failure output, and in the CI step comment: **presence only**. A fluent mistranslation, an English string pasted into the Spanish block, or a literal `TODO` all pass.
+
+| mutation | surface | result |
+|---|---|---|
+| key added to `en` only | `translations.ts` | exit 1 — *'mutation.only_in_en' is missing from 'es'* |
+| key added to `es` only | `translations.ts` | exit 1 — *'mutation.solo_en_es' is missing from 'en'* |
+| key deleted from `catalog.es.json` | projection | exit 1 — names the key and `es` |
+| key deleted from `catalog.en.json` | projection | exit 1 — names the key and `en` |
+| unmodified | both | exit 0 |
+
+The pytest side catches the projection mutations too (3 tests fail).
+
+`TestParity` deliberately compares **key sets, not counts**: `len(en) == len(es)` would pass
+while every key differed. A second test pins that intent so a future simplification to a
+length check has to be a deliberate act rather than a slip.
 
 ## 5. Locale resolution
 
