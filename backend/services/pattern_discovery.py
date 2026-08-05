@@ -10,6 +10,8 @@ from typing import Any
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from backend.i18n.catalog import translate
+
 from backend import models
 from backend.tenant_access import scope_query_to_org
 
@@ -177,7 +179,7 @@ class PatternDiscoveryService:
                 "impact_score": score,
                 "evidence": f"{count:,} registros comparten este concepto dentro del portafolio analizado.",
                 "entities": [cls._entity_ref(entity) for entity in concept_entities[concept]],
-                "recommended_action": "Explorar este cluster como posible lente narrativo o línea estratégica.",
+                "recommended_action": translate("report.hidden_patterns.semantic_cluster.action"),
             })
         return patterns
 
@@ -209,12 +211,12 @@ class PatternDiscoveryService:
         return [{
             "id": f"impact_outlier:{lead.id}",
             "type": "impact_outlier",
-            "label": "Output de impacto atípico",
+            "label": translate("report.hidden_patterns.impact_outlier.label"),
             "confidence": cls._confidence(score),
             "impact_score": score,
             "evidence": f"{lead.primary_label or 'This record'} clearly exceeds the portfolio citation baseline ({citations:,} citations).",
             "entities": [cls._entity_ref(lead)],
-            "recommended_action": "Usarlo como ancla del brief y revisar manualmente su contexto institucional.",
+            "recommended_action": translate("report.hidden_patterns.impact_outlier.action"),
         }]
 
     @classmethod
@@ -229,12 +231,12 @@ class PatternDiscoveryService:
         return [{
             "id": "quality_gap:low-confidence-records",
             "type": "quality_gap",
-            "label": "Brecha oculta de calidad",
+            "label": translate("report.hidden_patterns.quality_gap.label"),
             "confidence": cls._confidence(score),
             "impact_score": score,
             "evidence": f"{len(low):,} registros tienen baja calidad y pueden distorsionar la lectura ejecutiva.",
             "entities": [cls._entity_ref(entity) for entity in weakest],
-            "recommended_action": "Priorizar revisión de estos registros antes de compartir conclusiones externas.",
+            "recommended_action": translate("report.hidden_patterns.quality_gap.action"),
         }]
 
     @classmethod
@@ -260,12 +262,12 @@ class PatternDiscoveryService:
         return [{
             "id": f"provider_gap:{provider}",
             "type": "provider_gap",
-            "label": "Dependencia fuerte de una fuente",
+            "label": translate("report.hidden_patterns.provider_gap.label"),
             "confidence": cls._confidence(score),
             "impact_score": score,
             "evidence": f"{provider} accounts for {round(share * 100)}% of the records analysed.",
             "entities": [],
-            "recommended_action": "Comparar con fuentes complementarias para reducir sesgo de cobertura.",
+            "recommended_action": translate("report.hidden_patterns.provider_gap.action"),
         }]
 
     @classmethod
@@ -288,12 +290,12 @@ class PatternDiscoveryService:
         return [{
             "id": f"duplicate_candidate:{cls._label_key(group[0].primary_label)}",
             "type": "duplicate_candidate",
-            "label": "Posibles variantes duplicadas",
+            "label": translate("report.hidden_patterns.duplicate_variants.label"),
             "confidence": cls._confidence(score),
             "impact_score": score,
             "evidence": f"{len(candidates[0])} registros comparten una etiqueta normalizada muy similar.",
             "entities": [cls._entity_ref(entity) for entity in group],
-            "recommended_action": "Revisar si deben fusionarse, normalizarse o mantenerse como variantes.",
+            "recommended_action": translate("report.hidden_patterns.duplicate_variants.action"),
         }]
 
     @classmethod
@@ -332,12 +334,12 @@ class PatternDiscoveryService:
         return [{
             "id": f"collaboration_bridge:{leader.id}",
             "type": "collaboration_bridge",
-            "label": "Entidad puente en el grafo",
+            "label": translate("report.hidden_patterns.collaboration_bridge.label"),
             "confidence": cls._confidence(score),
             "impact_score": score,
             "evidence": f"{leader.primary_label or 'This entity'} concentrates {leader_degree} relationships; the dominant relation is {dominant_relation}.",
             "entities": [cls._entity_ref(leader)],
-            "recommended_action": "Inspeccionar esta entidad como puente entre comunidades, autores o temas.",
+            "recommended_action": translate("report.hidden_patterns.collaboration_bridge.action"),
         }]
 
     @staticmethod

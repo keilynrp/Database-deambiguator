@@ -212,9 +212,30 @@ later in this plan would revisit the chat, and the note would outlive the intent
 
 Group A — report surface, no threading required (one PR):
 
-- [ ] 6.1 `services/impact_projection.py` — 10 [`report.`], all static, including the recommendations reclassified in correction 3
-- [ ] 6.2 `services/pattern_discovery.py` — the 6 static strings [`report.`]; the 4 composed sentences became English in 1b and take no key
-- [ ] 6.3 `services/researcher_topic_analytics.py` — 2 metric descriptions [`report.`]
+- [x] 6.1 `services/impact_projection.py` — 10 [`report.`], all static. The three-band recommendation/brief-angle pairs collapse to a `band` variable plus two keyed lookups, so the branching stays and the copy leaves.
+- [x] 6.2 `services/pattern_discovery.py` — **11 strings, not the 6 the inventory recorded** (see correction 4 below) [`report.`]; the 4 composed sentences became English in 1b and take no key
+- [x] 6.3 `services/researcher_topic_analytics.py` — 2 metric descriptions [`report.`]
+
+**Correction 4 — the extractor missed Spanish that carries no accent.**
+
+The inventory recorded 6 static strings in `pattern_discovery.py`. There are **11**. The
+three it missed have no accented character at all:
+
+| missed | |
+|---|---|
+| `"Dependencia fuerte de una fuente"` | provider-gap label |
+| `"Posibles variantes duplicadas"` | duplicate-variants label |
+| `"Entidad puente en el grafo"` | collaboration-bridge label |
+
+This is the **mirror image of the false-positive problem**, and it has the same root. The
+extractor keyed partly on orthography, so English docstrings entered the inventory *for
+having* accents (`Cramér's V`, `Kölner Phonetik`) and real Spanish stayed out *for lacking
+them*. Correction 1 documented only the first half, because classifying by reading fixes
+what an extractor **over-includes** and can never reveal what it **left out**.
+
+Practical consequence for group B: locate strings by **structure** — the dict keys a
+module renders (`"label":`, `"recommended_action":`, `"description":`) — not by
+orthography. Group A's real total is **23 strings, not 18**.
 
 Group B — API surface, resolved language threaded from the request (one PR):
 

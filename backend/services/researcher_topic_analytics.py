@@ -9,6 +9,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from backend.i18n.catalog import translate
+
 from backend import models
 from backend.services.entity_query import entity_base_q
 
@@ -518,7 +520,7 @@ def topic_researcher_graph(
             ),
         },
         "scoring": {
-            "topic_score": "Normaliza coincidencia tema-texto, cantidad de registros y señal de citas a una escala 0-100.",
-            "coauthor_weight": "Número de registros del tema en los que aparece el par de investigadores.",
+            "topic_score": translate("report.researcher_topics.scoring.topic_score"),
+            "coauthor_weight": translate("report.researcher_topics.scoring.coauthor_weight"),
         },
     }
