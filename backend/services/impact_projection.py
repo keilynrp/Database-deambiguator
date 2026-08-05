@@ -4,6 +4,8 @@ import hashlib
 import math
 from typing import Any
 
+from backend.i18n.catalog import translate
+
 import numpy as np
 
 
@@ -62,14 +64,14 @@ class ImpactProjectionService:
         optimistic = round(float(p90))
 
         if expected >= 70 and confidence != "low":
-            recommendation = "El portafolio ya sostiene una narrativa de impacto defendible para stakeholders."
-            brief_angle = "Enfatizar evidencia de impacto, outputs destacados y oportunidades de posicionamiento."
+            band = "strong"
         elif expected >= 45:
-            recommendation = "Usar la proyección como lectura direccional y reforzar calidad/cobertura antes de escalar."
-            brief_angle = "Presentar el impacto como escenario probable, explicando brechas y supuestos."
+            band = "probable"
         else:
-            recommendation = "Tratar el impacto como señal temprana; enriquecer y revisar antes del brief externo."
-            brief_angle = "Enmarcar el brief como línea base inicial, no como conclusión de impacto."
+            band = "early"
+
+        recommendation = translate(f"report.impact_projection.recommendation.{band}")
+        brief_angle = translate(f"report.impact_projection.brief_angle.{band}")
 
         return {
             "method": "monte_carlo",
@@ -90,10 +92,7 @@ class ImpactProjectionService:
             },
             "recommendation": recommendation,
             "brief_angle": brief_angle,
-            "explanation": (
-                "Proyección probabilística basada en cobertura de enriquecimiento, calidad, "
-                "citas promedio y concentración de entidades de alto impacto."
-            ),
+            "explanation": translate("report.impact_projection.explanation.default"),
         }
 
     @staticmethod
@@ -123,7 +122,7 @@ class ImpactProjectionService:
             "confidence_score": 0,
             "interval_width": 0,
             "drivers": {"coverage": 0, "quality": 0, "citation_signal": 0, "concentration": 0},
-            "recommendation": "Importa y enriquece registros para generar una proyección de impacto.",
-            "brief_angle": "El brief debe presentarse como preparación del portafolio, todavía sin lectura de impacto.",
-            "explanation": "No hay suficientes registros para correr una proyección probabilística.",
+            "recommendation": translate("report.impact_projection.recommendation.insufficient"),
+            "brief_angle": translate("report.impact_projection.brief_angle.insufficient"),
+            "explanation": translate("report.impact_projection.explanation.insufficient"),
         }

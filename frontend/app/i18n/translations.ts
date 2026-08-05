@@ -2,6 +2,32 @@ export type Language = 'en' | 'es';
 
 export const translations = {
     en: {
+        // Backend: researcher topic scoring (phase 6, report surface)
+        'report.researcher_topics.scoring.topic_score': 'Normalises topic-text match, record count and citation signal onto a 0-100 scale.',
+        'report.researcher_topics.scoring.coauthor_weight': 'Number of records on the topic in which the pair of researchers both appear.',
+        // Backend: hidden patterns (phase 6, report surface)
+        'report.hidden_patterns.semantic_cluster.action': 'Explore this cluster as a possible narrative lens or strategic line.',
+        'report.hidden_patterns.impact_outlier.label': 'Impact outlier',
+        'report.hidden_patterns.impact_outlier.action': 'Use it as the brief\'s anchor and review its institutional context by hand.',
+        'report.hidden_patterns.quality_gap.label': 'Hidden quality gap',
+        'report.hidden_patterns.quality_gap.action': 'Prioritise reviewing these records before sharing conclusions externally.',
+        'report.hidden_patterns.provider_gap.label': 'Heavy dependence on a single source',
+        'report.hidden_patterns.provider_gap.action': 'Compare against complementary sources to reduce coverage bias.',
+        'report.hidden_patterns.duplicate_variants.label': 'Possible duplicate variants',
+        'report.hidden_patterns.duplicate_variants.action': 'Review whether these should be merged, normalised, or kept as variants.',
+        'report.hidden_patterns.collaboration_bridge.label': 'Bridging entity in the graph',
+        'report.hidden_patterns.collaboration_bridge.action': 'Inspect this entity as a bridge between communities, authors or topics.',
+        // Backend: impact projection (phase 6, report surface)
+        'report.impact_projection.recommendation.strong': 'The portfolio already supports an impact narrative that will hold up with stakeholders.',
+        'report.impact_projection.brief_angle.strong': 'Lead with impact evidence, standout outputs and positioning opportunities.',
+        'report.impact_projection.recommendation.probable': 'Use the projection as a directional reading, and strengthen quality and coverage before scaling.',
+        'report.impact_projection.brief_angle.probable': 'Present impact as a likely scenario, stating the gaps and assumptions it rests on.',
+        'report.impact_projection.recommendation.early': 'Treat impact as an early signal; enrich and review before any external brief.',
+        'report.impact_projection.brief_angle.early': 'Frame the brief as an initial baseline rather than a conclusion about impact.',
+        'report.impact_projection.explanation.default': 'Probabilistic projection based on enrichment coverage, quality, average citations and the concentration of high-impact entities.',
+        'report.impact_projection.recommendation.insufficient': 'Import and enrich records to produce an impact projection.',
+        'report.impact_projection.brief_angle.insufficient': 'The brief should be presented as portfolio preparation, with no impact reading yet.',
+        'report.impact_projection.explanation.insufficient': 'There are not enough records to run a probabilistic projection.',
         // Sidebar sections
         'nav.section.overview': 'Overview',
         'nav.section.data': 'Data',
@@ -3526,6 +3552,32 @@ export const translations = {
         'dashboard_showcase.high_severity': 'High',
     },
     es: {
+        // Backend: researcher topic scoring (phase 6, report surface)
+        'report.researcher_topics.scoring.topic_score': 'Normaliza coincidencia tema-texto, cantidad de registros y señal de citas a una escala 0-100.',
+        'report.researcher_topics.scoring.coauthor_weight': 'Número de registros del tema en los que aparece el par de investigadores.',
+        // Backend: hidden patterns (phase 6, report surface)
+        'report.hidden_patterns.semantic_cluster.action': 'Explorar este cluster como posible lente narrativo o línea estratégica.',
+        'report.hidden_patterns.impact_outlier.label': 'Output de impacto atípico',
+        'report.hidden_patterns.impact_outlier.action': 'Usarlo como ancla del brief y revisar manualmente su contexto institucional.',
+        'report.hidden_patterns.quality_gap.label': 'Brecha oculta de calidad',
+        'report.hidden_patterns.quality_gap.action': 'Priorizar revisión de estos registros antes de compartir conclusiones externas.',
+        'report.hidden_patterns.provider_gap.label': 'Dependencia fuerte de una fuente',
+        'report.hidden_patterns.provider_gap.action': 'Comparar con fuentes complementarias para reducir sesgo de cobertura.',
+        'report.hidden_patterns.duplicate_variants.label': 'Posibles variantes duplicadas',
+        'report.hidden_patterns.duplicate_variants.action': 'Revisar si deben fusionarse, normalizarse o mantenerse como variantes.',
+        'report.hidden_patterns.collaboration_bridge.label': 'Entidad puente en el grafo',
+        'report.hidden_patterns.collaboration_bridge.action': 'Inspeccionar esta entidad como puente entre comunidades, autores o temas.',
+        // Backend: impact projection (phase 6, report surface)
+        'report.impact_projection.recommendation.strong': 'El portafolio ya sostiene una narrativa de impacto defendible para stakeholders.',
+        'report.impact_projection.brief_angle.strong': 'Enfatizar evidencia de impacto, outputs destacados y oportunidades de posicionamiento.',
+        'report.impact_projection.recommendation.probable': 'Usar la proyección como lectura direccional y reforzar calidad/cobertura antes de escalar.',
+        'report.impact_projection.brief_angle.probable': 'Presentar el impacto como escenario probable, explicando brechas y supuestos.',
+        'report.impact_projection.recommendation.early': 'Tratar el impacto como señal temprana; enriquecer y revisar antes del brief externo.',
+        'report.impact_projection.brief_angle.early': 'Enmarcar el brief como línea base inicial, no como conclusión de impacto.',
+        'report.impact_projection.explanation.default': 'Proyección probabilística basada en cobertura de enriquecimiento, calidad, citas promedio y concentración de entidades de alto impacto.',
+        'report.impact_projection.recommendation.insufficient': 'Importa y enriquece registros para generar una proyección de impacto.',
+        'report.impact_projection.brief_angle.insufficient': 'El brief debe presentarse como preparación del portafolio, todavía sin lectura de impacto.',
+        'report.impact_projection.explanation.insufficient': 'No hay suficientes registros para correr una proyección probabilística.',
         // Sidebar sections
         'nav.section.overview': 'General',
         'nav.section.data': 'Datos',
