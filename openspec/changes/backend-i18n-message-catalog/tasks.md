@@ -119,10 +119,30 @@ length check has to be a deliberate act rather than a slip.
 
 ## 5. Locale resolution
 
-- [ ] 5.1 Write failing tests for the precedence chain: explicit parameter over header, header over default, default English
-- [ ] 5.2 Implement the resolver as a FastAPI dependency
-- [ ] 5.3 Test: an unsupported language falls back to English, succeeds, and logs the fallback
-- [ ] 5.4 Test: report generation ignores `Accept-Language` entirely — a Spanish-browser operator with no explicit parameter gets an English artefact (decided 2026-07-31; the header still applies to the rest of the API)
+- [x] 5.1 `test_i18n_locale_resolution.py`, 30 tests, RED on a missing module. Covers the chain plus `Accept-Language` parsing: q-value ordering, `q=0` meaning *not acceptable*, regional variants (`es-MX` → `es`), unsupported tags skipped rather than fatal, and malformed headers (the header is attacker-controllable and must never 500).
+- [x] 5.2 `backend/i18n/locale.py` — `resolve_language`, `resolve_report_language`, and `language_dependency` wired with FastAPI `Query`/`Header` markers.
+- [x] 5.3 An unsupported language falls back to the default, succeeds, and logs. **An unsupported explicit parameter does not fall through to the header**: the caller named a language and it is unavailable, and honouring the browser instead would hide that behind a plausible-looking result.
+- [x] 5.4 `resolve_report_language` **takes no header argument at all**, so it cannot consult one. A resolver that accepted it and chose not to read it is one refactor away from reading it; a test asserts the signature, making the boundary structural rather than conventional.
+
+Mutation-checked, 6 mutations:
+
+| mutation | result |
+|---|---|
+| explicit parameter ignored | 5 failed |
+| `q=0` entries kept | **28 passed — NOT caught** |
+| q-ordering dropped | 2 failed |
+| report resolver accepts a header | 1 failed |
+| unsupported-language warning silenced | 1 failed |
+| regional variant not stripped (`es-MX` ≠ `es`) | 2 failed |
+
+⚠️ The `q=0` test did not discriminate. `("es;q=0,en;q=0.4", "en")` passes whether `q=0`
+entries are **dropped** or merely **ranked last**, because the ordering alone already
+picks `en`. Fixed by adding `("es;q=0", "en")` and `("es;q=0,en;q=0", "en")`, where the
+rejected entry is the only candidate — now 2 tests fail on that mutation.
+
+That is the fourth non-discriminating test caught in this change. The pattern is always
+the same: **the fixture supplies a second mechanism that produces the same observable
+result**, so the assertion never depends on the one under test.
 
 ## 6. Migrate strings
 
