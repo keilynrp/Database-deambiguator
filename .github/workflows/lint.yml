@@ -64,7 +64,7 @@ jobs:
       - name: Check the committed SDK clients match sdk/openapi.json
         run: bash scripts/generate-sdk-clients.sh --check
 
-  # ── i18n catalog projection drift (blocking) ──────────────────────────────
+  # ── i18n catalog gates (blocking) ─────────────────────────────────────────
   # frontend/app/i18n/translations.ts is the single definition of every
   # user-facing string; backend/i18n/catalog.*.json is a generated mirror the
   # backend loads. A stale mirror serves text the product no longer says, and
@@ -72,7 +72,14 @@ jobs:
   # nobody is looking. This job fails the PR that edited the catalog without
   # regenerating. `--check` also regenerates twice and compares, so a
   # non-deterministic generator fails here rather than flapping later.
-  i18n-projection-drift:
+  #
+  # The second step is the EN/ES parity gate. Contrary to what #209 and the
+  # original proposal both stated, no such gate existed anywhere before this —
+  # not in CI, not in the test suite, and not in the type system, since
+  # LanguageContext.tsx casts the catalog to Record<Language, Record<string,
+  # string>> and a cast checks nothing. Parity held by whoever last edited the
+  # file.
+  i18n-catalog-gates:
     runs-on: ubuntu-latest
 
     steps:
@@ -94,6 +101,14 @@ jobs:
 
       - name: Check the committed i18n projection matches the frontend catalog
         run: node scripts/generate-i18n-projection.mjs --check
+
+      # Presence only. It cannot tell a translation from a placeholder, which is
+      # stated in the script rather than left for someone to infer from a green
+      # check. Covers the frontend catalog as well as the projection: gating
+      # only the mirror would move a one-sided key one file upstream instead of
+      # preventing it.
+      - name: Check EN/ES parity across the catalog and its projection
+        run: node scripts/check-i18n-parity.mjs
 
   # ── Domain scope contract lint (blocking) ─────────────────────────────────
   domain-scope-lint:
