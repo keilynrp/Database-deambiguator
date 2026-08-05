@@ -28,7 +28,22 @@ logger = logging.getLogger(__name__)
 #: The backend owns these namespaces inside the shared key space. A key without
 #: one of them belongs to the frontend, and rendering it server-side would put
 #: UI chrome into a PDF.
-SURFACE_PREFIXES = ("report.", "email.", "validation.")
+#:
+#: One prefix per surface the backend actually serves, rather than one blanket
+#: `backend.`: the guard's job is to keep frontend chrome out of server-rendered
+#: artefacts, and a key that names its surface also says whether it is allowed
+#: to reach a PDF. The first three came from the report-and-email framing of
+#: #209; the rest were added in phase 6, when migrating the strings showed that
+#: framing covered only 18 of 70.
+SURFACE_PREFIXES = (
+    "report.",  # PDF / PPTX / Excel artefact text
+    "email.",  # outbound mail subjects and bodies
+    "validation.",  # record-level failure reasons and remediation hints
+    "field.",  # field labels, help and examples served to the import wizard
+    "chat.",  # agentic chat replies and suggested follow-ups
+    "dashboard.",  # dashboard titles and descriptions served over the API
+    "preset.",  # audience preset names, descriptions and export CTAs
+)
 
 __all__ = ["translate", "SURFACE_PREFIXES"]
 

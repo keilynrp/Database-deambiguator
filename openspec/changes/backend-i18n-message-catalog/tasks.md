@@ -22,7 +22,7 @@ them to English here would be writing text this change then replaces.
 - [x] 1b.1 Failing test written first — `test_report_language_hidden_patterns.py`, 6 tests, one per
       composed string, RED 6/6 before the conversions. **Scoped to the composed strings, not the
       section.** The task as written ("no Spanish appears in the section") is a phase-6 assertion:
-      the static sentences in the same modules are still Spanish by design until 6.4–6.7, so that
+      the static sentences in the same modules are still Spanish by design until 6.1–6.2, so that
       test would be red for reasons this phase does not own. It belongs at 6.9 and is noted there.
 - [x] 1b.2 Converted the 4 composed `services/pattern_discovery.py` strings, every interpolation
       argument preserved: semantic cluster label (175), impact-outlier evidence (215), provider-gap
@@ -148,16 +148,82 @@ result**, so the assertion never depends on the one under test.
 
 Ordered by count so the largest surfaces land first; each module is independently revertable.
 
-- [ ] 6.1 `services/domain_neutral_labels.py`
-- [ ] 6.2 `services/audience_presets.py`
-- [ ] 6.3 `enrichment_worker.py`
-- [ ] 6.4 `services/impact_projection.py` — all 10 strings, including the static recommendations reclassified in correction 3
-- [ ] 6.5 `services/pattern_discovery.py` — the 6 static strings; the 4 composed sentences were converted to English in 1b and take no key
-- [ ] 6.6 `services/field_correspondence.py`
-- [ ] 6.7 `routers/dashboards.py`, `analyzers/correlation.py`, `services/researcher_topic_analytics.py`
-- [ ] 6.8 Remaining single-string modules from the inventory
-- [ ] 6.9 Verify no user-facing Spanish literal remains outside the catalog, using the classified inventory rather than the regex
-- [ ] 6.10 Add the section-wide assertion deferred from 1b.1: an English-generated report's Hidden Patterns section contains no Spanish at all. Only meaningful once 6.4–6.7 have landed
+**The module list below was rebuilt from `inventory.md` on 2026-08-05.** The original
+list contradicted the inventory in three ways, and one of them was destructive:
+
+- **6.6 named `services/field_correspondence.py`.** Correction 2 classifies its 10
+  Spanish strings as **input-matching aliases** — `"Identificador único": "canonical_id"`,
+  provenance `header_alias` — that map incoming CSV headers so users can upload Spanish
+  spreadsheets. Verified in the code before removing it from scope. Migrating them would
+  break Spanish imports, which is the exact damage the inventory warned about.
+- **6.7 named `analyzers/correlation.py`.** Its only accented string is the English
+  docstring `"""Compute pairwise Cramér's V between categorical fields."""` — one of the
+  27 false positives matched on orthography rather than language. Nothing to migrate.
+- **`services/agentic_research_chat.py` appeared nowhere**, despite being the second
+  largest module at 12 strings. It would have fallen under "remaining single-string
+  modules", which it is not.
+
+**23 of the 70 are in dead modules and are out of scope** (decided 2026-08-05):
+
+| module | strings | importers in `backend/` | tests |
+|---|---|---|---|
+| `services/domain_neutral_labels.py` | 14 | **0** | only in top-level `tests/`, which CI does not run |
+| `services/audience_presets.py` | 9 | **0** | only in top-level `tests/`, which CI does not run |
+
+Nothing in the application imports either one — verified across the whole repo by symbol,
+not just by import line. Their tests give an appearance of coverage over code no user can
+reach. Migrating them would mean adding ~23 catalog keys and rewiring modules nobody
+calls. They are left untouched; **deleting them is a separate decision** and is not part
+of an i18n change.
+
+This exposes a gap in the task-1 methodology worth carrying forward: the inventory
+classified each string **by reading it**, which caught the 47 false positives and the 14
+input aliases — but it judged "user-facing" from the string's *content*, never from
+whether any user can reach it. A perfectly user-facing Spanish string inside a module
+nothing imports is still not user-facing.
+
+`routers/demo.py` was checked the same way and **is** live — `app.include_router(demo.router)`
+in `main.py:547`. An import-line grep missed it; the router mount is what settles it.
+
+Scope is therefore **47 strings across 8 live modules**. Ordered by count, largest first;
+each module independently revertable. Surface prefix per module in brackets.
+
+### The split is by surface, not by size
+
+An earlier version of this list grouped the modules by string count. That is the same
+mistake corrections 2 and 3 already caught twice in this change — **grouping by an
+incidental attribute instead of the property that decides the work.** The property here
+is whether the surface has a language signal available at the call site, and it separates
+the 47 strings into two groups with entirely different risk:
+
+| surface | modules | strings | is English-by-default a regression? |
+|---|---|---|---|
+| **report** | `impact_projection`, `pattern_discovery`, `researcher_topic_analytics` | 18 | **No.** Reports already default to English by decision (2026-07-31) and ignore `Accept-Language`; phase 8 adds the explicit parameter. Migrating with the default *is* the intended behaviour. |
+| **API** | `agentic_research_chat`, `enrichment_worker`, `dashboards`, `demo`, `assistant_actions` | 29 | **Yes.** These answer a client that knows its language. They are Spanish-only today, so a bare `translate(key)` would take Spanish away from the readers who currently have it. |
+
+**Group B therefore threads the resolved language** through `language_dependency`, which
+phase 5 landed in `main` and nothing yet uses. That is not scope creep: migrating a
+string means the migrated version is at least as good as the one it replaced, and
+swapping "Spanish for everyone" for "English for everyone" is not a migration, it is
+breaking half the readers. The catalog exists so that both work.
+
+Deferring it was considered and rejected: phase 8 is explicitly about reports, so nothing
+later in this plan would revisit the chat, and the note would outlive the intention.
+
+Group A — report surface, no threading required (one PR):
+
+- [ ] 6.1 `services/impact_projection.py` — 10 [`report.`], all static, including the recommendations reclassified in correction 3
+- [ ] 6.2 `services/pattern_discovery.py` — the 6 static strings [`report.`]; the 4 composed sentences became English in 1b and take no key
+- [ ] 6.3 `services/researcher_topic_analytics.py` — 2 metric descriptions [`report.`]
+
+Group B — API surface, resolved language threaded from the request (one PR):
+
+- [ ] 6.4 `services/agentic_research_chat.py` — 12 [`chat.`]: fallback replies and suggested follow-ups. Its Spanish *intent regexes* were deleted by #227/PR #239 and are not in scope; these are output strings only. ⚠️ the inventory's line numbers are stale for exactly that reason — locate the strings, do not trust them
+- [ ] 6.5 `enrichment_worker.py` — 11 [`validation.`]: remediation hints and failure reasons shown to operators
+- [ ] 6.6 `routers/dashboards.py` (2) [`dashboard.`], `routers/demo.py` (2) [`dashboard.`]
+- [ ] 6.7 `services/assistant_actions.py` — 2 [`chat.`]
+- [ ] 6.8 Verify no user-facing Spanish literal remains **in a live module** outside the catalog, using the classified inventory rather than the regex — and confirm the 14 input aliases in `field_correspondence.py` and `backfill_canonical_id_entity_type.py` are still present verbatim, plus the two dead modules untouched
+- [ ] 6.9 Add the section-wide assertion deferred from 1b.1: an English-generated report's Hidden Patterns section contains no Spanish. Only meaningful once 6.1–6.2 have landed
 
 ## 7. Email
 
