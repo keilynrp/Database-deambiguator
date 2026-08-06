@@ -7,18 +7,34 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.agentic_chat_request import AgenticChatRequest
 from ...models.http_validation_error import HTTPValidationError
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
     body: AgenticChatRequest,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+    if not isinstance(accept_language, Unset):
+        headers["accept-language"] = accept_language
+
+    params: dict[str, Any] = {}
+
+    json_language: None | str | Unset
+    if isinstance(language, Unset):
+        json_language = UNSET
+    else:
+        json_language = language
+    params["language"] = json_language
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/agentic-chat/query",
+        "params": params,
     }
 
     _kwargs["json"] = body.to_dict()
@@ -62,12 +78,17 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: AgenticChatRequest,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Response[Any | HTTPValidationError]:
     """Agentic Chat Query
 
      Answer scoped research questions using RAG, NLQ and tool traces.
 
     Args:
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
         body (AgenticChatRequest):
 
     Raises:
@@ -80,6 +101,8 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+        language=language,
+        accept_language=accept_language,
     )
 
     response = client.get_httpx_client().request(
@@ -93,12 +116,17 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: AgenticChatRequest,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Any | HTTPValidationError | None:
     """Agentic Chat Query
 
      Answer scoped research questions using RAG, NLQ and tool traces.
 
     Args:
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
         body (AgenticChatRequest):
 
     Raises:
@@ -112,6 +140,8 @@ def sync(
     return sync_detailed(
         client=client,
         body=body,
+        language=language,
+        accept_language=accept_language,
     ).parsed
 
 
@@ -119,12 +149,17 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: AgenticChatRequest,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Response[Any | HTTPValidationError]:
     """Agentic Chat Query
 
      Answer scoped research questions using RAG, NLQ and tool traces.
 
     Args:
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
         body (AgenticChatRequest):
 
     Raises:
@@ -137,6 +172,8 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+        language=language,
+        accept_language=accept_language,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -148,12 +185,17 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: AgenticChatRequest,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Any | HTTPValidationError | None:
     """Agentic Chat Query
 
      Answer scoped research questions using RAG, NLQ and tool traces.
 
     Args:
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
         body (AgenticChatRequest):
 
     Raises:
@@ -168,5 +210,7 @@ async def asyncio(
         await asyncio_detailed(
             client=client,
             body=body,
+            language=language,
+            accept_language=accept_language,
         )
     ).parsed

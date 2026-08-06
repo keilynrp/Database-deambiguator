@@ -12,6 +12,7 @@ phase 2 actually committed.
 """
 
 import logging
+from pathlib import Path
 
 import pytest
 
@@ -168,4 +169,69 @@ class TestLoaderPointsAtTheCommittedProjection:
         for language in LANGUAGES:
             assert len(catalog_module._load_catalog(language)) > 3000, (
                 f"the {language} projection did not load from backend/i18n/"
+            )
+
+
+class TestLanguageCannotReachTheFilesystem:
+    """CodeQL flagged `py/path-injection` here, and it was right to.
+
+    `language` arrives from `?language=` and `Accept-Language`, and it was
+    interpolated straight into a path. Nothing exploitable reached it — every
+    caller goes through `_resolve_language` first — but that is a **non-local**
+    invariant: it holds because of a function somewhere else, it is invisible to
+    a reader of this one, and it is one direct call away from not holding.
+
+    The guard therefore lives in `_load_catalog` itself, so the path cannot be
+    derived from anything but a known language.
+    """
+
+    @pytest.mark.parametrize(
+        "hostile",
+        [
+            "../../../../etc/passwd",
+            "..\..\windows\win.ini",
+            "en/../../secrets",
+            "../catalog.en",
+            "",
+            ".",
+        ],
+    )
+    def test_a_traversal_attempt_never_touches_the_filesystem(self, monkeypatch, hostile):
+        """Asserting `== {}` would not discriminate.
+
+        An unguarded loader also returns `{}` for these, because the path it
+        builds happens not to exist — the `catalog.` prefix and `.json` suffix
+        make the attack impractical rather than impossible. What separates a
+        guard from luck is whether the path is consulted at all.
+        """
+        monkeypatch.undo()
+        catalog_module._load_catalog.cache_clear()
+        touched: list[str] = []
+        real_exists = Path.exists
+        monkeypatch.setattr(
+            Path, "exists", lambda self: (touched.append(str(self)), real_exists(self))[1]
+        )
+
+        result = catalog_module._load_catalog(hostile)
+
+        assert result == {}
+        assert not touched, f"an unsupported language reached the filesystem: {touched}"
+
+    def test_the_supported_languages_still_load(self, monkeypatch):
+        monkeypatch.undo()
+        catalog_module._load_catalog.cache_clear()
+
+        for language in LANGUAGES:
+            assert len(catalog_module._load_catalog(language)) > 3000
+
+    def test_a_key_cannot_forge_a_log_line(self, caplog):
+        """`py/log-injection`: a newline in a key must not fake a second record."""
+        forged = "report.\nWARNING:root:transfer approved"
+
+        with caplog.at_level(logging.WARNING):
+            translate(forged, "en")
+
+        for record in caplog.records:
+            assert "\n" not in record.getMessage(), (
+                f"a key forged a line break into the log: {record.getMessage()!r}"
             )

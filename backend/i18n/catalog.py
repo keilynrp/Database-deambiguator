@@ -50,7 +50,23 @@ __all__ = ["translate", "SURFACE_PREFIXES"]
 
 @lru_cache(maxsize=None)
 def _load_catalog(language: str) -> dict[str, str]:
-    """Read one language's projection. Cached — the file never changes at runtime."""
+    """Read one language's projection. Cached — the file never changes at runtime.
+
+    The whitelist is not redundant with `_resolve_language`. `language` reaches
+    this function from `?language=` and `Accept-Language`, and it is
+    interpolated into a filesystem path; that every current caller sanitises it
+    first is a **non-local** invariant — true because of a function elsewhere,
+    invisible to a reader of this one, and one direct call away from being
+    false. CodeQL flagged the flow as `py/path-injection` and was right to.
+    Checking here makes the path underivable from anything but a known language.
+    """
+    if language not in LANGUAGES:
+        logger.warning(
+            "i18n: refusing to load a catalog for unsupported language %r",
+            language,
+        )
+        return {}
+
     path = CATALOG_DIR / f"catalog.{language}.json"
     if not path.exists():
         logger.warning(
