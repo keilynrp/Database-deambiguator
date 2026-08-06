@@ -2,6 +2,31 @@ export type Language = 'en' | 'es';
 
 export const translations = {
     en: {
+        // Backend: dashboards + assistant actions (phase 6, API surface)
+        'dashboard.concept_cloud.label': 'Thematic co-occurrence',
+        'dashboard.concept_cloud.description': 'Area map of keyword pairs de-duplicated by lexical similarity',
+        'chat.action.audit_export.label': 'Export filtered audit log',
+        'chat.action.audit_export.description': 'Downloads audit events with the current filters applied.',
+        'chat.action.rag_reindex.label': 'Reindex the RAG catalogue',
+        'chat.action.rag_reindex.description': 'Rebuilds the semantic index from enriched entities.',
+        'chat.action.enrich_entity.label': 'Enrich the current record',
+        'chat.action.enrich_entity.description': 'Runs enrichment on a single entity.',
+        // Backend: agentic chat replies (phase 6, API surface)
+        'chat.fallback.unclear': 'I could not tell what kind of question this is, so I did not answer it rather than risk an answer of the wrong shape. Rephrase it asking explicitly for what you need — a count or distribution, the evidence behind something, or an analysis of patterns and gaps — or set the mode (nlq, rag or hybrid) on the query.',
+        'chat.fallback.provider_failed': 'I could not complete the query with the active LLM provider. The scope is still prepared for analysis: {records} records, {enrichment_pct}% enriched. Configure or check the AI/RAG provider and try again. Technical detail: {detail}',
+        'chat.fallback.no_evidence': 'The scope is ready to query, but there is not enough indexed evidence to produce a reliable answer. Index the RAG catalogue or run enrichment before using this question as brief evidence.',
+        'chat.nlq.reading_label': 'NLQ reading: ',
+        'chat.nlq.default_explanation': 'structured query executed',
+        'chat.nlq.result_label': '. Result: ',
+        'chat.follow_up.entity.evidence': 'What evidence supports this record?',
+        'chat.follow_up.entity.connections': 'How does it connect to other authors, affiliations or concepts?',
+        'chat.follow_up.entity.include': 'Should it be included in the final brief?',
+        'chat.follow_up.nlq.by_provider': 'Can you show the same result by provider?',
+        'chat.follow_up.nlq.top_domain': 'Which domain concentrates the most records?',
+        'chat.follow_up.nlq.by_entity_type': 'How does the distribution change by entity type?',
+        'chat.follow_up.default.supporting': 'Which records best support this conclusion?',
+        'chat.follow_up.default.gaps': 'Which gaps should I fix before the brief?',
+        'chat.follow_up.default.by_source': 'How does the pattern change by provider or ingest?',
         // Backend: researcher topic scoring (phase 6, report surface)
         'report.researcher_topics.scoring.topic_score': 'Normalises topic-text match, record count and citation signal onto a 0-100 scale.',
         'report.researcher_topics.scoring.coauthor_weight': 'Number of records on the topic in which the pair of researchers both appear.',
@@ -3552,6 +3577,31 @@ export const translations = {
         'dashboard_showcase.high_severity': 'High',
     },
     es: {
+        // Backend: dashboards + assistant actions (phase 6, API surface)
+        'dashboard.concept_cloud.label': 'Coocurrencia temática',
+        'dashboard.concept_cloud.description': 'Mapa de áreas con pares de keywords depurados por similitud léxica',
+        'chat.action.audit_export.label': 'Exportar auditoria filtrada',
+        'chat.action.audit_export.description': 'Descarga eventos de auditoria aplicando los filtros actuales.',
+        'chat.action.rag_reindex.label': 'Reindexar catalogo RAG',
+        'chat.action.rag_reindex.description': 'Reconstruye el indice semantico con entidades enriquecidas.',
+        'chat.action.enrich_entity.label': 'Enriquecer registro actual',
+        'chat.action.enrich_entity.description': 'Ejecuta enriquecimiento sobre una entidad individual.',
+        // Backend: agentic chat replies (phase 6, API surface)
+        'chat.fallback.unclear': 'No pude determinar que tipo de pregunta es esta, asi que no la respondi en lugar de arriesgar una respuesta con la forma equivocada. Reformulala pidiendo explicitamente lo que necesitas — un conteo o distribucion, la evidencia que sostiene algo, o un analisis de patrones y brechas — o fija el modo (nlq, rag o hybrid) en la consulta.',
+        'chat.fallback.provider_failed': 'No pude completar la consulta con el proveedor LLM activo. Aun asi, el alcance quedo preparado para analisis: {records} registros, {enrichment_pct}% enriquecidos. Configura o revisa el proveedor AI/RAG y vuelve a intentar. Detalle tecnico: {detail}',
+        'chat.fallback.no_evidence': 'El alcance esta listo para consulta, pero no hay suficiente evidencia indexada para producir una respuesta confiable. Indexa el catalogo RAG o ejecuta enrichment antes de usar esta pregunta como evidencia de brief.',
+        'chat.nlq.reading_label': 'Lectura NLQ: ',
+        'chat.nlq.default_explanation': 'consulta estructurada ejecutada',
+        'chat.nlq.result_label': '. Resultado: ',
+        'chat.follow_up.entity.evidence': 'Que evidencia sostiene este registro?',
+        'chat.follow_up.entity.connections': 'Como se conecta con otros autores, afiliaciones o conceptos?',
+        'chat.follow_up.entity.include': 'Conviene incluirlo en el brief final?',
+        'chat.follow_up.nlq.by_provider': 'Puedes mostrar el mismo resultado por proveedor?',
+        'chat.follow_up.nlq.top_domain': 'Que dominio concentra mas registros?',
+        'chat.follow_up.nlq.by_entity_type': 'Como cambia la distribucion por tipo de entidad?',
+        'chat.follow_up.default.supporting': 'Que registros sostienen mejor esta conclusion?',
+        'chat.follow_up.default.gaps': 'Que brechas deberia corregir antes del brief?',
+        'chat.follow_up.default.by_source': 'Como cambia el patron por proveedor o ingesta?',
         // Backend: researcher topic scoring (phase 6, report surface)
         'report.researcher_topics.scoring.topic_score': 'Normaliza coincidencia tema-texto, cantidad de registros y señal de citas a una escala 0-100.',
         'report.researcher_topics.scoring.coauthor_weight': 'Número de registros del tema en los que aparece el par de investigadores.',

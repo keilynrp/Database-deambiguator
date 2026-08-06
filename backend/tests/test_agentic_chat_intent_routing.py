@@ -23,6 +23,7 @@ from __future__ import annotations
 import pytest
 
 from backend import models
+from backend.i18n.catalog import translate
 from backend.services import agentic_research_chat as svc_module
 from backend.services.agentic_research_chat import (
     AgenticChatRequest,
@@ -148,8 +149,10 @@ def test_unclear_runs_neither_branch_and_says_so(monkeypatch, db_session):
     assert result["trace"]["nlq_used"] is False
     assert result["trace"]["mode_resolution"] == "llm"
     # The user is told the question was not understood, rather than handed a
-    # confident answer of the wrong shape.
-    assert "no pude determinar" in result["answer"].lower()
+    # confident answer of the wrong shape. Asserted against the catalog rather
+    # than a Spanish literal: this test is about routing, and pinning the copy
+    # here would make every future wording change fail an unrelated suite.
+    assert result["answer"] == translate("chat.fallback.unclear")
 
 
 # ── No classifier available is an infrastructure state, not an unclear question ──

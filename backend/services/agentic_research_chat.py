@@ -9,6 +9,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.i18n.catalog import translate
+
+#: Which follow-up questions each situation offers. The catalog holds the text;
+#: this holds only the choice, so adding a language never touches this file.
+_FOLLOW_UP_SUFFIXES = {
+    "entity": ("evidence", "connections", "include"),
+    "nlq": ("by_provider", "top_domain", "by_entity_type"),
+    "default": ("supporting", "gaps", "by_source"),
+}
+
 from backend import models
 from backend.analytics import rag_engine
 from backend.context_engine import ContextEngine
@@ -80,6 +90,7 @@ class AgenticResearchChatService:
         payload: AgenticChatRequest,
         current_user: models.User,
         org_id: int | None,
+        language: str | None = None,
     ) -> dict[str, Any]:
         # The integration is resolved before the mode because the mode now
         # depends on it: `auto` asks the provider to classify the question.
@@ -105,6 +116,7 @@ class AgenticResearchChatService:
                 errors.append(str(nlq_result["error"]))
 
         answer = cls._compose_answer(
+            language=language,
             payload=payload,
             mode_used=mode_used,
             rag_result=rag_result,
@@ -143,7 +155,7 @@ class AgenticResearchChatService:
             "trace_id": trace_id,
             "trace": trace,
             "sources": sources,
-            "follow_up_questions": cls._follow_ups(payload, mode_used),
+            "follow_up_questions": cls._follow_ups(payload, mode_used, language),
         }
 
     @staticmethod
@@ -396,6 +408,7 @@ class AgenticResearchChatService:
         nlq_result: dict[str, Any] | None,
         context: dict[str, Any],
         errors: list[str],
+        language: str | None = None,
     ) -> str:
         summary = context["blocks"].get("scope_summary", {})
 
@@ -403,14 +416,7 @@ class AgenticResearchChatService:
             # Saying nothing useful is the correct answer here. The alternative
             # — the behaviour this replaced — was to retrieve documents anyway
             # and present whatever came back as if it answered the question.
-            return (
-                "No pude determinar que tipo de pregunta es esta, asi que no la "
-                "respondi en lugar de arriesgar una respuesta con la forma "
-                "equivocada. Reformulala pidiendo explicitamente lo que "
-                "necesitas — un conteo o distribucion, la evidencia que sostiene "
-                "algo, o un analisis de patrones y brechas — o fija el modo "
-                "(nlq, rag o hybrid) en la consulta."
-            )
+            return translate("chat.fallback.unclear", language)
 
         rag_answer = (rag_result or {}).get("answer")
         nlq_translated = (nlq_result or {}).get("translated")
@@ -421,28 +427,27 @@ class AgenticResearchChatService:
             parts.append(str(rag_answer))
         if nlq_translated and nlq_result_data:
             parts.append(
-                "Lectura NLQ: "
-                + str(nlq_translated.get("explanation") or "consulta estructurada ejecutada")
-                + f". Resultado: {json.dumps(nlq_result_data, ensure_ascii=False, default=str)[:1200]}"
+                translate("chat.nlq.reading_label", language)
+                + str(
+                    nlq_translated.get("explanation")
+                    or translate("chat.nlq.default_explanation", language)
+                )
+                + translate("chat.nlq.result_label", language)
+                + json.dumps(nlq_result_data, ensure_ascii=False, default=str)[:1200]
             )
         if parts:
             return "\n\n".join(parts)
 
         if errors:
-            return (
-                "No pude completar la consulta con el proveedor LLM activo. "
-                "Aun asi, el alcance quedo preparado para analisis: "
-                f"{summary.get('records', 0)} registros, "
-                f"{summary.get('enrichment_pct', 0)}% enriquecidos. "
-                "Configura o revisa el proveedor AI/RAG y vuelve a intentar. "
-                f"Detalle tecnico: {'; '.join(errors[:2])}"
+            return translate(
+                "chat.fallback.provider_failed",
+                language,
+                records=summary.get("records", 0),
+                enrichment_pct=summary.get("enrichment_pct", 0),
+                detail="; ".join(errors[:2]),
             )
 
-        return (
-            "El alcance esta listo para consulta, pero no hay suficiente evidencia indexada "
-            "para producir una respuesta confiable. Indexa el catalogo RAG o ejecuta enrichment "
-            "antes de usar esta pregunta como evidencia de brief."
-        )
+        return translate("chat.fallback.no_evidence", language)
 
     @staticmethod
     def _normalize_sources(rag_result: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -517,21 +522,16 @@ class AgenticResearchChatService:
         return int(record.id)
 
     @staticmethod
-    def _follow_ups(payload: AgenticChatRequest, mode_used: str) -> list[str]:
+    def _follow_ups(
+        payload: AgenticChatRequest, mode_used: str, language: str | None = None
+    ) -> list[str]:
         if payload.entity_id:
-            return [
-                "Que evidencia sostiene este registro?",
-                "Como se conecta con otros autores, afiliaciones o conceptos?",
-                "Conviene incluirlo en el brief final?",
-            ]
-        if mode_used == "nlq":
-            return [
-                "Puedes mostrar el mismo resultado por proveedor?",
-                "Que dominio concentra mas registros?",
-                "Como cambia la distribucion por tipo de entidad?",
-            ]
+            group = "entity"
+        elif mode_used == "nlq":
+            group = "nlq"
+        else:
+            group = "default"
         return [
-            "Que registros sostienen mejor esta conclusion?",
-            "Que brechas deberia corregir antes del brief?",
-            "Como cambia el patron por proveedor o ingesta?",
+            translate(f"chat.follow_up.{group}.{suffix}", language)
+            for suffix in _FOLLOW_UP_SUFFIXES[group]
         ]
