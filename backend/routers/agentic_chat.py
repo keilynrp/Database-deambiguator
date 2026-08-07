@@ -11,6 +11,7 @@ from backend import models
 from backend.auth import get_current_user
 from backend.database import get_db
 from backend.routers.limiter import limiter
+from backend.i18n.locale import language_dependency
 from backend.services.agentic_research_chat import (
     AgenticChatRequest,
     AgenticResearchChatService,
@@ -27,6 +28,7 @@ def agentic_chat_query(
     payload: AgenticChatRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
+    language: str = Depends(language_dependency),
 ):
     """Answer scoped research questions using RAG, NLQ and tool traces."""
     org_id = resolve_request_org_id(db, current_user)
@@ -35,4 +37,5 @@ def agentic_chat_query(
         payload=payload,
         current_user=current_user,
         org_id=org_id,
+        language=language,
     )

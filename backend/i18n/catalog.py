@@ -48,15 +48,46 @@ SURFACE_PREFIXES = (
 __all__ = ["translate", "SURFACE_PREFIXES"]
 
 
+#: Every catalog path this module will ever open, built from the LANGUAGES
+#: constant and nothing else. A request value is only ever used as a *key* into
+#: this map — it never reaches path construction, so there is no flow to taint.
+#:
+#: The first attempt was a whitelist (`if language not in LANGUAGES: return {}`)
+#: immediately before `CATALOG_DIR / f"catalog.{language}.json"`. It closed the
+#: hole but CodeQL still reported `py/path-injection`, correctly: the parameter
+#: still reached the path expression, and a guard several lines up is an
+#: argument about reachability rather than a structural impossibility. It also
+#: made things worse in one respect — the rejection branch logged the hostile
+#: value, adding a fifth `py/log-injection` finding.
+_CATALOG_PATHS = {language: CATALOG_DIR / f"catalog.{language}.json" for language in LANGUAGES}
+
+
+def _loggable(value: object, limit: int = 80) -> str:
+    """Render an untrusted value safe to put in a log line.
+
+    A key or language arrives from the request, and a newline in it forges a
+    second log record — `py/log-injection`. `%r` already escapes newlines, but
+    relying on the format specifier means the protection disappears the moment
+    someone switches it to `%s`. Doing it here makes it a property of the value.
+    """
+    text = str(value)[:limit]
+    return "".join(char if char.isprintable() else "�" for char in text)
+
+
 @lru_cache(maxsize=None)
 def _load_catalog(language: str) -> dict[str, str]:
     """Read one language's projection. Cached — the file never changes at runtime."""
-    path = CATALOG_DIR / f"catalog.{language}.json"
+    path = _CATALOG_PATHS.get(language)
+    if path is None:
+        logger.warning(
+            "i18n: no catalog for unsupported language '%s'", _loggable(language)
+        )
+        return {}
+
     if not path.exists():
         logger.warning(
-            "i18n catalog missing for language %r at %s; falling back to keys",
-            language,
-            path,
+            "i18n catalog missing for language '%s'; falling back to keys",
+            _loggable(language),
         )
         return {}
     return json.loads(path.read_text(encoding="utf-8"))
@@ -68,8 +99,8 @@ def _resolve_language(language: str | None) -> str:
     if language in LANGUAGES:
         return language
     logger.warning(
-        "i18n: unsupported language %r requested; rendering in %r instead",
-        language,
+        "i18n: unsupported language '%s' requested; rendering in '%s' instead",
+        _loggable(language),
         DEFAULT_LANGUAGE,
     )
     return DEFAULT_LANGUAGE
@@ -115,14 +146,17 @@ def translate(key: str, language: str | None = None, **params: object) -> str:
         template = _load_catalog(DEFAULT_LANGUAGE).get(key)
         if template is not None:
             logger.warning(
-                "i18n: key %r missing in %r; served %r instead",
-                key,
-                resolved,
+                "i18n: key '%s' missing in '%s'; served '%s' instead",
+                _loggable(key),
+                _loggable(resolved),
                 DEFAULT_LANGUAGE,
             )
 
     if template is None:
-        logger.warning("i18n: key %r is not in the catalog; rendering the key itself", key)
+        logger.warning(
+            "i18n: key '%s' is not in the catalog; rendering the key itself",
+            _loggable(key),
+        )
         return key
 
     return _interpolate(template, params) if params else template

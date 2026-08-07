@@ -239,10 +239,45 @@ orthography. Group A's real total is **23 strings, not 18**.
 
 Group B — API surface, resolved language threaded from the request (one PR):
 
-- [ ] 6.4 `services/agentic_research_chat.py` — 12 [`chat.`]: fallback replies and suggested follow-ups. Its Spanish *intent regexes* were deleted by #227/PR #239 and are not in scope; these are output strings only. ⚠️ the inventory's line numbers are stale for exactly that reason — locate the strings, do not trust them
-- [ ] 6.5 `enrichment_worker.py` — 11 [`validation.`]: remediation hints and failure reasons shown to operators
-- [ ] 6.6 `routers/dashboards.py` (2) [`dashboard.`], `routers/demo.py` (2) [`dashboard.`]
-- [ ] 6.7 `services/assistant_actions.py` — 2 [`chat.`]
+- [x] 6.4 `services/agentic_research_chat.py` — **15 keys** [`chat.`]. Language threaded router → `ask()` → `_compose_answer()` / `_follow_ups()`. The three follow-up triples collapse to `_FOLLOW_UP_SUFFIXES`, so the module holds the *choice* and the catalog holds the text. ⚠️ the inventory's line numbers were stale (PR #239 moved them) — located by structure instead
+- [~] 6.5 `enrichment_worker.py` — **removed from this change** (2026-08-05). Not a string migration.
+
+  `_record_failure` writes `evidence` and `recommendations` into
+  `attributes_json["enrichment_failure"]`, and the worker runs in the background with no
+  request — so there is no `Accept-Language` and no parameter to thread. `translate()` at
+  write time would **freeze a language into the row**: the rendered text is stored and the
+  key is gone, so an operator who later chooses Spanish still reads English. Production
+  rows already have the mirror of this defect today, in Spanish.
+
+  Doing it properly means persisting the **key and its parameters** and translating at
+  read time. That changes the stored shape and needs a reader that tolerates old rows
+  (text) and new rows (key) at once — a data decision with a back-compat dimension, not
+  an i18n one. Its 13 strings (9 remediation hints + 4 `evidence` sentences, again more
+  than the inventory's 11) go to a separate change.
+
+  Everything else in group B is **request-scoped**, so `translate(key, language)` resolves
+  when the response is built and nothing is persisted.
+- [x] 6.6 `routers/dashboards.py` — 2 [`dashboard.`]
+- [~] `routers/demo.py` — **removed, same reason as 6.5.** `_DEMO_PORTAL_TITLE` and `_DEMO_PORTAL_DESCRIPTION` are written into a `models.CatalogPortal` row, so translating at write time freezes the language into stored data. Joins the persistence change.
+- [x] 6.7 `services/assistant_actions.py` — **6 keys, not 2** [`chat.`]: the inventory counted `description=` and missed `label=`. `REGISTRY` now stores catalog **keys**, resolved in `list_capabilities(language)` at read time; an operator override still passes through untranslated, because those are the operator's words.
+
+**The real fault line in phase 6 is not report-vs-API — it is resolve-on-read vs freeze-on-write.**
+
+The surface split was right about which strings need a threaded language, but two modules
+fail a prior test: they *persist* their text. `enrichment_worker` writes `evidence` and
+`recommendations` into `attributes_json`; `demo` writes a portal title and description into
+a `CatalogPortal` row. Translating at write time stores a rendered string and discards the
+key, so no later language choice can recover it — and production rows already carry Spanish
+frozen that way. Both go to a separate change that persists key + params and translates on
+read, tolerating old rows.
+
+Everything migrated in group B resolves when the response is built:
+
+| module | keys | resolved |
+|---|---|---|
+| `agentic_research_chat` | 15 | per request, threaded from the router |
+| `assistant_actions` | 6 | per request, in `list_capabilities(language)` |
+| `routers/dashboards` | 2 | per request |
 - [ ] 6.8 Verify no user-facing Spanish literal remains **in a live module** outside the catalog, using the classified inventory rather than the regex — and confirm the 14 input aliases in `field_correspondence.py` and `backfill_canonical_id_entity_type.py` are still present verbatim, plus the two dead modules untouched
 - [ ] 6.9 Add the section-wide assertion deferred from 1b.1: an English-generated report's Hidden Patterns section contains no Spanish. Only meaningful once 6.1–6.2 have landed
 

@@ -5480,8 +5480,21 @@ export type GetAdminWorkspaceResetPreviewResponse = GetAdminWorkspaceResetPrevie
 
 export type PostAgenticChatQueryData = {
     body: AgenticChatRequest;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
+    };
     url: '/agentic-chat/query';
 };
 
@@ -7316,10 +7329,32 @@ export type DeleteArtifactsTemplatesByTemplateIdResponse = DeleteArtifactsTempla
 
 export type GetAssistantActionsData = {
     body?: never;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
+    };
     url: '/assistant/actions';
 };
+
+export type GetAssistantActionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetAssistantActionsError = GetAssistantActionsErrors[keyof GetAssistantActionsErrors];
 
 export type GetAssistantActionsResponses = {
     /**

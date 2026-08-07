@@ -10246,6 +10246,43 @@
       "post": {
         "description": "Answer scoped research questions using RAG, NLQ and tool traces.",
         "operationId": "post_agentic_chat_query",
+        "parameters": [
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -13739,6 +13776,43 @@
     "/assistant/actions": {
       "get": {
         "operationId": "get_assistant_actions",
+        "parameters": [
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -13747,6 +13821,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [

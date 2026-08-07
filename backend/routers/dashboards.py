@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.i18n.catalog import translate
 from backend import models
 from backend.auth import get_current_user
 from backend.database import get_db
@@ -76,8 +77,8 @@ WIDGET_CATALOGUE = [
     },
     {
         "type":        "concept_cloud",
-        "label":       "Coocurrencia temática",
-        "description": "Mapa de áreas con pares de keywords depurados por similitud léxica",
+        "label":       translate("dashboard.concept_cloud.label"),
+        "description": translate("dashboard.concept_cloud.description"),
         "default_cols": 6,
         "icon":        "sparkles",
     },

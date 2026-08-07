@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from backend import models
 from backend.auth import get_current_user, require_role
+from backend.i18n.locale import language_dependency
 from backend.services import assistant_actions
 
 router = APIRouter(prefix="/assistant/actions", tags=["assistant-actions"])
@@ -18,9 +19,10 @@ class AssistantActionUpdate(BaseModel):
 @router.get("")
 def list_assistant_actions(
     current_user: models.User = Depends(get_current_user),
+    language: str = Depends(language_dependency),
 ):
     items = []
-    for item in assistant_actions.list_capabilities():
+    for item in assistant_actions.list_capabilities(language):
         items.append({**item, "executable": item["enabled"] and current_user.role in item["allowed_roles"]})
     return {"items": items}
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+from backend.i18n.catalog import translate
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
@@ -33,8 +34,8 @@ class AssistantActionCapability:
 REGISTRY: dict[str, AssistantActionCapability] = {
     "audit-export": AssistantActionCapability(
         id="audit-export",
-        label="Exportar auditoria filtrada",
-        description="Descarga eventos de auditoria aplicando los filtros actuales.",
+        label="chat.action.audit_export.label",
+        description="chat.action.audit_export.description",
         api_path="/audit-log/export",
         method="GET",
         kind="export",
@@ -45,8 +46,8 @@ REGISTRY: dict[str, AssistantActionCapability] = {
     ),
     "rag-reindex": AssistantActionCapability(
         id="rag-reindex",
-        label="Reindexar catalogo RAG",
-        description="Reconstruye el indice semantico con entidades enriquecidas.",
+        label="chat.action.rag_reindex.label",
+        description="chat.action.rag_reindex.description",
         api_path="/rag/index",
         method="POST",
         kind="mutation",
@@ -57,8 +58,8 @@ REGISTRY: dict[str, AssistantActionCapability] = {
     ),
     "entity-enrich-current": AssistantActionCapability(
         id="entity-enrich-current",
-        label="Enriquecer registro actual",
-        description="Ejecuta enriquecimiento sobre una entidad individual.",
+        label="chat.action.enrich_entity.label",
+        description="chat.action.enrich_entity.description",
         api_path="/enrich/row/{entity_id}",
         method="POST",
         kind="mutation",
@@ -94,11 +95,22 @@ def _save_overrides(overrides: dict[str, dict]) -> None:
     path.write_text(json.dumps(overrides, indent=2, sort_keys=True), encoding="utf-8")
 
 
-def list_capabilities() -> list[dict]:
+def list_capabilities(language: str | None = None) -> list[dict]:
+    """List the capabilities, with `label` and `description` resolved.
+
+    REGISTRY stores catalog **keys**, not copy, and they are translated here —
+    at read time, per request. Storing the rendered text would freeze whichever
+    language happened to be active when the module was imported.
+
+    An operator override keeps whatever text the operator wrote: it is their
+    words, not ours, so it is passed through rather than looked up.
+    """
     overrides = _load_overrides()
     capabilities: list[dict] = []
     for action_id, capability in REGISTRY.items():
         item = asdict(capability)
+        item["label"] = translate(item["label"], language)
+        item["description"] = translate(item["description"], language)
         item.update(overrides.get(action_id, {}))
         item["configured"] = action_id in overrides
         capabilities.append(item)
