@@ -14341,6 +14341,43 @@
       "post": {
         "description": "Request a password reset email if SMTP and the account are available.",
         "operationId": "post_auth_password_reset_request",
+        "parameters": [
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {

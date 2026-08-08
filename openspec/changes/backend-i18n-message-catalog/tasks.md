@@ -296,9 +296,21 @@ vocabulary.
 
 ## 7. Email
 
-- [ ] 7.1 Migrate password-reset subject and body to catalog keys in both languages
-- [ ] 7.2 Test: the subject resolves per language, with English as the default
-- [ ] 7.3 Add the subject change to the deploy note — nothing depends on the current Spanish text (confirmed 2026-07-31), but it is outward-facing and recipients will see it change
+- [x] 7.1 Subject and body are two keys, not four: the body is **one message with a `{link}` placeholder** rather than three concatenated fragments, because a translator needs the whole sentence to translate it. `{platform}` and `{link}` interpolate verbatim.
+- [x] 7.2 `test_i18n_email.py`, 9 tests: subject and body per language, English default, explicit parameter beating the header, the platform name interpolated rather than translated, the reset link surviving in both languages, and the catalog-sentinel check.
+
+⚠️ **These tests broke a neighbour before they passed.** `/auth/password-reset/request`
+allows 10/hour per IP and every test here goes through it, so the file exhausted the quota
+and `test_auth.py`'s long-standing reset test failed with **429 while passing in
+isolation**. An autouse fixture resets the limiter around each test. Worth remembering
+that a rate-limited endpoint makes test count a shared resource.
+
+⚠️ **Newlines nearly did not survive the catalog.** The body has real line breaks;
+`translations.ts` string literals cannot span lines. Hand-rolled escaping silently dropped
+them and the generator rejected the file. Fixed by emitting the literal with
+`json.dumps`, and verified end to end — the projection reads back 5 real newlines and the
+`{link}` placeholder intact.
+- [x] 7.3 `DEPLOY-NOTE.md` in this change directory. States who is affected (anyone with no Spanish language signal — Spanish speakers keep their exact wording), why it is safe, what to watch, and how to roll back. It also lists the three endpoints that gained a `language` parameter, since that reached the published SDK.
 
 ## 8. Report language
 
