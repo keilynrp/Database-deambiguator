@@ -2,6 +2,12 @@ export type Language = 'en' | 'es';
 
 export const translations = {
     en: {
+        // Backend: evidence + stakeholder value (phase 6 verification sweep)
+        'report.hidden_patterns.semantic_cluster.evidence': '{count} records share this concept within the portfolio analysed.',
+        'report.hidden_patterns.quality_gap.evidence': '{count} records are low quality and may distort the executive reading.',
+        'report.hidden_patterns.duplicate_variants.evidence': '{count} records share a very similar normalised label.',
+        'report.researcher_topics.stakeholder_value.actionable': 'An actionable map of experts and collaborations, ready for briefing.',
+        'report.researcher_topics.stakeholder_value.preliminary': 'Preliminary signal: validate sources, filters and coverage before using this in decisions.',
         // Backend: dashboards + assistant actions (phase 6, API surface)
         'dashboard.concept_cloud.label': 'Thematic co-occurrence',
         'dashboard.concept_cloud.description': 'Area map of keyword pairs de-duplicated by lexical similarity',
@@ -3577,6 +3583,12 @@ export const translations = {
         'dashboard_showcase.high_severity': 'High',
     },
     es: {
+        // Backend: evidence + stakeholder value (phase 6 verification sweep)
+        'report.hidden_patterns.semantic_cluster.evidence': '{count} registros comparten este concepto dentro del portafolio analizado.',
+        'report.hidden_patterns.quality_gap.evidence': '{count} registros tienen baja calidad y pueden distorsionar la lectura ejecutiva.',
+        'report.hidden_patterns.duplicate_variants.evidence': '{count} registros comparten una etiqueta normalizada muy similar.',
+        'report.researcher_topics.stakeholder_value.actionable': 'Mapa accionable de expertos y colaboraciones listo para briefing.',
+        'report.researcher_topics.stakeholder_value.preliminary': 'Senal preliminar: conviene validar fuentes, filtros y cobertura antes de usarlo en decisiones.',
         // Backend: dashboards + assistant actions (phase 6, API surface)
         'dashboard.concept_cloud.label': 'Coocurrencia temática',
         'dashboard.concept_cloud.description': 'Mapa de áreas con pares de keywords depurados por similitud léxica',
