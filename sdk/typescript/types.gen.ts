@@ -7581,8 +7581,21 @@ export type PostAuthPasswordResetConfirmResponses = {
 
 export type PostAuthPasswordResetRequestData = {
     body: PasswordResetRequest;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
+    };
     url: '/auth/password-reset/request';
 };
 

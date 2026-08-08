@@ -602,6 +602,8 @@
   "domains.set_active": "Establecer Activo",
   "domains.subtitle": "Administra los esquemas de dominios de conocimiento",
   "domains.title": "Registro de Dominios",
+  "email.password_reset.body": "Recibimos una solicitud para recuperar tu contraseña.\n\nUsa este enlace para crear una nueva contraseña:\n{link}\n\nEste enlace vence en 30 minutos. Si no solicitaste este cambio, puedes ignorar este correo.",
+  "email.password_reset.subject": "{platform}: recupera tu contraseña",
   "entities.brand": "Marca",
   "entities.created_at": "Creado",
   "entities.delete.success": "Entidad eliminada",

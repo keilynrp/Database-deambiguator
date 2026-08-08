@@ -602,6 +602,8 @@
   "domains.set_active": "Set Active",
   "domains.subtitle": "Manage knowledge domain schemas",
   "domains.title": "Domain Registry",
+  "email.password_reset.body": "We received a request to reset your password.\n\nUse this link to create a new one:\n{link}\n\nThe link expires in 30 minutes. If you did not ask for this, you can ignore this message.",
+  "email.password_reset.subject": "{platform}: reset your password",
   "entities.brand": "Brand",
   "entities.created_at": "Created",
   "entities.delete.success": "Entity deleted",

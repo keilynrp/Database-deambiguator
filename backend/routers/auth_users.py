@@ -19,6 +19,8 @@ from authlib.integrations.starlette_client import OAuth
 import os
 
 from backend import models, schemas
+from backend.i18n.catalog import translate
+from backend.i18n.locale import language_dependency
 from backend.auth import authenticate_user, create_access_token, create_refresh_token, get_current_user, require_role, _decode_token, hash_password
 from jose import JWTError
 from backend.database import get_db
@@ -122,6 +124,7 @@ def request_password_reset(
     request: Request,
     payload: PasswordResetRequest,
     db: Session = Depends(get_db),
+    language: str = Depends(language_dependency),
 ):
     """Request a password reset email if SMTP and the account are available."""
     neutral_response = {
@@ -155,12 +158,8 @@ def request_password_reset(
     sent = send_plain_email(
         smtp_settings,
         email,
-        subject=f"{platform_name}: recupera tu contraseña",
-        body=(
-            "Recibimos una solicitud para recuperar tu contraseña.\n\n"
-            f"Usa este enlace para crear una nueva contraseña:\n{link}\n\n"
-            "Este enlace vence en 30 minutos. Si no solicitaste este cambio, puedes ignorar este correo."
-        ),
+        subject=translate("email.password_reset.subject", language, platform=platform_name),
+        body=translate("email.password_reset.body", language, link=link),
     )
     if not sent:
         return {**neutral_response, "sent": False, "reason": "email_not_sent"}

@@ -2,6 +2,9 @@ export type Language = 'en' | 'es';
 
 export const translations = {
     en: {
+        // Backend: outbound email (phase 7)
+        "email.password_reset.subject": "{platform}: reset your password",
+        "email.password_reset.body": "We received a request to reset your password.\n\nUse this link to create a new one:\n{link}\n\nThe link expires in 30 minutes. If you did not ask for this, you can ignore this message.",
         // Backend: evidence + stakeholder value (phase 6 verification sweep)
         'report.hidden_patterns.semantic_cluster.evidence': '{count} records share this concept within the portfolio analysed.',
         'report.hidden_patterns.quality_gap.evidence': '{count} records are low quality and may distort the executive reading.',
@@ -3583,6 +3586,9 @@ export const translations = {
         'dashboard_showcase.high_severity': 'High',
     },
     es: {
+        // Backend: outbound email (phase 7)
+        "email.password_reset.subject": "{platform}: recupera tu contraseña",
+        "email.password_reset.body": "Recibimos una solicitud para recuperar tu contraseña.\n\nUsa este enlace para crear una nueva contraseña:\n{link}\n\nEste enlace vence en 30 minutos. Si no solicitaste este cambio, puedes ignorar este correo.",
         // Backend: evidence + stakeholder value (phase 6 verification sweep)
         'report.hidden_patterns.semantic_cluster.evidence': '{count} registros comparten este concepto dentro del portafolio analizado.',
         'report.hidden_patterns.quality_gap.evidence': '{count} registros tienen baja calidad y pueden distorsionar la lectura ejecutiva.',
