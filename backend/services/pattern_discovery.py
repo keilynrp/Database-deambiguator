@@ -177,7 +177,7 @@ class PatternDiscoveryService:
                 "label": f"Thematic concentration: {concept}",
                 "confidence": cls._confidence(score),
                 "impact_score": score,
-                "evidence": f"{count:,} registros comparten este concepto dentro del portafolio analizado.",
+                "evidence": translate("report.hidden_patterns.semantic_cluster.evidence", count=f"{count:,}"),
                 "entities": [cls._entity_ref(entity) for entity in concept_entities[concept]],
                 "recommended_action": translate("report.hidden_patterns.semantic_cluster.action"),
             })
@@ -234,7 +234,7 @@ class PatternDiscoveryService:
             "label": translate("report.hidden_patterns.quality_gap.label"),
             "confidence": cls._confidence(score),
             "impact_score": score,
-            "evidence": f"{len(low):,} registros tienen baja calidad y pueden distorsionar la lectura ejecutiva.",
+            "evidence": translate("report.hidden_patterns.quality_gap.evidence", count=f"{len(low):,}"),
             "entities": [cls._entity_ref(entity) for entity in weakest],
             "recommended_action": translate("report.hidden_patterns.quality_gap.action"),
         }]
@@ -293,7 +293,7 @@ class PatternDiscoveryService:
             "label": translate("report.hidden_patterns.duplicate_variants.label"),
             "confidence": cls._confidence(score),
             "impact_score": score,
-            "evidence": f"{len(candidates[0])} registros comparten una etiqueta normalizada muy similar.",
+            "evidence": translate("report.hidden_patterns.duplicate_variants.evidence", count=len(candidates[0])),
             "entities": [cls._entity_ref(entity) for entity in group],
             "recommended_action": translate("report.hidden_patterns.duplicate_variants.action"),
         }]

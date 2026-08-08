@@ -280,9 +280,9 @@ def _executive_summary(
             else f"Not enough evidence to map researchers on {topic}."
         ),
         "stakeholder_value": (
-            "Mapa accionable de expertos y colaboraciones listo para briefing."
+            translate("report.researcher_topics.stakeholder_value.actionable")
             if confidence >= 70
-            else "Senal preliminar: conviene validar fuentes, filtros y cobertura antes de usarlo en decisiones."
+            else translate("report.researcher_topics.stakeholder_value.preliminary")
         ),
     }
 

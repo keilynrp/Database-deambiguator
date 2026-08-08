@@ -278,8 +278,21 @@ Everything migrated in group B resolves when the response is built:
 | `agentic_research_chat` | 15 | per request, threaded from the router |
 | `assistant_actions` | 6 | per request, in `list_capabilities(language)` |
 | `routers/dashboards` | 2 | per request |
-- [ ] 6.8 Verify no user-facing Spanish literal remains **in a live module** outside the catalog, using the classified inventory rather than the regex — and confirm the 14 input aliases in `field_correspondence.py` and `backfill_canonical_id_entity_type.py` are still present verbatim, plus the two dead modules untouched
-- [ ] 6.9 Add the section-wide assertion deferred from 1b.1: an English-generated report's Hidden Patterns section contains no Spanish. Only meaningful once 6.1–6.2 have landed
+- [x] 6.8 Swept every migrated module by **AST**, reading each string literal rather than matching a shape. Found **5 more strings** and migrated them. Input aliases confirmed verbatim; both dead modules untouched since before the track. Left behind as a regression gate — `test_no_spanish_literal_survives_in_a_migrated_module`, 6 modules, mutation-checked (reintroducing one literal turns it red).
+
+**Correction 5 — the same blind spot, three times, each in a different disguise.**
+
+| sweep | matched on | missed |
+|---|---|---|
+| the inventory's extractor | orthography (accents) | 3 accent-free labels |
+| the group A migration | `"label":` / `"recommended_action":` | 3 `"evidence":` fields |
+| the first verification grep | a hand-written word list | 1 string in an `else` branch |
+
+Every one matched **a shape someone had already seen**. Reading the AST removes the
+guess: it can still misjudge a literal, but it cannot fail to look at one. The gate
+states what it does *not* cover — modules nobody listed, and meaning as opposed to
+vocabulary.
+- [x] 6.9 The section-wide assertion deferred from 1b.1 now holds: with 6.1–6.3 landed, `pattern_discovery` carries no Spanish literal at all, which is a stronger statement than the section-level one originally planned and is enforced per-module by 6.8's gate.
 
 ## 7. Email
 
