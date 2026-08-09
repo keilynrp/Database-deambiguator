@@ -12,7 +12,7 @@ from importlib import import_module
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
@@ -127,6 +127,15 @@ def generate_report(
     payload: _ReportRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    language: str | None = Query(
+        default=None,
+        description=(
+            "Language for catalog-sourced report text (en, es). Omitted means English. "
+            "Accept-Language is deliberately not consulted: a report is produced for an "
+            "audience, not for whoever triggered it."
+        ),
+        max_length=35,
+    ),
 ):
     """Generate a self-contained HTML report and return it as a downloadable file."""
     org_id = resolve_request_org_id(db, current_user)
@@ -147,6 +156,7 @@ def generate_report(
         benchmark_org=benchmark_org,
         stakeholder_profile=payload.stakeholder_profile,
         manual_sections=[section.model_dump() for section in payload.manual_sections],
+        language=language,
     )
     filename = (
         f"ukip_report_{payload.domain_id}_"
@@ -184,6 +194,14 @@ def export_pdf(
     payload: _ReportRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    language: str | None = Query(
+        default=None,
+        description=(
+            "Language for catalog-sourced report text (en, es). Omitted means English. "
+            "Accept-Language is deliberately not consulted."
+        ),
+        max_length=35,
+    ),
 ):
     """Generate a professional PDF report via WeasyPrint."""
     org_id = resolve_request_org_id(db, current_user)
@@ -204,6 +222,7 @@ def export_pdf(
         benchmark_org=benchmark_org,
         stakeholder_profile=payload.stakeholder_profile,
         manual_sections=[section.model_dump() for section in payload.manual_sections],
+        language=language,
     )
     pdf_bytes = _make_pdf(html)
     filename = (
@@ -222,6 +241,14 @@ def export_excel(
     payload: _ReportRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    language: str | None = Query(
+        default=None,
+        description=(
+            "Language for catalog-sourced report text (en, es). Omitted means English. "
+            "Accept-Language is deliberately not consulted."
+        ),
+        max_length=35,
+    ),
 ):
     """Generate a branded multi-sheet Excel workbook."""
     org_id = resolve_request_org_id(db, current_user)
@@ -237,6 +264,7 @@ def export_excel(
         payload.sections,
         org_id=org_id,
         manual_sections=[section.model_dump() for section in payload.manual_sections],
+        language=language,
     )
     filename = (
         f"ukip_export_{payload.domain_id}_"
@@ -257,6 +285,14 @@ def export_pptx(
     payload: _ReportRequest,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    language: str | None = Query(
+        default=None,
+        description=(
+            "Language for catalog-sourced report text (en, es). Omitted means English. "
+            "Accept-Language is deliberately not consulted."
+        ),
+        max_length=35,
+    ),
 ):
     """Generate a branded PowerPoint presentation (python-pptx)."""
     org_id = resolve_request_org_id(db, current_user)
@@ -284,6 +320,7 @@ def export_pptx(
             branding=branding_dict,
             org_id=org_id,
             manual_sections=[section.model_dump() for section in payload.manual_sections],
+            language=language,
         )
     except ImportError as exc:
         raise HTTPException(

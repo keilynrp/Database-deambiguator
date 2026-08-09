@@ -21356,6 +21356,27 @@
       "post": {
         "description": "Generate a branded multi-sheet Excel workbook.",
         "operationId": "post_exports_excel",
+        "parameters": [
+          {
+            "description": "Language for catalog-sourced report text (en, es). Omitted means English. Accept-Language is deliberately not consulted.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced report text (en, es). Omitted means English. Accept-Language is deliberately not consulted.",
+              "title": "Language"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -21402,6 +21423,27 @@
       "post": {
         "description": "Generate a professional PDF report via WeasyPrint.",
         "operationId": "post_exports_pdf",
+        "parameters": [
+          {
+            "description": "Language for catalog-sourced report text (en, es). Omitted means English. Accept-Language is deliberately not consulted.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced report text (en, es). Omitted means English. Accept-Language is deliberately not consulted.",
+              "title": "Language"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -21448,6 +21490,27 @@
       "post": {
         "description": "Generate a branded PowerPoint presentation (python-pptx).",
         "operationId": "post_exports_pptx",
+        "parameters": [
+          {
+            "description": "Language for catalog-sourced report text (en, es). Omitted means English. Accept-Language is deliberately not consulted.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced report text (en, es). Omitted means English. Accept-Language is deliberately not consulted.",
+              "title": "Language"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -25876,6 +25939,27 @@
       "post": {
         "description": "Generate a self-contained HTML report and return it as a downloadable file.",
         "operationId": "post_reports_generate",
+        "parameters": [
+          {
+            "description": "Language for catalog-sourced report text (en, es). Omitted means English. Accept-Language is deliberately not consulted: a report is produced for an audience, not for whoever triggered it.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced report text (en, es). Omitted means English. Accept-Language is deliberately not consulted: a report is produced for an audience, not for whoever triggered it.",
+              "title": "Language"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {

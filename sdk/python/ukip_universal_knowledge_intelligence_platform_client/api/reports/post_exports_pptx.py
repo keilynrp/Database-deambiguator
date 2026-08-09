@@ -7,18 +7,31 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.http_validation_error import HTTPValidationError
 from ...models.report_request import ReportRequest
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
     body: ReportRequest,
+    language: None | str | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+
+    params: dict[str, Any] = {}
+
+    json_language: None | str | Unset
+    if isinstance(language, Unset):
+        json_language = UNSET
+    else:
+        json_language = language
+    params["language"] = json_language
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/exports/pptx",
+        "params": params,
     }
 
     _kwargs["json"] = body.to_dict()
@@ -62,12 +75,15 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: ReportRequest,
+    language: None | str | Unset = UNSET,
 ) -> Response[Any | HTTPValidationError]:
     """Export Pptx
 
      Generate a branded PowerPoint presentation (python-pptx).
 
     Args:
+        language (None | str | Unset): Language for catalog-sourced report text (en, es). Omitted
+            means English. Accept-Language is deliberately not consulted.
         body (ReportRequest):
 
     Raises:
@@ -80,6 +96,7 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+        language=language,
     )
 
     response = client.get_httpx_client().request(
@@ -93,12 +110,15 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: ReportRequest,
+    language: None | str | Unset = UNSET,
 ) -> Any | HTTPValidationError | None:
     """Export Pptx
 
      Generate a branded PowerPoint presentation (python-pptx).
 
     Args:
+        language (None | str | Unset): Language for catalog-sourced report text (en, es). Omitted
+            means English. Accept-Language is deliberately not consulted.
         body (ReportRequest):
 
     Raises:
@@ -112,6 +132,7 @@ def sync(
     return sync_detailed(
         client=client,
         body=body,
+        language=language,
     ).parsed
 
 
@@ -119,12 +140,15 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: ReportRequest,
+    language: None | str | Unset = UNSET,
 ) -> Response[Any | HTTPValidationError]:
     """Export Pptx
 
      Generate a branded PowerPoint presentation (python-pptx).
 
     Args:
+        language (None | str | Unset): Language for catalog-sourced report text (en, es). Omitted
+            means English. Accept-Language is deliberately not consulted.
         body (ReportRequest):
 
     Raises:
@@ -137,6 +161,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         body=body,
+        language=language,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -148,12 +173,15 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: ReportRequest,
+    language: None | str | Unset = UNSET,
 ) -> Any | HTTPValidationError | None:
     """Export Pptx
 
      Generate a branded PowerPoint presentation (python-pptx).
 
     Args:
+        language (None | str | Unset): Language for catalog-sourced report text (en, es). Omitted
+            means English. Accept-Language is deliberately not consulted.
         body (ReportRequest):
 
     Raises:
@@ -168,5 +196,6 @@ async def asyncio(
         await asyncio_detailed(
             client=client,
             body=body,
+            language=language,
         )
     ).parsed

@@ -72,6 +72,7 @@ def generate_pptx(
     branding: dict,
     org_id: int | None = None,
     manual_sections: list[dict[str, str]] | None = None,
+    language: str | None = None,
 ) -> bytes:
     """
     Build a branded 16:9 PPTX.
@@ -157,8 +158,14 @@ def generate_pptx(
     # builder. (unify-report-format-coverage phase 3.) The hand-written slides
     # above are left in place for now; de-duping them onto their collectors is
     # deferred to the cleanup phase. `sections` is already canonicalized above.
+    from dataclasses import replace as _replace
+
     from backend import report_builder
+    from backend.i18n.catalog import translate
+    from backend.i18n.locale import resolve_report_language
     from backend.reporting.pptx_renderer import render_pptx
+
+    language = resolve_report_language(language)
     migrated_collectors = {
         "entity_stats": report_builder.collect_entity_stats,
         "enrichment_coverage": report_builder.collect_enrichment_coverage,
@@ -175,7 +182,13 @@ def generate_pptx(
     }
     for section_id, collect in migrated_collectors.items():
         if section_id in sections:
-            render_pptx(collect(db, domain_id, org_id), prs, accent)
+            # A slide heading has no length limit, so it takes the full title
+            # rather than Excel's abbreviated sheet name.
+            payload = _replace(
+                collect(db, domain_id, org_id),
+                title=translate(f"report.section.{section_id}", language),
+            )
+            render_pptx(payload, prs, accent)
 
     # ── Final slide: Closing ──────────────────────────────────────────────────
     slide = _add_slide(prs)
