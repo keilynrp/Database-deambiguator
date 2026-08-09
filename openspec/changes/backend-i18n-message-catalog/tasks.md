@@ -314,12 +314,14 @@ them and the generator rejected the file. Fixed by emitting the literal with
 
 ## 8. Report language
 
-- [ ] 8.1 Write a failing test that `POST /reports/generate` accepts a language and produces Spanish section titles
-- [ ] 8.2 Add the parameter and thread the resolved language through the builder to the PDF, PPTX and Excel exporters
-- [ ] 8.3 Test all three formats: catalog text is localised in each, per the parity contract those formats already carry
-- [ ] 8.4 Test: omitting the parameter preserves the behaviour of existing callers
-- [ ] 8.5 Render the disclosure that analysis text and provider-supplied names remain English, and test that a non-English artefact carries it
-- [ ] 8.6 Regenerate `sdk/openapi.json` and the SDK clients; confirm the drift gates pass
+- [x] 8.1 `test_i18n_report_language.py`, RED first.
+- [x] 8.2 `?language=` on all four endpoints. Titles are translated at the **single render boundary** keyed by section id, not in each of the ~14 collectors, so a new section cannot forget to.
+- [x] 8.3 All three formats tested. ⚠️ **Excel needed its own key space.** A sheet name is capped at 31 chars and forbids `/ \ ? * [ ] :`; `_safe_sheet_title` truncates rather than failing, so a violation cuts a tab mid-word in silence. `report.sheet.*` holds purpose-built short names; PPTX takes the full title, a slide heading having no limit.
+- [x] 8.4 **This one caught a real defect of mine.** The first implementation gave *English* short sheet names too — renaming `Entity Statistics` to `Entity Stats` in a file users download. Seven existing tests went red, and the parity guard was right: 8.4 says omitting the parameter preserves behaviour, and a renamed tab is a change a caller sees.
+
+  The fix was to revert the improvement, not to update the assertions. **English keeps the long title it always had, including the two Excel already truncates.** The constraint test now states two different true things rather than one uniform rule that was false for English: Spanish names need no truncation; English names are exactly what they were.
+- [x] 8.5 `report.disclosure.analysis_language`, inserted first so a reader meets the limitation before the text it applies to. Only on non-English artefacts — an English report has no mixture to explain.
+- [x] 8.6 +84 spec lines and both clients across all four endpoints. Largest contract move of the track; the three before it were one endpoint each.
 
 ## 9. Verification
 

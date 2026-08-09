@@ -79,6 +79,7 @@ class EnterpriseExcelExporter:
         sections: List[str],
         org_id: int | None = None,
         manual_sections: list[dict[str, str]] | None = None,
+        language: str | None = None,
     ) -> bytes:
         wb = openpyxl.Workbook()
 
@@ -105,8 +106,14 @@ class EnterpriseExcelExporter:
         # Each migrated section is one entry here — the strangler grows this map.
         # Requested sections are canonicalized so an alias (e.g. top_brands)
         # still resolves to its migrated collector.
+        from dataclasses import replace as _replace
+
         from backend import report_builder
+        from backend.i18n.catalog import translate
+        from backend.i18n.locale import resolve_report_language
         from backend.reporting.excel_renderer import render_excel
+
+        language = resolve_report_language(language)
         requested = set(report_builder.canonical_sections(sections))
         migrated_collectors = {
             "entity_stats": report_builder.collect_entity_stats,
@@ -125,6 +132,13 @@ class EnterpriseExcelExporter:
         for section_id, collect in migrated_collectors.items():
             if section_id in requested:
                 payload = collect(db, domain_id, org_id)
+                # Excel names the sheet from the payload title, and a sheet name
+                # is capped at 31 characters with several characters forbidden.
+                # `report.sheet.*` holds purpose-built short names so a tab reads
+                # as a word rather than as a mid-word truncation.
+                payload = _replace(
+                    payload, title=translate(f"report.sheet.{section_id}", language)
+                )
                 sheet = render_excel(payload, wb)
                 collected.append((sheet.title, payload))
 

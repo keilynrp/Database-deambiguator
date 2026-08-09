@@ -11316,7 +11316,14 @@ export type GetExportGraphResponses = {
 export type PostExportsExcelData = {
     body: ReportRequest;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced report text (en, es). Omitted means English. Accept-Language is deliberately not consulted.
+         */
+        language?: string | null;
+    };
     url: '/exports/excel';
 };
 
@@ -11339,7 +11346,14 @@ export type PostExportsExcelResponses = {
 export type PostExportsPdfData = {
     body: ReportRequest;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced report text (en, es). Omitted means English. Accept-Language is deliberately not consulted.
+         */
+        language?: string | null;
+    };
     url: '/exports/pdf';
 };
 
@@ -11362,7 +11376,14 @@ export type PostExportsPdfResponses = {
 export type PostExportsPptxData = {
     body: ReportRequest;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced report text (en, es). Omitted means English. Accept-Language is deliberately not consulted.
+         */
+        language?: string | null;
+    };
     url: '/exports/pptx';
 };
 
@@ -13760,7 +13781,14 @@ export type DeleteRelationshipsByRelIdResponse = DeleteRelationshipsByRelIdRespo
 export type PostReportsGenerateData = {
     body: ReportRequest;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced report text (en, es). Omitted means English. Accept-Language is deliberately not consulted: a report is produced for an audience, not for whoever triggered it.
+         */
+        language?: string | null;
+    };
     url: '/reports/generate';
 };
 
