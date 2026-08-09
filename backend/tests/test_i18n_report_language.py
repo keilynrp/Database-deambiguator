@@ -269,3 +269,37 @@ class TestAllThreeFormatsFollowTheLanguage:
         if resp.status_code == 500 and "pptx" in resp.text.lower():
             pytest.skip("python-pptx not available in this environment")
         assert resp.status_code == 200
+
+
+class TestTheDisclosureIsSpecific:
+    """Phase 9 found the disclosure was true but not useful.
+
+    Reading a real Spanish report showed 6 Spanish lines against 32 English
+    ones: section titles translate, but structural headings, metric labels,
+    empty-state messages and the stakeholder framing do not. The original
+    disclosure only mentioned "analysis text and provider names", so a reader
+    meeting a mostly-English document had no way to tell intent from defect.
+
+    No automated sweep could have found this. Every sweep in this track looked
+    for *Spanish* strings; these were always English, so nothing flagged them.
+    """
+
+    _MUST_NAME = ("headings", "labels", "providers")
+    _MUST_NAME_ES = ("encabezados", "etiquetas", "fuentes externas")
+
+    @pytest.mark.parametrize(
+        "language,markers",
+        [("en", _MUST_NAME), ("es", _MUST_NAME_ES)],
+    )
+    def test_the_disclosure_names_each_category_that_stays_english(
+        self, language, markers
+    ):
+        text = catalog_module._load_catalog.__wrapped__(language)[
+            "report.disclosure.analysis_language"
+        ]
+
+        missing = [m for m in markers if m not in text.lower()]
+        assert not missing, (
+            f"{language}: the disclosure does not mention {missing}; a reader cannot "
+            f"tell which English text is intended and which is a defect"
+        )

@@ -3079,7 +3079,7 @@
   "rag.subtitle": "Ask questions about your knowledge base",
   "rag.title": "Semantic AI",
   "rag.top_k": "Results to retrieve",
-  "report.disclosure.analysis_language": "Analysis text and names supplied by external providers (concepts, journal titles, author and institution names) remain in English.",
+  "report.disclosure.analysis_language": "This report translates section titles and the text this system authors. Structural headings, metric labels, empty-state messages, the stakeholder framing, generated analysis prose, and names supplied by external providers (concepts, journal titles, author and institution names) remain in English.",
   "report.hidden_patterns.collaboration_bridge.action": "Inspect this entity as a bridge between communities, authors or topics.",
   "report.hidden_patterns.collaboration_bridge.label": "Bridging entity in the graph",
   "report.hidden_patterns.duplicate_variants.action": "Review whether these should be merged, normalised, or kept as variants.",

@@ -3079,7 +3079,7 @@
   "rag.subtitle": "Haz preguntas sobre tu base de conocimiento",
   "rag.title": "IA Semántica",
   "rag.top_k": "Resultados a recuperar",
-  "report.disclosure.analysis_language": "El texto de análisis y los nombres provistos por fuentes externas (conceptos, títulos de revistas, nombres de autores e instituciones) permanecen en inglés.",
+  "report.disclosure.analysis_language": "Este informe traduce los títulos de sección y el texto que este sistema redacta. Los encabezados estructurales, las etiquetas de métricas, los mensajes de estado vacío, el encuadre por audiencia, la prosa de análisis generada y los nombres provistos por fuentes externas (conceptos, títulos de revistas, nombres de autores e instituciones) permanecen en inglés.",
   "report.hidden_patterns.collaboration_bridge.action": "Inspeccionar esta entidad como puente entre comunidades, autores o temas.",
   "report.hidden_patterns.collaboration_bridge.label": "Entidad puente en el grafo",
   "report.hidden_patterns.duplicate_variants.action": "Revisar si deben fusionarse, normalizarse o mantenerse como variantes.",
