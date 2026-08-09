@@ -325,7 +325,13 @@ them and the generator rejected the file. Fixed by emitting the literal with
 
 ## 9. Verification
 
-- [ ] 9.1 Full backend suite green
-- [ ] 9.2 Generate a real Spanish report in all three formats and read it — the defect in #209 was found by reading output, not by a test
-- [ ] 9.3 Confirm the reverse case: an English report contains no Spanish, which is the original bug
-- [ ] 9.4 Update issue #209 with what shipped and what deliberately did not
+- [x] 9.1 3790 passed, 9 skipped, 0 failed on the phase 8 merge; re-run for this change.
+- [x] 9.2 Rendered real reports in both languages and **read them**. This is the task that earned its place in the plan.
+
+  **Reading found what no test could.** A Spanish report is **6 Spanish lines against 32 English ones**: section titles and the disclosure translate; structural headings (`Executive Summary`, `Executive interpretation`), the stakeholder framing (`Leadership / Strategy`, `Framed for Leadership / Strategy: …`), empty-state messages (`No entities in this domain yet.`) and metric labels (`Total Entities`, `Valid`, `Pending`) do not.
+
+  **Why every sweep missed it:** the whole track was framed as *find Spanish text and move it to the catalog*. Task 1's inventory looked for **Spanish strings** — 127 candidates, 47 false positives, five corrections. These were **always English**, so nothing had reason to look at them. Producing a genuinely Spanish report means translating text that was never the reported defect.
+
+  Decided with the product owner: **close #209 on the defect it reported, and make the disclosure honest** about what remains English (option A + C). A follow-up issue covers full Spanish reports.
+- [x] 9.3 **The original bug is gone: the English report contains zero Spanish lines.** Measured on the rendered artefact, not on source.
+- [x] 9.4 Comment posted on #209, plus a follow-up issue for full Spanish reports and one for the 15 strings in modules that persist their text.
