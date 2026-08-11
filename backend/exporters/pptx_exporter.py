@@ -188,7 +188,7 @@ def generate_pptx(
                 collect(db, domain_id, org_id),
                 title=translate(f"report.section.{section_id}", language),
             )
-            render_pptx(payload, prs, accent)
+            render_pptx(payload, prs, accent, language)
 
     # ── Final slide: Closing ──────────────────────────────────────────────────
     slide = _add_slide(prs)

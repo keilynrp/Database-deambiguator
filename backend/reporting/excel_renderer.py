@@ -12,6 +12,7 @@ from openpyxl.styles import Alignment, Font
 from openpyxl.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
+from backend.reporting.localize import localize_section
 from backend.reporting.section_data import (
     Block,
     Meter,
@@ -99,7 +100,7 @@ def _write_caveat(ws: Worksheet, method: str, row: int) -> int:
     return row + 1
 
 
-def render_excel(section: SectionData, wb: Workbook) -> Worksheet:
+def render_excel(section: SectionData, wb: Workbook, language: str | None = None) -> Worksheet:
     """One section as a worksheet, opening with its finding.
 
     Where the disclosure goes depends on whether there is a table to attach it
@@ -119,6 +120,11 @@ def render_excel(section: SectionData, wb: Workbook) -> Worksheet:
     than the document does, so numbering here would contradict the PDF of the
     same generation (design decision 7). The sheet name is the reference.
     """
+    # Resolve any catalog keys the collector emitted, once, here — see
+    # backend/reporting/localize.py for why this is not threaded through
+    # the collectors instead.
+    section = localize_section(section, language)
+
     ws = wb.create_sheet(_safe_sheet_title(section.title, wb))
 
     takeaway = ws.cell(row=1, column=1, value=section.takeaway)

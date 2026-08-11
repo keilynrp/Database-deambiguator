@@ -12,6 +12,7 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.presentation import Presentation as PresentationType
 from pptx.util import Inches, Pt
 
+from backend.reporting.localize import localize_section
 from backend.reporting.section_data import (
     Block,
     Meter,
@@ -144,13 +145,18 @@ def _render_meter(slide, block: Meter, top: float) -> None:
     _text(slide, f"{pct}%", Inches(10.7), Inches(top + 0.4), Inches(1.5), Inches(0.35), size=12, bold=True)
 
 
-def render_pptx(section: SectionData, prs: PresentationType, accent: RGBColor) -> list:
+def render_pptx(section: SectionData, prs: PresentationType, accent: RGBColor, language: str | None = None) -> list:
     """Render one section as slides appended to `prs`. Returns the slides added.
 
     No exhibit ordinal: a deck renders a different set of sections than the
     document does, so numbering here would contradict the PDF of the same
     generation (design decision 7). The slide title is the reference.
     """
+    # Resolve any catalog keys the collector emitted, once, here — see
+    # backend/reporting/localize.py for why this is not threaded through
+    # the collectors instead.
+    section = localize_section(section, language)
+
     slide = _blank_slide(prs)
     added = [slide]
     _header(slide, section, accent, prs.slide_width)

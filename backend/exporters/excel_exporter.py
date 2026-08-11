@@ -139,7 +139,7 @@ class EnterpriseExcelExporter:
                 payload = _replace(
                     payload, title=translate(f"report.sheet.{section_id}", language)
                 )
-                sheet = render_excel(payload, wb)
+                sheet = render_excel(payload, wb, language)
                 collected.append((sheet.title, payload))
 
         # ── Sheet 4: Harmonization Log ────────────────────────────────────────

@@ -2058,7 +2058,7 @@ def build(
                     title=translate(f"report.section.{sec}", language),
                 )
                 collected.append(payload)
-                body_sections.append(render_html(payload))
+                body_sections.append(render_html(payload, language))
             except Exception as exc:
                 # Per-section error boundary: one failing collector degrades its
                 # own section, it does not take the report down.
