@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from html import escape
 
+from backend.reporting.localize import localize_section
 from backend.reporting.section_data import (
     Block,
     Meter,
@@ -118,7 +119,7 @@ def _exhibit_label(section: SectionData) -> str:
     )
 
 
-def render_html(section: SectionData) -> str:
+def render_html(section: SectionData, language: str | None = None) -> str:
     """One section as a self-contained document exhibit.
 
     The shape carries the presentation contract: the ordinal identifies the
@@ -126,6 +127,11 @@ def render_html(section: SectionData) -> str:
     secondary text, and the method footer travels underneath so a reader who
     quotes a figure out of the section can still see what it is.
     """
+    # Resolve any catalog keys the collector emitted, once, here — see
+    # backend/reporting/localize.py for why this is not threaded through
+    # the collectors instead.
+    section = localize_section(section, language)
+
     body = "".join(_render_block(block) for block in section.blocks)
     return (
         "<section>\n    "
