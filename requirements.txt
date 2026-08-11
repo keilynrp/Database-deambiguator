@@ -62,9 +62,9 @@ networkx>=3.6.1
 python-louvain==0.16
 
 # ── Authority resolver cache (Phase 1 — disambiguation/authority optimization)
-cachetools>=7.1.6
+cachetools>=7.1.7
 
 # ── Distributed cache (Redis-backed, optional; in-process fallback when REDIS_URL unset)
-redis>=8.0.1
+redis>=8.1.0
 # test-only: in-memory Redis used by the cache test suite
 fakeredis>=2.37.0
