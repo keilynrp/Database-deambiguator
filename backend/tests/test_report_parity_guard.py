@@ -26,6 +26,7 @@ import pytest
 from pptx import Presentation
 
 from backend import models, report_builder
+from backend.reporting.localize import localize_section
 from backend.exporters.excel_exporter import EnterpriseExcelExporter
 from backend.exporters.pptx_exporter import generate_pptx
 from backend.reporting import format_support
@@ -364,7 +365,14 @@ def test_a_rendered_section_states_its_finding_and_its_method(
     if not format_support.supports(export_format, section):
         pytest.skip(f"{export_format} declares {section} unsupported — see 6.3")
 
-    payload = report_builder.collect_section(db_session, section, "default")
+    # Localized before comparison: since #268 a collector emits catalog keys and
+    # the renderer resolves them, so "the payload the collector produced" means
+    # the payload after localization. Comparing against the raw one would ask the
+    # renderer to emit a key. The guard's strength is unchanged — it still fails
+    # if a renderer drops the method — and it still avoids hard-coded strings.
+    payload = localize_section(
+        report_builder.collect_section(db_session, section, "default")
+    )
     assert payload is not None, f"{section} has no collector"
 
     slots = _placement(export_format, section, db_session, payload)
@@ -424,7 +432,14 @@ def test_an_unsupported_section_is_exempt_and_still_reported(export_format, db_s
         f"{section} is now supported by {export_format}; this test needs a new subject"
     )
 
-    payload = report_builder.collect_section(db_session, section, "default")
+    # Localized before comparison: since #268 a collector emits catalog keys and
+    # the renderer resolves them, so "the payload the collector produced" means
+    # the payload after localization. Comparing against the raw one would ask the
+    # renderer to emit a key. The guard's strength is unchanged — it still fails
+    # if a renderer drops the method — and it still avoids hard-coded strings.
+    payload = localize_section(
+        report_builder.collect_section(db_session, section, "default")
+    )
     blob = _render(export_format, section, db_session)  # must not raise
 
     assert not _visible(export_format, blob, payload.takeaway), (

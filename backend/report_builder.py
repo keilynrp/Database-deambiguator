@@ -383,6 +383,7 @@ def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> "Se
     First section migrated onto the shared section payload; every format renders
     from this one collector rather than re-querying and re-formatting.
     """
+    from backend.reporting.localize import with_params
     from backend.reporting.section_data import (
         SectionData, StatGrid, StatItem, Table,
     )
@@ -405,11 +406,25 @@ def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> "Se
     enriched = enrich_map.get("completed", 0)
     enrich_pct = round(enriched / total * 100) if total else 0
 
+    # Labels and sub-labels are catalog keys; values stay as computed. The
+    # renderer resolves them — see backend/reporting/localize.py.
     grid = StatGrid(items=(
-        StatItem(label="Total Entities", value=f"{total:,}"),
-        StatItem(label="Valid", value=f"{status_map.get('valid', 0):,}", sub=f"{valid_pct}% of total"),
-        StatItem(label="Pending", value=f"{status_map.get('pending', 0):,}", sub="awaiting validation"),
-        StatItem(label="Enriched", value=f"{enriched:,}", sub=f"{enrich_pct}% coverage"),
+        StatItem(label="report.stat.entity_stats.total", value=f"{total:,}"),
+        StatItem(
+            label="report.stat.entity_stats.valid",
+            value=f"{status_map.get('valid', 0):,}",
+            sub=with_params("report.stat.entity_stats.sub.pct_of_total", pct=valid_pct),
+        ),
+        StatItem(
+            label="report.stat.entity_stats.pending",
+            value=f"{status_map.get('pending', 0):,}",
+            sub="report.stat.entity_stats.sub.awaiting",
+        ),
+        StatItem(
+            label="report.stat.entity_stats.enriched",
+            value=f"{enriched:,}",
+            sub=with_params("report.stat.entity_stats.sub.pct_coverage", pct=enrich_pct),
+        ),
     ))
 
     rows = tuple(
@@ -421,7 +436,11 @@ def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> "Se
         for s, c in sorted(by_status, key=lambda x: -x[1])
     )
     table = Table(
-        columns=("Validation Status", "Count", "Distribution"),
+        columns=(
+            "report.col.entity_stats.status",
+            "report.col.entity_stats.count",
+            "report.col.entity_stats.distribution",
+        ),
         rows=rows,
         bar_column=2,
     )
@@ -429,7 +448,7 @@ def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> "Se
 
     pending = status_map.get("pending", 0)
     if not total:
-        takeaway = "No entities in this domain yet."
+        takeaway = "report.takeaway.entity_stats.empty"
         materiality = Materiality.EMPTY
     else:
         # Both verbs agree with the count in front of them, not with `total`:
@@ -454,11 +473,7 @@ def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> "Se
         title="Entity Statistics",
         blocks=(grid, table),
         takeaway=takeaway,
-        method=(
-            "Counts are scoped to this domain and organization. \"Valid\" is the "
-            "record's validation status flag, not an assessment of the data's "
-            "quality — a record can be structurally valid and still be wrong."
-        ),
+        method="report.method.entity_stats",
         materiality=materiality,
     )
 

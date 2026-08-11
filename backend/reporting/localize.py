@@ -29,7 +29,19 @@ from backend.i18n.catalog import SURFACE_PREFIXES, translate
 
 from .section_data import Meter, Narrative, SectionData, StatGrid, StatItem, Table
 
-__all__ = ["localize_section", "looks_like_key"]
+__all__ = ["localize_section", "looks_like_key", "with_params"]
+
+
+#: Separates a key from its interpolation arguments, as in
+#: `report.stat.total.sub.pct?pct=42`. A collector knows the numbers when it
+#: builds the payload; the renderer knows the language. Neither knows both, so
+#: the key carries the arguments across.
+#:
+#: The alternative was a second field on every slot — a schema change to
+#: SectionData, which the format-parity contract also depends on. This keeps a
+#: slot a plain `str`, which is what lets a collector migrate one field at a
+#: time. `?` cannot appear in a catalog key, so the split is unambiguous.
+_PARAM_SEP = "?"
 
 
 def looks_like_key(value: Any) -> bool:
@@ -37,11 +49,36 @@ def looks_like_key(value: Any) -> bool:
     return isinstance(value, str) and value.startswith(SURFACE_PREFIXES)
 
 
+def _split_params(value: str) -> tuple[str, dict[str, str]]:
+    key, _, raw = value.partition(_PARAM_SEP)
+    if not raw:
+        return key, {}
+    params: dict[str, str] = {}
+    for pair in raw.split("&"):
+        name, _, val = pair.partition("=")
+        if name:
+            params[name] = val
+    return key, params
+
+
+def with_params(key: str, **params: object) -> str:
+    """Build a key that carries its interpolation arguments.
+
+    Used by collectors: `with_params("report.x.sub", pct=42)`. Resolving it is
+    the renderer's job, once it knows the language.
+    """
+    if not params:
+        return key
+    encoded = "&".join(f"{name}={value}" for name, value in params.items())
+    return f"{key}{_PARAM_SEP}{encoded}"
+
+
 def _text(value: Any, language: str | None) -> Any:
     """Resolve one slot. Anything that is not a key is returned unchanged."""
     if not looks_like_key(value):
         return value
-    return translate(value, language)
+    key, params = _split_params(value)
+    return translate(key, language, **params)
 
 
 def _tuple(values: tuple, language: str | None) -> tuple:

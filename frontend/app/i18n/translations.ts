@@ -2,6 +2,19 @@ export type Language = 'en' | 'es';
 
 export const translations = {
     en: {
+        // Backend: entity_stats section copy (#268)
+        "report.stat.entity_stats.total": "Total Entities",
+        "report.stat.entity_stats.valid": "Valid",
+        "report.stat.entity_stats.pending": "Pending",
+        "report.stat.entity_stats.enriched": "Enriched",
+        "report.stat.entity_stats.sub.pct_of_total": "{pct}% of total",
+        "report.stat.entity_stats.sub.awaiting": "awaiting validation",
+        "report.stat.entity_stats.sub.pct_coverage": "{pct}% coverage",
+        "report.col.entity_stats.status": "Validation Status",
+        "report.col.entity_stats.count": "Count",
+        "report.col.entity_stats.distribution": "Distribution",
+        "report.takeaway.entity_stats.empty": "No entities in this domain yet.",
+        "report.method.entity_stats": "Counts are scoped to this domain and organization. \"Valid\" is the record's validation status flag, not an assessment of the data's quality — a record can be structurally valid and still be wrong.",
         // Backend: Excel sheet names — <=31 chars, no / \ ? * [ ] (phase 8)
         "report.sheet.entity_stats": "Entity Statistics",
         "report.sheet.enrichment_coverage": "Enrichment Coverage",
@@ -3617,6 +3630,19 @@ export const translations = {
         'dashboard_showcase.high_severity': 'High',
     },
     es: {
+        // Backend: entity_stats section copy (#268)
+        "report.stat.entity_stats.total": "Entidades Totales",
+        "report.stat.entity_stats.valid": "Válidos",
+        "report.stat.entity_stats.pending": "Pendientes",
+        "report.stat.entity_stats.enriched": "Enriquecidos",
+        "report.stat.entity_stats.sub.pct_of_total": "{pct}% del total",
+        "report.stat.entity_stats.sub.awaiting": "esperando validación",
+        "report.stat.entity_stats.sub.pct_coverage": "{pct}% de cobertura",
+        "report.col.entity_stats.status": "Estado de Validación",
+        "report.col.entity_stats.count": "Cantidad",
+        "report.col.entity_stats.distribution": "Distribución",
+        "report.takeaway.entity_stats.empty": "Aún no hay entidades en este dominio.",
+        "report.method.entity_stats": "Los conteos están acotados a este dominio y organización. \"Válido\" es el indicador de estado de validación del registro, no una evaluación de la calidad del dato — un registro puede ser estructuralmente válido y aun así estar equivocado.",
         // Backend: Excel sheet names — <=31 chars, no / \ ? * [ ] (phase 8)
         "report.sheet.entity_stats": "Estadísticas",
         "report.sheet.enrichment_coverage": "Cobertura Enriq.",
