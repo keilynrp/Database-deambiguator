@@ -2,7 +2,7 @@ export type Language = 'en' | 'es';
 
 export const translations = {
     en: {
-        // Backend: entity_stats section copy (#268)
+        // Backend: entity_stats section copy (issue 268)
         "report.stat.entity_stats.total": "Total Entities",
         "report.stat.entity_stats.valid": "Valid",
         "report.stat.entity_stats.pending": "Pending",
@@ -3630,7 +3630,7 @@ export const translations = {
         'dashboard_showcase.high_severity': 'High',
     },
     es: {
-        // Backend: entity_stats section copy (#268)
+        // Backend: entity_stats section copy (issue 268)
         "report.stat.entity_stats.total": "Entidades Totales",
         "report.stat.entity_stats.valid": "Válidos",
         "report.stat.entity_stats.pending": "Pendientes",
