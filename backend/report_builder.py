@@ -583,7 +583,7 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         .group_by(models.RawEntity.secondary_label)\
         .order_by(func.count(models.RawEntity.id).desc()).limit(15).all()
     max_n = rows_q[0][1] if rows_q else 1
-    # Two different percentages, previously both called "Share": the bar is drawn
+    # Two different percentages, previously both called "report.col.authority.share": the bar is drawn
     # relative to the largest label (so the top row is always 100%), while the
     # finding a reader cares about is each label's share of all classified
     # entities. Naming them apart, and rendering the second, is what lets the
@@ -921,7 +921,7 @@ def collect_impact_projection(
     grid = StatGrid(items=(
         StatItem(label="Expected Impact", value=f"{score}/100", sub="Monte Carlo median projection"),
         StatItem(label="Probable Range", value=f"{p10}–{p90}", sub=f"P10 to P90 · expected {p50}"),
-        StatItem(label="Confidence", value=confidence, sub=f"{confidence_score}/100 stability score"),
+        StatItem(label="report.col.authority.confidence", value=confidence, sub=f"{confidence_score}/100 stability score"),
     ))
     interpretation = Narrative(
         heading="Executive interpretation",
@@ -1376,9 +1376,7 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
 
         return SectionData(
             takeaway=(
-                "No authority records exist for this workspace; identity "
-                "resolution has not been run over it. This is not a finding of "
-                "zero conflicts."
+                "report.takeaway.authority.empty"
             ),
             method=_AUTHORITY_METHOD,
             materiality=Materiality.EMPTY,
@@ -1386,14 +1384,10 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
             title="Authority Control",
             blocks=(
                 Narrative(
-                    heading="Authority resolution not available",
+                    heading="report.narrative.authority.unavailable",
                     paragraphs=(
-                        "No authority records exist for this workspace, so identity "
-                        "resolution has not been run over it.",
-                        "This is not a finding of zero conflicts: unresolved duplicates "
-                        "and identity collisions may still be present and simply have not "
-                        "been looked for. Run authority resolution before treating entity "
-                        "identity in this brief as settled.",
+                        "report.narrative.authority.empty.p1",
+                        "report.narrative.authority.empty.p2",
                     ),
                 ),
             ),
@@ -1409,13 +1403,13 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
     backlog_pct = round(pending / total * 100) if total else 0
 
     grid = StatGrid(items=(
-        StatItem(label="Authority Records", value=f"{total:,}"),
-        StatItem(label="Confirmed", value=f"{confirmed:,}",
+        StatItem(label="report.stat.authority.records", value=f"{total:,}"),
+        StatItem(label="report.stat.authority.confirmed", value=f"{confirmed:,}",
                  sub=f"{round(confirmed / total * 100)}% of total"),
-        StatItem(label="Pending Review", value=f"{pending:,}",
+        StatItem(label="report.stat.authority.pending", value=f"{pending:,}",
                  sub=f"{backlog_pct}% awaiting a human decision"),
-        StatItem(label="Mean Confidence", value=f"{round(float(mean_confidence) * 100)}%",
-                 sub="across all resolution attempts"),
+        StatItem(label="report.stat.authority.mean_confidence", value=f"{round(float(mean_confidence) * 100)}%",
+                 sub="report.stat.authority.sub.all_attempts"),
     ))
 
     by_resolution = query.with_entities(
@@ -1423,7 +1417,7 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
         func.count(models.AuthorityRecord.id),
     ).group_by(models.AuthorityRecord.resolution_status).all()
     distribution = Table(
-        columns=("Resolution Status", "Records", "Share"),
+        columns=("report.col.authority.resolution_status", "report.col.authority.records", "Share"),
         rows=tuple(
             (status or "unknown", f"{count:,}", f"{round(count / total * 100)}%")
             for status, count in sorted(by_resolution, key=lambda r: -r[1])
@@ -1445,7 +1439,7 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
         models.AuthorityRecord.confidence.asc()
     ).limit(_AUTHORITY_CONFLICT_LIMIT).all()
     conflicts_table = Table(
-        columns=("Value", "Field", "Resolution", "Confidence", "Reason"),
+        columns=("report.col.authority.value", "report.col.authority.field", "report.col.authority.resolution", "Confidence", "report.col.authority.reason"),
         rows=tuple(
             (
                 r[0] or "—",
@@ -1488,7 +1482,7 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
             grid,
             distribution,
             conflicts_table,
-            Narrative(heading="Reliability reading", paragraphs=tuple(reliability)),
+            Narrative(heading="report.narrative.authority.reliability", paragraphs=tuple(reliability)),
         ),
         takeaway=(
             f"{confirmed:,} of {_plural(total, 'authority record')} confirmed; "
@@ -1725,19 +1719,17 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
         from backend.reporting.section_data import Materiality
 
         return SectionData(
-            takeaway="No journal metrics have been collected for this domain.",
+            takeaway="report.takeaway.journal.empty",
             method=_JOURNAL_METHOD,
             materiality=Materiality.EMPTY,
             key="journal_portfolio",
             title="Journal Portfolio",
             blocks=(
                 Narrative(
-                    heading="Journal metrics not available",
+                    heading="report.narrative.journal.unavailable",
                     paragraphs=(
-                        "No journal metrics exist for this workspace, so the publication "
-                        "portfolio — where the work was published, at what open-access cost, "
-                        "and with what field-normalized standing — cannot be reported yet.",
-                        "Run journal enrichment to populate it.",
+                        "report.narrative.journal.empty.p1"
+                        "report.narrative.journal.empty.p2",
                     ),
                 ),
             ),
@@ -1751,11 +1743,11 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
     doaj_pct = round(in_doaj / total * 100) if total else 0
 
     grid = StatGrid(items=(
-        StatItem(label="Journals", value=f"{total:,}", sub="distinct venues"),
-        StatItem(label="In DOAJ", value=f"{doaj_pct}%",
+        StatItem(label="report.stat.journal.journals", value=f"{total:,}", sub="report.stat.journal.sub.distinct_venues"),
+        StatItem(label="report.stat.journal.in_doaj", value=f"{doaj_pct}%",
                  sub=f"{in_doaj:,} of {total:,} open-access listed"),
-        StatItem(label="Charging APC", value=f"{with_apc:,}",
-                 sub="venues with a publication fee"),
+        StatItem(label="report.stat.journal.charging_apc", value=f"{with_apc:,}",
+                 sub="report.stat.journal.sub.publication_fee"),
     ))
 
     top = query.with_entities(
@@ -1772,12 +1764,12 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
     ).limit(_JOURNAL_TOP_LIMIT).all()
     table = Table(
         columns=(
-            "Journal",
-            "NIF (field-normalized)",
-            "Bayesian NIF [95% CI]",
-            "Local works (2yr)",
-            "APC (USD)",
-            "DOAJ",
+            "report.col.journal.journal",
+            "report.col.journal.nif",
+            "report.col.journal.nif_bayes",
+            "report.col.journal.local_works",
+            "report.col.journal.apc",
+            "report.col.journal.doaj",
         ),
         rows=tuple(
             (
@@ -1793,16 +1785,11 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
     )
 
     note = Narrative(
-        heading="How to read these metrics",
+        heading="report.narrative.journal.how_to_read",
         paragraphs=(
-            "NIF is a field-normalized open proxy for journal standing (two-year mean "
-            "citedness, normalized within field). It is NOT a Journal Impact Factor and "
-            "must not be read as one.",
-            "The Bayesian NIF is the shrunk estimate for low-volume journals and is always "
-            "shown with its 95% credible interval; a point estimate without the interval "
-            "would misrepresent its uncertainty.",
-            "\"Local works (2yr)\" counts the works in THIS workspace, not the journal's "
-            "global two-year output — it is local coverage, not a global volume.",
+            "report.narrative.journal.nif",
+            "report.narrative.journal.bayes",
+            "report.narrative.journal.local_works"
         ),
     )
 
