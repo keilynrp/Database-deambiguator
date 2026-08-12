@@ -2,6 +2,24 @@ export type Language = 'en' | 'es';
 
 export const translations = {
     en: {
+        // Backend: enrichment_coverage, top_secondary_labels, harmonization_log (issue 268)
+        "report.stat.enrichment_coverage.coverage": "Coverage",
+        "report.stat.enrichment_coverage.sub.of_entities": "{done} of {total} entities",
+        "report.stat.enrichment_coverage.avg_citations": "Avg Citations",
+        "report.stat.enrichment_coverage.sub.enriched_only": "enriched entities only",
+        "report.col.enrichment_coverage.entity": "Entity",
+        "report.col.enrichment_coverage.citations": "Citations",
+        "report.col.enrichment_coverage.source": "Source",
+        "report.method.enrichment_coverage": "The mean is taken over enriched records only, so records never enriched do not pull it down: it describes the enriched subset, not the domain.",
+        "report.stat.top_secondary_labels.classified": "Classified Entities",
+        "report.col.top_secondary_labels.entities": "Entities",
+        "report.col.top_secondary_labels.share": "Share of classified",
+        "report.col.top_secondary_labels.weight": "Relative weight",
+        "report.method.top_secondary_labels": "The denominator is classified entities only: unclassified records are excluded, so a share here is a share of what was classified rather than of the domain.",
+        "report.stat.harmonization_log.applied": "Operations Applied",
+        "report.stat.harmonization_log.sub.recent_first": "most recent first",
+        "report.col.harmonization_log.updated": "Records Updated",
+        "report.col.harmonization_log.executed": "Executed",
         // Backend: entity_stats section copy (issue 268)
         "report.stat.entity_stats.total": "Total Entities",
         "report.stat.entity_stats.valid": "Valid",
@@ -3630,6 +3648,24 @@ export const translations = {
         'dashboard_showcase.high_severity': 'High',
     },
     es: {
+        // Backend: enrichment_coverage, top_secondary_labels, harmonization_log (issue 268)
+        "report.stat.enrichment_coverage.coverage": "Cobertura",
+        "report.stat.enrichment_coverage.sub.of_entities": "{done} de {total} entidades",
+        "report.stat.enrichment_coverage.avg_citations": "Citas Promedio",
+        "report.stat.enrichment_coverage.sub.enriched_only": "solo entidades enriquecidas",
+        "report.col.enrichment_coverage.entity": "Entidad",
+        "report.col.enrichment_coverage.citations": "Citas",
+        "report.col.enrichment_coverage.source": "Fuente",
+        "report.method.enrichment_coverage": "La media se calcula solo sobre registros enriquecidos, así que los nunca enriquecidos no la bajan: describe el subconjunto enriquecido, no el dominio.",
+        "report.stat.top_secondary_labels.classified": "Entidades Clasificadas",
+        "report.col.top_secondary_labels.entities": "Entidades",
+        "report.col.top_secondary_labels.share": "Proporción de clasificadas",
+        "report.col.top_secondary_labels.weight": "Peso relativo",
+        "report.method.top_secondary_labels": "El denominador son solo las entidades clasificadas: los registros sin clasificar quedan excluidos, así que una proporción acá es sobre lo clasificado, no sobre el dominio.",
+        "report.stat.harmonization_log.applied": "Operaciones Aplicadas",
+        "report.stat.harmonization_log.sub.recent_first": "más recientes primero",
+        "report.col.harmonization_log.updated": "Registros Actualizados",
+        "report.col.harmonization_log.executed": "Ejecutada",
         // Backend: entity_stats section copy (issue 268)
         "report.stat.entity_stats.total": "Entidades Totales",
         "report.stat.entity_stats.valid": "Válidos",

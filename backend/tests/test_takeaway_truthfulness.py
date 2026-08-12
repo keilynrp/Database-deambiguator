@@ -48,14 +48,26 @@ def _rendered_figures(section) -> set[str]:
 
 
 def _collect(db, key: str):
+    """Collect a section as a reader would see it.
+
+    Localized on the way out: since #268 a collector emits catalog keys and the
+    renderer resolves them. This suite checks what a *reader* can verify — that
+    a cited figure appears on the page, that two quantities are not conflated
+    under one word — so it has to look at rendered copy, not at keys.
+
+    Asserting on keys instead would be strictly weaker here: two distinct keys
+    that render to the same visible text is exactly the bug
+    `test_share_of_classified_is_rendered_not_only_asserted` exists to catch.
+    """
     from backend import report_builder as rb
+    from backend.reporting.localize import localize_section
 
     collect = rb.SECTION_COLLECTORS[key]
     if key == "institutional_benchmark":
-        return collect(db, "default", None, None, None)
+        return localize_section(collect(db, "default", None, None, None))
     if key in rb._BENCHMARK_ORG_SECTIONS:
-        return collect(db, "default", None, None)
-    return collect(db, "default", None)
+        return localize_section(collect(db, "default", None, None))
+    return localize_section(collect(db, "default", None))
 
 
 @pytest.fixture
