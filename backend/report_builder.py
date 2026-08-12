@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from backend import models
 from backend.analyzers.topic_modeling import TopicAnalyzer
+from backend.reporting.localize import with_params
 from backend.schema_registry import registry
 from backend.services.analytics_service import AnalyticsService
 from backend.services.pattern_discovery import PatternDiscoveryService
@@ -383,7 +384,6 @@ def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> "Se
     First section migrated onto the shared section payload; every format renders
     from this one collector rather than re-querying and re-formatting.
     """
-    from backend.reporting.localize import with_params
     from backend.reporting.section_data import (
         SectionData, StatGrid, StatItem, Table,
     )
@@ -510,14 +510,33 @@ def collect_enrichment_coverage(db: Session, domain_id: str, org_id: int | None)
     pct = round(completed / total * 100) if total else 0
 
     grid = StatGrid(items=(
-        StatItem(label="Coverage", value=f"{pct}%", sub=f"{completed:,} of {total:,} entities"),
-        StatItem(label="Avg Citations", value=f"{round(avg_cit or 0):,}", sub="enriched entities only"),
+        StatItem(
+            label="report.stat.enrichment_coverage.coverage",
+            value=f"{pct}%",
+            sub=with_params(
+                "report.stat.enrichment_coverage.sub.of_entities",
+                done=f"{completed:,}",
+                total=f"{total:,}",
+            ),
+        ),
+        StatItem(
+            label="report.stat.enrichment_coverage.avg_citations",
+            value=f"{round(avg_cit or 0):,}",
+            sub="report.stat.enrichment_coverage.sub.enriched_only",
+        ),
     ))
     rows = tuple(
         (r[0] or "—", f"{r[1] or 0:,}", r[2] or "—")
         for r in top
     )
-    table = Table(columns=("Entity", "Citations", "Source"), rows=rows)
+    table = Table(
+        columns=(
+            "report.col.enrichment_coverage.entity",
+            "report.col.enrichment_coverage.citations",
+            "report.col.enrichment_coverage.source",
+        ),
+        rows=rows,
+    )
     from backend.reporting.section_data import Materiality
 
     if not total:
@@ -539,11 +558,7 @@ def collect_enrichment_coverage(db: Session, domain_id: str, org_id: int | None)
         title="Enrichment Coverage",
         blocks=(grid, table),
         takeaway=takeaway,
-        method=(
-            "The mean is taken over enriched records only, so records never "
-            "enriched do not pull it down: it describes the enriched subset, not "
-            "the portfolio. Citation counts are as of the last enrichment run."
-        ),
+                method="report.method.enrichment_coverage",
         materiality=materiality,
     )
 
@@ -585,7 +600,7 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         for r in rows_q
     )
     table = Table(
-        columns=("Label", "Entities", "Share of classified", "Relative weight"),
+        columns=("Label", "report.col.top_secondary_labels.entities", "report.col.top_secondary_labels.share", "report.col.top_secondary_labels.weight"),
         rows=rows,
         bar_column=3,
     )
@@ -609,7 +624,7 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
     # section rendering its own denominator.
     totals = StatGrid(items=(
         StatItem(
-            label="Classified Entities",
+            label="report.stat.top_secondary_labels.classified",
             value=f"{classified:,}",
             sub=f"across {_plural(len(rows_q), 'label')}",
         ),
@@ -620,11 +635,7 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
             f"{_plural(classified, 'classified entity', 'classified entities')}"
             if rows else "No classified entities to report."
         ),
-        method=(
-            "The denominator is classified entities only: unclassified records "
-            "are excluded and do not show up as a gap. High concentration may "
-            "reflect the classifier's coverage rather than the portfolio's shape."
-        ),
+                method="report.method.top_secondary_labels",
         materiality=(
             Materiality.NOTABLE if top_share > 60
             else Materiality.ROUTINE if rows
@@ -763,7 +774,7 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
         for l in logs
     )
     table = Table(
-        columns=("Step", "Records Updated", "Status", "Executed"),
+        columns=("Step", "report.col.harmonization_log.updated", "Status", "report.col.harmonization_log.executed"),
         rows=rows,
     )
     from backend.reporting.section_data import Materiality, StatGrid, StatItem
@@ -771,7 +782,7 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
     # The count leads the takeaway, so it belongs on the page: a reader should
     # not have to count table rows to check the sentence above them.
     summary = StatGrid(items=(
-        StatItem(label="Operations Applied", value=f"{len(logs):,}", sub="most recent first"),
+        StatItem(label="Operations Applied", value=f"{len(logs):,}", sub="report.stat.harmonization_log.sub.recent_first"),
     ))
     return SectionData(
         key="harmonization_log",

@@ -126,7 +126,9 @@ def _seed_enriched(db) -> None:
 
 def test_collect_enrichment_coverage_returns_coverage_kpis_and_top_table(db_session):
     _seed_enriched(db_session)
-    section = report_builder.collect_enrichment_coverage(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_enrichment_coverage(db_session, "default", None)
+    )
 
     assert isinstance(section, SectionData)
     assert section.key == "enrichment_coverage"
@@ -145,7 +147,9 @@ def test_collect_enrichment_coverage_returns_coverage_kpis_and_top_table(db_sess
 
 
 def test_collect_enrichment_coverage_empty_workspace(db_session):
-    section = report_builder.collect_enrichment_coverage(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_enrichment_coverage(db_session, "default", None)
+    )
     grid = next(b for b in section.blocks if isinstance(b, StatGrid))
     labels = {item.label: item.value for item in grid.items}
     assert labels["Coverage"] == "0%"
@@ -186,7 +190,9 @@ def _seed_labels(db) -> None:
 
 def test_collect_top_secondary_labels_returns_share_table(db_session):
     _seed_labels(db_session)
-    section = report_builder.collect_top_secondary_labels(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_top_secondary_labels(db_session, "default", None)
+    )
 
     assert isinstance(section, SectionData)
     assert section.key == "top_secondary_labels"
@@ -210,7 +216,9 @@ def test_collect_top_secondary_labels_returns_share_table(db_session):
 
 
 def test_collect_top_secondary_labels_empty(db_session):
-    section = report_builder.collect_top_secondary_labels(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_top_secondary_labels(db_session, "default", None)
+    )
     table = next(b for b in section.blocks if isinstance(b, Table))
     assert table.rows == ()
 
@@ -253,7 +261,9 @@ def _seed_snapshot(db) -> None:
 
 def test_collect_impact_projection_returns_kpis_interpretation_and_drivers(db_session):
     _seed_snapshot(db_session)
-    section = report_builder.collect_impact_projection(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_impact_projection(db_session, "default", None)
+    )
 
     assert isinstance(section, SectionData)
     assert section.key == "impact_projection"
@@ -291,7 +301,9 @@ def test_migrated_impact_projection_html_preserves_structure(db_session):
 
 def test_collect_decision_recommendations_returns_priority_table(db_session):
     _seed_snapshot(db_session)
-    section = report_builder.collect_decision_recommendations(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_decision_recommendations(db_session, "default", None)
+    )
 
     assert isinstance(section, SectionData)
     assert section.key == "decision_recommendations"
@@ -316,7 +328,9 @@ def test_migrated_decision_recommendations_html_preserves_structure(db_session):
 
 def test_collect_hidden_patterns_returns_reading_and_impact_table(db_session):
     _seed_snapshot(db_session)
-    section = report_builder.collect_hidden_patterns(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_hidden_patterns(db_session, "default", None)
+    )
 
     assert section.key == "hidden_patterns"
     reading = next(b for b in section.blocks if isinstance(b, Narrative))
@@ -342,7 +356,9 @@ def test_migrated_hidden_patterns_html_preserves_structure(db_session):
 
 def test_collect_institutional_benchmark_returns_kpis_reading_and_tables(db_session):
     _seed_snapshot(db_session)
-    section = report_builder.collect_institutional_benchmark(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_institutional_benchmark(db_session, "default", None)
+    )
 
     assert section.key == "institutional_benchmark"
     grid = next(b for b in section.blocks if isinstance(b, StatGrid))
@@ -382,7 +398,9 @@ def _seed_harmonization(db) -> None:
 
 def test_collect_harmonization_log_returns_status_table(db_session):
     _seed_harmonization(db_session)
-    section = report_builder.collect_harmonization_log(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_harmonization_log(db_session, "default", None)
+    )
 
     assert section.key == "harmonization_log"
     assert section.title == "Harmonization Log"
@@ -394,7 +412,9 @@ def test_collect_harmonization_log_returns_status_table(db_session):
 
 
 def test_collect_harmonization_log_empty(db_session):
-    section = report_builder.collect_harmonization_log(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_harmonization_log(db_session, "default", None)
+    )
     table = next(b for b in section.blocks if isinstance(b, Table))
     assert table.rows == ()
 
@@ -412,7 +432,9 @@ def test_migrated_harmonization_log_html_preserves_structure(db_session):
 
 def test_collect_stakeholder_reading_returns_narrative(db_session):
     _seed_snapshot(db_session)
-    section = report_builder.collect_stakeholder_reading(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_stakeholder_reading(db_session, "default", None)
+    )
 
     assert isinstance(section, SectionData)
     assert section.key == "stakeholder_reading"
@@ -434,7 +456,9 @@ def test_stakeholder_reading_reports_quality_on_a_percentage_scale(db_session):
     a wrong figure in the most prominent line of the first section.
     """
     _seed_snapshot(db_session)
-    section = report_builder.collect_stakeholder_reading(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_stakeholder_reading(db_session, "default", None)
+    )
 
     assert "quality 80%" in section.takeaway, section.takeaway
     joined = " ".join(
