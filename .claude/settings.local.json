@@ -46,7 +46,8 @@
       "Bash(cargo clippy:*)",
       "Bash(test:*)",
       "Bash(openspec status:*)",
-      "mcp__plugin_everything-claude-code_playwright__browser_navigate"
+      "mcp__plugin_everything-claude-code_playwright__browser_navigate",
+      "Bash(docker run *)"
     ]
   }
 }

@@ -5,6 +5,7 @@ A collector pulls a section's data into a `SectionData` with no markup, so every
 format renders the same payload. Pilot section: entity_stats.
 """
 from backend import models, report_builder
+from backend.reporting.localize import localize_section
 from backend.reporting.section_data import (
     Meter,
     Narrative,
@@ -46,7 +47,13 @@ def _seed(db) -> None:
 
 def test_collect_entity_stats_returns_stat_grid_and_distribution(db_session):
     _seed(db_session)
-    section = report_builder.collect_entity_stats(db_session, "default", None)
+    # Localized: since #268 the collector emits catalog keys and the renderer
+    # resolves them. This test is about counts, ordering and structure — the
+    # English labels are how it addresses items, not what it asserts. That the
+    # collector emits keys at all is covered by test_i18n_entity_stats.py.
+    section = localize_section(
+        report_builder.collect_entity_stats(db_session, "default", None)
+    )
 
     assert isinstance(section, SectionData)
     assert section.key == "entity_stats"
@@ -68,7 +75,13 @@ def test_collect_entity_stats_returns_stat_grid_and_distribution(db_session):
 
 
 def test_collect_entity_stats_empty_workspace(db_session):
-    section = report_builder.collect_entity_stats(db_session, "default", None)
+    # Localized: since #268 the collector emits catalog keys and the renderer
+    # resolves them. This test is about counts, ordering and structure — the
+    # English labels are how it addresses items, not what it asserts. That the
+    # collector emits keys at all is covered by test_i18n_entity_stats.py.
+    section = localize_section(
+        report_builder.collect_entity_stats(db_session, "default", None)
+    )
     grid = next(b for b in section.blocks if isinstance(b, StatGrid))
     labels = {item.label: item.value for item in grid.items}
     assert labels["Total Entities"] == "0"
