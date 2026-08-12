@@ -7,6 +7,7 @@ formats. These tests cover the collectors' semantics: what the section says, wha
 it must never say, and that it never leaks across tenants.
 """
 from backend import models, report_builder
+from backend.reporting.localize import localize_section
 from backend.reporting.section_data import (
     Narrative,
     SectionData,
@@ -60,7 +61,9 @@ def _seed_authority(db, org_id=None) -> None:
 def test_collect_authority_control_reports_counts(db_session):
     """1.1 — total, confirmed and pending-review counts."""
     _seed_authority(db_session)
-    section = report_builder.collect_authority_control(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_authority_control(db_session, "default", None)
+    )
 
     assert isinstance(section, SectionData)
     assert section.key == "authority_control"
@@ -76,7 +79,9 @@ def test_collect_authority_control_reports_counts(db_session):
 def test_collect_authority_control_lists_unresolved_conflicts(db_session):
     """1.3 — unresolved conflicts carry their confidence and nil_reason."""
     _seed_authority(db_session)
-    section = report_builder.collect_authority_control(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_authority_control(db_session, "default", None)
+    )
 
     tables = [b for b in section.blocks if isinstance(b, Table)]
     conflicts = next(t for t in tables if "Value" in t.columns)
@@ -91,7 +96,9 @@ def test_collect_authority_control_lists_unresolved_conflicts(db_session):
 def test_collect_authority_control_states_reliability_impact(db_session):
     """1.5 — a review backlog produces a prose reliability statement."""
     _seed_authority(db_session)
-    section = report_builder.collect_authority_control(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_authority_control(db_session, "default", None)
+    )
 
     narrative = next(b for b in section.blocks if isinstance(b, Narrative))
     prose = " ".join(narrative.paragraphs).lower()
@@ -105,7 +112,9 @@ def test_collect_authority_control_empty_state_is_explanatory(db_session):
     Absence of authority data is not evidence of clean identity resolution;
     saying so would be a false reassurance in a decision brief.
     """
-    section = report_builder.collect_authority_control(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_authority_control(db_session, "default", None)
+    )
 
     narrative = next(b for b in section.blocks if isinstance(b, Narrative))
     prose = " ".join(narrative.paragraphs).lower()
@@ -122,7 +131,9 @@ def test_collect_authority_control_is_tenant_scoped(db_session):
                                      review_required=True, confidence=0.3))
     db_session.commit()
 
-    section = report_builder.collect_authority_control(db_session, "default", 1)
+    section = localize_section(
+        report_builder.collect_authority_control(db_session, "default", 1)
+    )
     blob = " ".join(
         " ".join(" ".join(r) for r in b.rows) if isinstance(b, Table)
         else " ".join(b.paragraphs) if isinstance(b, Narrative)
@@ -348,7 +359,13 @@ def _seed_journals(db, org_id=None) -> None:
 
 
 def _journal_section(db, org_id=None):
-    return report_builder.collect_journal_portfolio(db, "default", org_id)
+    # Localized: since issue 268 the collector emits catalog keys and the
+    # renderer resolves them. These tests identify columns by their visible name
+    # ("Bayes" in the header), which is the level a reader checks at — asserting
+    # on keys instead would stop catching two keys that render the same text.
+    return localize_section(
+        report_builder.collect_journal_portfolio(db, "default", org_id)
+    )
 
 
 def test_collect_journal_portfolio_reports_distribution(db_session):
