@@ -197,10 +197,7 @@ def collect_stakeholder_reading(
             f"{coverage_pct}%"
         ),
         method=(
-            "An interpretive framing of figures reported elsewhere in this "
-            "brief, written for a chosen audience — it introduces no new data. "
-            "The stance it takes follows the benchmark status, so a change of "
-            "audience changes the emphasis but not the underlying numbers."
+            "report.method.stakeholder"
         ),
     )
 
@@ -701,11 +698,11 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
             title="Top Concepts",
             blocks=(
                 Narrative(
-                    heading="No concepts available",
-                    paragraphs=("No enriched concepts found — run enrichment first.",),
+                    heading="report.narrative.topics.unavailable",
+                    paragraphs=("report.narrative.topics.empty.p1",),
                 ),
             ),
-            takeaway="No enriched concepts to report; enrichment has not produced any for this domain.",
+            takeaway="report.takeaway.topics.empty",
             method=method,
             materiality=Materiality.EMPTY,
         )
@@ -734,7 +731,7 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
         title="Top Concepts",
         blocks=(
             Table(
-                columns=("Concept", "Frequency", "Share of top", "Relative weight"),
+                columns=("report.col.topics.concept", "report.col.topics.frequency", "report.col.topics.share_of_top", "report.col.topics.relative_weight"),
                 rows=rows,
                 bar_column=3,
             ),
@@ -839,7 +836,7 @@ def collect_decision_recommendations(
         for action in actions
     )
     table = Table(
-        columns=("Priority", "Category", "Recommendation", "Detail", "Evidence"),
+        columns=("report.col.actions.priority", "report.col.actions.category", "report.col.actions.recommendation", "report.col.actions.detail", "report.col.actions.evidence"),
         rows=rows,
     )
     from backend.reporting.section_data import Materiality
@@ -851,8 +848,8 @@ def collect_decision_recommendations(
     from backend.reporting.section_data import StatGrid, StatItem
 
     action_summary = StatGrid(items=(
-        StatItem(label="Recommended Actions", value=f"{len(actions):,}"),
-        StatItem(label="High Priority", value=f"{high:,}", sub="of those actions"),
+        StatItem(label="report.stat.actions.recommended", value=f"{len(actions):,}"),
+        StatItem(label="report.stat.actions.high_priority", value=f"{high:,}", sub="report.stat.actions.sub.of_those"),
     ))
     return SectionData(
         takeaway=(
@@ -860,9 +857,7 @@ def collect_decision_recommendations(
             if actions else "No actions are being recommended from the current snapshot."
         ),
         method=(
-            "Heuristics derived from the current snapshot, not a ranked plan. "
-            "They reflect what the data suggests, not institutional priority, "
-            "and carry no estimate of effort."
+            "report.method.actions"
         ),
         materiality=(
             Materiality.LEAD if high
@@ -919,12 +914,12 @@ def collect_impact_projection(
     drivers = projection.get("drivers") or {}
 
     grid = StatGrid(items=(
-        StatItem(label="Expected Impact", value=f"{score}/100", sub="Monte Carlo median projection"),
-        StatItem(label="Probable Range", value=f"{p10}–{p90}", sub=f"P10 to P90 · expected {p50}"),
+        StatItem(label="report.stat.impact.expected", value=f"{score}/100", sub="report.stat.impact.sub.monte_carlo_median"),
+        StatItem(label="report.stat.impact.probable_range", value=f"{p10}–{p90}", sub=f"P10 to P90 · expected {p50}"),
         StatItem(label="report.col.authority.confidence", value=confidence, sub=f"{confidence_score}/100 stability score"),
     ))
     interpretation = Narrative(
-        heading="Executive interpretation",
+        heading="report.narrative.impact.exec_interpretation",
         paragraphs=(
             projection.get("recommendation", "No impact projection is available yet."),
             f'Brief angle: {projection.get("brief_angle", "Use this as a directional signal only.")}',
@@ -950,11 +945,7 @@ def collect_impact_projection(
     return SectionData(
         takeaway=f"Projected impact {score}/100, probable range {p10}-{p90}",
         method=(
-            "A Monte Carlo projection over the current records, not an "
-            "observation. The range is the projection's own uncertainty: a wide "
-            "range means the model cannot distinguish outcomes, not that impact "
-            "is variable. This section's name promises more certainty than the "
-            "figure supports."
+            "report.method.impact"
         ),
         # Never LEAD. A wide range is low information, and letting it head the
         # summary sells uncertainty as a finding.
@@ -997,10 +988,9 @@ def collect_hidden_patterns(
     patterns = result.get("patterns") or []
 
     reading = Narrative(
-        heading="Executive reading",
+        heading="report.narrative.patterns.exec_reading",
         paragraphs=(
-            "UKIP scanned the portfolio for non-obvious concentrations, outliers, "
-            "quality risks, source imbalance and graph bridge signals.",
+            "report.narrative.patterns.scan",
         ),
     )
     rows = tuple(
@@ -1015,7 +1005,7 @@ def collect_hidden_patterns(
         for pattern in patterns
     )
     table = Table(
-        columns=("Pattern", "Confidence", "Signal", "Evidence", "Action", "Impact"),
+        columns=("report.col.patterns.pattern", "report.col.patterns.confidence", "report.col.patterns.signal", "report.col.patterns.evidence", "report.col.patterns.action", "report.col.patterns.impact"),
         rows=rows,
         bar_column=5,
     )
@@ -1026,7 +1016,7 @@ def collect_hidden_patterns(
     # The count leads the takeaway, so it has to be visible: checking the
     # sentence should not mean counting table rows.
     pattern_summary = StatGrid(items=(
-        StatItem(label="Patterns Detected", value=f"{len(patterns):,}"),
+        StatItem(label="report.stat.patterns.detected", value=f"{len(patterns):,}"),
     ))
     return SectionData(
         takeaway=(
@@ -1034,9 +1024,7 @@ def collect_hidden_patterns(
             if rows else "No patterns detected in the current records."
         ),
         method=(
-            "Statistical co-occurrence within this corpus, not causation, and "
-            "sensitive to corpus size: a small corpus produces spurious "
-            "associations. Treat these as prompts to investigate, not findings."
+            "report.method.patterns"
         ),
         # Capped below LEAD unconditionally: the section name invites a causal
         # reading its method cannot support.
@@ -1223,14 +1211,13 @@ def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "S
             title="Agentic Research Trace",
             blocks=(
                 Narrative(
-                    heading="No saved traces",
+                    heading="report.narrative.trace.unavailable",
                     paragraphs=(
-                        "No saved agentic chat traces are available yet. Ask a question "
-                        "from the research assistant and save the trace to include it here.",
+                        "report.narrative.trace.empty.p1",
                     ),
                 ),
             ),
-            takeaway="No agentic research traces have been saved for this domain.",
+            takeaway="report.takeaway.trace.empty",
             method=method,
             materiality=Materiality.EMPTY,
         )
@@ -1270,8 +1257,8 @@ def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "S
     from backend.reporting.section_data import StatGrid, StatItem
 
     summary = StatGrid(items=(
-        StatItem(label="Saved Answers", value=f"{len(traces):,}"),
-        StatItem(label="Distinct Tools", value=f"{len(tools_seen):,}", sub="across those answers"),
+        StatItem(label="report.stat.trace.saved_answers", value=f"{len(traces):,}"),
+        StatItem(label="report.stat.trace.distinct_tools", value=f"{len(tools_seen):,}", sub="report.stat.trace.sub.across_answers"),
     ))
     return SectionData(
         key="agentic_trace",
