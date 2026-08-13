@@ -1118,31 +1118,31 @@ def collect_institutional_benchmark(
 
     grid = StatGrid(items=(
         StatItem(
-            label="Benchmark Profile",
+            label="report.stat.benchmark.profile",
             value=benchmark.get("profile_name", "Institutional Benchmark"),
             sub=benchmark.get("description", "") or None,
         ),
         StatItem(
-            label="Readiness",
+            label="report.stat.benchmark.readiness",
             value=f"{readiness_pct}%",
             sub=f"{passed_rules} of {total_rules} rules satisfied",
         ),
         StatItem(
-            label="Status",
+            label="report.col.benchmark.status",
             value=str(status).title(),
-            sub="Baseline evaluation for the current dataset",
+            sub="report.stat.benchmark.sub.baseline",
         ),
     ))
-    reading = Narrative(heading="Executive reading", paragraphs=tuple(paragraphs))
+    reading = Narrative(heading="report.narrative.benchmark.exec_reading", paragraphs=tuple(paragraphs))
     gap_table = Table(
-        columns=("Gap", "Priority", "Evidence"),
+        columns=("report.col.benchmark.gap", "report.col.benchmark.priority", "report.col.benchmark.evidence"),
         rows=tuple(
             (gap.get("label", ""), str(gap.get("priority", "")), gap.get("evidence", ""))
             for gap in top_gaps
         ),
     )
     rule_table = Table(
-        columns=("Rule", "Observed", "Threshold", "Status", "Interpretation"),
+        columns=("report.col.benchmark.rule", "report.col.benchmark.observed", "report.col.benchmark.threshold", "report.stat.benchmark.status", "report.col.benchmark.interpretation"),
         rows=tuple(
             (
                 rule.get("label", ""),
@@ -1165,10 +1165,7 @@ def collect_institutional_benchmark(
             f"{_plural(total_rules, 'rule')} pass; status \"{status}\""
         ),
         method=(
-            "Measured against the selected benchmark profile and comparison "
-            "organization. Readiness describes conformance to that profile's "
-            "rules, not standing among peers — a high score means the rules are "
-            "satisfied, not that the institution leads its field."
+            "report.method.benchmark"
         ),
         materiality=Materiality.LEAD if status != "ready" else Materiality.NOTABLE,
     )
@@ -1537,19 +1534,17 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
         from backend.reporting.section_data import Materiality
 
         return SectionData(
-            takeaway="No co-authorship graph has been computed for this domain.",
+            takeaway="report.takeaway.collab.empty",
             method=_COLLAB_METHOD,
             materiality=Materiality.EMPTY,
             key="collaboration_graph",
             title="Collaboration Graph",
             blocks=(
                 Narrative(
-                    heading="Collaboration graph not available",
+                    heading="report.narrative.collab.unavailable",
                     paragraphs=(
-                        "No author statistics exist for this workspace, so the "
-                        "coauthorship graph has not been computed over it.",
-                        "Run coauthorship analysis to surface collaboration structure "
-                        "— central authors, communities and the bridges between them.",
+                        "report.narrative.collab.empty.p1",
+                        "report.narrative.collab.empty.p2"
                     ),
                 ),
             ),
@@ -1563,11 +1558,11 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
     ).filter(models.AuthorStats.community_id.isnot(None)).scalar() or 0
 
     grid = StatGrid(items=(
-        StatItem(label="Authors", value=f"{author_count:,}"),
-        StatItem(label="Collaborations", value=f"{edge_count:,}",
-                 sub="coauthorship edges"),
-        StatItem(label="Communities", value=f"{community_count:,}",
-                 sub="detected clusters"),
+        StatItem(label="report.stat.collab.authors", value=f"{author_count:,}"),
+        StatItem(label="report.stat.collab.collaborations", value=f"{edge_count:,}",
+                 sub="report.stat.collab.sub.edges"),
+        StatItem(label="report.stat.collab.communities", value=f"{community_count:,}",
+                 sub="report.stat.collab.sub.clusters"),
     ))
 
     central = stats_q.with_entities(
@@ -1582,7 +1577,7 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
         models.AuthorStats.degree.desc().nullslast(),
     ).limit(_COLLAB_TOP_LIMIT).all()
     central_table = Table(
-        columns=("Author", "Degree", "Centrality", "Publications"),
+        columns=("report.col.collab.author", "report.col.collab.degree", "report.col.collab.centrality", "report.col.collab.publications"),
         rows=tuple(
             (
                 r[0] or "—",
@@ -1626,7 +1621,7 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
         for a in db.query(models.Author).filter(models.Author.id.in_(bridge_links.keys())).all()
     } if bridge_links else {}
     bridges_table = Table(
-        columns=("Bridge Author", "Communities Linked"),
+        columns=("report.col.collab.bridge_author", "report.col.collab.communities_linked"),
         rows=tuple(
             (bridge_names.get(aid, "—"), ", ".join(str(c) for c in sorted(comms)))
             for aid, comms in sorted(bridge_links.items(), key=lambda kv: -len(kv[1]))
@@ -1641,10 +1636,9 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
     ).scalar()
     if latest_computed is None:
         blocks.append(Narrative(
-            heading="Staleness",
+            heading="report.narrative.collab.staleness",
             paragraphs=(
-                "These statistics have no computation timestamp, so the collaboration "
-                "structure may be stale — treat it as indicative, not current.",
+                "report.narrative.collab.stale_warning"
             ),
         ))
     else:
@@ -1653,7 +1647,7 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
         age_days = (datetime.now(timezone.utc) - latest_computed).days
         if age_days >= _COLLAB_STALENESS_DAYS:
             blocks.append(Narrative(
-                heading="Staleness",
+                heading="report.narrative.collab.staleness",
                 paragraphs=(
                     f"The collaboration graph was last computed {age_days} days ago "
                     f"({latest_computed.strftime('%Y-%m-%d')}); it may be stale relative "

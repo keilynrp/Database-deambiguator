@@ -241,7 +241,9 @@ def _seed_coauthorship(db, org_id=None, *, computed_at="now") -> None:
 def test_collect_collaboration_graph_reports_counts(db_session):
     """3.1 — author, edge and community counts."""
     _seed_coauthorship(db_session)
-    section = report_builder.collect_collaboration_graph(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_collaboration_graph(db_session, "default", None)
+    )
 
     assert section.key == "collaboration_graph"
     grid = next(b for b in section.blocks if isinstance(b, StatGrid))
@@ -254,7 +256,9 @@ def test_collect_collaboration_graph_reports_counts(db_session):
 def test_collect_collaboration_graph_lists_most_central(db_session):
     """3.3 — most central authors with degree, centrality, publications."""
     _seed_coauthorship(db_session)
-    section = report_builder.collect_collaboration_graph(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_collaboration_graph(db_session, "default", None)
+    )
 
     table = next(t for t in section.blocks if isinstance(t, Table) and "Centrality" in t.columns)
     assert table.rows[0][0] == "Alice Ng"          # highest centrality leads
@@ -265,7 +269,9 @@ def test_collect_collaboration_graph_lists_most_central(db_session):
 def test_collect_collaboration_graph_identifies_bridges(db_session):
     """3.5 — bridge authors spanning communities are identified."""
     _seed_coauthorship(db_session)
-    section = report_builder.collect_collaboration_graph(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_collaboration_graph(db_session, "default", None)
+    )
 
     tables = [t for t in section.blocks if isinstance(t, Table)]
     bridges = next(t for t in tables if "Bridges" in t.columns[0] or "bridge" in t.columns[0].lower())
@@ -289,7 +295,9 @@ def test_collect_collaboration_graph_issues_no_graph_computation(db_session, mon
     monkeypatch.setattr(ga, "detect_communities", _boom)
     monkeypatch.setattr(ga, "pagerank", _boom)
 
-    section = report_builder.collect_collaboration_graph(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_collaboration_graph(db_session, "default", None)
+    )
     assert section.key == "collaboration_graph"     # rendered without recomputation
 
 
@@ -301,7 +309,9 @@ def test_collect_collaboration_graph_flags_staleness(db_session):
     the one a live workspace actually hits.)
     """
     _seed_coauthorship(db_session, computed_at="stale")   # 120 days old
-    section = report_builder.collect_collaboration_graph(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_collaboration_graph(db_session, "default", None)
+    )
 
     narrative = next(b for b in section.blocks if isinstance(b, Narrative))
     assert "stale" in " ".join(narrative.paragraphs).lower()
@@ -309,7 +319,9 @@ def test_collect_collaboration_graph_flags_staleness(db_session):
 
 def test_collect_collaboration_graph_empty_state(db_session):
     """3.9 — no author stats → explanatory empty state."""
-    section = report_builder.collect_collaboration_graph(db_session, "default", None)
+    section = localize_section(
+        report_builder.collect_collaboration_graph(db_session, "default", None)
+    )
     narrative = next(b for b in section.blocks if isinstance(b, Narrative))
     prose = " ".join(narrative.paragraphs).lower()
     assert "coauthorship" in prose or "collaboration" in prose
@@ -327,7 +339,9 @@ def test_collect_collaboration_graph_is_tenant_scoped(db_session):
     ))
     db_session.commit()
 
-    section = report_builder.collect_collaboration_graph(db_session, "default", 1)
+    section = localize_section(
+        report_builder.collect_collaboration_graph(db_session, "default", 1)
+    )
     grid = next(b for b in section.blocks if isinstance(b, StatGrid))
     assert {i.label: i.value for i in grid.items}["Authors"] == "4"
     blob = " ".join(
