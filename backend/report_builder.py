@@ -21,50 +21,56 @@ from backend.services.analytics_service import AnalyticsService
 from backend.services.pattern_discovery import PatternDiscoveryService
 from backend.tenant_access import scope_query_to_org
 
+# Every field here is a catalog key, resolved at the render boundary like any
+# other section copy. `focus` and `brief_hint` were two literals joined by an
+# f-string into one sentence; they are one key now, because translate() does not
+# translate its params — a translated fragment interpolated into a translated
+# sentence would arrive in the wrong language. For the same reason `takeaway`
+# is per-profile rather than one template taking the label as a parameter.
 _STAKEHOLDER_PROFILES = {
     "leadership": {
-        "label": "Leadership / Strategy",
-        "focus": "decision readiness, strategic risk, and institutional positioning",
-        "brief_hint": "Use this lens when the audience needs a concise readout of readiness, confidence, and next executive moves.",
+        "label": "report.stakeholder.leadership.label",
+        "framing": "report.stakeholder.leadership.framing",
         "attention_points": [
-            "benchmark readiness and whether the current portfolio supports a defendable executive conversation",
-            "main confidence risks that could weaken institutional positioning if shared too early",
-            "one concrete next move that improves decision readiness quickly",
+            "report.stakeholder.leadership.attention.readiness",
+            "report.stakeholder.leadership.attention.confidence",
+            "report.stakeholder.leadership.attention.next_move",
         ],
-        "narrative_goal": "Keep the story concise, directional, and anchored in readiness, confidence, and near-term institutional action.",
+        "narrative_goal": "report.stakeholder.leadership.narrative_goal",
+        "takeaway": "report.stakeholder.leadership.takeaway",
     },
     "research_office": {
-        "label": "Research Office",
-        "focus": "portfolio quality, benchmark progress, and operational follow-through",
-        "brief_hint": "Use this lens when the audience needs to understand what to improve in the dataset and which actions strengthen research reporting.",
+        "label": "report.stakeholder.research_office.label",
+        "framing": "report.stakeholder.research_office.framing",
         "attention_points": [
-            "coverage and quality gaps that most directly hold back reporting confidence",
-            "which benchmark rules already pass and which still need operational attention",
-            "the most practical next actions for strengthening the portfolio baseline",
+            "report.stakeholder.research_office.attention.gaps",
+            "report.stakeholder.research_office.attention.rules",
+            "report.stakeholder.research_office.attention.next_actions",
         ],
-        "narrative_goal": "Frame the brief as an operational readout: what is already usable, what still needs work, and where the office should focus next.",
+        "narrative_goal": "report.stakeholder.research_office.narrative_goal",
+        "takeaway": "report.stakeholder.research_office.takeaway",
     },
     "library": {
-        "label": "Library / Metadata",
-        "focus": "metadata quality, authority control, and catalog reliability",
-        "brief_hint": "Use this lens when the audience cares most about normalization quality, authority review, and trust in the underlying records.",
+        "label": "report.stakeholder.library.label",
+        "framing": "report.stakeholder.library.framing",
         "attention_points": [
-            "record quality and authority issues that still affect trust in the dataset",
-            "whether metadata consistency is strong enough for downstream analytics and reporting",
-            "where curation effort will most improve catalog reliability",
+            "report.stakeholder.library.attention.quality",
+            "report.stakeholder.library.attention.consistency",
+            "report.stakeholder.library.attention.curation",
         ],
-        "narrative_goal": "Tell the story through trust in the record layer: what is stable, what remains ambiguous, and what curation work matters most.",
+        "narrative_goal": "report.stakeholder.library.narrative_goal",
+        "takeaway": "report.stakeholder.library.takeaway",
     },
     "innovation": {
-        "label": "Innovation / Transfer",
-        "focus": "high-impact entities, signals worth following, and portfolio narratives that support opportunity scanning",
-        "brief_hint": "Use this lens when the audience wants a faster read on standout outputs, concentration areas, and next exploratory opportunities.",
+        "label": "report.stakeholder.innovation.label",
+        "framing": "report.stakeholder.innovation.framing",
         "attention_points": [
-            "high-impact outputs that can anchor opportunity scanning or partner conversations",
-            "concept clusters that point to concentration areas worth exploring further",
-            "the next exploratory move that could turn signal into action",
+            "report.stakeholder.innovation.attention.outputs",
+            "report.stakeholder.innovation.attention.clusters",
+            "report.stakeholder.innovation.attention.next_move",
         ],
-        "narrative_goal": "Keep the brief opportunity-oriented: highlight standout outputs, concentration areas, and the most promising next exploratory path.",
+        "narrative_goal": "report.stakeholder.innovation.narrative_goal",
+        "takeaway": "report.stakeholder.innovation.takeaway",
     },
 }
 
@@ -149,7 +155,7 @@ def collect_stakeholder_reading(
     action_text = actions[0]["title"] if actions else "Continue strengthening enrichment coverage and record quality before broad circulation."
 
     paragraphs: list[str] = [
-        f'This brief is being framed for {stakeholder["focus"]}. {stakeholder["brief_hint"]}',
+        stakeholder["framing"],
         stance,
         f"Current benchmark readiness is {readiness_pct}%, average quality is {quality_avg}%, and enrichment coverage is {coverage_pct}%.",
         f'The current Monte Carlo impact projection is {impact_score}/100, with a probable range of {impact_range.get("p10", 0)}–{impact_range.get("p90", 0)}.',
@@ -182,19 +188,20 @@ def collect_stakeholder_reading(
 
     attention_points = stakeholder.get("attention_points", [])
     if attention_points:
-        paragraphs.append("How to read this brief for this audience:")
+        paragraphs.append("report.stakeholder.how_to_read")
         paragraphs.extend(attention_points)
-    paragraphs.append(f'Narrative goal: {stakeholder["narrative_goal"]}')
+    paragraphs.append(stakeholder["narrative_goal"])
 
     reading = Narrative(heading=stakeholder["label"], paragraphs=tuple(paragraphs))
     return SectionData(
         key="stakeholder_reading",
         title="Stakeholder Reading",
         blocks=(reading,),
-        takeaway=(
-            f'Framed for {stakeholder["label"]}: benchmark readiness '
-            f"{readiness_pct}%, quality {quality_avg}%, enrichment coverage "
-            f"{coverage_pct}%"
+        takeaway=with_params(
+            stakeholder["takeaway"],
+            readiness=readiness_pct,
+            quality=quality_avg,
+            coverage=coverage_pct,
         ),
         method=(
             "report.method.stakeholder"
@@ -1996,7 +2003,7 @@ def build(
         </div>
         <h1>{report_title}</h1>
         <p class="meta">Domain: <b>{domain_name}</b> &nbsp;·&nbsp; Generated: <b>{generated_at}</b></p>
-        <p class="meta" style="margin-top:8px">Stakeholder lens: <b>{stakeholder["label"]}</b></p>
+        <p class="meta" style="margin-top:8px">{translate("report.stakeholder.lens", language)}: <b>{translate(stakeholder["label"], language)}</b></p>
     </div>"""
 
     body_sections = [
