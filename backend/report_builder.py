@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from backend import models
 from backend.analyzers.topic_modeling import TopicAnalyzer
-from backend.reporting.localize import with_params
+from backend.reporting.localize import localize_section, with_params
 from backend.schema_registry import registry
 from backend.services.analytics_service import AnalyticsService
 from backend.services.pattern_discovery import PatternDiscoveryService
@@ -567,7 +567,7 @@ def collect_enrichment_coverage(db: Session, domain_id: str, org_id: int | None)
     from backend.reporting.section_data import Materiality
 
     if not total:
-        takeaway = "No entities to enrich in this domain yet."
+        takeaway = "report.empty.enrichment_coverage"
         materiality = Materiality.EMPTY
     else:
         takeaway = (
@@ -660,7 +660,7 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         takeaway=(
             f'"{rows[0][0]}" is the leading classification at {top_share}% of '
             f"{_plural(classified, 'classified entity', 'classified entities')}"
-            if rows else "No classified entities to report."
+            if rows else "report.empty.secondary_labels"
         ),
                 method="report.method.top_secondary_labels",
         materiality=(
@@ -818,7 +818,7 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
         takeaway=(
             f"{_plural(len(logs), 'harmonization operation')} applied, "
             f"most recently {rows[0][0]}"
-            if rows else "No harmonization operations have been applied."
+            if rows else "report.empty.harmonization"
         ),
         method=(
             "Records operations that were applied, not proposed or rejected. "
@@ -884,7 +884,7 @@ def collect_decision_recommendations(
     return SectionData(
         takeaway=(
             f"{_plural(len(actions), 'recommended action')}, {high} of them high priority"
-            if actions else "No actions are being recommended from the current snapshot."
+            if actions else "report.empty.decision_recommendations"
         ),
         method=(
             "report.method.actions"
@@ -951,8 +951,10 @@ def collect_impact_projection(
     interpretation = Narrative(
         heading="report.narrative.impact.exec_interpretation",
         paragraphs=(
-            projection.get("recommendation", "No impact projection is available yet."),
-            f'Brief angle: {projection.get("brief_angle", "Use this as a directional signal only.")}',
+            projection.get("recommendation") or "report.empty.impact_projection",
+            with_params("report.narrative.impact.brief_angle", angle=projection["brief_angle"])
+            if projection.get("brief_angle")
+            else "report.narrative.impact.brief_angle.default",
             projection.get("explanation", ""),
         ),
     )
@@ -1051,7 +1053,7 @@ def collect_hidden_patterns(
     return SectionData(
         takeaway=(
             f"{_plural(len(patterns), 'pattern')} detected; the strongest involves {rows[0][0]}"
-            if rows else "No patterns detected in the current records."
+            if rows else "report.empty.hidden_patterns"
         ),
         method=(
             "report.method.patterns"
@@ -1483,8 +1485,7 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
             )
     else:
         reliability.append(
-            "No records are awaiting review, so identity resolution is settled for "
-            "the records that were processed."
+            "report.empty.authority_review"
         )
 
     from backend.reporting.section_data import Materiality
@@ -2081,6 +2082,13 @@ def build(
                     exhibit=exhibit_no,
                     title=translate(f"report.section.{sec}", language),
                 )
+                # Resolve here, where the payload forks. Every renderer localizes
+                # what it is handed, but the executive summary is not a renderer:
+                # it reads `takeaway` off the collected payload directly, so a
+                # migrated takeaway reached it as a raw catalog key. Doing it once
+                # at the fork covers both consumers; localize_section is
+                # idempotent, so the renderers' own pass stays a no-op.
+                payload = localize_section(payload, language)
                 collected.append(payload)
                 body_sections.append(render_html(payload, language))
             except Exception as exc:

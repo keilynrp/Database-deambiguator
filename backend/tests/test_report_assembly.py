@@ -143,6 +143,31 @@ def test_empty_sections_are_de_emphasised_not_dropped(client, auth_headers):
     assert "No harmonization operations" in text
 
 
+def test_summary_never_shows_a_raw_catalog_key(client, auth_headers):
+    """The executive summary reads `takeaway` off the collected payload, and it
+    is not a renderer — so it does not get the localization every renderer
+    performs on what it is handed.
+
+    That gap shipped: five takeaways were migrated to catalog keys in earlier
+    batches, and an empty one of those sections printed `report.takeaway.…`
+    verbatim in a real report. Only one test covered the path, and it happened
+    to assert on the single takeaway still holding literal English.
+
+    So assert the property, not one section's wording: no summary entry may
+    contain a key from any surface. A section migrating its takeaway tomorrow is
+    covered without anyone remembering to extend this.
+    """
+    html = _generate(
+        client, auth_headers,
+        ["entity_stats", "harmonization_log", "topic_clusters", "agentic_trace"],
+    )
+    for _muted, text in _entries(_summary(html)):
+        assert not any(
+            token.startswith(("report.", "email.", "validation.", "chat.", "ops."))
+            for token in text.split()
+        ), f"the summary shows an unresolved catalog key: {text!r}"
+
+
 def test_summary_escapes_takeaway_text(client, auth_headers):
     """Takeaways are data. A section name or label containing markup must not
     reach the document as markup."""

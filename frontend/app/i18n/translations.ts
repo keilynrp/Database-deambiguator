@@ -4,6 +4,15 @@ export const translations = {
     en: {
         // Backend: final report sections (issue 268)
         "report.method.stakeholder": "An interpretive framing of figures reported elsewhere in this brief, written for a chosen audience — it introduces no new data. The stance it takes follows the benchmark status, so a change of audience changes the emphasis but not the underlying numbers.",
+        "report.empty.enrichment_coverage": "No entities to enrich in this domain yet.",
+        "report.empty.secondary_labels": "No classified entities to report.",
+        "report.empty.harmonization": "No harmonization operations have been applied.",
+        "report.empty.decision_recommendations": "No actions are being recommended from the current snapshot.",
+        "report.empty.impact_projection": "No impact projection is available yet.",
+        "report.empty.hidden_patterns": "No patterns detected in the current records.",
+        "report.empty.authority_review": "No records are awaiting review, so identity resolution is settled for the records that were processed.",
+        "report.narrative.impact.brief_angle": "Brief angle: {angle}",
+        "report.narrative.impact.brief_angle.default": "Brief angle: Use this as a directional signal only.",
         "report.stakeholder.lens": "Stakeholder lens",
         "report.stakeholder.stance.ready": "The dataset is already in a comparatively strong position for a first stakeholder-facing conversation.",
         "report.stakeholder.stance.watch": "The dataset already supports directional interpretation, but it still carries enough uncertainty that the audience should treat this brief as an informed internal read rather than a final position.",
@@ -3800,6 +3809,15 @@ export const translations = {
     es: {
         // Backend: final report sections (issue 268)
         "report.method.stakeholder": "Un encuadre interpretativo de cifras reportadas en otras partes de este informe, escrito para una audiencia elegida — no introduce datos nuevos. La postura que toma sigue el estado de la comparativa, así que cambiar de audiencia cambia el énfasis pero no los números de base.",
+        "report.empty.enrichment_coverage": "Todavía no hay entidades para enriquecer en este dominio.",
+        "report.empty.secondary_labels": "No hay entidades clasificadas para reportar.",
+        "report.empty.harmonization": "No se ha aplicado ninguna operación de armonización.",
+        "report.empty.decision_recommendations": "No se está recomendando ninguna acción a partir de la instantánea actual.",
+        "report.empty.impact_projection": "Todavía no hay una proyección de impacto disponible.",
+        "report.empty.hidden_patterns": "No se detectaron patrones en los registros actuales.",
+        "report.empty.authority_review": "No hay registros esperando revisión, así que la resolución de identidad está resuelta para los registros que se procesaron.",
+        "report.narrative.impact.brief_angle": "Ángulo del informe: {angle}",
+        "report.narrative.impact.brief_angle.default": "Ángulo del informe: usá esto solo como señal direccional.",
         "report.stakeholder.lens": "Enfoque de audiencia",
         "report.stakeholder.stance.ready": "El conjunto de datos ya está en una posición comparativamente sólida para una primera conversación con partes interesadas.",
         "report.stakeholder.stance.watch": "El conjunto de datos ya admite una interpretación direccional, pero todavía arrastra suficiente incertidumbre como para que la audiencia lea este informe como una lectura interna informada y no como una posición definitiva.",
