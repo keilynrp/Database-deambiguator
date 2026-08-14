@@ -1996,7 +1996,7 @@ def build(
     except Exception:
         pass
 
-    report_title = title or f"UKIP Report — {domain_name}"
+    report_title = title or translate("report.cover.title", language, domain=domain_name)
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     stakeholder = _stakeholder_profile(stakeholder_profile)
 
@@ -2010,7 +2010,7 @@ def build(
             <span style="font-size:20px;font-weight:700;color:#111827">UKIP</span>
         </div>
         <h1>{report_title}</h1>
-        <p class="meta">Domain: <b>{domain_name}</b> &nbsp;·&nbsp; Generated: <b>{generated_at}</b></p>
+        <p class="meta">{translate("report.cover.domain", language)}: <b>{domain_name}</b> &nbsp;·&nbsp; {translate("report.cover.generated", language)}: <b>{generated_at}</b></p>
         <p class="meta" style="margin-top:8px">{translate("report.stakeholder.lens", language)}: <b>{translate(stakeholder["label"], language)}</b></p>
     </div>"""
 
