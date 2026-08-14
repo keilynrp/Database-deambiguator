@@ -84,8 +84,10 @@ def _stakeholder_profile(profile_id: str | None) -> dict[str, str]:
     return _STAKEHOLDER_PROFILES.get(profile_id or "leadership", _STAKEHOLDER_PROFILES["leadership"])
 
 
-def _section_manual_note(title: str, content: str) -> str:
-    safe_title = escape(title.strip() or "Analyst Note")
+def _section_manual_note(title: str, content: str, language: str | None = None) -> str:
+    # Raw HTML, not SectionData, so localize_section never sees it: the default
+    # title has to be resolved here.
+    safe_title = escape(title.strip() or translate("report.manual.default_title", language))
     paragraphs = [
         f"<p>{escape(part.strip())}</p>"
         for part in content.split("\n\n")
@@ -809,7 +811,7 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
     # The count leads the takeaway, so it belongs on the page: a reader should
     # not have to count table rows to check the sentence above them.
     summary = StatGrid(items=(
-        StatItem(label="Operations Applied", value=f"{len(logs):,}", sub="report.stat.harmonization_log.sub.recent_first"),
+        StatItem(label="report.stat.harmonization_log.applied", value=f"{len(logs):,}", sub="report.stat.harmonization_log.sub.recent_first"),
     ))
     return SectionData(
         key="harmonization_log",
@@ -962,10 +964,10 @@ def collect_impact_projection(
     meters = tuple(
         Meter(label=label, pct=_pct(drivers.get(key, 0)))
         for label, key in (
-            ("Coverage", "coverage"),
-            ("Quality", "quality"),
-            ("Citation signal", "citation_signal"),
-            ("Concentration", "concentration"),
+            ("report.meter.coverage", "coverage"),
+            ("report.meter.quality", "quality"),
+            ("report.meter.citation_signal", "citation_signal"),
+            ("report.meter.concentration", "concentration"),
         )
     )
     from backend.reporting.section_data import Materiality
@@ -1259,18 +1261,24 @@ def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "S
 
         tools = trace_meta.get("tools_used") or []
         tools_seen.update(tools)
-        tool_list = ", ".join(tools) or "No tools"
+        tool_list = ", ".join(tools)
         source_list = ", ".join(
             str(s.get("label") or s.get("entity_id") or "source")
             for s in sources[:4]
             if isinstance(s, dict)
-        ) or "No explicit sources"
+        )
 
         blocks.append(
             Narrative(
-                heading=question or "Saved question",
+                heading=question or "report.trace.saved_question",
                 paragraphs=tuple(
-                    p for p in (answer, f"Tools: {tool_list}", f"Sources: {source_list}") if p
+                    p for p in (
+                        answer,
+                        with_params("report.trace.tools", tools=tool_list)
+                        if tool_list else "report.trace.tools.none",
+                        with_params("report.trace.sources", sources=source_list)
+                        if source_list else "report.trace.sources.none",
+                    ) if p
                 ),
             )
         )
@@ -2018,8 +2026,9 @@ def build(
     ]
     for manual in manual_sections or []:
         manual_html = _section_manual_note(
-            str(manual.get("title") or "Analyst Note"),
+            str(manual.get("title") or ""),
             str(manual.get("content") or ""),
+            language,
         )
         if manual_html:
             body_sections.append(manual_html)

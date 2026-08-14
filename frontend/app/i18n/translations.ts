@@ -4,6 +4,16 @@ export const translations = {
     en: {
         // Backend: final report sections (issue 268)
         "report.method.stakeholder": "An interpretive framing of figures reported elsewhere in this brief, written for a chosen audience — it introduces no new data. The stance it takes follows the benchmark status, so a change of audience changes the emphasis but not the underlying numbers.",
+        "report.meter.coverage": "Coverage",
+        "report.meter.quality": "Quality",
+        "report.meter.citation_signal": "Citation signal",
+        "report.meter.concentration": "Concentration",
+        "report.trace.saved_question": "Saved question",
+        "report.trace.tools": "Tools: {tools}",
+        "report.trace.tools.none": "Tools: none",
+        "report.trace.sources": "Sources: {sources}",
+        "report.trace.sources.none": "Sources: no explicit sources",
+        "report.manual.default_title": "Analyst Note",
         "report.method.journal": "NIF is a field-normalized two-year mean citedness computed from OpenAlex: an open proxy, NOT the Journal Impact Factor, and not comparable to a published JIF. The works count behind it is local to this corpus, not OpenAlex's global figure for the journal. DOAJ and APC status are as of the last journal sync.",
         "report.method.collab": "Co-authorship is derived from local records, and author identities are derived rather than canonical, so one person can appear more than once. Community detection returns one partition among several possible ones.",
         "report.method.authority": "Mean confidence is the matcher's own score, not agreement with a human reviewer. Records awaiting review are unvalidated, so they contribute to the mean without anyone having confirmed them. The conflicts table lists the worst offenders, not the whole review queue.",
@@ -3817,6 +3827,16 @@ export const translations = {
     es: {
         // Backend: final report sections (issue 268)
         "report.method.stakeholder": "Un encuadre interpretativo de cifras reportadas en otras partes de este informe, escrito para una audiencia elegida — no introduce datos nuevos. La postura que toma sigue el estado de la comparativa, así que cambiar de audiencia cambia el énfasis pero no los números de base.",
+        "report.meter.coverage": "Cobertura",
+        "report.meter.quality": "Calidad",
+        "report.meter.citation_signal": "Señal de citación",
+        "report.meter.concentration": "Concentración",
+        "report.trace.saved_question": "Pregunta guardada",
+        "report.trace.tools": "Herramientas: {tools}",
+        "report.trace.tools.none": "Herramientas: ninguna",
+        "report.trace.sources": "Fuentes: {sources}",
+        "report.trace.sources.none": "Fuentes: sin fuentes explícitas",
+        "report.manual.default_title": "Nota del analista",
         "report.method.journal": "El NIF es una media de citación a dos años normalizada por campo, calculada desde OpenAlex: un indicador abierto aproximado, NO el Factor de Impacto de la revista, y no comparable con un JIF publicado. El conteo de trabajos que lo sustenta es local a este corpus, no la cifra global de OpenAlex para la revista. El estado DOAJ y de APC corresponde a la última sincronización de revistas.",
         "report.method.collab": "La co-autoría se deriva de los registros locales, y las identidades de autor son derivadas y no canónicas, así que una misma persona puede aparecer más de una vez. La detección de comunidades devuelve una partición entre varias posibles.",
         "report.method.authority": "La confianza promedio es el puntaje del propio emparejador, no la coincidencia con un revisor humano. Los registros que esperan revisión no están validados, así que aportan al promedio sin que nadie los haya confirmado. La tabla de conflictos lista los peores casos, no la cola completa de revisión.",
