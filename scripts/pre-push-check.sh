@@ -37,6 +37,34 @@ done
 
 EXIT=0
 
+# ── Gate result cache ────────────────────────────────────────────────────────
+# A gate whose inputs are byte-identical to a run that already passed does not
+# have to run again. The key is the git tree hash of the paths that decide the
+# result, so rebasing a commit onto a new base — which rewrites the sha but not
+# the content — is a cache hit rather than another full suite.
+#
+# Two things keep it from lying:
+#   * The suites run against the WORKING TREE while the key describes HEAD. When
+#     the deciding paths are dirty or hold untracked files the two disagree, so
+#     gate_key prints nothing and the gate runs unconditionally. A cache that is
+#     wrong in the "skip it" direction is worse than no cache at all.
+#   * Entries live under .git/, so they are per-clone and never reach a commit.
+CACHE_DIR="$(git rev-parse --git-dir)/pre-push-cache"
+mkdir -p "$CACHE_DIR"
+
+# gate_key <name> <path>… → key on stdout, or nothing when it cannot be trusted
+gate_key() {
+  local name="$1"; shift
+  [ -n "$(git status --porcelain -- "$@" 2>/dev/null)" ] && return 0
+  {
+    echo "$name"
+    for p in "$@"; do git rev-parse "HEAD:$p" 2>/dev/null || echo "absent:$p"; done
+  } | git hash-object --stdin
+}
+
+gate_hit()    { [ -n "$1" ] && [ -f "$CACHE_DIR/$1" ]; }
+gate_record() { [ -n "$1" ] && : > "$CACHE_DIR/$1"; }
+
 echo "── Pre-push check vs. $BASE ──"
 echo "Changed files: ${#CHANGED[@]} (TS: ${#TS_CHANGED[@]}, Py: ${#PYTHON_CHANGED[@]})"
 echo
@@ -92,8 +120,17 @@ echo
 
 # 3c. Frontend unit tests (vitest) — runs the same suite as the CI `frontend-test` job.
 if [ ${#TS_CHANGED[@]} -gt 0 ]; then
-  echo "▶ vitest --run (frontend unit tests)…"
-  (cd frontend && npm test -- --run --reporter=dot) || EXIT=1
+  VITEST_KEY="$(gate_key vitest frontend)"
+  if gate_hit "$VITEST_KEY"; then
+    echo "▶ vitest --run — SKIPPED (this frontend/ tree already passed)"
+  else
+    echo "▶ vitest --run (frontend unit tests)…"
+    if (cd frontend && npm test -- --run --reporter=dot); then
+      gate_record "$VITEST_KEY"
+    else
+      EXIT=1
+    fi
+  fi
   echo
 fi
 
@@ -103,8 +140,19 @@ if [ ${#BACKEND_TESTS_CHANGED[@]} -gt 0 ]; then
   python -m pytest -x -q "${BACKEND_TESTS_CHANGED[@]}" || EXIT=1
   echo
 elif [ ${#PYTHON_CHANGED[@]} -gt 0 ]; then
-  echo "▶ pytest backend/tests (full suite — backend changed but no test file changed)…"
-  python -m pytest -x -q backend/tests/ || EXIT=1
+  # conftest.py sits at the repo root and requirements pin the interpreter's
+  # libraries, so both decide the outcome as much as backend/ itself does.
+  PYTEST_KEY="$(gate_key backend-full backend conftest.py requirements.txt requirements.lock)"
+  if gate_hit "$PYTEST_KEY"; then
+    echo "▶ pytest backend/tests — SKIPPED (this backend/ tree already passed the full suite)"
+  else
+    echo "▶ pytest backend/tests (full suite — backend changed but no test file changed)…"
+    if python -m pytest -x -q backend/tests/; then
+      gate_record "$PYTEST_KEY"
+    else
+      EXIT=1
+    fi
+  fi
   echo
 fi
 
