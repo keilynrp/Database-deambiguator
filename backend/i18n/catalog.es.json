@@ -3331,6 +3331,8 @@
   "report.stat.trace.distinct_tools": "Herramientas Distintas",
   "report.stat.trace.saved_answers": "Respuestas Guardadas",
   "report.stat.trace.sub.across_answers": "en esas respuestas",
+  "report.status.below_threshold": "Bajo el umbral",
+  "report.status.passed": "Cumple",
   "report.takeaway.authority.empty": "No existen registros de autoridad en este espacio de trabajo; no se ejecutó resolución de identidad sobre él. Esto no es un hallazgo de cero conflictos.",
   "report.takeaway.collab.empty": "No se calculó un grafo de coautoría para este dominio.",
   "report.takeaway.entity_stats.empty": "Aún no hay entidades en este dominio.",

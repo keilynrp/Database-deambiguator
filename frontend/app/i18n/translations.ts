@@ -4,6 +4,8 @@ export const translations = {
     en: {
         // Backend: final report sections (issue 268)
         "report.method.stakeholder": "An interpretive framing of figures reported elsewhere in this brief, written for a chosen audience — it introduces no new data. The stance it takes follows the benchmark status, so a change of audience changes the emphasis but not the underlying numbers.",
+        "report.status.passed": "Passed",
+        "report.status.below_threshold": "Below threshold",
         "report.cover.title": "UKIP Report — {domain}",
         "report.cover.domain": "Domain",
         "report.cover.generated": "Generated",
@@ -3830,6 +3832,8 @@ export const translations = {
     es: {
         // Backend: final report sections (issue 268)
         "report.method.stakeholder": "Un encuadre interpretativo de cifras reportadas en otras partes de este informe, escrito para una audiencia elegida — no introduce datos nuevos. La postura que toma sigue el estado de la comparativa, así que cambiar de audiencia cambia el énfasis pero no los números de base.",
+        "report.status.passed": "Cumple",
+        "report.status.below_threshold": "Bajo el umbral",
         "report.cover.title": "Informe UKIP — {domain}",
         "report.cover.domain": "Dominio",
         "report.cover.generated": "Generado",

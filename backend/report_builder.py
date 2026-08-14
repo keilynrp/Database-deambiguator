@@ -1161,7 +1161,7 @@ def collect_institutional_benchmark(
                 rule.get("label", ""),
                 str(rule.get("observed", "")),
                 str(rule.get("threshold", "")),
-                "Passed" if rule.get("passed") else "Below threshold",
+                "report.status.passed" if rule.get("passed") else "report.status.below_threshold",
                 rule.get("message", ""),
             )
             for rule in rules

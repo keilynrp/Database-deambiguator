@@ -3331,6 +3331,8 @@
   "report.stat.trace.distinct_tools": "Distinct Tools",
   "report.stat.trace.saved_answers": "Saved Answers",
   "report.stat.trace.sub.across_answers": "across those answers",
+  "report.status.below_threshold": "Below threshold",
+  "report.status.passed": "Passed",
   "report.takeaway.authority.empty": "No authority records exist for this workspace; identity resolution has not been run over it. This is not a finding of zero conflicts.",
   "report.takeaway.collab.empty": "No co-authorship graph has been computed for this domain.",
   "report.takeaway.entity_stats.empty": "No entities in this domain yet.",
