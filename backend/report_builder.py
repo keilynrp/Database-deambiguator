@@ -146,26 +146,45 @@ def collect_stakeholder_reading(
     impact_range = impact_projection.get("range") or {}
 
     if benchmark_status == "ready":
-        stance = "The dataset is already in a comparatively strong position for a first stakeholder-facing conversation."
+        stance = "report.stakeholder.stance.ready"
     elif benchmark_status == "watch":
-        stance = "The dataset already supports directional interpretation, but it still carries enough uncertainty that the audience should treat this brief as an informed internal read rather than a final position."
+        stance = "report.stakeholder.stance.watch"
     else:
-        stance = "The dataset is best treated as an early baseline. It already surfaces useful directional patterns, but it is not yet robust enough for a high-confidence external narrative."
-
-    action_text = actions[0]["title"] if actions else "Continue strengthening enrichment coverage and record quality before broad circulation."
+        stance = "report.stakeholder.stance.gap"
 
     paragraphs: list[str] = [
         stakeholder["framing"],
         stance,
-        f"Current benchmark readiness is {readiness_pct}%, average quality is {quality_avg}%, and enrichment coverage is {coverage_pct}%.",
-        f'The current Monte Carlo impact projection is {impact_score}/100, with a probable range of {impact_range.get("p10", 0)}–{impact_range.get("p90", 0)}.',
+        with_params(
+            "report.stakeholder.figures",
+            readiness=readiness_pct,
+            quality=quality_avg,
+            coverage=coverage_pct,
+        ),
+        with_params(
+            "report.stakeholder.projection",
+            score=impact_score,
+            p10=impact_range.get("p10", 0),
+            p90=impact_range.get("p90", 0),
+        ),
     ]
     if top_entity:
-        entity_label = top_entity.get("entity_name") or top_entity.get("primary_label") or "the current lead record"
+        # A provider-supplied name is data and goes in as a parameter. With no
+        # name there is nothing to parametrise, and the fallback phrase has to
+        # be part of the sentence — a key passed as a param would be
+        # substituted, not translated.
+        entity_label = top_entity.get("entity_name") or top_entity.get("primary_label")
         paragraphs.append(
-            f"The highest-impact visible entity right now is {entity_label}, which can anchor a concrete stakeholder discussion."
+            with_params("report.stakeholder.top_entity", entity=entity_label)
+            if entity_label
+            else "report.stakeholder.top_entity.unnamed"
         )
-    paragraphs.append(f"Recommended emphasis: {action_text}")
+    # Same shape: a recommendation title is data, its absence is copy.
+    paragraphs.append(
+        with_params("report.stakeholder.emphasis", emphasis=actions[0]["title"])
+        if actions
+        else "report.stakeholder.emphasis.default"
+    )
 
     # Readiness caveat: an identity-resolution backlog sitting underneath the
     # dataset must qualify readiness language, so a brief cannot call the data
@@ -174,17 +193,21 @@ def collect_stakeholder_reading(
     pending_authority, total_authority = _authority_backlog_ratio(db, org_id)
     if total_authority:
         backlog_pct = round(pending_authority / total_authority * 100)
-        disclosure = (
-            f"Identity resolution: {pending_authority:,} of {total_authority:,} "
-            f"authority records ({backlog_pct}%) are awaiting human review."
-        )
-        if pending_authority / total_authority >= _authority_backlog_threshold():
-            disclosure += (
-                " That backlog is material, so entity identity is not settled: read "
-                "the readiness above as provisional to that extent until the review "
-                "queue is worked down."
+        # The qualifier used to be concatenated onto the sentence. Two keys
+        # cannot be concatenated — the collector holds keys, and only the
+        # renderer knows the language — so the material case is a key carrying
+        # both sentences. That keeps this one paragraph, as it renders today.
+        material = pending_authority / total_authority >= _authority_backlog_threshold()
+        paragraphs.append(
+            with_params(
+                "report.stakeholder.identity_backlog.material"
+                if material
+                else "report.stakeholder.identity_backlog",
+                pending=f"{pending_authority:,}",
+                total=f"{total_authority:,}",
+                pct=backlog_pct,
             )
-        paragraphs.append(disclosure)
+        )
 
     attention_points = stakeholder.get("attention_points", [])
     if attention_points:
