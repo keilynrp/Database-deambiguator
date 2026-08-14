@@ -820,10 +820,7 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
             f"most recently {rows[0][0]}"
             if rows else "report.empty.harmonization"
         ),
-        method=(
-            "Records operations that were applied, not proposed or rejected. "
-            "It shows what changed, not what was reviewed."
-        ),
+        method="report.method.harmonization",
         materiality=Materiality.ROUTINE if rows else Materiality.EMPTY,
     )
 
@@ -1113,27 +1110,21 @@ def collect_institutional_benchmark(
     total_rules = benchmark.get("total_rules", 0)
 
     if status == "ready":
-        benchmark_summary = (
-            "This benchmark profile is currently in a ready state. "
-            "The dataset is strong enough for a first stakeholder-facing interpretation with relatively limited benchmark risk."
-        )
+        benchmark_summary = "report.benchmark.state.ready"
     elif status == "watch":
-        benchmark_summary = (
-            "This benchmark profile is in a watch state. "
-            "The dataset already supports early interpretation, but important gaps still make the benchmark better suited for internal review than final external positioning."
-        )
+        benchmark_summary = "report.benchmark.state.watch"
     else:
-        benchmark_summary = (
-            "This benchmark profile is currently showing a material gap. "
-            "The benchmark is still useful as a directional baseline, but the current dataset should not be treated as fully decision-ready without additional enrichment or cleanup."
-        )
+        benchmark_summary = "report.benchmark.state.gap"
 
     paragraphs = [benchmark_summary]
     if top_gaps:
         lead_gap = top_gaps[0]
         paragraphs.append(
-            f"The main constraint right now is {lead_gap['label'].lower()}, "
-            f"with evidence: {lead_gap['evidence']}"
+            with_params(
+                "report.benchmark.lead_gap",
+                gap=lead_gap["label"].lower(),
+                evidence=lead_gap["evidence"],
+            )
         )
 
     grid = StatGrid(items=(
@@ -1315,24 +1306,9 @@ def _section_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> s
 # ── Authority / coauthorship / journals (extend-report-module-coverage) ──────
 #: Shared by both return paths of collect_authority_control so the empty case
 #: discloses the same thing as the populated one.
-_JOURNAL_METHOD = (
-    "NIF is a field-normalized two-year mean citedness computed from OpenAlex: "
-    "an open proxy, NOT the Journal Impact Factor, and not comparable to a "
-    "published JIF. The works count behind it is local to this corpus, not "
-    "OpenAlex's global figure for the journal. DOAJ and APC status are as of "
-    "the last journal sync."
-)
-_COLLAB_METHOD = (
-    "Co-authorship is derived from local records, and author identities are "
-    "derived rather than canonical, so one person can appear more than once. "
-    "Community detection returns one partition among several possible ones."
-)
-_AUTHORITY_METHOD = (
-    "Mean confidence is the matcher's own score, not agreement with a human "
-    "reviewer. Records awaiting review are unvalidated, so they contribute to "
-    "the mean without anyone having confirmed them. The conflicts table lists "
-    "the worst offenders, not the whole review queue."
-)
+_JOURNAL_METHOD = "report.method.journal"
+_COLLAB_METHOD = "report.method.collab"
+_AUTHORITY_METHOD = "report.method.authority"
 
 # Explicit cap on the conflicts table: a brief lists the worst offenders, it is
 # not an export of the review queue (production holds ~9.4k pending records).

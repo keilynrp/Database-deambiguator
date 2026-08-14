@@ -4,6 +4,14 @@ export const translations = {
     en: {
         // Backend: final report sections (issue 268)
         "report.method.stakeholder": "An interpretive framing of figures reported elsewhere in this brief, written for a chosen audience — it introduces no new data. The stance it takes follows the benchmark status, so a change of audience changes the emphasis but not the underlying numbers.",
+        "report.method.journal": "NIF is a field-normalized two-year mean citedness computed from OpenAlex: an open proxy, NOT the Journal Impact Factor, and not comparable to a published JIF. The works count behind it is local to this corpus, not OpenAlex's global figure for the journal. DOAJ and APC status are as of the last journal sync.",
+        "report.method.collab": "Co-authorship is derived from local records, and author identities are derived rather than canonical, so one person can appear more than once. Community detection returns one partition among several possible ones.",
+        "report.method.authority": "Mean confidence is the matcher's own score, not agreement with a human reviewer. Records awaiting review are unvalidated, so they contribute to the mean without anyone having confirmed them. The conflicts table lists the worst offenders, not the whole review queue.",
+        "report.method.harmonization": "Records operations that were applied, not proposed or rejected. It shows what changed, not what was reviewed.",
+        "report.benchmark.state.ready": "This benchmark profile is currently in a ready state. The dataset is strong enough for a first stakeholder-facing interpretation with relatively limited benchmark risk.",
+        "report.benchmark.state.watch": "This benchmark profile is in a watch state. The dataset already supports early interpretation, but important gaps still make the benchmark better suited for internal review than final external positioning.",
+        "report.benchmark.state.gap": "This benchmark profile is currently showing a material gap. The benchmark is still useful as a directional baseline, but the current dataset should not be treated as fully decision-ready without additional enrichment or cleanup.",
+        "report.benchmark.lead_gap": "The main constraint right now is {gap}, with evidence: {evidence}",
         "report.empty.enrichment_coverage": "No entities to enrich in this domain yet.",
         "report.empty.secondary_labels": "No classified entities to report.",
         "report.empty.harmonization": "No harmonization operations have been applied.",
@@ -3809,6 +3817,14 @@ export const translations = {
     es: {
         // Backend: final report sections (issue 268)
         "report.method.stakeholder": "Un encuadre interpretativo de cifras reportadas en otras partes de este informe, escrito para una audiencia elegida — no introduce datos nuevos. La postura que toma sigue el estado de la comparativa, así que cambiar de audiencia cambia el énfasis pero no los números de base.",
+        "report.method.journal": "El NIF es una media de citación a dos años normalizada por campo, calculada desde OpenAlex: un indicador abierto aproximado, NO el Factor de Impacto de la revista, y no comparable con un JIF publicado. El conteo de trabajos que lo sustenta es local a este corpus, no la cifra global de OpenAlex para la revista. El estado DOAJ y de APC corresponde a la última sincronización de revistas.",
+        "report.method.collab": "La co-autoría se deriva de los registros locales, y las identidades de autor son derivadas y no canónicas, así que una misma persona puede aparecer más de una vez. La detección de comunidades devuelve una partición entre varias posibles.",
+        "report.method.authority": "La confianza promedio es el puntaje del propio emparejador, no la coincidencia con un revisor humano. Los registros que esperan revisión no están validados, así que aportan al promedio sin que nadie los haya confirmado. La tabla de conflictos lista los peores casos, no la cola completa de revisión.",
+        "report.method.harmonization": "Registra las operaciones que se aplicaron, no las propuestas ni las rechazadas. Muestra qué cambió, no qué se revisó.",
+        "report.benchmark.state.ready": "Este perfil de comparativa está actualmente en estado listo. El conjunto de datos es lo bastante sólido para una primera interpretación ante partes interesadas con un riesgo de comparativa relativamente acotado.",
+        "report.benchmark.state.watch": "Este perfil de comparativa está en estado de observación. El conjunto de datos ya admite una interpretación temprana, pero quedan brechas importantes que lo hacen más apto para revisión interna que para un posicionamiento externo definitivo.",
+        "report.benchmark.state.gap": "Este perfil de comparativa muestra actualmente una brecha material. La comparativa sigue siendo útil como línea base direccional, pero el conjunto de datos actual no debería tratarse como plenamente listo para decidir sin enriquecimiento o limpieza adicionales.",
+        "report.benchmark.lead_gap": "La principal restricción en este momento es {gap}, con evidencia: {evidence}",
         "report.empty.enrichment_coverage": "Todavía no hay entidades para enriquecer en este dominio.",
         "report.empty.secondary_labels": "No hay entidades clasificadas para reportar.",
         "report.empty.harmonization": "No se ha aplicado ninguna operación de armonización.",
