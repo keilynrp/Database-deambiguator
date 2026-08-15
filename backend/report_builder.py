@@ -1724,7 +1724,7 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
                 Narrative(
                     heading="report.narrative.journal.unavailable",
                     paragraphs=(
-                        "report.narrative.journal.empty.p1"
+                        "report.narrative.journal.empty.p1",
                         "report.narrative.journal.empty.p2",
                     ),
                 ),
