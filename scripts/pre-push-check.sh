@@ -24,6 +24,7 @@ mapfile -t CHANGED < <(git diff --name-only --diff-filter=AM "$BASE"...HEAD)
 PYTHON_CHANGED=()
 TS_CHANGED=()
 BACKEND_TESTS_CHANGED=()
+PY_SOURCE_CHANGED=()
 
 for f in "${CHANGED[@]}"; do
   case "$f" in
@@ -32,6 +33,7 @@ for f in "${CHANGED[@]}"; do
   esac
   case "$f" in
     backend/tests/test_*.py) BACKEND_TESTS_CHANGED+=("$f");;
+    *.py)                    PY_SOURCE_CHANGED+=("$f");;
   esac
 done
 
@@ -134,9 +136,20 @@ if [ ${#TS_CHANGED[@]} -gt 0 ]; then
   echo
 fi
 
-# 4. Backend tests — scoped to changed test files when possible, full suite otherwise.
-if [ ${#BACKEND_TESTS_CHANGED[@]} -gt 0 ]; then
-  echo "▶ pytest (scoped to changed tests): ${BACKEND_TESTS_CHANGED[*]}"
+# 4. Backend tests.
+#
+# Which branch runs is decided by whether SOURCE changed, not by whether a test
+# file did. It used to be the other way round — an if/elif with the scoped run
+# first — so touching one test file REPLACED the full suite instead of adding to
+# it. A branch that rewrote report_builder.py and the shared localize.py got its
+# local verification cut from 3820 tests to 27 because it also edited two test
+# files, and CI then found seven failures the push had reported as green.
+#
+# Source changed, with or without tests: run everything. The full suite already
+# includes whatever test files were touched, so there is no scoped run to add.
+if [ ${#PY_SOURCE_CHANGED[@]} -eq 0 ] && [ ${#BACKEND_TESTS_CHANGED[@]} -gt 0 ]; then
+  # Only test files changed — nothing else can have broken.
+  echo "▶ pytest (scoped: only test files changed): ${BACKEND_TESTS_CHANGED[*]}"
   python -m pytest -x -q "${BACKEND_TESTS_CHANGED[@]}" || EXIT=1
   echo
 elif [ ${#PYTHON_CHANGED[@]} -gt 0 ]; then
@@ -146,7 +159,7 @@ elif [ ${#PYTHON_CHANGED[@]} -gt 0 ]; then
   if gate_hit "$PYTEST_KEY"; then
     echo "▶ pytest backend/tests — SKIPPED (this backend/ tree already passed the full suite)"
   else
-    echo "▶ pytest backend/tests (full suite — backend changed but no test file changed)…"
+    echo "▶ pytest backend/tests (full suite — backend source changed)…"
     if python -m pytest -x -q backend/tests/; then
       gate_record "$PYTEST_KEY"
     else
