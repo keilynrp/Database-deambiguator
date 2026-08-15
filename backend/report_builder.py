@@ -241,12 +241,18 @@ def _section_stakeholder_reading(
     benchmark_profile_id: str | None = None,
     benchmark_org: models.Organization | None = None,
     stakeholder_profile: str | None = None,
+    language: str | None = None,
 ) -> str:
+    # This section is assembled ahead of the collector loop, so it never passes
+    # the point where `build()` resolves a payload's language. Its copy moved to
+    # the catalog in #284 and still rendered English, because a key with no
+    # language resolves through the default rather than failing.
     from backend.reporting.html_renderer import render_html
     return render_html(
         collect_stakeholder_reading(
             db, domain_id, org_id, benchmark_profile_id, benchmark_org, stakeholder_profile
-        )
+        ),
+        language,
     )
 
 # ── CSS (inline, print-friendly) ─────────────────────────────────────────────
@@ -2038,6 +2044,7 @@ def build(
             benchmark_profile_id=benchmark_profile_id,
             benchmark_org=benchmark_org,
             stakeholder_profile=stakeholder_profile,
+            language=language,
         )
     ]
     for manual in manual_sections or []:
