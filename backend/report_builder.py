@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from backend import models
 from backend.analyzers.topic_modeling import TopicAnalyzer
-from backend.reporting.localize import with_params
+from backend.reporting.localize import localize_section, with_params
 from backend.schema_registry import registry
 from backend.services.analytics_service import AnalyticsService
 from backend.services.pattern_discovery import PatternDiscoveryService
@@ -84,8 +84,10 @@ def _stakeholder_profile(profile_id: str | None) -> dict[str, str]:
     return _STAKEHOLDER_PROFILES.get(profile_id or "leadership", _STAKEHOLDER_PROFILES["leadership"])
 
 
-def _section_manual_note(title: str, content: str) -> str:
-    safe_title = escape(title.strip() or "Analyst Note")
+def _section_manual_note(title: str, content: str, language: str | None = None) -> str:
+    # Raw HTML, not SectionData, so localize_section never sees it: the default
+    # title has to be resolved here.
+    safe_title = escape(title.strip() or translate("report.manual.default_title", language))
     paragraphs = [
         f"<p>{escape(part.strip())}</p>"
         for part in content.split("\n\n")
@@ -146,26 +148,45 @@ def collect_stakeholder_reading(
     impact_range = impact_projection.get("range") or {}
 
     if benchmark_status == "ready":
-        stance = "The dataset is already in a comparatively strong position for a first stakeholder-facing conversation."
+        stance = "report.stakeholder.stance.ready"
     elif benchmark_status == "watch":
-        stance = "The dataset already supports directional interpretation, but it still carries enough uncertainty that the audience should treat this brief as an informed internal read rather than a final position."
+        stance = "report.stakeholder.stance.watch"
     else:
-        stance = "The dataset is best treated as an early baseline. It already surfaces useful directional patterns, but it is not yet robust enough for a high-confidence external narrative."
-
-    action_text = actions[0]["title"] if actions else "Continue strengthening enrichment coverage and record quality before broad circulation."
+        stance = "report.stakeholder.stance.gap"
 
     paragraphs: list[str] = [
         stakeholder["framing"],
         stance,
-        f"Current benchmark readiness is {readiness_pct}%, average quality is {quality_avg}%, and enrichment coverage is {coverage_pct}%.",
-        f'The current Monte Carlo impact projection is {impact_score}/100, with a probable range of {impact_range.get("p10", 0)}–{impact_range.get("p90", 0)}.',
+        with_params(
+            "report.stakeholder.figures",
+            readiness=readiness_pct,
+            quality=quality_avg,
+            coverage=coverage_pct,
+        ),
+        with_params(
+            "report.stakeholder.projection",
+            score=impact_score,
+            p10=impact_range.get("p10", 0),
+            p90=impact_range.get("p90", 0),
+        ),
     ]
     if top_entity:
-        entity_label = top_entity.get("entity_name") or top_entity.get("primary_label") or "the current lead record"
+        # A provider-supplied name is data and goes in as a parameter. With no
+        # name there is nothing to parametrise, and the fallback phrase has to
+        # be part of the sentence — a key passed as a param would be
+        # substituted, not translated.
+        entity_label = top_entity.get("entity_name") or top_entity.get("primary_label")
         paragraphs.append(
-            f"The highest-impact visible entity right now is {entity_label}, which can anchor a concrete stakeholder discussion."
+            with_params("report.stakeholder.top_entity", entity=entity_label)
+            if entity_label
+            else "report.stakeholder.top_entity.unnamed"
         )
-    paragraphs.append(f"Recommended emphasis: {action_text}")
+    # Same shape: a recommendation title is data, its absence is copy.
+    paragraphs.append(
+        with_params("report.stakeholder.emphasis", emphasis=actions[0]["title"])
+        if actions
+        else "report.stakeholder.emphasis.default"
+    )
 
     # Readiness caveat: an identity-resolution backlog sitting underneath the
     # dataset must qualify readiness language, so a brief cannot call the data
@@ -174,17 +195,21 @@ def collect_stakeholder_reading(
     pending_authority, total_authority = _authority_backlog_ratio(db, org_id)
     if total_authority:
         backlog_pct = round(pending_authority / total_authority * 100)
-        disclosure = (
-            f"Identity resolution: {pending_authority:,} of {total_authority:,} "
-            f"authority records ({backlog_pct}%) are awaiting human review."
-        )
-        if pending_authority / total_authority >= _authority_backlog_threshold():
-            disclosure += (
-                " That backlog is material, so entity identity is not settled: read "
-                "the readiness above as provisional to that extent until the review "
-                "queue is worked down."
+        # The qualifier used to be concatenated onto the sentence. Two keys
+        # cannot be concatenated — the collector holds keys, and only the
+        # renderer knows the language — so the material case is a key carrying
+        # both sentences. That keeps this one paragraph, as it renders today.
+        material = pending_authority / total_authority >= _authority_backlog_threshold()
+        paragraphs.append(
+            with_params(
+                "report.stakeholder.identity_backlog.material"
+                if material
+                else "report.stakeholder.identity_backlog",
+                pending=f"{pending_authority:,}",
+                total=f"{total_authority:,}",
+                pct=backlog_pct,
             )
-        paragraphs.append(disclosure)
+        )
 
     attention_points = stakeholder.get("attention_points", [])
     if attention_points:
@@ -544,7 +569,7 @@ def collect_enrichment_coverage(db: Session, domain_id: str, org_id: int | None)
     from backend.reporting.section_data import Materiality
 
     if not total:
-        takeaway = "No entities to enrich in this domain yet."
+        takeaway = "report.empty.enrichment_coverage"
         materiality = Materiality.EMPTY
     else:
         takeaway = (
@@ -637,7 +662,7 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         takeaway=(
             f'"{rows[0][0]}" is the leading classification at {top_share}% of '
             f"{_plural(classified, 'classified entity', 'classified entities')}"
-            if rows else "No classified entities to report."
+            if rows else "report.empty.secondary_labels"
         ),
                 method="report.method.top_secondary_labels",
         materiality=(
@@ -786,7 +811,7 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
     # The count leads the takeaway, so it belongs on the page: a reader should
     # not have to count table rows to check the sentence above them.
     summary = StatGrid(items=(
-        StatItem(label="Operations Applied", value=f"{len(logs):,}", sub="report.stat.harmonization_log.sub.recent_first"),
+        StatItem(label="report.stat.harmonization_log.applied", value=f"{len(logs):,}", sub="report.stat.harmonization_log.sub.recent_first"),
     ))
     return SectionData(
         key="harmonization_log",
@@ -795,12 +820,9 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
         takeaway=(
             f"{_plural(len(logs), 'harmonization operation')} applied, "
             f"most recently {rows[0][0]}"
-            if rows else "No harmonization operations have been applied."
+            if rows else "report.empty.harmonization"
         ),
-        method=(
-            "Records operations that were applied, not proposed or rejected. "
-            "It shows what changed, not what was reviewed."
-        ),
+        method="report.method.harmonization",
         materiality=Materiality.ROUTINE if rows else Materiality.EMPTY,
     )
 
@@ -861,7 +883,7 @@ def collect_decision_recommendations(
     return SectionData(
         takeaway=(
             f"{_plural(len(actions), 'recommended action')}, {high} of them high priority"
-            if actions else "No actions are being recommended from the current snapshot."
+            if actions else "report.empty.decision_recommendations"
         ),
         method=(
             "report.method.actions"
@@ -928,8 +950,10 @@ def collect_impact_projection(
     interpretation = Narrative(
         heading="report.narrative.impact.exec_interpretation",
         paragraphs=(
-            projection.get("recommendation", "No impact projection is available yet."),
-            f'Brief angle: {projection.get("brief_angle", "Use this as a directional signal only.")}',
+            projection.get("recommendation") or "report.empty.impact_projection",
+            with_params("report.narrative.impact.brief_angle", angle=projection["brief_angle"])
+            if projection.get("brief_angle")
+            else "report.narrative.impact.brief_angle.default",
             projection.get("explanation", ""),
         ),
     )
@@ -940,10 +964,10 @@ def collect_impact_projection(
     meters = tuple(
         Meter(label=label, pct=_pct(drivers.get(key, 0)))
         for label, key in (
-            ("Coverage", "coverage"),
-            ("Quality", "quality"),
-            ("Citation signal", "citation_signal"),
-            ("Concentration", "concentration"),
+            ("report.meter.coverage", "coverage"),
+            ("report.meter.quality", "quality"),
+            ("report.meter.citation_signal", "citation_signal"),
+            ("report.meter.concentration", "concentration"),
         )
     )
     from backend.reporting.section_data import Materiality
@@ -1028,7 +1052,7 @@ def collect_hidden_patterns(
     return SectionData(
         takeaway=(
             f"{_plural(len(patterns), 'pattern')} detected; the strongest involves {rows[0][0]}"
-            if rows else "No patterns detected in the current records."
+            if rows else "report.empty.hidden_patterns"
         ),
         method=(
             "report.method.patterns"
@@ -1088,27 +1112,21 @@ def collect_institutional_benchmark(
     total_rules = benchmark.get("total_rules", 0)
 
     if status == "ready":
-        benchmark_summary = (
-            "This benchmark profile is currently in a ready state. "
-            "The dataset is strong enough for a first stakeholder-facing interpretation with relatively limited benchmark risk."
-        )
+        benchmark_summary = "report.benchmark.state.ready"
     elif status == "watch":
-        benchmark_summary = (
-            "This benchmark profile is in a watch state. "
-            "The dataset already supports early interpretation, but important gaps still make the benchmark better suited for internal review than final external positioning."
-        )
+        benchmark_summary = "report.benchmark.state.watch"
     else:
-        benchmark_summary = (
-            "This benchmark profile is currently showing a material gap. "
-            "The benchmark is still useful as a directional baseline, but the current dataset should not be treated as fully decision-ready without additional enrichment or cleanup."
-        )
+        benchmark_summary = "report.benchmark.state.gap"
 
     paragraphs = [benchmark_summary]
     if top_gaps:
         lead_gap = top_gaps[0]
         paragraphs.append(
-            f"The main constraint right now is {lead_gap['label'].lower()}, "
-            f"with evidence: {lead_gap['evidence']}"
+            with_params(
+                "report.benchmark.lead_gap",
+                gap=lead_gap["label"].lower(),
+                evidence=lead_gap["evidence"],
+            )
         )
 
     grid = StatGrid(items=(
@@ -1143,7 +1161,7 @@ def collect_institutional_benchmark(
                 rule.get("label", ""),
                 str(rule.get("observed", "")),
                 str(rule.get("threshold", "")),
-                "Passed" if rule.get("passed") else "Below threshold",
+                "report.status.passed" if rule.get("passed") else "report.status.below_threshold",
                 rule.get("message", ""),
             )
             for rule in rules
@@ -1243,18 +1261,24 @@ def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "S
 
         tools = trace_meta.get("tools_used") or []
         tools_seen.update(tools)
-        tool_list = ", ".join(tools) or "No tools"
+        tool_list = ", ".join(tools)
         source_list = ", ".join(
             str(s.get("label") or s.get("entity_id") or "source")
             for s in sources[:4]
             if isinstance(s, dict)
-        ) or "No explicit sources"
+        )
 
         blocks.append(
             Narrative(
-                heading=question or "Saved question",
+                heading=question or "report.trace.saved_question",
                 paragraphs=tuple(
-                    p for p in (answer, f"Tools: {tool_list}", f"Sources: {source_list}") if p
+                    p for p in (
+                        answer,
+                        with_params("report.trace.tools", tools=tool_list)
+                        if tool_list else "report.trace.tools.none",
+                        with_params("report.trace.sources", sources=source_list)
+                        if source_list else "report.trace.sources.none",
+                    ) if p
                 ),
             )
         )
@@ -1290,24 +1314,9 @@ def _section_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> s
 # ── Authority / coauthorship / journals (extend-report-module-coverage) ──────
 #: Shared by both return paths of collect_authority_control so the empty case
 #: discloses the same thing as the populated one.
-_JOURNAL_METHOD = (
-    "NIF is a field-normalized two-year mean citedness computed from OpenAlex: "
-    "an open proxy, NOT the Journal Impact Factor, and not comparable to a "
-    "published JIF. The works count behind it is local to this corpus, not "
-    "OpenAlex's global figure for the journal. DOAJ and APC status are as of "
-    "the last journal sync."
-)
-_COLLAB_METHOD = (
-    "Co-authorship is derived from local records, and author identities are "
-    "derived rather than canonical, so one person can appear more than once. "
-    "Community detection returns one partition among several possible ones."
-)
-_AUTHORITY_METHOD = (
-    "Mean confidence is the matcher's own score, not agreement with a human "
-    "reviewer. Records awaiting review are unvalidated, so they contribute to "
-    "the mean without anyone having confirmed them. The conflicts table lists "
-    "the worst offenders, not the whole review queue."
-)
+_JOURNAL_METHOD = "report.method.journal"
+_COLLAB_METHOD = "report.method.collab"
+_AUTHORITY_METHOD = "report.method.authority"
 
 # Explicit cap on the conflicts table: a brief lists the worst offenders, it is
 # not an export of the review queue (production holds ~9.4k pending records).
@@ -1460,8 +1469,7 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
             )
     else:
         reliability.append(
-            "No records are awaiting review, so identity resolution is settled for "
-            "the records that were processed."
+            "report.empty.authority_review"
         )
 
     from backend.reporting.section_data import Materiality
@@ -1988,7 +1996,7 @@ def build(
     except Exception:
         pass
 
-    report_title = title or f"UKIP Report — {domain_name}"
+    report_title = title or translate("report.cover.title", language, domain=domain_name)
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     stakeholder = _stakeholder_profile(stakeholder_profile)
 
@@ -2002,7 +2010,7 @@ def build(
             <span style="font-size:20px;font-weight:700;color:#111827">UKIP</span>
         </div>
         <h1>{report_title}</h1>
-        <p class="meta">Domain: <b>{domain_name}</b> &nbsp;·&nbsp; Generated: <b>{generated_at}</b></p>
+        <p class="meta">{translate("report.cover.domain", language)}: <b>{domain_name}</b> &nbsp;·&nbsp; {translate("report.cover.generated", language)}: <b>{generated_at}</b></p>
         <p class="meta" style="margin-top:8px">{translate("report.stakeholder.lens", language)}: <b>{translate(stakeholder["label"], language)}</b></p>
     </div>"""
 
@@ -2018,8 +2026,9 @@ def build(
     ]
     for manual in manual_sections or []:
         manual_html = _section_manual_note(
-            str(manual.get("title") or "Analyst Note"),
+            str(manual.get("title") or ""),
             str(manual.get("content") or ""),
+            language,
         )
         if manual_html:
             body_sections.append(manual_html)
@@ -2058,6 +2067,13 @@ def build(
                     exhibit=exhibit_no,
                     title=translate(f"report.section.{sec}", language),
                 )
+                # Resolve here, where the payload forks. Every renderer localizes
+                # what it is handed, but the executive summary is not a renderer:
+                # it reads `takeaway` off the collected payload directly, so a
+                # migrated takeaway reached it as a raw catalog key. Doing it once
+                # at the fork covers both consumers; localize_section is
+                # idempotent, so the renderers' own pass stays a no-op.
+                payload = localize_section(payload, language)
                 collected.append(payload)
                 body_sections.append(render_html(payload, language))
             except Exception as exc:

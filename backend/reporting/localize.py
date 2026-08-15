@@ -102,9 +102,20 @@ def _block(block: Any, language: str | None) -> Any:
             ),
         )
     if isinstance(block, Table):
-        # Only headers. Cells hold entity labels, concept names and figures —
-        # provider data the system does not own.
-        return replace(block, columns=_tuple(block.columns, language))
+        # Cells were once exempt, on the grounds that they hold entity labels,
+        # concept names and figures — provider data the system does not own.
+        # That describes nearly every table and misses one: the benchmark rule
+        # table has a status column the system writes itself, where a key
+        # rendered verbatim.
+        #
+        # So a cell now follows the same rule as every other slot: a surface
+        # prefix means key, anything else passes through. Provider data is still
+        # untouched, and no longer because of which field it happens to sit in.
+        return replace(
+            block,
+            columns=_tuple(block.columns, language),
+            rows=tuple(_tuple(row, language) for row in block.rows),
+        )
     if isinstance(block, Narrative):
         return replace(
             block,

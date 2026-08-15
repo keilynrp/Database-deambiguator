@@ -98,6 +98,7 @@ class TestResolution:
                     language
                 ],
                 "report.col.concept": {"en": "Concept", "es": "Concepto"}[language],
+                "report.status.passed": {"en": "Passed", "es": "Cumple"}[language],
                 "report.narrative.exec": {"en": "Executive reading", "es": "Lectura ejecutiva"}[
                     language
                 ],
@@ -128,12 +129,22 @@ class TestResolution:
             "report states"
         )
 
-    def test_table_headers_resolve_but_cells_do_not(self):
+    def test_table_cells_pass_through_unless_they_are_keys(self):
+        """Cells were exempt from resolution on the grounds that they hold
+        provider data. That is true of nearly every table and false of one: the
+        benchmark rule table has a status column the system writes itself, and a
+        key placed there rendered verbatim.
+
+        So the rule is now the same one every other slot already uses — a string
+        starting with a surface prefix is a key, anything else is data. Provider
+        text is still untouched, and now it is untouched for a reason that does
+        not depend on which field it landed in.
+        """
         section = _section(
             blocks=(
                 Table(
                     columns=("report.col.concept", "Frequency"),
-                    rows=(("knowledge graph", "20"),),
+                    rows=(("knowledge graph", "report.status.passed"),),
                 ),
             )
         )
@@ -141,8 +152,12 @@ class TestResolution:
         out = localize_section(section, "es")
 
         assert out.blocks[0].columns == ("Concepto", "Frequency")
-        assert out.blocks[0].rows == (("knowledge graph", "20"),), (
-            "cells hold provider data — a concept name is not ours to translate"
+        cell_data, cell_key = out.blocks[0].rows[0]
+        assert cell_data == "knowledge graph", (
+            "a concept name is provider data and is not ours to translate"
+        )
+        assert cell_key == "Cumple", (
+            "a system-authored cell holding a key must resolve, not render raw"
         )
 
     def test_stat_sub_labels_resolve(self):

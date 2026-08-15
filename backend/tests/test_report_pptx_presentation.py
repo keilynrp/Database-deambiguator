@@ -94,7 +94,13 @@ def test_the_method_is_on_the_slide_and_in_full_in_the_notes(db_session):
     """
     _seed(db_session)
     slides = _section_slides(_deck(db_session, ["journal_portfolio"]), "Journal Portfolio")
-    full_method = report_builder.collect_journal_portfolio(db_session, "default", None).method
+    # The collector returns a catalog key; the deck renders resolved prose. Compare
+    # against what a reader gets, which is what the notes are supposed to carry.
+    from backend.reporting.localize import localize_section
+
+    full_method = localize_section(
+        report_builder.collect_journal_portfolio(db_session, "default", None), "en"
+    ).method
 
     footer = _slide_text(slides[0])
     assert "field-normalized" in footer, footer

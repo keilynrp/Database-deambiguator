@@ -148,7 +148,17 @@ def test_collect_authority_control_is_tenant_scoped(db_session):
 # ── 2. Readiness caveat in the stakeholder reading ──────────────────────────
 
 def _reading_prose(db, org_id=None) -> str:
+    """The prose a reader sees, not the payload a collector returns.
+
+    A collector holds catalog keys; only the render boundary turns them into
+    sentences. Asserting on the payload asserted on keys, which is why these
+    tests broke the moment the section migrated. Resolving into English here
+    keeps the assertions readable AND keeps them true of the report.
+    """
+    from backend.reporting.localize import localize_section
+
     section = report_builder.collect_stakeholder_reading(db, "default", org_id)
+    section = localize_section(section, "en")
     narrative = next(b for b in section.blocks if isinstance(b, Narrative))
     return " ".join(narrative.paragraphs)
 

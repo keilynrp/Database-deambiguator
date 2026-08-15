@@ -110,6 +110,7 @@ class EnterpriseExcelExporter:
 
         from backend import report_builder
         from backend.i18n.catalog import translate
+        from backend.reporting.localize import localize_section
         from backend.i18n.locale import resolve_report_language
         from backend.reporting.excel_renderer import render_excel
 
@@ -140,7 +141,11 @@ class EnterpriseExcelExporter:
                     payload, title=translate(f"report.sheet.{section_id}", language)
                 )
                 sheet = render_excel(payload, wb, language)
-                collected.append((sheet.title, payload))
+                # render_excel localizes internally, but it returns the sheet, not the
+                # payload — and Methodology reads takeaway/method straight off
+                # what is collected here. Same seam as the HTML executive
+                # summary: resolve before collecting, or the sheet shows keys.
+                collected.append((sheet.title, localize_section(payload, language)))
 
         # ── Sheet 4: Harmonization Log ────────────────────────────────────────
         # Still a bespoke writer: its sheet carries columns the collector's payload
@@ -153,6 +158,9 @@ class EnterpriseExcelExporter:
         # itself remains open under report-format-parity.
         if "harmonization_log" in requested:
             payload = report_builder.collect_harmonization_log(db, domain_id, org_id)
+            # Resolve before the fork: the bespoke writer puts the method in A2
+            # of its own sheet, and Methodology reads it again off `collected`.
+            payload = localize_section(payload, language)
             ws_harm = wb.create_sheet("Harmonization")
             self._write_harmonization(ws_harm, db, org_id, payload=payload)
             collected.append((ws_harm.title, payload))
