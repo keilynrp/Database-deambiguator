@@ -384,16 +384,23 @@ footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e5e7eb;
 
 # ── Section builders ──────────────────────────────────────────────────────────
 
-def _plural(count: int, singular: str, plural: str | None = None) -> str:
-    """`3 patterns`, `1 pattern` — a count with a word that agrees with it.
+def _counted(stem: str, count: int, **params) -> str:
+    """A catalog key whose variant agrees with `count`, carrying its arguments.
 
-    Since 5.1 a takeaway is the section's heading in HTML/PDF and the first row
-    of its sheet in Excel, so "1 patterns detected" is no longer buried in a
-    summary list: it is the most prominent line the section has. Reading a real
-    report found five of these, in five separately-authored collectors, which is
-    what a helper is for.
+    `3 patterns` / `1 pattern` used to be built here, in English, by appending an
+    "s". A catalog cannot work that way: Spanish agrees in the verb as well as
+    the noun, so the choice is not "which suffix" but "which whole sentence".
+    Each variant is therefore a complete sentence in the catalog, which leaves
+    the translator free to inflect however the language requires while this
+    function only decides *which* of the two to ask for.
+
+    Three sentences do not fit even this: they inflect on two or three
+    independent counts, which is 4 and 8 variants of one line. Those were
+    rephrased so no word depends on a number — see the keys without .one/.other.
     """
-    return f"{count:,} {singular if count == 1 else (plural or singular + 's')}"
+    return with_params(
+        f"{stem}.{'one' if count == 1 else 'other'}", count=f"{count:,}", **params
+    )
 
 
 def _entities_query(db: Session, domain_id: str, org_id: int | None):
@@ -485,11 +492,10 @@ def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> "Se
         # the pending one, so the two can disagree with each other in one
         # sentence and still both be right.
         valid = int(status_map.get("valid", 0))
-        takeaway = (
-            f"{valid:,} of {_plural(total, 'entity', 'entities')} "
-            f"pass{'es' if valid == 1 else ''} validation "
-            f"({valid_pct}%); {pending:,} "
-            f"remain{'s' if pending == 1 else ''} unresolved"
+        takeaway = with_params(
+            "report.takeaway.entity_stats",
+            valid=f"{valid:,}", total=f"{total:,}", pct=valid_pct,
+            pending=f"{pending:,}",
         )
         materiality = (
             Materiality.LEAD if valid_pct < 85
@@ -655,13 +661,15 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         StatItem(
             label="report.stat.top_secondary_labels.classified",
             value=f"{classified:,}",
-            sub=f"across {_plural(len(rows_q), 'label')}",
+            sub=_counted("report.stat.top_secondary_labels.across", len(rows_q)),
         ),
     ))
     return SectionData(
         takeaway=(
-            f'"{rows[0][0]}" is the leading classification at {top_share}% of '
-            f"{_plural(classified, 'classified entity', 'classified entities')}"
+            _counted(
+                "report.takeaway.secondary_labels", classified,
+                top=rows[0][0], pct=top_share,
+            )
             if rows else "report.empty.secondary_labels"
         ),
                 method="report.method.top_secondary_labels",
@@ -818,8 +826,7 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
         title="Harmonization Log",
         blocks=(summary, table),
         takeaway=(
-            f"{_plural(len(logs), 'harmonization operation')} applied, "
-            f"most recently {rows[0][0]}"
+            _counted("report.takeaway.harmonization", len(logs), recent=rows[0][0])
             if rows else "report.empty.harmonization"
         ),
         method="report.method.harmonization",
@@ -882,7 +889,7 @@ def collect_decision_recommendations(
     ))
     return SectionData(
         takeaway=(
-            f"{_plural(len(actions), 'recommended action')}, {high} of them high priority"
+            _counted("report.takeaway.decisions", len(actions), high=high)
             if actions else "report.empty.decision_recommendations"
         ),
         method=(
@@ -1051,7 +1058,7 @@ def collect_hidden_patterns(
     ))
     return SectionData(
         takeaway=(
-            f"{_plural(len(patterns), 'pattern')} detected; the strongest involves {rows[0][0]}"
+            _counted("report.takeaway.patterns", len(patterns), top=rows[0][0])
             if rows else "report.empty.hidden_patterns"
         ),
         method=(
@@ -1174,8 +1181,10 @@ def collect_institutional_benchmark(
         title="Institutional Benchmark",
         blocks=(grid, reading, gap_table, rule_table),
         takeaway=(
-            f"Benchmark readiness {readiness_pct}% — {passed_rules} of "
-            f"{_plural(total_rules, 'rule')} pass; status \"{status}\""
+            _counted(
+                "report.takeaway.benchmark", total_rules,
+                readiness=readiness_pct, passed=passed_rules, status=status,
+            )
         ),
         method=(
             "report.method.benchmark"
@@ -1484,9 +1493,12 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
             Narrative(heading="report.narrative.authority.reliability", paragraphs=tuple(reliability)),
         ),
         takeaway=(
-            f"{confirmed:,} of {_plural(total, 'authority record')} confirmed; "
-            f"{pending:,} await{'s' if pending == 1 else ''} human review "
-            f"(mean confidence {round(float(mean_confidence or 0) * 100)}%)"
+            with_params(
+                "report.takeaway.authority",
+                confirmed=f"{confirmed:,}", total=f"{total:,}",
+                pending=f"{pending:,}",
+                confidence=round(float(mean_confidence or 0) * 100),
+            )
         ),
         method=_AUTHORITY_METHOD,
         # A backlog larger than the confirmed set is the finding, not a footnote.
@@ -1664,9 +1676,11 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
         title="Collaboration Graph",
         blocks=tuple(blocks),
         takeaway=(
-            f"{_plural(author_count, 'author')} across "
-            f"{_plural(community_count, 'community', 'communities')}, linked by "
-            f"{_plural(edge_count, 'collaboration')}"
+            with_params(
+                "report.takeaway.collab",
+                authors=f"{author_count:,}", communities=f"{community_count:,}",
+                collaborations=f"{edge_count:,}",
+            )
         ),
         method=_COLLAB_METHOD,
         materiality=Materiality.NOTABLE if community_count > 1 else Materiality.ROUTINE,
@@ -1796,8 +1810,10 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
         title="Journal Portfolio",
         blocks=(grid, table, note),
         takeaway=(
-            f"{_plural(total, 'journal')} in the portfolio; {doaj_pct}% listed in DOAJ "
-            f"and {with_apc:,} charging an APC"
+            _counted(
+                "report.takeaway.journal", total,
+                doaj=doaj_pct, apc=f"{with_apc:,}",
+            )
         ),
         method=_JOURNAL_METHOD,
         materiality=Materiality.NOTABLE if doaj_pct < 50 else Materiality.ROUTINE,

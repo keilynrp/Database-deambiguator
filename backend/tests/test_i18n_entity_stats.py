@@ -5,17 +5,23 @@ other eighteen use — stat labels, stat sub-labels, table headers, method and a
 empty-state takeaway — so getting it right here is what makes the rest
 mechanical.
 
-**The composed takeaway is deliberately not migrated.** It bakes English plural
-agreement into the f-string, for two counts that inflect independently:
+**The composed takeaway is migrated now, by rephrasing it.** This file used to
+argue the opposite, and the argument was right at the time:
 
     f"{valid} of {_plural(total, 'entity', 'entities')} "
     f"pass{'es' if valid == 1 else ''} validation "
     f"({pct}%); {pending} remain{'s' if pending == 1 else ''} unresolved"
 
-A catalog key cannot carry that, Spanish inflects differently, and rephrasing to
-avoid it would change what English readers see — which task 8.4 of #209 already
-established is not an improvement to make silently. It needs a plural-aware
-mechanism, which is its own change.
+The noun inflects on `total` and the verb on `valid`, independently, so a
+catalog needs four whole-sentence variants per language — and Spanish inflects
+the verb too, so it is four there as well. The collaboration takeaway was worse:
+three independent counts, eight variants of one line.
+
+It said rephrasing "is not an improvement to make silently". That still stands;
+the change was made explicitly, weighed against the alternative, and recorded —
+the takeaway now reads `Validation: 30 of 40 (75%); 10 unresolved`, and no word
+in it depends on a number. Sentences governed by a single count kept their
+wording and use `.one`/`.other` variants instead.
 """
 
 from __future__ import annotations
