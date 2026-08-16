@@ -3140,7 +3140,7 @@
   "report.cover.domain": "Dominio",
   "report.cover.generated": "Generado",
   "report.cover.title": "Informe UKIP — {domain}",
-  "report.disclosure.analysis_language": "Este informe traduce los títulos de sección y el texto que este sistema redacta. Los encabezados estructurales, las etiquetas de métricas, los mensajes de estado vacío, el encuadre por audiencia, la prosa de análisis generada y los nombres provistos por fuentes externas (conceptos, títulos de revistas, nombres de autores e instituciones) permanecen en inglés.",
+  "report.disclosure.analysis_language": "Este informe traduce los títulos de sección y el texto que este sistema redacta. Los encabezados estructurales, las etiquetas de métricas, los mensajes de estado vacío, la prosa de análisis generada y los nombres provistos por fuentes externas (conceptos, títulos de revistas, nombres de autores e instituciones) permanecen en inglés.",
   "report.empty.authority_review": "No hay registros esperando revisión, así que la resolución de identidad está resuelta para los registros que se procesaron.",
   "report.empty.decision_recommendations": "No se está recomendando ninguna acción a partir de la instantánea actual.",
   "report.empty.enrichment_coverage": "Todavía no hay entidades para enriquecer en este dominio.",

@@ -275,7 +275,7 @@ export const translations = {
         "report.section.authority_control": "Authority Control",
         "report.section.collaboration_graph": "Collaboration Graph",
         "report.section.journal_portfolio": "Journal Portfolio",
-        "report.disclosure.analysis_language": "This report translates section titles and the text this system authors. Structural headings, metric labels, empty-state messages, the stakeholder framing, generated analysis prose, and names supplied by external providers (concepts, journal titles, author and institution names) remain in English.",
+        "report.disclosure.analysis_language": "This report translates section titles and the text this system authors. Structural headings, metric labels, empty-state messages, generated analysis prose, and names supplied by external providers (concepts, journal titles, author and institution names) remain in English.",
         // Backend: outbound email (phase 7)
         "email.password_reset.subject": "{platform}: reset your password",
         "email.password_reset.body": "We received a request to reset your password.\n\nUse this link to create a new one:\n{link}\n\nThe link expires in 30 minutes. If you did not ask for this, you can ignore this message.",
@@ -4133,7 +4133,7 @@ export const translations = {
         "report.section.authority_control": "Control de Autoridades",
         "report.section.collaboration_graph": "Grafo de Colaboración",
         "report.section.journal_portfolio": "Portafolio de Revistas",
-        "report.disclosure.analysis_language": "Este informe traduce los títulos de sección y el texto que este sistema redacta. Los encabezados estructurales, las etiquetas de métricas, los mensajes de estado vacío, el encuadre por audiencia, la prosa de análisis generada y los nombres provistos por fuentes externas (conceptos, títulos de revistas, nombres de autores e instituciones) permanecen en inglés.",
+        "report.disclosure.analysis_language": "Este informe traduce los títulos de sección y el texto que este sistema redacta. Los encabezados estructurales, las etiquetas de métricas, los mensajes de estado vacío, la prosa de análisis generada y los nombres provistos por fuentes externas (conceptos, títulos de revistas, nombres de autores e instituciones) permanecen en inglés.",
         // Backend: outbound email (phase 7)
         "email.password_reset.subject": "{platform}: recupera tu contraseña",
         "email.password_reset.body": "Recibimos una solicitud para recuperar tu contraseña.\n\nUsa este enlace para crear una nueva contraseña:\n{link}\n\nEste enlace vence en 30 minutos. Si no solicitaste este cambio, puedes ignorar este correo.",
