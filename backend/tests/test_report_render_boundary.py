@@ -69,6 +69,11 @@ _SECTIONS = [
     "impact_projection",
     "authority_control",
     "agentic_trace",
+    # Both were missing until #268's fourth batch. Nothing here rendered their
+    # copy, so a key leaking from either was invisible to the guard that exists
+    # precisely so no format can show one.
+    "topic_clusters",
+    "collaboration_graph",
 ]
 
 _BRANDING = {"primary_color": "#2563eb", "organization_name": "UKIP"}
