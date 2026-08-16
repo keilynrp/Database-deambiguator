@@ -143,8 +143,14 @@ def test_slides_do_not_invent_exhibit_ordinals(db_session):
 
 # ── The three sections that were bypassing the payload ────────────────────────
 
+#: (section id, slide label, a fragment of its takeaway).
+#:
+#: `entity_stats` reads "Validation: 4 of 5 …" rather than "4 of 5 entities pass
+#: validation": that sentence inflected a noun on one count and a verb on
+#: another, which is four whole-sentence variants per language once the copy
+#: comes from a catalog. It was rephrased so no word depends on a number.
 _MIGRATED = [
-    ("entity_stats", "Entity Statistics", "pass validation"),
+    ("entity_stats", "Entity Statistics", "Validation:"),
     ("enrichment_coverage", "Enrichment Coverage", "Enrichment covers"),
     ("top_secondary_labels", "Top Secondary Labels", "leading classification"),
 ]
