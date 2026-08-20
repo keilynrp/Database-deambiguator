@@ -22,6 +22,7 @@ Fuentes estrategicas relacionadas:
 - `docs/product/ENTERPRISE_READINESS_PROGRAM.md`
 - `docs/product/ENTERPRISE_CONTROL_REGISTER.md`
 - `docs/product/epics/EPIC-018-enterprise-assurance-and-operational-readiness.md`
+- `docs/product/ENGINEERING_STABILIZATION_PLAN_2026Q3.md`
 
 ## Epicas activas
 
@@ -45,6 +46,24 @@ Fuentes estrategicas relacionadas:
 | EPIC-016 | Data Lifecycle and Privacy Controls | Formalizar export, deletion, retention y evidencia de ciclo de vida | Done | data lifecycle events, DSAR, deletion, retention policies |
 | EPIC-018 | Enterprise Assurance and Operational Readiness | Cerrar controles P0/P1 con operacion y evidencia verificable | In progress | jobs externos, BCP/DR, secure SDLC, audit evidence, IAM, privacy, residency |
 
+## Engineering stabilization 2026 Q3
+
+Fuente de ejecucion: `docs/product/ENGINEERING_STABILIZATION_PLAN_2026Q3.md`.
+
+Regla de secuenciacion: mientras existan P0 abiertos, la expansion funcional amplia no debe desplazar trabajo de seguridad o confianza de produccion sin una justificacion explicita.
+
+| Orden | Issue | Prioridad | Resultado esperado | Epica principal |
+| ---: | --- | --- | --- | --- |
+| 1 | #290 | P0 | Rebasar baseline de seguridad Next.js y retirar excepciones obsoletas | EPIC-018 |
+| 2 | #268 / PR #289 | P0 | Cerrar regresiones de reporting ES desde salida renderizada | EPIC-008 |
+| 3 | #291 | P0 | Gate Playwright para journeys criticos | EPIC-011 / EPIC-014 |
+| 4 | #292 | P1 | Unificar reporting detras de un boundary localizado | EPIC-008 |
+| 5 | #269 | P1 | Persistir referencias i18n en lugar de copy renderizado | EPIC-004 / EPIC-008 |
+| 6 | #293 | P1 | Particionar tests y reducir feedback CI sin perder cobertura | EPIC-011 |
+| 7 | #294 | P1 | Ratchet de deuda Ruff/ESLint | EPIC-011 / EPIC-014 |
+| 8 | #295 | P2 | Generar metricas volatiles del repositorio y bloquear drift | gobernanza documental |
+| 9 | #296 | P2 | Definir support tiers y boundaries de capacidades | arquitectura transversal |
+
 ## Enterprise readiness execution order
 
 | Order | Story | Control | Priority | Dependency | Delivery state | Target maturity |
@@ -62,6 +81,7 @@ Fuentes estrategicas relacionadas:
 
 ## Prioridades recomendadas de corto plazo
 
+- ejecutar primero el tramo `Engineering stabilization 2026 Q3`, comenzando por #290, #268/#289 y #291
 - usar `US-058` como guardarrail para calibrar cualquier cambio posterior en heuristicas o rutas LLM
 - extender el fallback jerarquico de `US-057` solo donde exista jerarquia de conceptos realmente util
 - cerrar historias pendientes de `EPIC-004` que eleven calidad de authority review y enrichment fallback
