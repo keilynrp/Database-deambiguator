@@ -30,7 +30,7 @@ end-to-end. Nothing else gets the tag — see §7 for why.
 | 2. Ingest/import → Entity Explorer | `import-export.spec.ts` → "uploading a file completes ingest and the imported record is visible in the Entity Explorer" | Mocked `/upload`, then mocked `/entities` reflecting the uploaded record | None | Pass |
 | 3. Entity search/detail read path | `entities.spec.ts` → "searching finds a result and opening it shows the entity detail" (new file — no prior spec covered this journey) | Mocked `/entities` (search) and `/entities/777` (detail); every other detail-page endpoint degrades on the existing catch-all | None | Pass |
 | 4. Analytics/dashboard load with representative data | `navigation.spec.ts` → "navigates to Analytics page and loads representative dashboard data" | Existing `mockExecutiveDashboard` helper fixture (120 entities, 66.7% enrichment) | None | Pass |
-| 5. Reporting language path, EN + ES | `reports-language.spec.ts` (new file) → one test per language | Mocked `/reports/sections`, `/analytics/benchmarks/profiles`, `/reports/generate` | None | Pass |
+| 5. Reporting language path, EN + ES | `reports-language.spec.ts` (new file) → one test per language | Mocked `/reports/sections`, `/analytics/benchmarks/profiles`, `/reports/generate` (language-conditional response) | None | Pass |
 
 All five reuse the existing `frontend/e2e/helpers.ts` (`injectAuth`,
 `mockUserMe`, `mockHomeDashboard`, `mockExecutiveDashboard`) and the
@@ -41,21 +41,36 @@ so a new file was the only option, not a duplicate.
 
 ### Journey 5 scope note
 
-`reports-language.spec.ts` asserts that the Reports page's own chrome
-(heading, generate button, completion toast) renders in the active UI
-language and never falls back to English or an unresolved catalog key. It
-does **not** assert on the generated artifact's content language, because the
-frontend does not currently forward the UI's language as the `language`
-query parameter `/reports/generate` and `/exports/*` accept
-(`backend/i18n/locale.py`'s `resolve_report_language`) — every report is
-generated in the backend's default language today regardless of the UI
-language setting. That gap predates #291 and is a frontend/backend wiring
-question, not something a CI test-infrastructure change is authorized to fix
-(see #291's contract: no product-behavior changes). The artifact's own
-catalog-language correctness is covered separately by
-`backend/tests/test_report_pptx_presentation.py` and the "no rendered format
-may show an unresolved catalog key" backend suite. Tracked as a remaining
-risk in the #291 PR, not silently worked around.
+`reports-language.spec.ts` proves two things: (1) the Reports page's own
+chrome (heading, generate button, completion toast) renders in the active UI
+language, never falling back to English or an unresolved catalog key, and
+(2) the frontend actually forwards the UI's active language to the backend —
+`frontend/app/reports/page.tsx`'s `handleGenerate` now appends
+`?language=${language}` (from `useLanguage()`) to `/reports/generate` and
+`/exports/*`, matching the backend's existing `language` query parameter
+(`backend/i18n/locale.py`'s `resolve_report_language`). The test asserts
+this from both ends without a live backend: the mock route inspects the
+request's own `language` query param and serves a distinct body per
+language (`en`, `es`, or a deliberately wrong "unexpected" body if the
+param is missing/malformed), then the test reads the *downloaded* artifact
+and asserts it is exactly the language-specific body — proving the request
+carried the right param and the resulting content actually reached the
+user unmangled.
+
+This was originally out of scope for #291 (a frontend behavior change), and
+was escalated as `ARCHITECTURE_DECISION_REQUIRED` before implementation.
+The decision (resolved, see the #291 PR discussion): wire the two already-
+existing contracts together — `useLanguage()` on the frontend,
+`resolve_report_language`'s `language` param on the backend — since neither
+side needed a new API, DB change, or auth change; backend semantics are
+unchanged (`language=None` still resolves to the documented default for any
+other caller).
+
+What this still does not cover: the *rendering correctness* of catalog-
+sourced text inside a real, non-mocked artifact — that remains a backend
+concern, covered by `backend/tests/test_report_render_boundary.py
+::test_no_format_shows_an_unresolved_catalog_key` (parametrized `en`/`es`
+across every export format) and `test_report_pptx_presentation.py`.
 
 ---
 
@@ -132,21 +147,27 @@ suite).
 
 **Target: median gate runtime under 10 minutes.**
 
-Measured directly (not estimated) in the same sandbox used throughout: two
-consecutive `npx playwright test --grep @critical` runs (6 tests across 5
-files, `next build && next start` via the webServer, single worker, Chrome),
-each preceded by a fresh `npx playwright install --with-deps chrome`:
+**Real GitHub Actions evidence** — `frontend-e2e-critical` job, PR #304
+(`.github/workflows/lint.yml`): **1m38s** end to end (checkout, Node 22
+setup, `npm ci`, Chrome install, the full `--grep @critical` run, artifact
+upload). Well under target, with substantial headroom.
+
+Local sandbox measurements (not CI, but the same environment used to debug
+the server-strategy question in §5): two consecutive
+`npx playwright test --grep @critical` runs (6 tests across 5 files, `next
+build && next start` via the webServer, single worker, Chrome), each
+preceded by a fresh `npx playwright install --with-deps chrome`:
 
 | Run | Playwright-reported test duration (includes `next build`+`next start` via webServer) |
 | --- | --- |
 | 1 | 3.0 min |
 | 2 (consecutive) | 2.8 min |
 
-Add `npm ci` (~1-2 min with a warm npm cache, as CI has via
-`actions/setup-node`'s `cache: npm`) and Chrome install (~1 min): **total job
-runtime ≈ 5-6 min**, well under the 10-minute target with headroom for CI
-runner variance. Exact CI numbers are in the `frontend-e2e-critical` job's
-Actions run linked from the #291 PR.
+The gap between the local sandbox (~3 min just for the Playwright process)
+and the real CI job (1m38s for the *entire* job including setup) reflects
+the sandbox's documented CPU constraints (§5, and referenced throughout
+#290/#291) — GitHub Actions runners are unconstrained by comparison. CI is
+the authoritative number.
 
 ---
 
