@@ -105,4 +105,15 @@ export async function mockExecutiveDashboard(page: Page) {
   await page.route(`${API_BASE}/analytics/benchmarks/profiles`, (route) =>
     route.fulfill({ json: [{ id: "default", name: "Default", is_default: true }] })
   );
+  // EnrichmentSourceHealthCard (rendered on the dashboard) expects these two
+  // shapes specifically — the page-wide `[]` catch-all satisfies most
+  // endpoints, but `{entries: [...]}` is not `[]`, and without this override
+  // `stats.entries` is undefined and crashes the whole route via
+  // analytics/error.tsx ("r.entries is not iterable").
+  await page.route(`${API_BASE}/enrichment/sources/health`, (route) =>
+    route.fulfill({ json: { sources: [] } })
+  );
+  await page.route(`${API_BASE}/enrichment/sources/stats`, (route) =>
+    route.fulfill({ json: { domain_id: "default", entries: [] } })
+  );
 }
