@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "country-flag-emoji-polyfill": "^0.1.10",
-    "next": "^16.2.10",
+    "next": "^16.3.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-is": "^19.2.8",
@@ -43,7 +43,7 @@
     "d3-force": "^3.0.0",
     "d3-geo": "^3.1.1",
     "eslint": "^10",
-    "eslint-config-next": "^16.3.0",
+    "eslint-config-next": "^16.3.1",
     "jsdom": "^30.0.1",
     "tailwindcss": "^4",
     "topojson-client": "^3.1.0",
