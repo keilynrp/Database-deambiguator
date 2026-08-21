@@ -109,7 +109,7 @@ type ExportFormat = "html" | "pdf" | "excel" | "pptx";
 export default function ReportsPage() {
   const { activeDomainId, setActiveDomainId } = useDomain();
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const tr = useCallback((key: string, fallback: string) => {
     const value = t(key);
     return value === key ? fallback : value;
@@ -554,8 +554,14 @@ export default function ReportsPage() {
         format === "excel" ? "/exports/excel"   :
         format === "pptx"  ? "/exports/pptx"    :
                              "/reports/generate";
+      // Forward the UI's active language to the backend's existing
+      // `language` query parameter (resolve_report_language in
+      // backend/i18n/locale.py), so a report generated while the app is set
+      // to Spanish actually renders catalog-sourced text in Spanish instead
+      // of silently defaulting to English.
+      const endpointWithLanguage = `${endpoint}?language=${encodeURIComponent(language)}`;
 
-      const res = await apiFetch(endpoint, {
+      const res = await apiFetch(endpointWithLanguage, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

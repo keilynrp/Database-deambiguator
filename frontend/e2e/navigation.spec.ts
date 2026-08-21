@@ -23,7 +23,7 @@ test.describe("Sidebar navigation", () => {
     });
   });
 
-  test("navigates to Analytics page", async ({ page }) => {
+  test("navigates to Analytics page and loads representative dashboard data @critical", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
@@ -32,6 +32,14 @@ test.describe("Sidebar navigation", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible({
       timeout: 10_000,
     });
+
+    // Assert the KPIs from mockExecutiveDashboard's fixture actually rendered
+    // — proves the dashboard fetched and displayed real data, not just an
+    // empty/error shell behind a visible heading.
+    await expect(page.getByText("120", { exact: true }).first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText("66.7%", { exact: true })).toBeVisible();
   });
 
   test("navigates to RAG Chat page", async ({ page }) => {

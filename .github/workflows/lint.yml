@@ -309,3 +309,52 @@ jobs:
       - name: TypeScript check
         working-directory: frontend
         run: npx tsc --noEmit
+
+  # ── Frontend critical-path E2E (Playwright, blocking) ──────────────────────
+  # Small deterministic browser-level release gate for #291. The broad E2E
+  # suite remains local/manual; only tests tagged @critical block this workflow.
+  frontend-e2e-critical:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --prefer-offline
+
+      - name: Install Playwright Chrome + OS dependencies
+        working-directory: frontend
+        run: npx playwright install --with-deps chrome
+
+      - name: Run critical-path Playwright suite
+        working-directory: frontend
+        run: npx playwright test --grep @critical
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload Playwright failure evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-test-results
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
