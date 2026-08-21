@@ -201,11 +201,11 @@ def collect_stakeholder_reading(
         # both sentences. That keeps this one paragraph, as it renders today.
         material = pending_authority / total_authority >= _authority_backlog_threshold()
         paragraphs.append(
-            with_params(
+            _counted(
                 "report.stakeholder.identity_backlog.material"
                 if material
                 else "report.stakeholder.identity_backlog",
-                pending=f"{pending_authority:,}",
+                pending_authority,
                 total=f"{total_authority:,}",
                 pct=backlog_pct,
             )
@@ -241,12 +241,18 @@ def _section_stakeholder_reading(
     benchmark_profile_id: str | None = None,
     benchmark_org: models.Organization | None = None,
     stakeholder_profile: str | None = None,
+    language: str | None = None,
 ) -> str:
+    # This section is assembled ahead of the collector loop, so it never passes
+    # the point where `build()` resolves a payload's language. Its copy moved to
+    # the catalog in #284 and still rendered English, because a key with no
+    # language resolves through the default rather than failing.
     from backend.reporting.html_renderer import render_html
     return render_html(
         collect_stakeholder_reading(
             db, domain_id, org_id, benchmark_profile_id, benchmark_org, stakeholder_profile
-        )
+        ),
+        language,
     )
 
 # ── CSS (inline, print-friendly) ─────────────────────────────────────────────
@@ -578,9 +584,12 @@ def collect_enrichment_coverage(db: Session, domain_id: str, org_id: int | None)
         takeaway = "report.empty.enrichment_coverage"
         materiality = Materiality.EMPTY
     else:
-        takeaway = (
-            f"Enrichment covers {pct}% of records ({completed:,} of {total:,}); "
-            f"mean citation count {round(avg_cit or 0):,}"
+        takeaway = with_params(
+            "report.takeaway.enrichment_coverage",
+            pct=pct,
+            completed=f"{completed:,}",
+            total=f"{total:,}",
+            citations=f"{round(avg_cit or 0):,}",
         )
         materiality = (
             Materiality.LEAD if pct < 60
@@ -717,12 +726,7 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
         Table,
     )
 
-    method = (
-        "Most frequent enriched concepts for this domain, ranked by occurrence "
-        f"and capped at the top {_TOPIC_CAP}. Frequency counts concept "
-        "occurrences across enriched records, not distinct entities, so one "
-        "record contributes more than once when it carries a concept repeatedly."
-    )
+    method = with_params("report.method.topic_clusters", cap=_TOPIC_CAP)
 
     try:
         result = TopicAnalyzer().top_topics(domain_id=domain_id, top_n=_TOPIC_CAP, org_id=org_id)
@@ -951,8 +955,10 @@ def collect_impact_projection(
 
     grid = StatGrid(items=(
         StatItem(label="report.stat.impact.expected", value=f"{score}/100", sub="report.stat.impact.sub.monte_carlo_median"),
-        StatItem(label="report.stat.impact.probable_range", value=f"{p10}–{p90}", sub=f"P10 to P90 · expected {p50}"),
-        StatItem(label="report.col.authority.confidence", value=confidence, sub=f"{confidence_score}/100 stability score"),
+        StatItem(label="report.stat.impact.probable_range", value=f"{p10}–{p90}",
+                 sub=with_params("report.stat.impact.sub.range", p50=p50)),
+        StatItem(label="report.col.authority.confidence", value=confidence,
+                 sub=with_params("report.stat.impact.sub.stability", score=confidence_score)),
     ))
     interpretation = Narrative(
         heading="report.narrative.impact.exec_interpretation",
@@ -981,7 +987,9 @@ def collect_impact_projection(
 
     spread = (p90 or 0) - (p10 or 0)
     return SectionData(
-        takeaway=f"Projected impact {score}/100, probable range {p10}-{p90}",
+        takeaway=with_params(
+            "report.takeaway.impact", score=score, p10=p10, p90=p90
+        ),
         method=(
             "report.method.impact"
         ),
@@ -1414,7 +1422,8 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
     grid = StatGrid(items=(
         StatItem(label="report.stat.authority.records", value=f"{total:,}"),
         StatItem(label="report.stat.authority.confirmed", value=f"{confirmed:,}",
-                 sub=f"{round(confirmed / total * 100)}% of total"),
+                 sub=with_params("report.stat.authority.sub.of_total",
+                                 pct=round(confirmed / total * 100))),
         StatItem(label="report.stat.authority.pending", value=f"{pending:,}",
                  sub=f"{backlog_pct}% awaiting a human decision"),
         StatItem(label="report.stat.authority.mean_confidence", value=f"{round(float(mean_confidence) * 100)}%",
@@ -1448,7 +1457,9 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
         models.AuthorityRecord.confidence.asc()
     ).limit(_AUTHORITY_CONFLICT_LIMIT).all()
     conflicts_table = Table(
-        columns=("report.col.authority.value", "report.col.authority.field", "report.col.authority.resolution", "Confidence", "report.col.authority.reason"),
+        columns=("report.col.authority.value", "report.col.authority.field",
+                 "report.col.authority.resolution", "report.col.authority.confidence",
+                 "report.col.authority.reason"),
         rows=tuple(
             (
                 r[0] or "—",
@@ -1462,19 +1473,24 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
     )
 
     reliability = [
-        f"{pending:,} of {total:,} authority records ({backlog_pct}%) are awaiting "
-        f"human review.",
+        # The verb agrees with `pending`, not with `total` or the percentage,
+        # and it does so in English as well ("1 … is awaiting"). Three numbers,
+        # one of them governing.
+        _counted(
+            "report.narrative.authority.backlog",
+            pending,
+            total=f"{total:,}",
+            pct=backlog_pct,
+        ),
     ]
     if pending:
-        reliability.append(
-            "Entity identity in this brief should be read as provisional to that "
-            "extent: unreviewed records may merge distinct entities or split a single "
-            "one, which shifts counts and rankings elsewhere in the report."
-        )
+        reliability.append("report.narrative.authority.provisional")
         if len(conflicts) == _AUTHORITY_CONFLICT_LIMIT:
             reliability.append(
-                f"The table above lists the {_AUTHORITY_CONFLICT_LIMIT} lowest-confidence "
-                "cases only; it is a sample of the backlog, not the whole queue."
+                with_params(
+                    "report.narrative.authority.sample",
+                    limit=_AUTHORITY_CONFLICT_LIMIT,
+                )
             )
     else:
         reliability.append(
@@ -1651,8 +1667,11 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
     if latest_computed is None:
         blocks.append(Narrative(
             heading="report.narrative.collab.staleness",
+            # The trailing comma is load-bearing: without it this is a `str`,
+            # not a 1-tuple, and `localize._tuple` iterates it character by
+            # character into one paragraph per letter.
             paragraphs=(
-                "report.narrative.collab.stale_warning"
+                "report.narrative.collab.stale_warning",
             ),
         ))
     else:
@@ -1662,10 +1681,15 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
         if age_days >= _COLLAB_STALENESS_DAYS:
             blocks.append(Narrative(
                 heading="report.narrative.collab.staleness",
+                # No `.one` variant: this branch is gated on
+                # `age_days >= _COLLAB_STALENESS_DAYS`, so the count is never 1
+                # and a singular sentence would be copy no reader can reach.
                 paragraphs=(
-                    f"The collaboration graph was last computed {age_days} days ago "
-                    f"({latest_computed.strftime('%Y-%m-%d')}); it may be stale relative "
-                    "to recent imports. Recompute before relying on the structure.",
+                    with_params(
+                        "report.narrative.collab.staleness_note",
+                        days=age_days,
+                        date=latest_computed.strftime("%Y-%m-%d"),
+                    ),
                 ),
             ))
 
@@ -2038,6 +2062,7 @@ def build(
             benchmark_profile_id=benchmark_profile_id,
             benchmark_org=benchmark_org,
             stakeholder_profile=stakeholder_profile,
+            language=language,
         )
     ]
     for manual in manual_sections or []:

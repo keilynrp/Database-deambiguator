@@ -108,6 +108,44 @@ class TestTheDisclosure:
         assert "permanece en inglés" not in html
 
 
+class TestTheStakeholderReadingFollowsTheLanguage:
+    """#268 — the opening section had its copy migrated but never its language.
+
+    `_STAKEHOLDER_PROFILES` moved to the catalog in #284, which made the Spanish
+    copy exist. It never rendered: `_section_stakeholder_reading` called
+    `render_html(collect_...())` with no `language`, so every key resolved
+    through the default and the section that opens a Spanish report was English
+    end to end.
+
+    That is invisible to the render-boundary guard, which proves no key *leaks*
+    and says nothing about which language a resolved key resolved into. It is
+    also invisible to the section-title tests above, because this section's
+    title is not what was wrong.
+    """
+
+    def _stakeholder_copy(self, language: str) -> str:
+        from backend.i18n.catalog import translate
+
+        return translate("report.stakeholder.how_to_read", language)
+
+    def test_a_spanish_report_frames_the_lens_in_spanish(self, client, auth_headers):
+        html = _generate(client, auth_headers, language="es")
+
+        assert self._stakeholder_copy("es") in html, (
+            "the stakeholder reading rendered in the default language: the "
+            "section's copy is in the catalog but the renderer was never told "
+            "which language to resolve it into"
+        )
+        assert self._stakeholder_copy("en") not in html, (
+            "English stakeholder copy survived in a Spanish report"
+        )
+
+    def test_an_english_report_is_unchanged(self, client, auth_headers):
+        html = _generate(client, auth_headers, language="en")
+
+        assert self._stakeholder_copy("en") in html
+
+
 class TestTheTitlesComeFromTheCatalog:
     def test_output_follows_the_catalog(self, client, auth_headers, monkeypatch):
         sentinel = "SENTINEL-SECTION"
