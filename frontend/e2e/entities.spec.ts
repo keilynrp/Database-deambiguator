@@ -14,23 +14,44 @@ import { API_BASE, injectAuth, mockUserMe } from "./helpers";
  * helpers.ts's mockExecutiveDashboard). Both get an explicit, correctly
  * shaped empty response instead.
  */
-const SEARCH_RESULT = [
-  {
-    id: 777,
-    primary_label: "Ada Lovelace",
-    secondary_label: "Countess of Lovelace",
-    canonical_id: "Q7259",
-    entity_type: "person",
-    domain: "default",
-    validation_status: "confirmed",
-    enrichment_status: "completed",
-    enrichment_citation_count: 12,
-    source: "user",
-    attributes_json: null,
-    normalized_json: null,
-    quality_score: 0.82,
-  },
-];
+const ADA_LOVELACE = {
+  id: 777,
+  primary_label: "Ada Lovelace",
+  secondary_label: "Countess of Lovelace",
+  canonical_id: "Q7259",
+  entity_type: "person",
+  domain: "default",
+  validation_status: "confirmed",
+  enrichment_status: "completed",
+  enrichment_citation_count: 12,
+  source: "user",
+  attributes_json: null,
+  normalized_json: null,
+  quality_score: 0.82,
+};
+
+// A second entity that does NOT match a "Lovelace" search. Its presence in
+// the initial (unfiltered) list and absence from the filtered response is
+// what proves the search request actually changed what's rendered, rather
+// than the test re-asserting a result that was already on screen.
+const DECOY_ENTITY = {
+  id: 778,
+  primary_label: "Bob Placeholder",
+  secondary_label: null,
+  canonical_id: "Q0",
+  entity_type: "person",
+  domain: "default",
+  validation_status: "confirmed",
+  enrichment_status: "none",
+  enrichment_citation_count: null,
+  source: "user",
+  attributes_json: null,
+  normalized_json: null,
+  quality_score: 0.4,
+};
+
+const UNFILTERED_RESULT = [ADA_LOVELACE, DECOY_ENTITY];
+const FILTERED_RESULT = [ADA_LOVELACE];
 
 const ENTITY_DETAIL = {
   id: 777,
@@ -62,8 +83,10 @@ test.describe("Entity search and detail read path (critical)", () => {
     // only the two endpoints this journey actually reads are overridden.
     await page.route(`${API_BASE}/**`, (route) => route.fulfill({ json: [] }));
     await mockUserMe(page);
+    // Initial, unfiltered load — includes a decoy entity so a later search
+    // has something to actually prove it filtered out.
     await page.route(`${API_BASE}/entities?**`, (route) =>
-      route.fulfill({ json: SEARCH_RESULT, headers: { "X-Total-Count": "1" } })
+      route.fulfill({ json: UNFILTERED_RESULT, headers: { "X-Total-Count": "2" } })
     );
     await page.route(`${API_BASE}/entities/777`, (route) =>
       route.fulfill({ json: ENTITY_DETAIL })
@@ -99,13 +122,38 @@ test.describe("Entity search and detail read path (critical)", () => {
     ).toBeVisible({ timeout: 10_000 });
 
     const resultLink = page.getByRole("link", { name: "Ada Lovelace" });
+    const decoyLink = page.getByRole("link", { name: "Bob Placeholder" });
     await expect(resultLink).toBeVisible({ timeout: 10_000 });
+    // The decoy is part of the unfiltered response, so it must be visible
+    // now — its later disappearance is what proves the search actually ran.
+    await expect(decoyLink).toBeVisible({ timeout: 10_000 });
 
-    // Search interaction: typing must not break the already-rendered result
-    // (the mock is search-agnostic, so this exercises the debounced fetch
-    // path without coupling the assertion to query-string echoing).
+    // Search interaction: register a route for the exact filtered request
+    // *before* triggering it (registered after the beforeEach catch-all, so
+    // it takes precedence — same pattern as coauthorship.spec.ts), then wait
+    // for that specific request/response rather than re-checking state that
+    // was already on screen from the initial load.
+    await page.route(`${API_BASE}/entities?**`, (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("search") === "Lovelace") {
+        return route.fulfill({ json: FILTERED_RESULT, headers: { "X-Total-Count": "1" } });
+      }
+      return route.fulfill({ json: UNFILTERED_RESULT, headers: { "X-Total-Count": "2" } });
+    });
+
     const searchBox = page.getByPlaceholder(/Buscar por título/i);
+    const filteredResponsePromise = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname.endsWith("/entities") && url.searchParams.get("search") === "Lovelace";
+    });
     await searchBox.fill("Lovelace");
+    const filteredResponse = await filteredResponsePromise;
+    expect(filteredResponse.ok()).toBe(true);
+
+    // Only after that request/response completes: the decoy — present in
+    // the unfiltered response, absent from the filtered one — is gone, and
+    // the real match is still there.
+    await expect(decoyLink).toHaveCount(0);
     await expect(resultLink).toBeVisible();
 
     await resultLink.click();
