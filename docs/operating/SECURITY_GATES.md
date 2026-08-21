@@ -95,22 +95,31 @@ EMPTY — no findings at gate introduction (2026-06-10).
 
 ### 7b. npm allowlist (`frontend/.npm-audit-allowlist.json`)
 
-EMPTY as of 2026-08-20 — all eleven prior entries resolved by the Next.js
-16.3.1 upgrade (#290) and removed. See the 2026-08-20 review note below for
-the verification evidence; the pre-upgrade entries are preserved further
-down for history.
+EMPTY as of 2026-08-20 — all eleven prior entries removed as part of #290.
+See the 2026-08-20 review note below for the verification evidence and the
+actual chronology (most of the underlying fixes predate #290 itself); the
+pre-upgrade entries are preserved further down for history.
 
-**Review conducted 2026-08-20** (owner: platform owner). Baseline before this
-review: `next` resolved to `16.2.10` per `package.json`'s declared range, but
-`frontend/package-lock.json` had *already* drifted to `next@16.3.0` via a
-routine Dependabot lockfile regen on 2026-08-14 (#283) — Dependabot runs on
-GitHub's Linux infrastructure, so this was a legitimate resolution, just an
-undocumented one. `package.json` was bumped to `next: ^16.3.1` /
-`eslint-config-next: ^16.3.1` (latest stable 16.3.x at review time) and the
-lockfile regenerated in a Linux container (`node:22-alpine`, matching
-`frontend/Dockerfile` and `.github/workflows/security.yml`'s
+**Review conducted 2026-08-20** (owner: platform owner), landed via #290.
+**Chronology matters here — #290 did not fix most of these advisories; it
+formalized and reconciled a state that had partly already arrived.** Before
+#290, `package.json` still declared `next: ^16.2.10`, but
+`frontend/package-lock.json` had *already* drifted to `next@16.3.0` **and**
+`postcss@8.5.23` **and** `sharp@0.35.3` via a routine Dependabot lockfile
+regen on 2026-08-14 (#283) — all three resolved silently within the existing
+`^16.2.10` range (Dependabot runs on GitHub's Linux infra, so this was a
+legitimate resolution, just an undocumented one; `package.json` itself was
+never touched by #283). #290's actual changes were: (1) bump `package.json`
+to declare `next: ^16.3.1` / `eslint-config-next: ^16.3.1` (latest stable
+16.3.x at review time) instead of the stale `^16.2.10`, which moved the
+*resolved* `next` one further step from `16.3.0` to `16.3.1` — postcss and
+sharp were untouched by #290's own diff, already sitting at `8.5.23` /
+`0.35.3` beforehand; and (2) reconcile this table and the allowlist against
+the resulting (mostly pre-existing) dependency graph. The lockfile refresh
+that produced `next@16.3.1` was done in a Linux container (`node:22-alpine`,
+matching `frontend/Dockerfile` and `.github/workflows/security.yml`'s
 `node-version: 22` — never on the Windows host, per the lockfile-regen
-prohibition noted throughout this table). Resolved versions after upgrade:
+prohibition noted throughout this table). Resolved versions after #290:
 `next@16.3.1`, `eslint-config-next@16.3.1`, `postcss@8.5.23`, `sharp@0.35.3`
 (react/react-dom left untouched at `19.2.8`, not downgraded).
 
@@ -121,8 +130,8 @@ passes cleanly with an empty allowlist. Per-advisory disposition:
 
 | ID | Package | Prior severity | Disposition |
 | --- | --- | --- | --- |
-| 1124066 (GHSA-f88m-g3jw-g9cj) | sharp (bundled by next 16.x) | HIGH | **Removed — category B.** Fixed by next 16.3.x bundling a newer sharp; resolved sharp is now `0.35.3`. No longer emitted. |
-| 1124170 (GHSA-6gpp-xcg3-4w24) | next 16.2.10 | HIGH | **Removed — category A.** Documented exit condition was "stable 16.3.0"; resolved is now `16.3.1`. No longer emitted. |
+| 1124066 (GHSA-f88m-g3jw-g9cj) | sharp (bundled by next 16.x) | HIGH | **Removed — category B.** Fixed by next 16.3.x bundling a newer sharp (`0.35.3`) — already true pre-#290 via the 2026-08-14 Dependabot regen; #290's own diff does not touch sharp. No longer emitted. |
+| 1124170 (GHSA-6gpp-xcg3-4w24) | next 16.2.10 | HIGH | **Removed — category A.** Documented exit condition was "stable 16.3.0", already met pre-#290 (the 2026-08-14 Dependabot regen); #290 moves the *declared* range and resolved version one step further, to `16.3.1`. No longer emitted at either version. |
 | 1124171 (GHSA-m99w-x7hq-7vfj) | next 16.2.10 | HIGH | **Removed — category A/E.** No longer emitted at 16.3.1. (Exposure was already assessed not-exposed: zero `use server` directives, re-verified 2026-08-20 — still zero.) |
 | 1124184 (GHSA-89xv-2m56-2m9x) | next 16.2.10 | HIGH | **Removed — category A/E.** No longer emitted at 16.3.1. (Re-verified not exposed: no Server Actions, app still runs on `next start`.) |
 | 1124186 (GHSA-68g3-v927-f742) | next 16.2.10 | MODERATE | **Removed — category A.** No longer emitted at 16.3.1. |
@@ -131,7 +140,7 @@ passes cleanly with an empty allowlist. Per-advisory disposition:
 | 1124192 (GHSA-p9j2-gv94-2wf4) | next 16.2.10 | HIGH | **Removed — category A/E.** No longer emitted at 16.3.1. (Re-verified not exposed: `next.config.ts`'s only rewrite, `/api/backend/:path*` → `${BACKEND_INTERNAL}/:path*`, still has a fixed, env-derived destination hostname; only the path is caller-supplied.) |
 | 1124194 (GHSA-q8wf-6r8g-63ch) | next 16.2.10 | MODERATE | **Removed — category A.** No longer emitted at 16.3.1. (`next/image` surface unchanged: still the single usage in `app/components/UserAvatar.tsx`.) |
 | 1124196 (GHSA-955p-x3mx-jcvp) | next 16.2.10 | MODERATE | **Removed — category A/E.** No longer emitted at 16.3.1. (Re-verified not exposed: no Server Functions or Server Actions.) |
-| 1124288 (GHSA-r28c-9q8g-f849) | postcss 8.5.13 | HIGH | **Removed — category A.** Exit condition was "postcss ≥ 8.5.18"; resolved is now `8.5.23`. No longer emitted, and `next`'s transitive-via-postcss propagation trigger is gone with it. |
+| 1124288 (GHSA-r28c-9q8g-f849) | postcss 8.5.13 | HIGH | **Removed — category A.** Exit condition was "postcss ≥ 8.5.18", already met pre-#290 (`8.5.23`, via the 2026-08-14 Dependabot regen — #290's own diff does not touch postcss). No longer emitted, and `next`'s transitive-via-postcss propagation trigger is gone with it. |
 
 `frontend/middleware.ts` was re-read in full as part of this review: it still
 only sets response headers (CSP, `X-Content-Type-Options`, `Referrer-Policy`)
@@ -191,17 +200,20 @@ one postcss entry clears both. The real fix is a postcss bump (>8.5.17); it is
 left to Dependabot/CI rather than a Windows-local lockfile regen (which strips
 linux/native optional deps). Exit condition: postcss ≥ 8.5.18.
 
-Note (2026-08-20): both exit conditions above are now satisfied. Stable
-Next.js 16.3.0 released 2026-08-03; a routine Dependabot lockfile regen on
-2026-08-14 (#283) had already picked it up transparently under the existing
-`^16.2.10` range (Dependabot runs on GitHub's Linux infra, so this was a
-sound resolution, just undocumented — `package.json` itself was not bumped
-until this review). `package.json` now declares `next: ^16.3.1` /
-`eslint-config-next: ^16.3.1` (latest stable 16.3.x), and the lockfile
-resolves `next@16.3.1`, `postcss@8.5.23` (clears the ≥8.5.18 exit condition),
-and a bundled `sharp@0.35.3`. `npm audit --omit=dev --json` reports zero
-vulnerabilities of any severity; all eleven entries in this section were
-removed. See the 2026-08-20 review note above the entries table for the full
+Note (2026-08-20): both exit conditions above were already satisfied before
+#290 touched anything. Stable Next.js 16.3.0 released 2026-08-03; a routine
+Dependabot lockfile regen on 2026-08-14 (#283) had already picked up both
+`next@16.3.0` and `postcss@8.5.23` (clearing the ≥8.5.18 exit condition)
+transparently under the existing `^16.2.10` range (Dependabot runs on
+GitHub's Linux infra, so this was a sound resolution, just undocumented —
+`package.json` itself was not bumped until #290, and postcss is not touched
+by #290's diff at all). #290's own contribution is: `package.json` now
+declares `next: ^16.3.1` / `eslint-config-next: ^16.3.1` (latest stable
+16.3.x), moving the resolved `next` one further step to `16.3.1`; and, with
+that graph in hand, reconciling this table — `npm audit --omit=dev --json`
+reports zero vulnerabilities of any severity, and all eleven entries in this
+section were removed. See the 2026-08-20 review note above the entries table
+for the full
 per-advisory disposition.
 
 ### 7c. Trivy ignore file (`.trivyignore`)
