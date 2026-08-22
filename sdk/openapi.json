@@ -16495,6 +16495,43 @@
     "/catalogs": {
       "get": {
         "operationId": "get_catalogs",
+        "parameters": [
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -16509,6 +16546,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -16523,6 +16570,43 @@
       },
       "post": {
         "operationId": "post_catalogs",
+        "parameters": [
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -16672,6 +16756,41 @@
               "title": "Slug",
               "type": "string"
             }
+          },
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
           }
         ],
         "responses": {
@@ -16717,6 +16836,41 @@
               "minLength": 3,
               "title": "Slug",
               "type": "string"
+            }
+          },
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
             }
           }
         ],
@@ -16785,6 +16939,41 @@
               "minimum": 1,
               "title": "Entity Id",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
             }
           }
         ],
@@ -17020,6 +17209,41 @@
                 }
               ],
               "title": "Order"
+            }
+          },
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
             }
           }
         ],
@@ -18410,6 +18634,43 @@
       "post": {
         "description": "Seed demo data from live OpenAlex API (preferred) or bundled snapshot fallback.\nClears any existing demo entities first for idempotency.\nFalls back to legacy Excel file if neither OpenAlex source is available.",
         "operationId": "post_demo_seed",
+        "parameters": [
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
+          }
+        ],
         "responses": {
           "201": {
             "content": {
@@ -18418,6 +18679,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -18434,6 +18705,43 @@
     "/demo/status": {
       "get": {
         "operationId": "get_demo_status",
+        "parameters": [
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -18442,6 +18750,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -19281,6 +19599,41 @@
               "title": "Entity Id",
               "type": "integer"
             }
+          },
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
           }
         ],
         "responses": {
@@ -19922,6 +20275,41 @@
                 }
               ],
               "title": "Concept"
+            }
+          },
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
             }
           }
         ],
@@ -20638,6 +21026,41 @@
               "title": "Entity Id",
               "type": "integer"
             }
+          },
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
           }
         ],
         "responses": {
@@ -20683,6 +21106,41 @@
               "minimum": 1,
               "title": "Entity Id",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.",
+              "title": "Language"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
             }
           }
         ],
