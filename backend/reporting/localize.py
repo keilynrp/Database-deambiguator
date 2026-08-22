@@ -28,7 +28,7 @@ from typing import Any
 from backend.i18n import DEFAULT_LANGUAGE
 from backend.i18n.catalog import SURFACE_PREFIXES, translate
 
-from .document import LocalizedReportDocument, ReportDocument
+from .document import LocalizedReportDocument, ReportDocument, SectionError
 from .section_data import Meter, Narrative, SectionData, StatGrid, StatItem, Table
 
 __all__ = [
@@ -237,6 +237,8 @@ def assert_localized_document(doc: LocalizedReportDocument) -> None:
         doc.stakeholder_lens_caption,
         doc.executive_summary_title,
         doc.manual_note_default_title,
+        doc.generated_by_caption,
+        doc.section_error_prefix,
         doc.disclosure,
     )
     if culprit is not None:
@@ -245,14 +247,15 @@ def assert_localized_document(doc: LocalizedReportDocument) -> None:
             "in a document-level field."
         )
     for section in doc.sections:
-        assert_localized_section(section)
-    for error in doc.errors:
-        culprit = _first_unresolved_key(error.title)
-        if culprit is not None:
-            raise UnresolvedCatalogKeyError(
-                f"LocalizedReportDocument carries an unresolved catalog key "
-                f"{culprit!r} in a section-error title."
-            )
+        if isinstance(section, SectionError):
+            culprit = _first_unresolved_key(section.title)
+            if culprit is not None:
+                raise UnresolvedCatalogKeyError(
+                    f"LocalizedReportDocument carries an unresolved catalog key "
+                    f"{culprit!r} in a section-error title."
+                )
+        else:
+            assert_localized_section(section)
 
 
 def localize_document(doc: ReportDocument, language: str | None = None) -> LocalizedReportDocument:
@@ -268,9 +271,11 @@ def localize_document(doc: ReportDocument, language: str | None = None) -> Local
     `disclosure` is None for the default language: an English report has no
     language mixture to explain, so there is nothing to disclose (task 8.5).
     """
-    sections = tuple(localize_section(s, language) for s in doc.sections)
-    errors = tuple(
-        replace(e, title=resolve_value(e.title, language)) for e in doc.errors
+    sections = tuple(
+        replace(s, title=resolve_value(s.title, language))
+        if isinstance(s, SectionError)
+        else localize_section(s, language)
+        for s in doc.sections
     )
     resolved_language = language or DEFAULT_LANGUAGE
     localized = LocalizedReportDocument(
@@ -285,13 +290,14 @@ def localize_document(doc: ReportDocument, language: str | None = None) -> Local
         stakeholder_lens_caption=resolve_value("report.stakeholder.lens", language),
         executive_summary_title=resolve_value("report.summary.title", language),
         manual_note_default_title=resolve_value("report.manual.default_title", language),
+        generated_by_caption=resolve_value("report.footer.generated_by", language),
+        section_error_prefix=resolve_value("report.error.section_prefix", language),
         disclosure=(
             resolve_value("report.disclosure.analysis_language", language)
             if resolved_language != DEFAULT_LANGUAGE
             else None
         ),
         sections=sections,
-        errors=errors,
         # Pass through unchanged: a manual note's title/content is analyst-
         # authored free text, never a catalog key candidate — see
         # document.ManualNote.

@@ -2020,8 +2020,13 @@ def assemble_report_document(
         db, domain_id, org_id, benchmark_profile_id, benchmark_org, stakeholder_profile
     )
 
+    # One list, not a sections list plus a separate errors list: a failed
+    # collector's SectionError lands here in its own request-order slot, the
+    # same position a successful SectionData for that section would have
+    # taken. Splitting successes and failures into two tuples would lose that
+    # interleaving — every error would render after every success regardless
+    # of request order, which is not what build() did before #292.
     doc_sections: list = [stakeholder_section]
-    errors: list = []
     exhibit_no = 0
 
     for sec in sections:
@@ -2046,7 +2051,7 @@ def assemble_report_document(
         except Exception as exc:
             # Per-section error boundary: one failing collector degrades its
             # own section, it does not take the report down.
-            errors.append(SectionError(
+            doc_sections.append(SectionError(
                 section_key=sec, title=f"report.section.{sec}", detail=str(exc)
             ))
 
@@ -2062,7 +2067,6 @@ def assemble_report_document(
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         stakeholder_label=stakeholder["label"],
         sections=tuple(doc_sections),
-        errors=tuple(errors),
         manual_notes=manual_notes,
     )
 
