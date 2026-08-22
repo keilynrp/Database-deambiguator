@@ -18,6 +18,8 @@ from sqlalchemy.orm import Session
 from backend import models
 from backend.auth import get_current_user, require_role
 from backend.database import get_db
+from backend.i18n.locale import language_dependency
+from backend.i18n.message_ref import resolve_plain_or_key
 from backend.tenant_access import persisted_org_id, resolve_request_org_id
 
 logger = logging.getLogger(__name__)
@@ -34,11 +36,15 @@ _SEED_CHUNK = 500
 _DEMO_BATCH_SOURCE_TYPE = "demo"
 _DEMO_BATCH_SOURCE_LABEL = "UKIP Demo Dataset"
 _DEMO_PORTAL_SLUG = "ukip-demo-catalog"
-_DEMO_PORTAL_TITLE = "Portal demo UKIP"
-_DEMO_PORTAL_DESCRIPTION = (
-    "Portal de descubrimiento generado automáticamente desde la demo UKIP "
-    "para explorar un corpus científico pregenerado."
-)
+# #269 — these used to be Spanish literals written straight into the row.
+# `CatalogPortal.title`/`.description` are plain string columns with no
+# params to carry, so the bounded fix is the simplest one available for that
+# shape: the value IS the catalog key, resolved at the read surface
+# (`catalogs._serialize_portal`) rather than rendered here at write time. A
+# legacy row's literal text still round-trips unchanged — see
+# `message_ref.resolve_plain_or_key`.
+_DEMO_PORTAL_TITLE = "dashboard.demo_portal.title"
+_DEMO_PORTAL_DESCRIPTION = "dashboard.demo_portal.description"
 
 _SHOWCASE_CLUSTERS = (
     {
@@ -164,7 +170,7 @@ def _demo_portal(db: Session) -> models.CatalogPortal | None:
     )
 
 
-def _demo_status_payload(db: Session) -> dict:
+def _demo_status_payload(db: Session, language: str) -> dict:
     count = _demo_count(db)
     portal = _demo_portal(db)
     return {
@@ -172,7 +178,7 @@ def _demo_status_payload(db: Session) -> dict:
         "demo_entity_count": count,
         "catalog_portal": (
             {
-                "title": portal.title,
+                "title": resolve_plain_or_key(portal.title, language),
                 "slug": portal.slug,
                 "url": f"/catalogs/{portal.slug}",
             }
@@ -313,8 +319,9 @@ def _create_demo_batch_and_portal(
 def demo_status(
     db: Session = Depends(get_db),
     _: models.User = Depends(get_current_user),
+    language: str = Depends(language_dependency),
 ):
-    return _demo_status_payload(db)
+    return _demo_status_payload(db, language)
 
 
 # ── POST /demo/seed ───────────────────────────────────────────────────────────
@@ -423,6 +430,7 @@ def _seed_from_enriched_records(
 def demo_seed(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin")),
+    language: str = Depends(language_dependency),
 ):
     """
     Seed demo data from live OpenAlex API (preferred) or bundled snapshot fallback.
@@ -447,7 +455,7 @@ def demo_seed(
             "seeded": seeded,
             "source": data_source,
             "message": f"Demo dataset loaded: {seeded} entities from live OpenAlex.",
-            "catalog_portal": {"title": portal.title, "slug": portal.slug, "url": f"/catalogs/{portal.slug}"},
+            "catalog_portal": {"title": resolve_plain_or_key(portal.title, language), "slug": portal.slug, "url": f"/catalogs/{portal.slug}"},
         }
     except Exception as exc:
         logger.info("Live OpenAlex unavailable (%s), trying snapshot fallback", exc)
@@ -461,7 +469,7 @@ def demo_seed(
             "seeded": seeded,
             "source": data_source,
             "message": f"Demo dataset loaded: {seeded} entities from bundled snapshot.",
-            "catalog_portal": {"title": portal.title, "slug": portal.slug, "url": f"/catalogs/{portal.slug}"},
+            "catalog_portal": {"title": resolve_plain_or_key(portal.title, language), "slug": portal.slug, "url": f"/catalogs/{portal.slug}"},
         }
     except Exception as exc:
         logger.info("Snapshot fallback unavailable (%s), trying legacy Excel", exc)
@@ -475,7 +483,7 @@ def demo_seed(
             "seeded": seeded,
             "source": data_source,
             "message": f"Demo dataset loaded: {seeded} curated scientific intelligence entities.",
-            "catalog_portal": {"title": portal.title, "slug": portal.slug, "url": f"/catalogs/{portal.slug}"},
+            "catalog_portal": {"title": resolve_plain_or_key(portal.title, language), "slug": portal.slug, "url": f"/catalogs/{portal.slug}"},
         }
 
     try:
@@ -509,7 +517,7 @@ def demo_seed(
         "seeded": seeded,
         "source": "legacy_excel",
         "message": f"Demo dataset loaded: {seeded} entities ready.",
-        "catalog_portal": {"title": portal.title, "slug": portal.slug, "url": f"/catalogs/{portal.slug}"},
+        "catalog_portal": {"title": resolve_plain_or_key(portal.title, language), "slug": portal.slug, "url": f"/catalogs/{portal.slug}"},
     }
 
 

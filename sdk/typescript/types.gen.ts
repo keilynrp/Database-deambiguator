@@ -8696,10 +8696,32 @@ export type GetBrandsResponses = {
 
 export type GetCatalogsData = {
     body?: never;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
+    };
     url: '/catalogs';
 };
+
+export type GetCatalogsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetCatalogsError = GetCatalogsErrors[keyof GetCatalogsErrors];
 
 export type GetCatalogsResponses = {
     /**
@@ -8714,8 +8736,21 @@ export type GetCatalogsResponse = GetCatalogsResponses[keyof GetCatalogsResponse
 
 export type PostCatalogsData = {
     body: CatalogPortalCreate;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
+    };
     url: '/catalogs';
 };
 
@@ -8801,13 +8836,26 @@ export type DeleteCatalogsBySlugResponse = DeleteCatalogsBySlugResponses[keyof D
 
 export type GetCatalogsBySlugData = {
     body?: never;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path: {
         /**
          * Slug
          */
         slug: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
+    };
     url: '/catalogs/{slug}';
 };
 
@@ -8831,13 +8879,26 @@ export type GetCatalogsBySlugResponse = GetCatalogsBySlugResponses[keyof GetCata
 
 export type PutCatalogsBySlugData = {
     body: CatalogPortalUpdate;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path: {
         /**
          * Slug
          */
         slug: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
+    };
     url: '/catalogs/{slug}';
 };
 
@@ -8861,6 +8922,12 @@ export type PutCatalogsBySlugResponse = PutCatalogsBySlugResponses[keyof PutCata
 
 export type GetCatalogsBySlugRecordsByEntityIdData = {
     body?: never;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path: {
         /**
          * Slug
@@ -8871,7 +8938,14 @@ export type GetCatalogsBySlugRecordsByEntityIdData = {
          */
         entity_id: number;
     };
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
+    };
     url: '/catalogs/{slug}/records/{entity_id}';
 };
 
@@ -8895,6 +8969,12 @@ export type GetCatalogsBySlugRecordsByEntityIdResponse = GetCatalogsBySlugRecord
 
 export type GetCatalogsBySlugResultsData = {
     body?: never;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path: {
         /**
          * Slug
@@ -8950,6 +9030,12 @@ export type GetCatalogsBySlugResultsData = {
          * Order
          */
         order?: string | null;
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
     };
     url: '/catalogs/{slug}/results';
 };
@@ -9760,10 +9846,32 @@ export type DeleteDemoResetResponses = {
 
 export type PostDemoSeedData = {
     body?: never;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
+    };
     url: '/demo/seed';
 };
+
+export type PostDemoSeedErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PostDemoSeedError = PostDemoSeedErrors[keyof PostDemoSeedErrors];
 
 export type PostDemoSeedResponses = {
     /**
@@ -9774,10 +9882,32 @@ export type PostDemoSeedResponses = {
 
 export type GetDemoStatusData = {
     body?: never;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
+    };
     url: '/demo/status';
 };
+
+export type GetDemoStatusErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetDemoStatusError = GetDemoStatusErrors[keyof GetDemoStatusErrors];
 
 export type GetDemoStatusResponses = {
     /**
@@ -10251,13 +10381,26 @@ export type PostEnrichProgressResponses = {
 
 export type PostEnrichRowByEntityIdData = {
     body?: never;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path: {
         /**
          * Entity Id
          */
         entity_id: number;
     };
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
+    };
     url: '/enrich/row/{entity_id}';
 };
 
@@ -10510,6 +10653,12 @@ export type GetEnrichmentSourcesStatsResponse = GetEnrichmentSourcesStatsRespons
 
 export type GetEntitiesData = {
     body?: never;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path?: never;
     query?: {
         /**
@@ -10572,6 +10721,12 @@ export type GetEntitiesData = {
          * Concept
          */
         concept?: string | null;
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
     };
     url: '/entities';
 };
@@ -10905,13 +11060,26 @@ export type DeleteEntitiesByEntityIdResponses = {
 
 export type GetEntitiesByEntityIdData = {
     body?: never;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path: {
         /**
          * Entity Id
          */
         entity_id: number;
     };
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
+    };
     url: '/entities/{entity_id}';
 };
 
@@ -10935,13 +11103,26 @@ export type GetEntitiesByEntityIdResponse = GetEntitiesByEntityIdResponses[keyof
 
 export type PutEntitiesByEntityIdData = {
     body: EntityBase;
+    headers?: {
+        /**
+         * Accept-Language
+         */
+        'accept-language'?: string | null;
+    };
     path: {
         /**
          * Entity Id
          */
         entity_id: number;
     };
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for catalog-sourced text (en, es). Falls back to Accept-Language, then English.
+         */
+        language?: string | null;
+    };
     url: '/entities/{entity_id}';
 };
 

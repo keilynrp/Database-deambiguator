@@ -28,6 +28,7 @@ import os
 
 from backend import database, models, schemas
 from backend.schemas import EnrichmentStatus
+from backend.i18n.locale import language_dependency
 from backend.services.entity_query import entity_base_q, count_total, count_enriched
 from backend.analyzers.external_attention import compute_attention_summary
 from backend.analytics.montecarlo import simulate_citation_impact
@@ -108,6 +109,7 @@ def get_entities(
     concept:              Optional[str] = Query(default=None, min_length=1),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
+    language: str = Depends(language_dependency),
 ):
     org_id = resolve_request_org_id(db, current_user)
     total, entities = EntityService.get_list(
@@ -130,6 +132,10 @@ def get_entities(
         org_id=org_id,
     )
     EntityService.attach_journal_metrics(db, entities, org_id)
+    for entity in entities:
+        entity.attributes_json = enrichment_worker.resolve_enrichment_failure_for_response(
+            entity.attributes_json, language
+        )
     response.headers["X-Total-Count"] = str(total)
     return entities
 
@@ -277,12 +283,16 @@ def get_entity(
     entity_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
+    language: str = Depends(language_dependency),
 ):
     org_id = resolve_request_org_id(db, current_user)
     entity = get_scoped_record(db, models.RawEntity, entity_id, org_id)
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
     EntityService.attach_journal_metrics(db, [entity], org_id)
+    entity.attributes_json = enrichment_worker.resolve_enrichment_failure_for_response(
+        entity.attributes_json, language
+    )
     return entity
 
 
@@ -320,6 +330,7 @@ def update_entity(
     payload: schemas.EntityBase = ...,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    language: str = Depends(language_dependency),
 ):
     org_id = resolve_request_org_id(db, current_user)
     entity = get_scoped_record(db, models.RawEntity, entity_id, org_id)
@@ -339,6 +350,9 @@ def update_entity(
     )
     db.commit()
     db.refresh(entity)
+    entity.attributes_json = enrichment_worker.resolve_enrichment_failure_for_response(
+        entity.attributes_json, language
+    )
     return entity
 
 
@@ -485,6 +499,7 @@ def enrich_single_entity(
     entity_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    language: str = Depends(language_dependency),
 ):
     """Enriches a single row manually (e.g. from a UI click)."""
     require_assistant_action(current_user, "entity-enrich-current")
@@ -493,6 +508,12 @@ def enrich_single_entity(
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
     enriched = enrichment_worker.enrich_single_record(db, entity)
+    # This request has a language (unlike the worker itself, which never
+    # picks one — see enrich_single_record); resolving the response here is
+    # the read boundary, not a locale choice the worker made.
+    enriched.attributes_json = enrichment_worker.resolve_enrichment_failure_for_response(
+        enriched.attributes_json, language
+    )
     return enriched
 
 

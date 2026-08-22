@@ -25,7 +25,12 @@ def _get_kwargs(
     ft_journal_metric_signal: None | str | Unset = UNSET,
     sort_by: None | str | Unset = UNSET,
     order: None | str | Unset = UNSET,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
+    if not isinstance(accept_language, Unset):
+        headers["accept-language"] = accept_language
 
     params: dict[str, Any] = {}
 
@@ -103,6 +108,13 @@ def _get_kwargs(
         json_order = order
     params["order"] = json_order
 
+    json_language: None | str | Unset
+    if isinstance(language, Unset):
+        json_language = UNSET
+    else:
+        json_language = language
+    params["language"] = json_language
+
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
@@ -113,6 +125,7 @@ def _get_kwargs(
         "params": params,
     }
 
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -161,6 +174,8 @@ def sync_detailed(
     ft_journal_metric_signal: None | str | Unset = UNSET,
     sort_by: None | str | Unset = UNSET,
     order: None | str | Unset = UNSET,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Response[Any | HTTPValidationError]:
     """Get Catalog Results
 
@@ -178,6 +193,9 @@ def sync_detailed(
         ft_journal_metric_signal (None | str | Unset):
         sort_by (None | str | Unset):
         order (None | str | Unset):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -201,6 +219,8 @@ def sync_detailed(
         ft_journal_metric_signal=ft_journal_metric_signal,
         sort_by=sort_by,
         order=order,
+        language=language,
+        accept_language=accept_language,
     )
 
     response = client.get_httpx_client().request(
@@ -226,6 +246,8 @@ def sync(
     ft_journal_metric_signal: None | str | Unset = UNSET,
     sort_by: None | str | Unset = UNSET,
     order: None | str | Unset = UNSET,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Any | HTTPValidationError | None:
     """Get Catalog Results
 
@@ -243,6 +265,9 @@ def sync(
         ft_journal_metric_signal (None | str | Unset):
         sort_by (None | str | Unset):
         order (None | str | Unset):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -267,6 +292,8 @@ def sync(
         ft_journal_metric_signal=ft_journal_metric_signal,
         sort_by=sort_by,
         order=order,
+        language=language,
+        accept_language=accept_language,
     ).parsed
 
 
@@ -286,6 +313,8 @@ async def asyncio_detailed(
     ft_journal_metric_signal: None | str | Unset = UNSET,
     sort_by: None | str | Unset = UNSET,
     order: None | str | Unset = UNSET,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Response[Any | HTTPValidationError]:
     """Get Catalog Results
 
@@ -303,6 +332,9 @@ async def asyncio_detailed(
         ft_journal_metric_signal (None | str | Unset):
         sort_by (None | str | Unset):
         order (None | str | Unset):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -326,6 +358,8 @@ async def asyncio_detailed(
         ft_journal_metric_signal=ft_journal_metric_signal,
         sort_by=sort_by,
         order=order,
+        language=language,
+        accept_language=accept_language,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -349,6 +383,8 @@ async def asyncio(
     ft_journal_metric_signal: None | str | Unset = UNSET,
     sort_by: None | str | Unset = UNSET,
     order: None | str | Unset = UNSET,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Any | HTTPValidationError | None:
     """Get Catalog Results
 
@@ -366,6 +402,9 @@ async def asyncio(
         ft_journal_metric_signal (None | str | Unset):
         sort_by (None | str | Unset):
         order (None | str | Unset):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -391,5 +430,7 @@ async def asyncio(
             ft_journal_metric_signal=ft_journal_metric_signal,
             sort_by=sort_by,
             order=order,
+            language=language,
+            accept_language=accept_language,
         )
     ).parsed

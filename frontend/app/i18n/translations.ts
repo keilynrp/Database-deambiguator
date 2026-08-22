@@ -2,6 +2,24 @@ export type Language = 'en' | 'es';
 
 export const translations = {
     en: {
+        // Backend: persisted localized messages (issue 269) — resolved at
+        // read time from a stored key + params, never rendered at write
+        // time. See backend/i18n/message_ref.py.
+        "validation.enrichment_failure.evidence.missing_title": "The record has no title or primary label to search external sources with.",
+        "validation.enrichment_failure.evidence.no_provider_match": "No matches were found for '{query}' in the available enrichment sources.",
+        "validation.enrichment_failure.evidence.data_error": "Data error during enrichment: {error}",
+        "validation.enrichment_failure.evidence.unexpected_error": "Unexpected error during enrichment: {error_type}: {error}",
+        "validation.enrichment_failure.recommendation.missing_title.0": "Complete the title or primary label before retrying.",
+        "validation.enrichment_failure.recommendation.missing_title.1": "Include a stable identifier such as a DOI if available.",
+        "validation.enrichment_failure.recommendation.no_provider_match.0": "Check that the title has no abbreviations, leftover HTML, or typos.",
+        "validation.enrichment_failure.recommendation.no_provider_match.1": "Add or correct the DOI to increase the chance of a match.",
+        "validation.enrichment_failure.recommendation.no_provider_match.2": "Enable an additional enrichment source if the record is not covered by OpenAlex.",
+        "validation.enrichment_failure.recommendation.data_error.0": "Review the record's DOI, title, authors, and base metadata.",
+        "validation.enrichment_failure.recommendation.data_error.1": "Retry enrichment after correcting the incomplete or inconsistent fields.",
+        "validation.enrichment_failure.recommendation.unexpected_error.0": "Retry enrichment; if it recurs, check the backend logs.",
+        "validation.enrichment_failure.recommendation.unexpected_error.1": "Verify connectivity and configuration of the active external sources.",
+        "dashboard.demo_portal.title": "UKIP Demo Portal",
+        "dashboard.demo_portal.description": "Discovery portal generated automatically from the UKIP demo to explore a pre-generated scientific corpus.",
         // Backend: final report sections (issue 268)
         "report.method.stakeholder": "An interpretive framing of figures reported elsewhere in this brief, written for a chosen audience — it introduces no new data. The stance it takes follows the benchmark status, so a change of audience changes the emphasis but not the underlying numbers.",
         "report.takeaway.entity_stats": "Validation: {valid} of {total} ({pct}%); {pending} unresolved",
@@ -3872,6 +3890,24 @@ export const translations = {
         'dashboard_showcase.high_severity': 'High',
     },
     es: {
+        // Backend: persisted localized messages (issue 269) — resolved at
+        // read time from a stored key + params, never rendered at write
+        // time. See backend/i18n/message_ref.py.
+        "validation.enrichment_failure.evidence.missing_title": "El registro no tiene título o etiqueta principal para buscar en fuentes externas.",
+        "validation.enrichment_failure.evidence.no_provider_match": "No se encontraron coincidencias para '{query}' en las fuentes de enriquecimiento disponibles.",
+        "validation.enrichment_failure.evidence.data_error": "Error de datos durante el enriquecimiento: {error}",
+        "validation.enrichment_failure.evidence.unexpected_error": "Error inesperado durante el enriquecimiento: {error_type}: {error}",
+        "validation.enrichment_failure.recommendation.missing_title.0": "Complete el título o etiqueta principal antes de reintentar.",
+        "validation.enrichment_failure.recommendation.missing_title.1": "Incluya un identificador estable como DOI si está disponible.",
+        "validation.enrichment_failure.recommendation.no_provider_match.0": "Revise que el título no tenga abreviaturas, HTML residual o errores tipográficos.",
+        "validation.enrichment_failure.recommendation.no_provider_match.1": "Agregue o corrija el DOI para aumentar la probabilidad de coincidencia.",
+        "validation.enrichment_failure.recommendation.no_provider_match.2": "Active una fuente adicional de enriquecimiento si el registro no está cubierto por OpenAlex.",
+        "validation.enrichment_failure.recommendation.data_error.0": "Revise DOI, título, autores y metadatos base del registro.",
+        "validation.enrichment_failure.recommendation.data_error.1": "Reintente el enriquecimiento después de corregir los campos incompletos o inconsistentes.",
+        "validation.enrichment_failure.recommendation.unexpected_error.0": "Reintente el enriquecimiento; si se repite, revise los logs del backend.",
+        "validation.enrichment_failure.recommendation.unexpected_error.1": "Verifique conectividad y configuración de las fuentes externas activas.",
+        "dashboard.demo_portal.title": "Portal demo UKIP",
+        "dashboard.demo_portal.description": "Portal de descubrimiento generado automáticamente desde la demo UKIP para explorar un corpus científico pregenerado.",
         // Backend: final report sections (issue 268)
         "report.method.stakeholder": "Un encuadre interpretativo de cifras reportadas en otras partes de este informe, escrito para una audiencia elegida — no introduce datos nuevos. La postura que toma sigue el estado de la comparativa, así que cambiar de audiencia cambia el énfasis pero no los números de base.",
         "report.takeaway.entity_stats": "Validación: {valid} de {total} ({pct}%); {pending} sin resolver",

@@ -9,21 +9,37 @@ from ...client import AuthenticatedClient, Client
 from ...models.catalog_portal_response import CatalogPortalResponse
 from ...models.catalog_portal_update import CatalogPortalUpdate
 from ...models.http_validation_error import HTTPValidationError
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     slug: str,
     *,
     body: CatalogPortalUpdate,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+    if not isinstance(accept_language, Unset):
+        headers["accept-language"] = accept_language
+
+    params: dict[str, Any] = {}
+
+    json_language: None | str | Unset
+    if isinstance(language, Unset):
+        json_language = UNSET
+    else:
+        json_language = language
+    params["language"] = json_language
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "put",
         "url": "/catalogs/{slug}".format(
             slug=quote(str(slug), safe=""),
         ),
+        "params": params,
     }
 
     _kwargs["json"] = body.to_dict()
@@ -69,11 +85,16 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: CatalogPortalUpdate,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Response[CatalogPortalResponse | HTTPValidationError]:
     """Update Catalog Portal
 
     Args:
         slug (str):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
         body (CatalogPortalUpdate):
 
     Raises:
@@ -87,6 +108,8 @@ def sync_detailed(
     kwargs = _get_kwargs(
         slug=slug,
         body=body,
+        language=language,
+        accept_language=accept_language,
     )
 
     response = client.get_httpx_client().request(
@@ -101,11 +124,16 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: CatalogPortalUpdate,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> CatalogPortalResponse | HTTPValidationError | None:
     """Update Catalog Portal
 
     Args:
         slug (str):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
         body (CatalogPortalUpdate):
 
     Raises:
@@ -120,6 +148,8 @@ def sync(
         slug=slug,
         client=client,
         body=body,
+        language=language,
+        accept_language=accept_language,
     ).parsed
 
 
@@ -128,11 +158,16 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: CatalogPortalUpdate,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Response[CatalogPortalResponse | HTTPValidationError]:
     """Update Catalog Portal
 
     Args:
         slug (str):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
         body (CatalogPortalUpdate):
 
     Raises:
@@ -146,6 +181,8 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         slug=slug,
         body=body,
+        language=language,
+        accept_language=accept_language,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -158,11 +195,16 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: CatalogPortalUpdate,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> CatalogPortalResponse | HTTPValidationError | None:
     """Update Catalog Portal
 
     Args:
         slug (str):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
         body (CatalogPortalUpdate):
 
     Raises:
@@ -178,5 +220,7 @@ async def asyncio(
             slug=slug,
             client=client,
             body=body,
+            language=language,
+            accept_language=accept_language,
         )
     ).parsed
