@@ -126,14 +126,67 @@ def generate_pptx(
     _add_text_box(slide, footer_text, Inches(1), Inches(6.8), Inches(11), Inches(0.4),
                   font_size=10, color=RGBColor(150, 150, 150))
 
+    # ── #292: assemble + localize the migrated sections once, ahead of both
+    # the manual-notes loop (which needs the shared default title) and the
+    # slide loop below (which needs the localized payloads). This exporter
+    # renders a subset of sections, in its own order, alongside hand-built
+    # cover/closing slides that stay out of scope (pre-existing, never
+    # localized) — so rather than report_builder.assemble_report_document()
+    # (every canonical section, numbered, plus a stakeholder reading this
+    # format never renders), it builds its own small `ReportDocument` from
+    # just the sections it uses.
+    from dataclasses import replace as _replace
+
+    from backend import report_builder
+    from backend.i18n.locale import resolve_report_language
+    from backend.reporting.document import ReportDocument
+    from backend.reporting.localize import localize_document
+    from backend.reporting.pptx_renderer import render_pptx
+
+    language = resolve_report_language(language)
+    migrated_collectors = {
+        "entity_stats": report_builder.collect_entity_stats,
+        "enrichment_coverage": report_builder.collect_enrichment_coverage,
+        "top_secondary_labels": report_builder.collect_top_secondary_labels,
+        "impact_projection": report_builder.collect_impact_projection,
+        "institutional_benchmark": report_builder.collect_institutional_benchmark,
+        "hidden_patterns": report_builder.collect_hidden_patterns,
+        "decision_recommendations": report_builder.collect_decision_recommendations,
+        "harmonization_log": report_builder.collect_harmonization_log,
+        "authority_control": report_builder.collect_authority_control,
+        "collaboration_graph": report_builder.collect_collaboration_graph,
+        "journal_portfolio": report_builder.collect_journal_portfolio,
+        "topic_clusters": report_builder.collect_topic_clusters,
+    }
+    doc_sections = [
+        # A slide heading has no length limit, so it takes the full section
+        # title rather than Excel's abbreviated sheet name. A bare key, not
+        # translate()'d here — it resolves with everything else below.
+        _replace(collect(db, domain_id, org_id), title=f"report.section.{section_id}")
+        for section_id, collect in migrated_collectors.items()
+        if section_id in sections
+    ]
+    localized = localize_document(
+        ReportDocument(
+            domain_id=domain_id,
+            domain_name=domain_id,
+            title=report_title,
+            generated_at="",
+            stakeholder_label="",
+            sections=tuple(doc_sections),
+        ),
+        language,
+    )
+    sections_by_key = {s.key: s for s in localized.sections}
+
     for manual in manual_sections or []:
-        manual_title = (manual.get("title") or "Analyst Note").strip()[:120]
+        manual_title = (manual.get("title") or localized.manual_note_default_title).strip()[:120]
         manual_content = (manual.get("content") or "").strip()
         if not manual_content:
             continue
         slide = _add_slide(prs)
         _add_header_bar(slide, accent, W)
-        _add_text_box(slide, manual_title or "Analyst Note", Inches(0.5), Inches(0.05), Inches(10), Inches(0.45),
+        _add_text_box(slide, manual_title or localized.manual_note_default_title, Inches(0.5), Inches(0.05), Inches(10), Inches(0.45),
                       font_size=16, bold=True, color=RGBColor(255, 255, 255))
         _add_text_box(slide, manual_content[:1800], Inches(0.75), Inches(0.9), Inches(11.8), Inches(5.6),
                       font_size=15, color=RGBColor(45, 55, 72))
@@ -152,43 +205,16 @@ def generate_pptx(
     # It is now in the migrated map below, so all four formats render the same
     # rows from one payload.
 
-    # ── Migrated sections: rendered from the shared section payload ───────────
+    # ── Migrated sections: rendered from the shared, localized payload ────────
     # These render via the format-neutral collectors + the shared PPTX renderer,
     # so the section is authored once and appears here without a bespoke slide
     # builder. (unify-report-format-coverage phase 3.) The hand-written slides
     # above are left in place for now; de-duping them onto their collectors is
-    # deferred to the cleanup phase. `sections` is already canonicalized above.
-    from dataclasses import replace as _replace
-
-    from backend import report_builder
-    from backend.i18n.catalog import translate
-    from backend.i18n.locale import resolve_report_language
-    from backend.reporting.pptx_renderer import render_pptx
-
-    language = resolve_report_language(language)
-    migrated_collectors = {
-        "entity_stats": report_builder.collect_entity_stats,
-        "enrichment_coverage": report_builder.collect_enrichment_coverage,
-        "top_secondary_labels": report_builder.collect_top_secondary_labels,
-        "impact_projection": report_builder.collect_impact_projection,
-        "institutional_benchmark": report_builder.collect_institutional_benchmark,
-        "hidden_patterns": report_builder.collect_hidden_patterns,
-        "decision_recommendations": report_builder.collect_decision_recommendations,
-        "harmonization_log": report_builder.collect_harmonization_log,
-        "authority_control": report_builder.collect_authority_control,
-        "collaboration_graph": report_builder.collect_collaboration_graph,
-        "journal_portfolio": report_builder.collect_journal_portfolio,
-        "topic_clusters": report_builder.collect_topic_clusters,
-    }
-    for section_id, collect in migrated_collectors.items():
-        if section_id in sections:
-            # A slide heading has no length limit, so it takes the full title
-            # rather than Excel's abbreviated sheet name.
-            payload = _replace(
-                collect(db, domain_id, org_id),
-                title=translate(f"report.section.{section_id}", language),
-            )
-            render_pptx(payload, prs, accent, language)
+    # deferred to the cleanup phase. Assembled and localized once, above.
+    for section_id in migrated_collectors:
+        section = sections_by_key.get(section_id)
+        if section is not None:
+            render_pptx(section, prs, accent)
 
     # ── Final slide: Closing ──────────────────────────────────────────────────
     slide = _add_slide(prs)

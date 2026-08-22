@@ -3346,6 +3346,7 @@
   "report.stat.trace.sub.across_answers": "across those answers",
   "report.status.below_threshold": "Below threshold",
   "report.status.passed": "Passed",
+  "report.summary.title": "Executive Summary",
   "report.takeaway.authority": "Authority records: {confirmed} of {total} confirmed; {pending} awaiting review (mean confidence {confidence}%)",
   "report.takeaway.authority.empty": "No authority records exist for this workspace; identity resolution has not been run over it. This is not a finding of zero conflicts.",
   "report.takeaway.benchmark.one": "Benchmark readiness {readiness}% — {passed} of {count} rule passes; status \"{status}\"",

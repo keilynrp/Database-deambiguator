@@ -3346,6 +3346,7 @@
   "report.stat.trace.sub.across_answers": "en esas respuestas",
   "report.status.below_threshold": "Bajo el umbral",
   "report.status.passed": "Cumple",
+  "report.summary.title": "Resumen Ejecutivo",
   "report.takeaway.authority": "Registros de autoridad: {confirmed} de {total} confirmados; {pending} esperando revisión (confianza promedio {confidence}%)",
   "report.takeaway.authority.empty": "No existen registros de autoridad en este espacio de trabajo; no se ejecutó resolución de identidad sobre él. Esto no es un hallazgo de cero conflictos.",
   "report.takeaway.benchmark.one": "Preparación de la comparativa {readiness}% — {passed} de {count} regla cumple; estado \"{status}\"",

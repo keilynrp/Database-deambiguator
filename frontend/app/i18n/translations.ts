@@ -276,6 +276,11 @@ export const translations = {
         "report.section.collaboration_graph": "Collaboration Graph",
         "report.section.journal_portfolio": "Journal Portfolio",
         "report.disclosure.analysis_language": "This report translates section titles and the text this system authors. Structural headings, metric labels, empty-state messages, generated analysis prose, and names supplied by external providers (concepts, journal titles, author and institution names) remain in English.",
+        // #292: the executive summary heading was a hardcoded English literal
+        // in report_builder.py, invisible to the render-boundary guard because
+        // it was never a catalog key to begin with — see docs on
+        // LocalizedReportDocument.executive_summary_title.
+        "report.summary.title": "Executive Summary",
         // Backend: outbound email (phase 7)
         "email.password_reset.subject": "{platform}: reset your password",
         "email.password_reset.body": "We received a request to reset your password.\n\nUse this link to create a new one:\n{link}\n\nThe link expires in 30 minutes. If you did not ask for this, you can ignore this message.",
@@ -4134,6 +4139,7 @@ export const translations = {
         "report.section.collaboration_graph": "Grafo de Colaboración",
         "report.section.journal_portfolio": "Portafolio de Revistas",
         "report.disclosure.analysis_language": "Este informe traduce los títulos de sección y el texto que este sistema redacta. Los encabezados estructurales, las etiquetas de métricas, los mensajes de estado vacío, la prosa de análisis generada y los nombres provistos por fuentes externas (conceptos, títulos de revistas, nombres de autores e instituciones) permanecen en inglés.",
+        "report.summary.title": "Resumen Ejecutivo",
         // Backend: outbound email (phase 7)
         "email.password_reset.subject": "{platform}: recupera tu contraseña",
         "email.password_reset.body": "Recibimos una solicitud para recuperar tu contraseña.\n\nUsa este enlace para crear una nueva contraseña:\n{link}\n\nEste enlace vence en 30 minutos. Si no solicitaste este cambio, puedes ignorar este correo.",
