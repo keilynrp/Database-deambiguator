@@ -8,20 +8,39 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.entity import Entity
 from ...models.http_validation_error import HTTPValidationError
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     entity_id: int,
+    *,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
+    if not isinstance(accept_language, Unset):
+        headers["accept-language"] = accept_language
+
+    params: dict[str, Any] = {}
+
+    json_language: None | str | Unset
+    if isinstance(language, Unset):
+        json_language = UNSET
+    else:
+        json_language = language
+    params["language"] = json_language
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/enrich/row/{entity_id}".format(
             entity_id=quote(str(entity_id), safe=""),
         ),
+        "params": params,
     }
 
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -59,6 +78,8 @@ def sync_detailed(
     entity_id: int,
     *,
     client: AuthenticatedClient,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Response[Entity | HTTPValidationError]:
     """Enrich Single Entity
 
@@ -66,6 +87,9 @@ def sync_detailed(
 
     Args:
         entity_id (int):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -77,6 +101,8 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         entity_id=entity_id,
+        language=language,
+        accept_language=accept_language,
     )
 
     response = client.get_httpx_client().request(
@@ -90,6 +116,8 @@ def sync(
     entity_id: int,
     *,
     client: AuthenticatedClient,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Entity | HTTPValidationError | None:
     """Enrich Single Entity
 
@@ -97,6 +125,9 @@ def sync(
 
     Args:
         entity_id (int):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -109,6 +140,8 @@ def sync(
     return sync_detailed(
         entity_id=entity_id,
         client=client,
+        language=language,
+        accept_language=accept_language,
     ).parsed
 
 
@@ -116,6 +149,8 @@ async def asyncio_detailed(
     entity_id: int,
     *,
     client: AuthenticatedClient,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Response[Entity | HTTPValidationError]:
     """Enrich Single Entity
 
@@ -123,6 +158,9 @@ async def asyncio_detailed(
 
     Args:
         entity_id (int):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -134,6 +172,8 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         entity_id=entity_id,
+        language=language,
+        accept_language=accept_language,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -145,6 +185,8 @@ async def asyncio(
     entity_id: int,
     *,
     client: AuthenticatedClient,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Entity | HTTPValidationError | None:
     """Enrich Single Entity
 
@@ -152,6 +194,9 @@ async def asyncio(
 
     Args:
         entity_id (int):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -165,5 +210,7 @@ async def asyncio(
         await asyncio_detailed(
             entity_id=entity_id,
             client=client,
+            language=language,
+            accept_language=accept_language,
         )
     ).parsed

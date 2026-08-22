@@ -27,7 +27,12 @@ def _get_kwargs(
     ft_work_type: None | str | Unset = UNSET,
     ft_journal_metric_signal: None | str | Unset = UNSET,
     concept: None | str | Unset = UNSET,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
+    if not isinstance(accept_language, Unset):
+        headers["accept-language"] = accept_language
 
     params: dict[str, Any] = {}
 
@@ -101,6 +106,13 @@ def _get_kwargs(
         json_concept = concept
     params["concept"] = json_concept
 
+    json_language: None | str | Unset
+    if isinstance(language, Unset):
+        json_language = UNSET
+    else:
+        json_language = language
+    params["language"] = json_language
+
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
@@ -109,6 +121,7 @@ def _get_kwargs(
         "params": params,
     }
 
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -165,6 +178,8 @@ def sync_detailed(
     ft_work_type: None | str | Unset = UNSET,
     ft_journal_metric_signal: None | str | Unset = UNSET,
     concept: None | str | Unset = UNSET,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Response[HTTPValidationError | list[Entity]]:
     """Get Entities
 
@@ -184,6 +199,9 @@ def sync_detailed(
         ft_work_type (None | str | Unset):
         ft_journal_metric_signal (None | str | Unset):
         concept (None | str | Unset):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -209,6 +227,8 @@ def sync_detailed(
         ft_work_type=ft_work_type,
         ft_journal_metric_signal=ft_journal_metric_signal,
         concept=concept,
+        language=language,
+        accept_language=accept_language,
     )
 
     response = client.get_httpx_client().request(
@@ -236,6 +256,8 @@ def sync(
     ft_work_type: None | str | Unset = UNSET,
     ft_journal_metric_signal: None | str | Unset = UNSET,
     concept: None | str | Unset = UNSET,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> HTTPValidationError | list[Entity] | None:
     """Get Entities
 
@@ -255,6 +277,9 @@ def sync(
         ft_work_type (None | str | Unset):
         ft_journal_metric_signal (None | str | Unset):
         concept (None | str | Unset):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -281,6 +306,8 @@ def sync(
         ft_work_type=ft_work_type,
         ft_journal_metric_signal=ft_journal_metric_signal,
         concept=concept,
+        language=language,
+        accept_language=accept_language,
     ).parsed
 
 
@@ -302,6 +329,8 @@ async def asyncio_detailed(
     ft_work_type: None | str | Unset = UNSET,
     ft_journal_metric_signal: None | str | Unset = UNSET,
     concept: None | str | Unset = UNSET,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> Response[HTTPValidationError | list[Entity]]:
     """Get Entities
 
@@ -321,6 +350,9 @@ async def asyncio_detailed(
         ft_work_type (None | str | Unset):
         ft_journal_metric_signal (None | str | Unset):
         concept (None | str | Unset):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -346,6 +378,8 @@ async def asyncio_detailed(
         ft_work_type=ft_work_type,
         ft_journal_metric_signal=ft_journal_metric_signal,
         concept=concept,
+        language=language,
+        accept_language=accept_language,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -371,6 +405,8 @@ async def asyncio(
     ft_work_type: None | str | Unset = UNSET,
     ft_journal_metric_signal: None | str | Unset = UNSET,
     concept: None | str | Unset = UNSET,
+    language: None | str | Unset = UNSET,
+    accept_language: None | str | Unset = UNSET,
 ) -> HTTPValidationError | list[Entity] | None:
     """Get Entities
 
@@ -390,6 +426,9 @@ async def asyncio(
         ft_work_type (None | str | Unset):
         ft_journal_metric_signal (None | str | Unset):
         concept (None | str | Unset):
+        language (None | str | Unset): Language for catalog-sourced text (en, es). Falls back to
+            Accept-Language, then English.
+        accept_language (None | str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -417,5 +456,7 @@ async def asyncio(
             ft_work_type=ft_work_type,
             ft_journal_metric_signal=ft_journal_metric_signal,
             concept=concept,
+            language=language,
+            accept_language=accept_language,
         )
     ).parsed
