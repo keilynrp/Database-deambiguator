@@ -20,6 +20,7 @@ from backend.circuit_breaker import CircuitBreaker, CircuitOpenError
 from backend.tenant_access import LEGACY_GLOBAL_ORG_ID, scope_query_to_org
 from backend.domain_scope import parse_scope, resolve_domain_filter
 from backend.notifications.emit import emit_outbound
+from backend.i18n.message_ref import make_message_ref, resolve_message, resolve_message_list
 
 logger = logging.getLogger(__name__)
 
@@ -168,33 +169,43 @@ class EnrichmentFailureReason:
 # crash will be reclaimed on the next startup.
 VALID_STATUSES = {s.value for s in EnrichmentStatus}
 
+#: #269 — these used to be Spanish literals, written straight into
+#: `attributes_json` regardless of who would eventually read them. A
+#: background worker has no request and so no language to render into; the
+#: fix is to stop rendering here at all; each entry is now a persisted
+#: reference (`make_message_ref`) resolved only when a reader asks for a
+#: language, at the API boundary that exposes `enrichment_failure`.
 _FAILURE_RECOMMENDATIONS = {
     "missing_title": [
-        "Complete el título o etiqueta principal antes de reintentar.",
-        "Incluya un identificador estable como DOI si está disponible.",
+        make_message_ref("validation.enrichment_failure.recommendation.missing_title.0"),
+        make_message_ref("validation.enrichment_failure.recommendation.missing_title.1"),
     ],
     "no_provider_match": [
-        "Revise que el título no tenga abreviaturas, HTML residual o errores tipográficos.",
-        "Agregue o corrija el DOI para aumentar la probabilidad de coincidencia.",
-        "Active una fuente adicional de enriquecimiento si el registro no está cubierto por OpenAlex.",
+        make_message_ref("validation.enrichment_failure.recommendation.no_provider_match.0"),
+        make_message_ref("validation.enrichment_failure.recommendation.no_provider_match.1"),
+        make_message_ref("validation.enrichment_failure.recommendation.no_provider_match.2"),
     ],
     "data_error": [
-        "Revise DOI, título, autores y metadatos base del registro.",
-        "Reintente el enriquecimiento después de corregir los campos incompletos o inconsistentes.",
+        make_message_ref("validation.enrichment_failure.recommendation.data_error.0"),
+        make_message_ref("validation.enrichment_failure.recommendation.data_error.1"),
     ],
     "unexpected_error": [
-        "Reintente el enriquecimiento; si se repite, revise los logs del backend.",
-        "Verifique conectividad y configuración de las fuentes externas activas.",
+        make_message_ref("validation.enrichment_failure.recommendation.unexpected_error.0"),
+        make_message_ref("validation.enrichment_failure.recommendation.unexpected_error.1"),
     ],
 }
 
 
-def _attrs(entity: models.RawEntity) -> dict:
+def _parse_attrs(raw: str | None) -> dict:
     try:
-        parsed = json.loads(entity.attributes_json or "{}")
+        parsed = json.loads(raw or "{}")
         return parsed if isinstance(parsed, dict) else {}
     except (TypeError, ValueError):
         return {}
+
+
+def _attrs(entity: models.RawEntity) -> dict:
+    return _parse_attrs(entity.attributes_json)
 
 
 def _clear_enrichment_failure(entity: models.RawEntity) -> None:
@@ -213,11 +224,16 @@ def _set_enrichment_failed(
     entity: models.RawEntity,
     *,
     code: str,
-    evidence: str,
+    evidence: dict | str,
     provider_attempts: list[str] | None = None,
     exception_type: str | None = None,
     failure_reason: str | None = None,
 ) -> None:
+    # `evidence` is a `make_message_ref()` dict for every call site in this
+    # module (#269) — `dict | str` stays in the signature only because a
+    # caller elsewhere could still be relied on to pass a legacy literal, and
+    # this function stores what it is given without judging it either way;
+    # resolving it into text is the response boundary's job, not this one's.
     attrs = _attrs(entity)
     attrs["enrichment_failure"] = {
         "code": code,
@@ -237,6 +253,45 @@ def _set_enrichment_failed(
     entity.enrichment_status = EnrichmentStatus.failed
     if failure_reason is not None:
         entity.enrichment_failure_reason = failure_reason
+
+
+def resolve_enrichment_failure_for_response(raw_attributes_json: str | None, language: str) -> str | None:
+    """Resolve `enrichment_failure.evidence`/`.recommendations` for one response.
+
+    The only place #269's persisted references become rendered text. Called
+    at each API surface that exposes `attributes_json`, after the request's
+    language is known — never inside the worker, which has none.
+
+    A fast path first: most entities carry no `enrichment_failure` at all, so
+    a substring check on the raw JSON avoids parsing every row in a list
+    response for the common case. A legacy row (`evidence`/`recommendations`
+    already rendered strings) round-trips byte-for-byte unchanged — nothing
+    in it looks like a ref, so nothing changes, and the original string is
+    returned rather than a re-serialized copy that could reorder keys.
+    """
+    if not raw_attributes_json or "enrichment_failure" not in raw_attributes_json:
+        return raw_attributes_json
+
+    attrs = _parse_attrs(raw_attributes_json)
+    failure = attrs.get("enrichment_failure")
+    if not isinstance(failure, dict):
+        return raw_attributes_json
+
+    changed = False
+    if "evidence" in failure:
+        resolved = resolve_message(failure["evidence"], language)
+        if resolved != failure["evidence"]:
+            failure["evidence"] = resolved
+            changed = True
+    if "recommendations" in failure:
+        resolved = resolve_message_list(failure["recommendations"], language)
+        if resolved != failure["recommendations"]:
+            failure["recommendations"] = resolved
+            changed = True
+
+    if not changed:
+        return raw_attributes_json
+    return json.dumps(attrs, ensure_ascii=False)
 
 
 def reset_stale_processing_records(db: Session) -> int:
@@ -608,7 +663,7 @@ def enrich_single_record(db: Session, entity: models.RawEntity) -> models.RawEnt
         _set_enrichment_failed(
             entity,
             code="missing_title",
-            evidence="El registro no tiene título o etiqueta principal para buscar en fuentes externas.",
+            evidence=make_message_ref("validation.enrichment_failure.evidence.missing_title"),
         )
         db.commit()
         _after_enrichment_commit(db, entity, previous_status=previous_status)
@@ -764,7 +819,12 @@ def enrich_single_record(db: Session, entity: models.RawEntity) -> models.RawEnt
                 _set_enrichment_failed(
                     entity,
                     code="no_provider_match",
-                    evidence=f"No se encontraron coincidencias para '{query}' en las fuentes de enriquecimiento disponibles.",
+                    # `query` is the record's own title — provider/user data,
+                    # a param the catalog sentence interpolates verbatim and
+                    # never a translation target itself.
+                    evidence=make_message_ref(
+                        "validation.enrichment_failure.evidence.no_provider_match", query=query
+                    ),
                     provider_attempts=provider_attempts,
                     failure_reason=_failure_reason,
                 )
@@ -775,7 +835,11 @@ def enrich_single_record(db: Session, entity: models.RawEntity) -> models.RawEnt
         _set_enrichment_failed(
             entity,
             code="data_error",
-            evidence=f"Error de datos durante el enriquecimiento: {e}",
+            # `error` is the exception's own message — diagnostic, not owned
+            # copy, carried as a param for the same reason `query` is above.
+            evidence=make_message_ref(
+                "validation.enrichment_failure.evidence.data_error", error=str(e)
+            ),
             provider_attempts=provider_attempts,
             exception_type=type(e).__name__,
             failure_reason=EnrichmentFailureReason.API_ERROR,
@@ -786,7 +850,11 @@ def enrich_single_record(db: Session, entity: models.RawEntity) -> models.RawEnt
         _set_enrichment_failed(
             entity,
             code="unexpected_error",
-            evidence=f"Error inesperado durante el enriquecimiento: {type(e).__name__}: {e}",
+            evidence=make_message_ref(
+                "validation.enrichment_failure.evidence.unexpected_error",
+                error_type=type(e).__name__,
+                error=str(e),
+            ),
             provider_attempts=provider_attempts,
             exception_type=type(e).__name__,
             failure_reason=EnrichmentFailureReason.ALL_SOURCES_FAILED,

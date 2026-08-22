@@ -18,9 +18,11 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Query as SAQuery, Session
 
-from backend import models, schemas
+from backend import enrichment_worker, models, schemas
 from backend.auth import get_current_user, get_current_user_optional, require_role
 from backend.database import get_db
+from backend.i18n.locale import language_dependency
+from backend.i18n.message_ref import resolve_plain_or_key
 from backend.schema_registry import registry
 from backend.services.entity_service import EntityService
 from backend.tenant_access import persisted_org_id, resolve_request_org_id, scope_query_to_org
@@ -96,15 +98,18 @@ def _portal_query_defaults(portal: models.CatalogPortal) -> dict[str, Any]:
     }
 
 
-def _serialize_portal(portal: models.CatalogPortal) -> dict[str, Any]:
+def _serialize_portal(portal: models.CatalogPortal, language: str) -> dict[str, Any]:
+    # #269 — a new portal's title/description is the catalog key itself
+    # (see routers/demo.py), resolved here at the read surface; a legacy
+    # row's literal text is not a key and passes through unchanged.
     defaults = _portal_query_defaults(portal)
     return {
         "id": portal.id,
         "org_id": portal.org_id,
         "source_batch_id": portal.source_batch_id,
-        "title": portal.title,
+        "title": resolve_plain_or_key(portal.title, language),
         "slug": portal.slug,
-        "description": portal.description,
+        "description": resolve_plain_or_key(portal.description, language),
         "domain_id": portal.domain_id,
         "visibility": portal.visibility,
         "source_label": portal.source_label,
@@ -316,6 +321,7 @@ def _portal_entity_query(
 def list_catalog_portals(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
+    language: str = Depends(language_dependency),
 ):
     org_id = resolve_request_org_id(db, current_user)
     portals = (
@@ -323,7 +329,7 @@ def list_catalog_portals(
         .order_by(models.CatalogPortal.created_at.desc(), models.CatalogPortal.id.desc())
         .all()
     )
-    return [_serialize_portal(portal) for portal in portals]
+    return [_serialize_portal(portal, language) for portal in portals]
 
 
 @router.get("/catalogs/import-candidates")
@@ -428,6 +434,7 @@ def create_catalog_portal(
     payload: schemas.CatalogPortalCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    language: str = Depends(language_dependency),
 ):
     org_id = resolve_request_org_id(db, current_user)
     _ensure_domain_exists(payload.domain_id)
@@ -476,7 +483,7 @@ def create_catalog_portal(
     db.add(portal)
     db.commit()
     db.refresh(portal)
-    return _serialize_portal(portal)
+    return _serialize_portal(portal, language)
 
 
 @router.get("/catalogs/{slug}", response_model=schemas.CatalogPortalSummaryResponse)
@@ -484,6 +491,7 @@ def get_catalog_portal(
     slug: str = Path(..., min_length=3),
     db: Session = Depends(get_db),
     current_user: models.User | None = Depends(get_current_user_optional),
+    language: str = Depends(language_dependency),
 ):
     portal, org_id = _resolve_portal_access(db, slug, current_user)
     defaults = _portal_query_defaults(portal)
@@ -503,7 +511,7 @@ def get_catalog_portal(
     avg_quality = query.with_entities(models.RawEntity.quality_score).all()
     quality_values = [row[0] for row in avg_quality if row[0] is not None]
 
-    data = _serialize_portal(portal)
+    data = _serialize_portal(portal, language)
     data["summary"] = {
         "total_records": total_records,
         "enriched_records": enriched_records,
@@ -519,6 +527,7 @@ def update_catalog_portal(
     slug: str = Path(..., min_length=3),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("super_admin", "admin", "editor")),
+    language: str = Depends(language_dependency),
 ):
     org_id = resolve_request_org_id(db, current_user)
     portal = _get_scoped_portal_or_404(db, slug, org_id)
@@ -559,7 +568,7 @@ def update_catalog_portal(
     portal.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(portal)
-    return _serialize_portal(portal)
+    return _serialize_portal(portal, language)
 
 
 @router.delete("/catalogs/{slug}", status_code=204)
@@ -592,6 +601,7 @@ def get_catalog_results(
     order: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: models.User | None = Depends(get_current_user_optional),
+    language: str = Depends(language_dependency),
 ):
     portal, org_id = _resolve_portal_access(db, slug, current_user)
     filters = _resolve_filters(
@@ -650,8 +660,13 @@ def get_catalog_results(
         org_id=org_id,
     )
 
+    for item in items:
+        item.attributes_json = enrichment_worker.resolve_enrichment_failure_for_response(
+            item.attributes_json, language
+        )
+
     return {
-        "portal": _serialize_portal(portal),
+        "portal": _serialize_portal(portal, language),
         "filters": {**filters, "domain_id": portal.domain_id},
         "total": total,
         "skip": skip,
@@ -667,6 +682,7 @@ def get_catalog_record(
     entity_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
     current_user: models.User | None = Depends(get_current_user_optional),
+    language: str = Depends(language_dependency),
 ):
     portal, org_id = _resolve_portal_access(db, slug, current_user)
     defaults = _portal_query_defaults(portal)
@@ -688,4 +704,7 @@ def get_catalog_record(
     if not record:
         raise HTTPException(status_code=404, detail="Catalog record not found")
     EntityService.attach_journal_metrics(db, [record], org_id)
+    record.attributes_json = enrichment_worker.resolve_enrichment_failure_for_response(
+        record.attributes_json, language
+    )
     return record

@@ -143,7 +143,11 @@ def test_enrich_marks_failed_when_all_adapters_return_nothing(db_session):
     failure = json.loads(result.attributes_json)["enrichment_failure"]
     assert failure["code"] == "no_provider_match"
     assert "openalex" in failure["provider_attempts"]
-    assert "Some Unknown Entity" in failure["evidence"]
+    # #269 — evidence is a persisted key+params reference, not rendered
+    # prose: the record's title travels as a param, resolved at read time.
+    assert failure["evidence"]["type"] == "i18n_ref"
+    assert failure["evidence"]["key"] == "validation.enrichment_failure.evidence.no_provider_match"
+    assert failure["evidence"]["params"]["query"] == "Some Unknown Entity"
 
 
 def test_enrich_skips_scholar_when_disabled(db_session):
