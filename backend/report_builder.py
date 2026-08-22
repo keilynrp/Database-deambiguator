@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import json
 import os
-from html import escape
 from datetime import datetime, timezone
 from typing import List, TypedDict
 
@@ -84,10 +83,16 @@ def _stakeholder_profile(profile_id: str | None) -> dict[str, str]:
     return _STAKEHOLDER_PROFILES.get(profile_id or "leadership", _STAKEHOLDER_PROFILES["leadership"])
 
 
-def _section_manual_note(title: str, content: str, language: str | None = None) -> str:
-    # Raw HTML, not SectionData, so localize_section never sees it: the default
-    # title has to be resolved here.
-    safe_title = escape(title.strip() or translate("report.manual.default_title", language))
+def _section_manual_note(title: str, content: str, default_title: str = "Analyst Note") -> str:
+    # A manual note's CONTENT is analyst-authored free text — provider data
+    # the system does not own, never a localization target. Only the default
+    # title (shown when the analyst left it blank) is owned copy; since #292
+    # it arrives pre-resolved from the localized document rather than this
+    # function calling translate() itself, which is why it is a parameter
+    # here rather than a catalog lookup.
+    from html import escape
+
+    safe_title = escape(title.strip() or default_title)
     paragraphs = [
         f"<p>{escape(part.strip())}</p>"
         for part in content.split("\n\n")
@@ -241,19 +246,19 @@ def _section_stakeholder_reading(
     benchmark_profile_id: str | None = None,
     benchmark_org: models.Organization | None = None,
     stakeholder_profile: str | None = None,
-    language: str | None = None,
 ) -> str:
-    # This section is assembled ahead of the collector loop, so it never passes
-    # the point where `build()` resolves a payload's language. Its copy moved to
-    # the catalog in #284 and still rendered English, because a key with no
-    # language resolves through the default rather than failing.
+    # Dead as a callable in build() since #292 — build() assembles this
+    # section into the document like any other and localizes it once, in the
+    # single localize_document() pass. Not in SECTION_BUILDERS (it is not a
+    # requestable section; build() always includes it) — this wrapper stays
+    # only so a direct caller gets the same rendering `build()` produces,
+    # matching the other twelve `_section_*` wrappers below.
     from backend.reporting.html_renderer import render_html
-    return render_html(
-        collect_stakeholder_reading(
-            db, domain_id, org_id, benchmark_profile_id, benchmark_org, stakeholder_profile
-        ),
-        language,
-    )
+    from backend.reporting.localize import localize_section
+    return render_html(localize_section(collect_stakeholder_reading(
+        db, domain_id, org_id, benchmark_profile_id, benchmark_org, stakeholder_profile
+    )))
+
 
 # ── CSS (inline, print-friendly) ─────────────────────────────────────────────
 
@@ -521,7 +526,8 @@ def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> "Se
 
 def _section_entity_stats(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    return render_html(collect_entity_stats(db, domain_id, org_id))
+    from backend.reporting.localize import localize_section
+    return render_html(localize_section(collect_entity_stats(db, domain_id, org_id)))
 
 
 def collect_enrichment_coverage(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
@@ -609,7 +615,8 @@ def collect_enrichment_coverage(db: Session, domain_id: str, org_id: int | None)
 
 def _section_enrichment_coverage(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    return render_html(collect_enrichment_coverage(db, domain_id, org_id))
+    from backend.reporting.localize import localize_section
+    return render_html(localize_section(collect_enrichment_coverage(db, domain_id, org_id)))
 
 
 def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
@@ -695,7 +702,8 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
 
 def _section_top_brands(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    return render_html(collect_top_secondary_labels(db, domain_id, org_id))
+    from backend.reporting.localize import localize_section
+    return render_html(localize_section(collect_top_secondary_labels(db, domain_id, org_id)))
 
 
 #: One limit, applied in the payload, because no renderer truncates — whatever
@@ -792,7 +800,8 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
 
 def _section_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    return render_html(collect_topic_clusters(db, domain_id, org_id))
+    from backend.reporting.localize import localize_section
+    return render_html(localize_section(collect_topic_clusters(db, domain_id, org_id)))
 
 
 def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
@@ -840,7 +849,8 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
 
 def _section_harmonization_log(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    return render_html(collect_harmonization_log(db, domain_id, org_id))
+    from backend.reporting.localize import localize_section
+    return render_html(localize_section(collect_harmonization_log(db, domain_id, org_id)))
 
 
 def collect_decision_recommendations(
@@ -917,7 +927,8 @@ def _section_decision_recommendations(
     benchmark_org: models.Organization | None = None,
 ) -> str:
     from backend.reporting.html_renderer import render_html
-    return render_html(collect_decision_recommendations(db, domain_id, org_id, benchmark_org))
+    from backend.reporting.localize import localize_section
+    return render_html(localize_section(collect_decision_recommendations(db, domain_id, org_id, benchmark_org)))
 
 
 def collect_impact_projection(
@@ -1009,7 +1020,8 @@ def _section_impact_projection(
     benchmark_org: models.Organization | None = None,
 ) -> str:
     from backend.reporting.html_renderer import render_html
-    return render_html(collect_impact_projection(db, domain_id, org_id, benchmark_org))
+    from backend.reporting.localize import localize_section
+    return render_html(localize_section(collect_impact_projection(db, domain_id, org_id, benchmark_org)))
 
 
 def collect_hidden_patterns(
@@ -1088,7 +1100,8 @@ def _section_hidden_patterns(
     benchmark_org: models.Organization | None = None,
 ) -> str:
     from backend.reporting.html_renderer import render_html
-    return render_html(collect_hidden_patterns(db, domain_id, org_id, benchmark_org))
+    from backend.reporting.localize import localize_section
+    return render_html(localize_section(collect_hidden_patterns(db, domain_id, org_id, benchmark_org)))
 
 
 def collect_institutional_benchmark(
@@ -1209,9 +1222,12 @@ def _section_institutional_benchmark(
     benchmark_org: models.Organization | None = None,
 ) -> str:
     from backend.reporting.html_renderer import render_html
+    from backend.reporting.localize import localize_section
     return render_html(
-        collect_institutional_benchmark(
-            db, domain_id, org_id, benchmark_profile_id, benchmark_org
+        localize_section(
+            collect_institutional_benchmark(
+                db, domain_id, org_id, benchmark_profile_id, benchmark_org
+            )
         )
     )
 
@@ -1325,7 +1341,8 @@ def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "S
 
 def _section_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    return render_html(collect_agentic_trace(db, domain_id, org_id))
+    from backend.reporting.localize import localize_section
+    return render_html(localize_section(collect_agentic_trace(db, domain_id, org_id)))
 
 
 # ── Authority / coauthorship / journals (extend-report-module-coverage) ──────
@@ -1528,7 +1545,8 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
 
 def _section_authority_control(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    return render_html(collect_authority_control(db, domain_id, org_id))
+    from backend.reporting.localize import localize_section
+    return render_html(localize_section(collect_authority_control(db, domain_id, org_id)))
 
 
 # How many top authors / bridges a brief lists. A reading, not a graph export.
@@ -1713,7 +1731,8 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
 
 def _section_collaboration_graph(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    return render_html(collect_collaboration_graph(db, domain_id, org_id))
+    from backend.reporting.localize import localize_section
+    return render_html(localize_section(collect_collaboration_graph(db, domain_id, org_id)))
 
 
 _JOURNAL_TOP_LIMIT = 12
@@ -1846,7 +1865,8 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
 
 def _section_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    return render_html(collect_journal_portfolio(db, domain_id, org_id))
+    from backend.reporting.localize import localize_section
+    return render_html(localize_section(collect_journal_portfolio(db, domain_id, org_id)))
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -1927,45 +1947,6 @@ def collect_section(
     return collect(db, domain_id, org_id)
 
 
-def _executive_summary(collected: list) -> str:
-    """Every collected section's takeaway, ordered by materiality.
-
-    Ordered, not filtered. A reader can see that a section was computed and had
-    nothing notable to say — which is itself information — while the findings
-    that matter lead. Non-material entries are de-emphasized rather than
-    dropped.
-
-    Ties break on exhibit order so the sequence is stable for a given
-    selection rather than depending on dict iteration.
-    """
-    from backend.reporting.section_data import Materiality
-
-    if not collected:
-        return ""
-
-    ranked = sorted(
-        collected,
-        key=lambda s: (-int(s.materiality), s.exhibit or 0),
-    )
-
-    items = []
-    for section in ranked:
-        muted = ' class="muted"' if section.materiality <= Materiality.ROUTINE else ""
-        items.append(
-            f"<li{muted}>"
-            f'<span class="ord">Exhibit {section.exhibit}</span>&nbsp;·&nbsp;'
-            f"{escape(section.takeaway)}"
-            f"</li>"
-        )
-
-    return (
-        "<section>"
-        "<h2>Executive Summary</h2>"
-        f'<ul class="summary-list">{"".join(items)}</ul>'
-        "</section>"
-    )
-
-
 SECTION_LABELS = {
     "entity_stats": "Entity Statistics",
     "enrichment_coverage": "Enrichment Coverage",
@@ -2002,6 +1983,94 @@ def canonical_sections(sections: list[str]) -> list[str]:
     return [SECTION_ALIASES.get(section, section) for section in sections]
 
 
+def assemble_report_document(
+    db: Session,
+    domain_id: str,
+    sections: List[str],
+    title: str | None = None,
+    org_id: int | None = None,
+    benchmark_profile_id: str | None = None,
+    benchmark_org: models.Organization | None = None,
+    stakeholder_profile: str | None = None,
+    manual_sections: List[ManualReportSection] | None = None,
+) -> "ReportDocument":
+    """Collect every section HTML/PDF renders into one semantic document.
+
+    Renderer-neutral and pre-localization — see
+    `backend.reporting.document.ReportDocument`. This is `build()`'s entire
+    former body minus the actual markup: the stakeholder reading and the
+    numbered, collector-driven sections all become `SectionData` entries
+    here (stakeholder reading did not before #292 — it rendered from its own
+    side channel, ahead of the point `build()` resolved a language, which is
+    the defect #268/#289 fixed at the symptom and #292 closes at the seam).
+    """
+    from dataclasses import replace as _replace
+
+    from backend.reporting.document import ManualNote, ReportDocument, SectionError
+
+    domain_name = domain_id
+    try:
+        d = registry.get_domain(domain_id)
+        domain_name = d.name if d else domain_id
+    except Exception:
+        pass
+
+    stakeholder = _stakeholder_profile(stakeholder_profile)
+    stakeholder_section = collect_stakeholder_reading(
+        db, domain_id, org_id, benchmark_profile_id, benchmark_org, stakeholder_profile
+    )
+
+    # One list, not a sections list plus a separate errors list: a failed
+    # collector's SectionError lands here in its own request-order slot, the
+    # same position a successful SectionData for that section would have
+    # taken. Splitting successes and failures into two tuples would lose that
+    # interleaving — every error would render after every success regardless
+    # of request order, which is not what build() did before #292.
+    doc_sections: list = [stakeholder_section]
+    exhibit_no = 0
+
+    for sec in sections:
+        if sec not in SECTION_COLLECTORS:
+            continue
+        try:
+            payload = collect_section(
+                db, sec, domain_id, org_id,
+                benchmark_profile_id=benchmark_profile_id,
+                benchmark_org=benchmark_org,
+            )
+            # Numbered only once a section has actually collected, so a
+            # section that errors below does not consume an ordinal and
+            # leave a gap in the sequence a reader would notice.
+            exhibit_no += 1
+            # A bare key, not translate()'d here: title resolves alongside
+            # every other field, once, in localize_document(). The section id
+            # is canonical and this is the one place every section passes
+            # through, so a new section cannot forget to.
+            payload = _replace(payload, exhibit=exhibit_no, title=f"report.section.{sec}")
+            doc_sections.append(payload)
+        except Exception as exc:
+            # Per-section error boundary: one failing collector degrades its
+            # own section, it does not take the report down.
+            doc_sections.append(SectionError(
+                section_key=sec, title=f"report.section.{sec}", detail=str(exc)
+            ))
+
+    manual_notes = tuple(
+        ManualNote(title=str(m.get("title") or ""), content=str(m.get("content") or ""))
+        for m in (manual_sections or [])
+    )
+
+    return ReportDocument(
+        domain_id=domain_id,
+        domain_name=domain_name,
+        title=title or with_params("report.cover.title", domain=domain_name),
+        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        stakeholder_label=stakeholder["label"],
+        sections=tuple(doc_sections),
+        manual_notes=manual_notes,
+    )
+
+
 def build(
     db: Session,
     domain_id: str,
@@ -2020,139 +2089,22 @@ def build(
     disclosure. Analysis prose and provider-supplied names stay English by
     decision, which is why a non-English report carries a disclosure saying so
     rather than leaving a reader to interpret the mixture as a defect.
+
+    Three steps, matching the target architecture (#292): assemble the
+    semantic document, localize it exactly once, hand the result — and
+    nothing else — to the HTML adapter.
     """
-    from backend.i18n import DEFAULT_LANGUAGE
-    from backend.i18n.catalog import translate
     from backend.i18n.locale import resolve_report_language
+    from backend.reporting.html_renderer import render_html_document
+    from backend.reporting.localize import localize_document
 
     # Reports never consult Accept-Language: resolve_report_language takes no
     # header argument, so the operator's browser cannot decide the language of
     # a document produced for someone else.
     language = resolve_report_language(language)
-    domain_name = domain_id
-    try:
-        d = registry.get_domain(domain_id)
-        domain_name = d.name if d else domain_id
-    except Exception:
-        pass
-
-    report_title = title or translate("report.cover.title", language, domain=domain_name)
-    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    stakeholder = _stakeholder_profile(stakeholder_profile)
-
-    logo_svg = """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
-    </svg>"""
-
-    cover = f"""<div class="cover">
-        <div class="logo">
-            <div class="logo-icon">{logo_svg}</div>
-            <span style="font-size:20px;font-weight:700;color:#111827">UKIP</span>
-        </div>
-        <h1>{report_title}</h1>
-        <p class="meta">{translate("report.cover.domain", language)}: <b>{domain_name}</b> &nbsp;·&nbsp; {translate("report.cover.generated", language)}: <b>{generated_at}</b></p>
-        <p class="meta" style="margin-top:8px">{translate("report.stakeholder.lens", language)}: <b>{translate(stakeholder["label"], language)}</b></p>
-    </div>"""
-
-    body_sections = [
-        _section_stakeholder_reading(
-            db,
-            domain_id,
-            org_id,
-            benchmark_profile_id=benchmark_profile_id,
-            benchmark_org=benchmark_org,
-            stakeholder_profile=stakeholder_profile,
-            language=language,
-        )
-    ]
-    for manual in manual_sections or []:
-        manual_html = _section_manual_note(
-            str(manual.get("title") or ""),
-            str(manual.get("content") or ""),
-            language,
-        )
-        if manual_html:
-            body_sections.append(manual_html)
-    # Assembly runs on the collectors, not the string builders. HTML/PDF was the
-    # last format still assembling from rendered markup, which is why exhibit
-    # ordinals and the executive summary could not be built: this function never
-    # held a SectionData to attach them to. Excel and PPTX already work this way.
-    #
-    # Output is intended to be byte-identical to the builder path — every
-    # `_section_*` was already a thin `render_html(collect_*(...))` wrapper, so
-    # this removes one level of indirection rather than changing what renders.
-    from dataclasses import replace as _replace
-
-    from backend.reporting.html_renderer import render_html
-
-    collected: list = []
-    exhibit_no = 0
-
-    for sec in sections:
-        if sec in SECTION_COLLECTORS:
-            try:
-                payload = collect_section(
-                    db, sec, domain_id, org_id,
-                    benchmark_profile_id=benchmark_profile_id,
-                    benchmark_org=benchmark_org,
-                )
-                # Numbered only once a section has actually collected, so a
-                # section that errors below does not consume an ordinal and
-                # leave a gap in the sequence a reader would notice.
-                exhibit_no += 1
-                # Titles are translated here rather than in each collector: the
-                # section id is canonical and this is the one place every
-                # section passes through, so a new section cannot forget to.
-                payload = _replace(
-                    payload,
-                    exhibit=exhibit_no,
-                    title=translate(f"report.section.{sec}", language),
-                )
-                # Resolve here, where the payload forks. Every renderer localizes
-                # what it is handed, but the executive summary is not a renderer:
-                # it reads `takeaway` off the collected payload directly, so a
-                # migrated takeaway reached it as a raw catalog key. Doing it once
-                # at the fork covers both consumers; localize_section is
-                # idempotent, so the renderers' own pass stays a no-op.
-                payload = localize_section(payload, language)
-                collected.append(payload)
-                body_sections.append(render_html(payload, language))
-            except Exception as exc:
-                # Per-section error boundary: one failing collector degrades its
-                # own section, it does not take the report down.
-                body_sections.append(f'<section><h2>{translate(f"report.section.{sec}", language)}</h2>'
-                                     f'<p style="color:#ef4444">Error building section: {exc}</p></section>')
-
-    # Built after the loop but placed before it: the summary states the findings
-    # and cannot know them until every section has been collected.
-    summary = _executive_summary(collected)
-    if summary:
-        body_sections.insert(0, summary)
-
-    # Task 8.5. Only a non-English artefact needs it: an English report has no
-    # mixture to explain. Placed first so a reader meets the limitation before
-    # the text it applies to, rather than discovering it as an apparent defect.
-    if language != DEFAULT_LANGUAGE:
-        body_sections.insert(
-            0,
-            '<section class="ukip-language-disclosure"><p>'
-            f'{translate("report.disclosure.analysis_language", language)}'
-            "</p></section>",
-        )
-
-    footer = f'<footer>Generated by UKIP &nbsp;·&nbsp; {generated_at}</footer>'
-
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{report_title}</title>
-  <style>{_CSS}</style>
-</head>
-<body>
-  {cover}
-  {"".join(body_sections)}
-  {footer}
-</body>
-</html>"""
+    doc = assemble_report_document(
+        db, domain_id, sections, title, org_id,
+        benchmark_profile_id, benchmark_org, stakeholder_profile, manual_sections,
+    )
+    localized = localize_document(doc, language)
+    return render_html_document(localized)

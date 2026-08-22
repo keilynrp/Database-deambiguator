@@ -106,12 +106,21 @@ class EnterpriseExcelExporter:
         # Each migrated section is one entry here — the strangler grows this map.
         # Requested sections are canonicalized so an alias (e.g. top_brands)
         # still resolves to its migrated collector.
+        #
+        # #292: this exporter renders a subset of the sections the localized
+        # document boundary carries, and in its own order — so rather than
+        # consuming report_builder.assemble_report_document() (which collects
+        # every canonical section, numbered, plus the stakeholder reading this
+        # format never renders), it assembles its own small `ReportDocument`
+        # from just the sections it uses and localizes it once. Every sheet
+        # writer below reads only the localized result; nothing here calls
+        # translate() or localize_section() itself.
         from dataclasses import replace as _replace
 
         from backend import report_builder
-        from backend.i18n.catalog import translate
-        from backend.reporting.localize import localize_section
         from backend.i18n.locale import resolve_report_language
+        from backend.reporting.document import ReportDocument
+        from backend.reporting.localize import localize_document
         from backend.reporting.excel_renderer import render_excel
 
         language = resolve_report_language(language)
@@ -129,23 +138,17 @@ class EnterpriseExcelExporter:
             "journal_portfolio": report_builder.collect_journal_portfolio,
             "topic_clusters": report_builder.collect_topic_clusters,
         }
-        collected: list[tuple[str, object]] = []
+        doc_sections = []
         for section_id, collect in migrated_collectors.items():
             if section_id in requested:
                 payload = collect(db, domain_id, org_id)
                 # Excel names the sheet from the payload title, and a sheet name
                 # is capped at 31 characters with several characters forbidden.
                 # `report.sheet.*` holds purpose-built short names so a tab reads
-                # as a word rather than as a mid-word truncation.
-                payload = _replace(
-                    payload, title=translate(f"report.sheet.{section_id}", language)
-                )
-                sheet = render_excel(payload, wb, language)
-                # render_excel localizes internally, but it returns the sheet, not the
-                # payload — and Methodology reads takeaway/method straight off
-                # what is collected here. Same seam as the HTML executive
-                # summary: resolve before collecting, or the sheet shows keys.
-                collected.append((sheet.title, localize_section(payload, language)))
+                # as a word rather than as a mid-word truncation. A bare key,
+                # not translate()'d here — it resolves with everything else in
+                # the single localize_document() pass below.
+                doc_sections.append(_replace(payload, title=f"report.sheet.{section_id}"))
 
         # ── Sheet 4: Harmonization Log ────────────────────────────────────────
         # Still a bespoke writer: its sheet carries columns the collector's payload
@@ -157,13 +160,34 @@ class EnterpriseExcelExporter:
         # collected for the Methodology sheet either way. Migrating the writer
         # itself remains open under report-format-parity.
         if "harmonization_log" in requested:
-            payload = report_builder.collect_harmonization_log(db, domain_id, org_id)
-            # Resolve before the fork: the bespoke writer puts the method in A2
-            # of its own sheet, and Methodology reads it again off `collected`.
-            payload = localize_section(payload, language)
+            doc_sections.append(report_builder.collect_harmonization_log(db, domain_id, org_id))
+
+        localized = localize_document(
+            ReportDocument(
+                domain_id=domain_id,
+                domain_name=domain_id,
+                title=domain_id,
+                generated_at="",
+                stakeholder_label="",
+                sections=tuple(doc_sections),
+            ),
+            language,
+        )
+        sections_by_key = {s.key: s for s in localized.sections}
+
+        collected: list[tuple[str, object]] = []
+        for section_id in migrated_collectors:
+            section = sections_by_key.get(section_id)
+            if section is None:
+                continue
+            sheet = render_excel(section, wb)
+            collected.append((sheet.title, section))
+
+        harmonization_section = sections_by_key.get("harmonization_log")
+        if harmonization_section is not None:
             ws_harm = wb.create_sheet("Harmonization")
-            self._write_harmonization(ws_harm, db, org_id, payload=payload)
-            collected.append((ws_harm.title, payload))
+            self._write_harmonization(ws_harm, db, org_id, payload=harmonization_section)
+            collected.append((ws_harm.title, harmonization_section))
 
         # Built after the section sheets and moved to the front — the same shape
         # as the HTML executive summary, and for the same reason: it states what
@@ -173,7 +197,7 @@ class EnterpriseExcelExporter:
 
         if manual_sections:
             ws_notes = wb.create_sheet("Analyst Notes")
-            self._write_manual_sections(ws_notes, manual_sections)
+            self._write_manual_sections(ws_notes, manual_sections, localized.manual_note_default_title)
 
         buf = BytesIO()
         wb.save(buf)
@@ -312,11 +336,13 @@ class EnterpriseExcelExporter:
         ws.column_dimensions["C"].width = 96
         wb.move_sheet(ws, offset=-(len(wb.sheetnames) - 2))
 
-    def _write_manual_sections(self, ws, manual_sections: list[dict[str, str]]) -> None:
+    def _write_manual_sections(
+        self, ws, manual_sections: list[dict[str, str]], default_title: str
+    ) -> None:
         headers = ["Section", "Analyst Text"]
         _style_header_row(ws, headers)
         for row_idx, section in enumerate(manual_sections, start=2):
-            ws.cell(row=row_idx, column=1, value=(section.get("title") or "Analyst Note")[:120])
+            ws.cell(row=row_idx, column=1, value=(section.get("title") or default_title)[:120])
             cell = ws.cell(row=row_idx, column=2, value=section.get("content") or "")
             cell.alignment = Alignment(wrap_text=True, vertical="top")
         ws.column_dimensions["A"].width = 28

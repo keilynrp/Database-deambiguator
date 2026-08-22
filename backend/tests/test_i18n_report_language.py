@@ -149,15 +149,18 @@ class TestTheStakeholderReadingFollowsTheLanguage:
 class TestTheTitlesComeFromTheCatalog:
     def test_output_follows_the_catalog(self, client, auth_headers, monkeypatch):
         sentinel = "SENTINEL-SECTION"
-        real_keys = [
-            key
-            for key in catalog_module._load_catalog.__wrapped__("en")
-            if key.startswith("report.section.")
-        ]
+        real = catalog_module._load_catalog.__wrapped__("en")
+        real_keys = [key for key in real if key.startswith("report.section.")]
         assert real_keys, "no report.section.* keys in the catalog"
-        monkeypatch.setattr(
-            catalog_module, "_load_catalog", lambda language: {k: sentinel for k in real_keys}
-        )
+        # Overlay the sentinel onto the real catalog rather than replacing it:
+        # since #292 every document-level scalar (cover captions, the
+        # stakeholder label, the executive summary title, ...) resolves
+        # through the same localize_document() pass as section titles, and a
+        # catalog missing those entirely would (correctly) trip the boundary's
+        # own unresolved-key guard. Only the keys this test cares about need
+        # to change.
+        patched = {**real, **{k: sentinel for k in real_keys}}
+        monkeypatch.setattr(catalog_module, "_load_catalog", lambda language: patched)
 
         html = _generate(client, auth_headers, language="en")
 
