@@ -276,10 +276,10 @@ export const translations = {
         "report.section.collaboration_graph": "Collaboration Graph",
         "report.section.journal_portfolio": "Journal Portfolio",
         "report.disclosure.analysis_language": "This report translates section titles and the text this system authors. Structural headings, metric labels, empty-state messages, generated analysis prose, and names supplied by external providers (concepts, journal titles, author and institution names) remain in English.",
-        // #292: the executive summary heading was a hardcoded English literal
-        // in report_builder.py, invisible to the render-boundary guard because
-        // it was never a catalog key to begin with — see docs on
-        // LocalizedReportDocument.executive_summary_title.
+        // Issue 292: the executive summary heading was a hardcoded English
+        // literal in report_builder.py, invisible to the render-boundary
+        // guard because it was never a catalog key to begin with — see docs
+        // on LocalizedReportDocument.executive_summary_title.
         "report.summary.title": "Executive Summary",
         // Backend: outbound email (phase 7)
         "email.password_reset.subject": "{platform}: reset your password",
