@@ -2,16 +2,28 @@
 
 **Universal Knowledge Intelligence Platform**
 
-![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
+<!-- BEGIN GENERATED REPOSITORY METRICS: badge-python-runtime -->
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+<!-- END GENERATED REPOSITORY METRICS: badge-python-runtime -->
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+<!-- BEGIN GENERATED REPOSITORY METRICS: badge-nextjs -->
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
+<!-- END GENERATED REPOSITORY METRICS: badge-nextjs -->
+<!-- BEGIN GENERATED REPOSITORY METRICS: badge-react -->
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111111)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+<!-- END GENERATED REPOSITORY METRICS: badge-react -->
+<!-- BEGIN GENERATED REPOSITORY METRICS: badge-typescript -->
+![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)
+<!-- END GENERATED REPOSITORY METRICS: badge-typescript -->
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
 ![Rust](https://img.shields.io/badge/Rust-gRPC_Engine-000000?logo=rust&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-3163_passing-28A745?logo=pytest&logoColor=white)
-![Routes](https://img.shields.io/badge/API_Routes-420-blue)
+<!-- BEGIN GENERATED REPOSITORY METRICS: badge-tests -->
+![Tests](https://img.shields.io/badge/Tests-3985_collected-28A745?logo=pytest&logoColor=white)
+<!-- END GENERATED REPOSITORY METRICS: badge-tests -->
+<!-- BEGIN GENERATED REPOSITORY METRICS: badge-api-operations -->
+![API Operations](https://img.shields.io/badge/API_Operations-420-blue)
+<!-- END GENERATED REPOSITORY METRICS: badge-api-operations -->
 
 UKIP is a research intelligence platform for ingesting, normalizing, enriching, reconciling, exploring, and reporting on knowledge datasets. It is built around a governed semantic canonical layer: source data is profiled, mapped into canonical entities, resolved against authority registries, enriched with evidence, and surfaced through dashboards, graph analytics, and executive reports.
 
@@ -66,7 +78,9 @@ backend/                 FastAPI API server
   cache/                 distributed cache layer: Redis backend + in-process fallback, fail-open
   domains/               3 configurable schemas: default, science, healthcare
   scripts/               maintenance + backfills (nif_bayes, work_type, retrospective) + job worker/scheduler entrypoints
-  tests/                 261 test files, 3170 tests
+<!-- BEGIN GENERATED REPOSITORY METRICS: tree-backend-tests -->
+  tests/                 311 test files, 3985 tests
+<!-- END GENERATED REPOSITORY METRICS: tree-backend-tests -->
 frontend/                Next.js 16 App Router
   app/                   65 pages, 90+ components, 8 context providers
   i18n/                  EN / ES localization
@@ -119,16 +133,22 @@ UKIP manages major product and implementation decisions as architecture decision
 
 | Layer | Technology |
 | --- | --- |
-| Backend API | Python 3.11+, FastAPI, Pydantic v2, SQLAlchemy |
+<!-- BEGIN GENERATED REPOSITORY METRICS: techstack-backend-runtime -->
+| Backend API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy |
+<!-- END GENERATED REPOSITORY METRICS: techstack-backend-runtime -->
 | Database | PostgreSQL (production), SQLite (local/test), DuckDB (OLAP), ChromaDB (RAG) |
 | Caching | Redis (distributed, optional via `REDIS_URL`) with automatic in-process `cachetools` fallback |
 | Migrations | Alembic |
 | Auth | JWT + RBAC (super_admin / admin / editor / viewer), SSO via Authlib, rate limiting via SlowAPI |
-| Frontend | Next.js 16, React 19, TypeScript 5, Tailwind CSS 4, Recharts, D3 |
+<!-- BEGIN GENERATED REPOSITORY METRICS: techstack-frontend -->
+| Frontend | Next.js 16, React 19, TypeScript 6, Tailwind CSS 4, Recharts, D3 |
+<!-- END GENERATED REPOSITORY METRICS: techstack-frontend -->
 | Engine | Rust, Tokio, tonic gRPC, sqlx |
 | Analytics | pandas, DuckDB, PyArrow, NumPy, SciPy |
 | Background Jobs | Durable PostgreSQL lease queue (broker-free, at-least-once) with worker/scheduler processes |
-| Testing | pytest (3170 tests), Vitest, Playwright |
+<!-- BEGIN GENERATED REPOSITORY METRICS: techstack-testing -->
+| Testing | pytest (3985 tests collected), Vitest (332 tests), Playwright |
+<!-- END GENERATED REPOSITORY METRICS: techstack-testing -->
 | Deployment | Docker Compose, GHCR images, Dokploy-oriented production compose |
 | Monitoring | Sentry (opt-in), structured logging |
 
@@ -256,7 +276,9 @@ cd frontend && npm run e2e
 cd frontend && npx tsc --noEmit
 ```
 
-**Current test stats:** 3170 backend tests across 261 test files (3163 passing, 7 skipped). Frontend: 273 Vitest tests.
+<!-- BEGIN GENERATED REPOSITORY METRICS: summary-test-stats -->
+**Current test stats:** 3985 backend tests collected across 311 test files. Frontend: 332 Vitest tests.
+<!-- END GENERATED REPOSITORY METRICS: summary-test-stats -->
 
 ---
 
