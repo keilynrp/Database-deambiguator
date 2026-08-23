@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "metrics": {
+    "backend_tests_collected": 3985,
+    "backend_test_files": 311,
+    "frontend_vitest_tests": 332,
+    "api_operations": 420,
+    "python_runtime_shipped": "3.13",
+    "nextjs_version": "16.3.1",
+    "react_version": "19.2.8",
+    "typescript_version": "6.0.3"
+  },
+  "derivations": {
+    "backend_tests_collected": "Count of pytest node IDs collected from backend/tests/ via scripts/backend_test_partitions.py's collect_exhaustive() (pytest --collect-only, fail-closed on any exit code other than 0/5).",
+    "backend_test_files": "Count of distinct file paths among those collected node IDs (not every *.py under backend/tests/).",
+    "frontend_vitest_tests": "Count of tests printed by `vitest list` (frontend/, pinned project config).",
+    "api_operations": "Count of get/post/put/patch/delete/options/head/trace keys across 'paths' in sdk/openapi.json.",
+    "python_runtime_shipped": "Major.minor version parsed from the 'FROM python:X.Y...' line in Dockerfile.backend.",
+    "nextjs_version": "Resolved version of 'next' in frontend/package-lock.json.",
+    "react_version": "Resolved version of 'react' in frontend/package-lock.json.",
+    "typescript_version": "Resolved version of 'typescript' in frontend/package-lock.json."
+  },
+  "sources": {
+    "backend_tests": "backend/tests/ (pytest collection)",
+    "frontend_vitest": "frontend/ (`vitest list`)",
+    "openapi_spec": "sdk/openapi.json",
+    "dockerfile": "Dockerfile.backend",
+    "frontend_lockfile": "frontend/package-lock.json"
+  }
+}

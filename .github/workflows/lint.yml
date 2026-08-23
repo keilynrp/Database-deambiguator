@@ -110,6 +110,44 @@ jobs:
       - name: Check EN/ES parity across the catalog and its projection
         run: node scripts/check-i18n-parity.mjs
 
+  # ── Generated repository metrics drift (blocking) ─────────────────────────
+  # README.md's test/API/toolchain badges, tree summary, tech-stack table
+  # rows, and closing test-stats line — plus docs/generated/repo_metrics.json
+  # — are a generated projection (issue #295), not hand-maintained claims.
+  # This job re-derives every metric from its authoritative source (pytest
+  # collection, `vitest list`, sdk/openapi.json, Dockerfile.backend,
+  # frontend/package-lock.json) and fails the PR that changed one of those
+  # sources without regenerating.
+  repo-metrics-drift:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt -c requirements.lock
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --prefer-offline
+
+      - name: Check generated repository metrics match their authoritative sources
+        run: python scripts/generate_repo_metrics.py --check
+
   # ── Domain scope contract lint (blocking) ─────────────────────────────────
   domain-scope-lint:
     runs-on: ubuntu-latest

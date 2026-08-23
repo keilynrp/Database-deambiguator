@@ -124,3 +124,35 @@ Para enterprise readiness, la autoridad es:
 7. Runtime projection: `backend/enterprise_readiness.py`
 
 La proyeccion runtime nunca reemplaza ni eleva el estado del registro de controles.
+
+## 11. Metricas generadas del repositorio
+
+Los conteos volatiles de `README.md` (tests de backend, tests de Vitest,
+operaciones de API, runtime de Python, versiones de Next.js/React/
+TypeScript) son una **proyeccion generada**, nunca una fuente de verdad. Su
+autoridad sigue siendo el codigo/config/tests subyacentes:
+
+- pytest collection sobre `backend/tests/` (misma primitiva que #293 usa
+  para el sharding de CI);
+- `vitest list` sobre `frontend/`;
+- `sdk/openapi.json` (operaciones HTTP documentadas);
+- `Dockerfile.backend` (runtime de Python realmente empaquetado);
+- `frontend/package-lock.json` (versiones resueltas de Next.js/React/
+  TypeScript).
+
+Generador/checker: `scripts/generate_repo_metrics.py`.
+
+- `python scripts/generate_repo_metrics.py` regenera las regiones marcadas
+  del README y `docs/generated/repo_metrics.json`.
+- `python scripts/generate_repo_metrics.py --check` falla (exit 1) si el
+  README o el artefacto generado estan desactualizados respecto a las
+  fuentes autoritativas.
+
+Limite generado: cada metrica vive entre un par de marcadores
+`<!-- BEGIN GENERATED REPOSITORY METRICS: <slug> --> ... <!-- END GENERATED
+REPOSITORY METRICS: <slug> -->` en `README.md`. Ningun agente debe editar a
+mano el contenido entre esos marcadores, ni los valores de
+`docs/generated/repo_metrics.json`; ambos se sobrescriben en la siguiente
+ejecucion del generador. El gate `repo-metrics-drift` en
+`.github/workflows/lint.yml` bloquea cualquier PR que deje el README o el
+artefacto desincronizados de sus fuentes.
