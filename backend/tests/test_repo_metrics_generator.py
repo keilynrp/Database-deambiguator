@@ -60,6 +60,17 @@ class _FakeCompletedProcess:
         self.stderr = stderr
 
 
+def _write_exact(path: Path, text: str) -> None:
+    """Write with no newline translation — matches grm._write_text_exact.
+
+    `Path.write_text(newline=...)` only exists from Python 3.13; this repo
+    also runs a Python 3.12 compatibility lane, so these README fixtures go
+    through the file-handle form instead.
+    """
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        handle.write(text)
+
+
 # ── backend test collection: fail-closed ────────────────────────────────
 
 
@@ -347,7 +358,7 @@ def _write_fixture_repo(tmp_path: Path) -> grm.Config:
         ),
         encoding="utf-8",
     )
-    (tmp_path / "README.md").write_text(_readme_fixture(), encoding="utf-8", newline="")
+    _write_exact(tmp_path / "README.md", _readme_fixture())
 
     fake_runner = lambda *a, **k: _FakeCompletedProcess(
         returncode=0, stdout="a.test.ts > suite > only case\n"
@@ -378,7 +389,7 @@ def test_run_check_fails_on_stale_readme_metric(tmp_path: Path):
         "![API Operations](https://img.shields.io/badge/API_Operations-999-blue)",
     )
     assert mutated != text
-    cfg.readme_path.write_text(mutated, encoding="utf-8", newline="")
+    _write_exact(cfg.readme_path, mutated)
 
     assert grm.run(cfg, check=True) == 1
 
@@ -399,7 +410,7 @@ def test_run_fails_closed_on_missing_begin_marker(tmp_path: Path):
     broken = cfg.readme_path.read_text(encoding="utf-8").replace(
         "<!-- BEGIN GENERATED REPOSITORY METRICS: badge-tests -->\n", ""
     )
-    cfg.readme_path.write_text(broken, encoding="utf-8", newline="")
+    _write_exact(cfg.readme_path, broken)
 
     assert grm.run(cfg, check=True) == 1
     assert grm.run(cfg, check=False) == 1

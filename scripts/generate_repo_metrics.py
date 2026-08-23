@@ -80,6 +80,30 @@ class MarkerError(RuntimeError):
     """The README's generated marker boundaries are missing/duplicated/reversed."""
 
 
+def _read_text_exact(path: Path) -> str:
+    """Read a file with no newline translation.
+
+    `Path.read_text(newline=...)` only exists from Python 3.13; this repo's
+    CI also runs a Python 3.12 compatibility lane, so newline control goes
+    through the file-handle form instead (`open(newline=...)` has always
+    accepted it).
+    """
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        return handle.read()
+
+
+def _write_text_exact(path: Path, text: str) -> None:
+    """Write exactly the given text — no newline translation.
+
+    Same 3.12-compatibility reason as `_read_text_exact`: without this, the
+    write_text() default (universal-newline translation) would turn every
+    "\\n" this module renders into os.linesep, silently rewriting the whole
+    file's line endings on Windows.
+    """
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        handle.write(text)
+
+
 # ── Metrics ──────────────────────────────────────────────────────────────
 
 
@@ -521,7 +545,7 @@ def run(cfg: Config, check: bool) -> int:
         return 1
 
     try:
-        current_readme = cfg.readme_path.read_text(encoding="utf-8", newline="")
+        current_readme = _read_text_exact(cfg.readme_path)
     except OSError as exc:
         print(f"[repo-metrics] cannot read {cfg.readme_path}: {exc}", file=sys.stderr)
         return 1
@@ -544,9 +568,7 @@ def run(cfg: Config, check: bool) -> int:
 
     rendered_artifact = render_artifact(metrics, cfg)
     current_artifact = (
-        cfg.artifact_path.read_text(encoding="utf-8", newline="")
-        if cfg.artifact_path.exists()
-        else None
+        _read_text_exact(cfg.artifact_path) if cfg.artifact_path.exists() else None
     )
 
     readme_stale = rendered_readme != current_readme
@@ -564,15 +586,11 @@ def run(cfg: Config, check: bool) -> int:
         print(f"[repo-metrics] OK — README and {cfg.artifact_path.name} match derived metrics.")
         return 0
 
-    # newline="" — write exactly the "\n" this module renders, regardless of
-    # the host OS's line-ending convention. Universal-newline translation
-    # (the write_text default) would turn every "\n" into os.linesep and
-    # silently rewrite the whole file's line endings on Windows.
     if readme_stale:
-        cfg.readme_path.write_text(rendered_readme, encoding="utf-8", newline="")
+        _write_text_exact(cfg.readme_path, rendered_readme)
     cfg.artifact_path.parent.mkdir(parents=True, exist_ok=True)
     if artifact_stale:
-        cfg.artifact_path.write_text(rendered_artifact, encoding="utf-8", newline="")
+        _write_text_exact(cfg.artifact_path, rendered_artifact)
 
     print(
         "[repo-metrics] updated"
