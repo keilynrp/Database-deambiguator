@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "measured_at": "2026-08-23T04:41:00Z",
+  "source_ref": "da1a89540dcb731d21d8a1a9d74669076c8ecc28",
+  "ruff": {
+    "tool_version": "0.16.4",
+    "command": "ruff check backend/ --output-format=json",
+    "violation_count": 3560
+  },
+  "eslint": {
+    "tool_version": "10.8.1",
+    "command": "npx eslint --format json (frontend/, default project scope, npm-ci-locked version)",
+    "error_count": 0,
+    "warning_count": 3
+  },
+  "policy": {
+    "comparison": "exact_match_required",
+    "description": "The ratchet requires current == baseline for every governed metric. current > baseline is a REGRESSION (fails: new debt was introduced). current < baseline is STALE (fails: real debt was reduced but this file was not ratcheted down — update the counts below in the same PR that reduced them). Baseline increases are prohibited except through an explicit, documented governance decision; baseline decreases are a routine required edit, not a governance decision.",
+    "verifier": "scripts/lint_debt_ratchet.py check"
+  }
+}

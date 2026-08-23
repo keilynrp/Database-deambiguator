@@ -142,8 +142,59 @@ jobs:
       - name: Enforce entity_base_q contract (migrated files)
         run: python scripts/lint_entity_query.py
 
-  # ── Backend lint (ruff) ────────────────────────────────────────────────────
-  backend-lint:
+  # ── Backend lint on changed files (blocking) ───────────────────────────────
+  # Equivalent of frontend-lint below, for backend/: the repo-wide ratchet
+  # (lint-debt-ratchet, further down) only guarantees "no worse in total" —
+  # it would tolerate new violations in a touched file if unrelated cleanup
+  # elsewhere in the same PR kept the total flat. This closes that loophole
+  # by requiring every backend/**.py file the diff touches to be fully
+  # Ruff-clean (whole file, matching frontend-lint's own whole-file
+  # strictness), independent of the repo-wide baseline (issue #294).
+  backend-lint-changed:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install ruff (pinned — see docs/operating/LINT_DEBT_RATCHET.md)
+        run: pip install ruff==0.16.4
+
+      - name: Resolve diff base SHA
+        id: base-sha
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+          fi
+
+          if [[ -z "${BASE_SHA}" || "${BASE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
+            BASE_SHA="$(git rev-parse HEAD^)"
+          fi
+
+          echo "sha=${BASE_SHA}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run Ruff on changed backend files
+        run: python scripts/lint_backend_changed.py check --base-sha "${{ steps.base-sha.outputs.sha }}"
+
+  # ── Repo-wide lint debt ratchet (blocking) ─────────────────────────────────
+  # Was two non-blocking debt-radar jobs (backend ruff --exit-zero, frontend
+  # eslint continue-on-error). Folded into one job that measures both tools
+  # the same way and fails if either total deviates from the committed
+  # baseline in either direction (issue #294) — see
+  # docs/operating/LINT_DEBT_RATCHET.md for the exact-equality policy this
+  # implements and .github/quality/lint_baseline.json for the current counts.
+  lint-debt-ratchet:
     runs-on: ubuntu-latest
 
     steps:
@@ -156,13 +207,22 @@ jobs:
           python-version: "3.13"
           cache: pip
 
-      - name: Install ruff
-        run: pip install ruff
+      - name: Install ruff (pinned — see docs/operating/LINT_DEBT_RATCHET.md)
+        run: pip install ruff==0.16.4
 
-      - name: Run ruff (non-blocking — report only)
-        run: |
-          ruff check backend/ --output-format=github --exit-zero
-        continue-on-error: true
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --prefer-offline
+
+      - name: Check lint debt against the committed baseline
+        run: python scripts/lint_debt_ratchet.py check
 
   # ── Frontend lint on changed files (blocking) ──────────────────────────────
   frontend-lint:
@@ -235,30 +295,6 @@ jobs:
       - name: Skip message when no frontend files changed
         if: steps.changed-frontend.outputs.count == '0'
         run: echo "No frontend source files changed; skipping blocking ESLint run."
-
-  # ── Frontend lint repo-wide (non-blocking debt radar) ─────────────────────
-  frontend-lint-repo:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Set up Node 22
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci --prefer-offline
-
-      - name: Run ESLint repo-wide (non-blocking)
-        working-directory: frontend
-        run: npm run lint -- --max-warnings=0
-        continue-on-error: true
 
   # ── Frontend unit tests (Vitest) ──────────────────────────────────────────
   frontend-test:
