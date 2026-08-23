@@ -156,3 +156,20 @@ mano el contenido entre esos marcadores, ni los valores de
 ejecucion del generador. El gate `repo-metrics-drift` en
 `.github/workflows/lint.yml` bloquea cualquier PR que deje el README o el
 artefacto desincronizados de sus fuentes.
+
+## 12. Capacidades y niveles de soporte
+
+Para capacidades de producto (que existe, en que tier de soporte, con que
+frontera de codigo y que release gates la protegen), la autoridad es:
+
+1. Inventario canonico: `docs/ARCHITECTURE.md` (Parte I — Arquitectura de
+   Capacidades), unica matriz de capacidades del repositorio.
+2. Eje distinto y complementario, no un tier de capacidad: madurez de
+   controles operacionales transversales (backup/DR, IAM, incident
+   response) en `docs/product/ENTERPRISE_CONTROL_REGISTER.md` (ver §10).
+3. Granularidad de feature, no de capacidad: specs y changes activos en
+   `openspec/specs/` y `openspec/changes/`.
+
+Ningun agente debe crear un registro de capacidades o niveles de soporte
+paralelo a `docs/ARCHITECTURE.md`. Un cambio real de frontera o de tier de
+una capacidad se documenta ahi primero.
