@@ -20,6 +20,32 @@ def _reload_encryption(key: str | None):
     return enc
 
 
+# Canonical ENCRYPTION_KEY as set by conftest.py before any test module loads.
+_CANONICAL_ENCRYPTION_KEY = os.environ.get("ENCRYPTION_KEY")
+
+
+@pytest.fixture(autouse=True)
+def _restore_encryption_module():
+    """Reload backend.encryption back to the canonical (conftest-configured) key
+    after every test in this file.
+
+    Every test here calls _reload_encryption(), which mutates os.environ
+    directly (not via monkeypatch, since these tests exist to exercise
+    encryption's own import-time key-loading logic) and reloads the module.
+    Without a restore, the module's _primary_fernet is left None (or invalid)
+    for the rest of the pytest process, so any later test in the same shard
+    that reads backend.encryption.has_primary_key() — e.g. ops_checks'
+    secrets check — silently inherits that contaminated state.
+    """
+    yield
+    if _CANONICAL_ENCRYPTION_KEY is None:
+        os.environ.pop("ENCRYPTION_KEY", None)
+    else:
+        os.environ["ENCRYPTION_KEY"] = _CANONICAL_ENCRYPTION_KEY
+    import backend.encryption as enc
+    importlib.reload(enc)
+
+
 # ── Without encryption key (dev passthrough) ────────────────────────────────
 
 def test_no_key_encrypt_returns_plaintext():
@@ -49,8 +75,13 @@ def enc_with_key():
     key = Fernet.generate_key().decode()
     enc = _reload_encryption(key)
     yield enc
-    # Restore: no key after tests
-    _reload_encryption(None)
+    # No explicit restore here: the autouse, function-scoped
+    # _restore_encryption_module fixture above already reloads
+    # backend.encryption back to the canonical key after every test in this
+    # file, including the last one that uses enc_with_key. Since module-scoped
+    # fixtures tear down after the module's last function-scoped teardown, a
+    # _reload_encryption(None) here would run last and re-contaminate module
+    # state for every test after this file in the same shard process.
 
 
 def test_encrypt_produces_different_value(enc_with_key):

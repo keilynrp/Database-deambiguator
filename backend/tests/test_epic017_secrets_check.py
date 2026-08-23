@@ -45,12 +45,22 @@ def test_warning_when_retiring_keys_present(db_session, monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _restore_modules_after_reload():
-    """Reload backend.auth and backend.ops_checks back to canonical env state.
+    """Sync backend.encryption before each test, and reload backend.auth,
+    backend.ops_checks, and backend.encryption back to canonical env state
+    after each test.
 
     These tests monkeypatch JWT/ENCRYPTION env vars and importlib.reload(auth);
     monkeypatch restores os.environ on teardown but not the imported modules, so
     we reload afterward to avoid leaking mutated SECRET_KEY into other modules.
+    backend.encryption is included defensively on both sides: _secrets_check()
+    reads its module-level _primary_fernet, which another test earlier in the
+    same shard process could have left contaminated (see test_encryption.py) —
+    the pre-test reload makes this file's tests correct regardless of run
+    order, and the post-test reload keeps that contamination from spreading
+    further downstream.
     """
+    importlib.reload(importlib.import_module("backend.encryption"))
     yield
     importlib.reload(importlib.import_module("backend.auth"))
     importlib.reload(importlib.import_module("backend.ops_checks"))
+    importlib.reload(importlib.import_module("backend.encryption"))
