@@ -197,7 +197,7 @@ Cada capacidad tiene **exactamente un** nivel de soporte. Método de inventario:
 | **Shell de aplicación frontend y superficies de producto** | 1 | App Router de Next.js, ~28 superficies de página, 8 context providers, i18n EN/ES | `frontend/app/` | Contrato de fetch JSON contra la API REST | `frontend-test`, `frontend-typecheck`, `frontend-lint`, `design-system:check`, `frontend-e2e-critical` (Playwright `@critical`) |
 | **Ingeniería de release y gobernanza del repositorio** | 1 | Partición determinística de tests (#293), ratchet de deuda de lint (#294), métricas generadas del repo (#295), gates de OpenAPI/SDK/i18n/dominio/seguridad | `scripts/{backend_test_partitions,lint_debt_ratchet,lint_backend_changed,lint_domain_scope,lint_entity_query,generate_repo_metrics}.py`, `.github/workflows/*.yml` | Es en sí misma el conjunto de gates bloqueantes que protege a todas las demás capacidades | Por construcción: cada gate es bloqueante para todo PR |
 
-**Total: 24 capacidades — 8 Tier 1, 12 Tier 2, 3 Tier 3, 1 Tier 4** (Integración comercial legacy y Motor Rust cuentan aparte de Herramientas admin en el conteo de Tier 3, ver Grupo C).
+**Total: 29 capacidades — 9 Tier 1, 15 Tier 2, 4 Tier 3, 1 Tier 4.** ("CLI, mantenimiento y migraciones" cuenta como Tier 2 pese a su nota heterogénea — las migraciones Alembic son Tier 1 de facto dentro de esa fila, pero la fila en sí es Tier 2.)
 
 ---
 
