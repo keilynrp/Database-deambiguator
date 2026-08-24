@@ -266,3 +266,68 @@ to the shipped artifact.
 - Consider registry layer cache (`cache-from`/`cache-to`) to avoid the double image build per job (scan build + push build).
 - `gitleaks-action` requires a `GITLEAKS_LICENSE` secret if the repo ever moves to a GitHub organization; free for personal accounts.
 - Dependency upgrades to burn down the 32-entry pip-audit baseline (§7e) need their own test pass before landing; plan as a dedicated upgrade sprint. Priority targets: starlette 0.52→1.x (4 CVEs; major bump, verify FastAPI compat), python-multipart →0.0.31 (3 CVEs), cryptography →48.0.1.
+
+---
+
+## 9. GitHub App stateless installation-token compatibility (#299, 2026-08-23)
+
+GitHub began a staged rollout of a new stateless GitHub App installation-token
+representation (`ghs_APPID_JWT`, variable-length, roughly 520 characters,
+still `ghs_`-prefixed) alongside a temporary per-request override header
+(`X-GitHub-Stateless-S2S-Token: enabled|disabled`) scoped to
+`POST /app/installations/:installation_id/access_tokens`. This section
+records the compatibility audit against that change (EPIC-018).
+
+**Token issuance conclusion**
+
+- UKIP mints GitHub App installation tokens: **NO.**
+- A repository-wide inventory (workflows, backend, frontend, scripts,
+  SDK, Docker/deployment config, docs) found no GitHub App integration of
+  any kind: no app ID, installation ID, private key, `/access_tokens` call,
+  `api.github.com` client, or `gh` CLI usage anywhere in repository-owned
+  code. GitHub Actions alone owns `GITHUB_TOKEN` issuance and lifecycle for
+  this repository.
+- Override-header applicability: **NO** — there is no UKIP-owned installation-
+  token-minting flow to validate it against. Per the issue's Case B path,
+  this is documented as not applicable rather than building token-minting
+  infrastructure solely to exercise the header. The header was **not used**.
+- Permanent override remains: **NO** (never introduced).
+
+**Inventory method**: repository-wide grep across `.github/workflows/**`,
+`backend/`, `frontend/`, `sdk/`, `scripts/`, `alembic/`, `docs/operating/`,
+and Docker/deployment configuration for `GITHUB_TOKEN`, `GH_TOKEN`,
+`Authorization: Bearer`/`Authorization: token`, `ghs_`/`ghp_`/`ghu_`/`gho_`/
+`github_pat_`, installation IDs, `/access_tokens`, `api.github.com`, token
+regexes/length checks, `split('.')`/JWT decode, and mask/redact helpers.
+
+**Compatibility matrix**
+
+| Surface | File/location | Token source | Behavior | Assumption | New-format risk | Validation / result |
+| --- | --- | --- | --- | --- | --- | --- |
+| GHCR login (3 image builds) | `.github/workflows/docker.yml:53,185,271` | Actions `GITHUB_TOKEN` | opaque pass-through | none | none — value flows straight from `secrets.GITHUB_TOKEN` into `docker/login-action@v4.6.0`'s `password` input; never read, split, or length-checked by repository code | Read (no custom code touches the value). Not applicable. |
+| gitleaks scan attribution | `.github/workflows/security.yml:26` | Actions `GITHUB_TOKEN` | opaque pass-through | none | none — passed as an env var straight into `gitleaks/gitleaks-action@v3` | Read. Not applicable. |
+| Secret-scan detection rules | `.gitleaks.toml` | n/a (detects, doesn't hold, tokens) | validated (via upstream ruleset) | `useDefault = true`, no repo-owned GitHub-token regex | none — gitleaks' built-in GitHub-token rules are upstream-maintained; this repo defines zero custom token regexes | Read. Third-party-owned, not applicable to remediate here. |
+| Generic BYOK credential fields (`StoreConnection.api_key/api_secret/access_token`, `AIIntegration.api_key`) | `backend/models.py`, `backend/schemas.py`, `backend/routers/stores.py`, `backend/routers/ai_rag.py` | user-supplied opaque string (GitHub is not a supported `StoreConnection` platform today) | opaque pass-through, encrypted at rest (Fernet) | none — Pydantic fields carry no `max_length`; DB columns are unbounded `sa.String`/Postgres `VARCHAR` | none — already accepts arbitrary-length opaque values | Regression tests added: `backend/tests/test_github_token_opaque_compat.py` posts a 40-char (legacy-shaped) and a 520-char (stateless-shaped) synthetic opaque token to both `/stores` and `/ai-integrations`, asserts `201`, then reads the created row back from the database and decrypts the stored value — proving exact byte-for-byte equality with the original token (not merely a non-error status) for both lengths. |
+| UKIP's own JWTs, Fernet keys, webhook secret, password-reset token | `backend/auth.py`, `backend/encryption.py`, `backend/schemas.py` (`WebhookCreate.secret`), `backend/routers/auth_users.py` (`PasswordResetConfirm.token`) | UKIP-generated, unrelated token families | generated / validated | UKIP's own length/format contracts (e.g. reset token 32–256 chars) | none — these are not GitHub tokens and are out of scope per the issue's token-family separation requirement | Read only. Confirmed unrelated; not modified. |
+
+**Length/shape audit**: no repository-owned code contains a fixed
+installation-token length check, a `ghs_[A-Za-z0-9]{36}`-style regex, JWT
+`split('.')`/decode applied to a GitHub token, or a persistence/transport
+field capped below 520 characters that could ever carry one.
+
+**Secret-safety audit**: no logging, exception-reporting, or masking helper
+in the repository does fixed-length substring redaction on GitHub-token-like
+values; the only masking in this space (gitleaks' own reporting) is
+upstream-owned. No live token was generated, logged, or persisted at any
+point during this audit — all test values are synthetic and constructed at
+runtime (never a single contiguous literal) to avoid resembling a real
+credential.
+
+**Remaining risk**: none identified. If UKIP ever adds a GitHub App
+integration (installation-token minting, OAuth-via-GitHub, or a supported
+`StoreConnection` platform for GitHub), re-run this audit against that new
+code path — this section covers only the surfaces that exist today.
+
+**Temporary override header**: `X-GitHub-Stateless-S2S-Token` is not a
+runtime or CI dependency anywhere in this repository, before or after this
+audit.
