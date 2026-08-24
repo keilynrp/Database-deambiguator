@@ -155,6 +155,55 @@ def test_exit_code_0_and_5_are_accepted_as_legitimate():
     assert btp._run_pytest_collect(["backend/tests"], runner=fake_empty) == []
 
 
+def test_collect_exhaustive_with_markers_captures_node_ids_and_marker_names():
+    """Real end-to-end run of the single-pass collector (#293 latency
+    follow-up) against a throwaway fixture directory, proving it returns the
+    same node IDs `collect_exhaustive()` would plus correct per-marker
+    membership — from ONE collection instead of one subprocess per marker."""
+    import tempfile
+
+    fixture = (
+        "import pytest\n"
+        "\n"
+        "@pytest.mark.unit\n"
+        "def test_a():\n"
+        "    pass\n"
+        "\n"
+        "@pytest.mark.security\n"
+        "def test_b():\n"
+        "    pass\n"
+        "\n"
+        "def test_c():\n"
+        "    pass\n"
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        (tmp_path / "test_fixture_markers.py").write_text(fixture)
+        with patch.object(btp, "REPO_ROOT", tmp_path):
+            node_ids, marker_map = btp.collect_exhaustive_with_markers(test_root=".")
+
+    assert set(node_ids) == {
+        "test_fixture_markers.py::test_a",
+        "test_fixture_markers.py::test_b",
+        "test_fixture_markers.py::test_c",
+    }
+    assert marker_map["unit"] == {"test_fixture_markers.py::test_a"}
+    assert marker_map["security"] == {"test_fixture_markers.py::test_b"}
+    assert marker_map["contract"] == set()
+
+
+def test_collect_exhaustive_with_markers_fails_closed_when_sidecar_is_missing():
+    """If pytest exits 0/5 but the marker-audit plugin never wrote its
+    sidecar JSON (e.g. -p failed to load, or the collection-finish hook
+    never fired), that must raise — not silently return an empty marker map
+    that would make every marker's count look like zero."""
+    fake_collect = lambda *a, **k: []  # noqa: E731 — sidecar deliberately never created
+    with patch.object(btp, "_run_pytest_collect", fake_collect):
+        with pytest.raises(RuntimeError, match="failed closed"):
+            btp.collect_exhaustive_with_markers()
+
+
 def test_a_real_broken_import_makes_collect_exhaustive_raise():
     """End-to-end version of the same sentinel: a genuinely unimportable test
     module must make collection fail closed, not silently shrink the
