@@ -79,15 +79,28 @@ class TestStoreConnectionCredentialFieldsAcceptLongOpaqueTokens:
 
 
 class TestAIIntegrationCredentialFieldAcceptsLongOpaqueTokens:
-    """POST /ai-integrations never rejects a long, opaque api_key."""
+    """POST /ai-integrations persists a long, opaque api_key without truncation."""
 
-    def test_stateless_length_api_key_is_accepted(self, client, auth_headers):
+    @pytest.mark.parametrize(
+        "token",
+        [_LEGACY_SYNTHETIC_TOKEN, _STATELESS_SYNTHETIC_TOKEN],
+        ids=["legacy-40", "stateless-520"],
+    )
+    def test_create_with_long_api_key_round_trips_exactly(
+        self, client, auth_headers, token, db
+    ):
         resp = client.post(
             "/ai-integrations",
             json={
-                "provider_name": "token-compat-provider",
-                "api_key": _STATELESS_SYNTHETIC_TOKEN,
+                "provider_name": f"token-compat-provider-{len(token)}",
+                "api_key": token,
             },
             headers=auth_headers,
         )
-        assert resp.status_code != 422, resp.text
+        assert resp.status_code == 201, resp.text
+
+        integration_id = resp.json()["id"]
+        integration = db.query(models.AIIntegration).filter_by(id=integration_id).one()
+        stored = decrypt(integration.api_key)
+        assert stored == token
+        assert len(stored) == len(token)
