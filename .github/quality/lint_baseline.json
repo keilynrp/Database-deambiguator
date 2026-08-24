@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "measured_at": "2026-08-23T04:41:00Z",
-  "source_ref": "da1a89540dcb731d21d8a1a9d74669076c8ecc28",
+  "measured_at": "2026-08-24T18:41:06Z",
+  "source_ref": "64cbaff9be465a9786ffa3050ec0a1f49f9c3abf",
   "ruff": {
     "tool_version": "0.16.4",
     "command": "ruff check backend/ --output-format=json",
-    "violation_count": 3560
+    "violation_count": 3552
   },
   "eslint": {
     "tool_version": "10.8.1",

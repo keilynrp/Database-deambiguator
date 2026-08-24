@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "metrics": {
-    "backend_tests_collected": 3992,
+    "backend_tests_collected": 3994,
     "backend_test_files": 312,
     "frontend_vitest_tests": 332,
     "api_operations": 420,
