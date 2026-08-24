@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
     steps:
       - name: Checkout code
@@ -43,7 +43,7 @@ jobs:
         run: |
           python scripts/backend_test_partitions.py list-shard \
             --index "${{ matrix.shard }}" \
-            --count 6 \
+            --count 10 \
             --out "shard-${{ matrix.shard }}.txt"
           echo "Shard ${{ matrix.shard }} count: $(wc -l < shard-${{ matrix.shard }}.txt)"
 
@@ -131,13 +131,17 @@ jobs:
       - name: Verify partition union equals exhaustive suite
         run: |
           python scripts/backend_test_partitions.py verify \
-            --count 6 \
+            --count 10 \
             --shard-file shard-artifacts/shard-0.txt \
             --shard-file shard-artifacts/shard-1.txt \
             --shard-file shard-artifacts/shard-2.txt \
             --shard-file shard-artifacts/shard-3.txt \
             --shard-file shard-artifacts/shard-4.txt \
-            --shard-file shard-artifacts/shard-5.txt
+            --shard-file shard-artifacts/shard-5.txt \
+            --shard-file shard-artifacts/shard-6.txt \
+            --shard-file shard-artifacts/shard-7.txt \
+            --shard-file shard-artifacts/shard-8.txt \
+            --shard-file shard-artifacts/shard-9.txt
 
       - name: Audit pytest marker taxonomy
         run: python scripts/backend_test_partitions.py audit-markers
@@ -149,7 +153,11 @@ jobs:
             shard-artifacts/coverage-shard-2 \
             shard-artifacts/coverage-shard-3 \
             shard-artifacts/coverage-shard-4 \
-            shard-artifacts/coverage-shard-5
+            shard-artifacts/coverage-shard-5 \
+            shard-artifacts/coverage-shard-6 \
+            shard-artifacts/coverage-shard-7 \
+            shard-artifacts/coverage-shard-8 \
+            shard-artifacts/coverage-shard-9
           coverage report --fail-under=75
           coverage xml -o coverage.xml
 
@@ -181,8 +189,13 @@ jobs:
         run: |
           python -m backend.eval.entity_resolution_eval --gate 0.75 --algorithm blocking --threshold 80
 
-  postgres-smoke:
+  postgres-shard:
+    name: postgres-shard-${{ matrix.shard }} (pg16)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
 
     steps:
       - name: Checkout code
@@ -196,6 +209,13 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt -c requirements.lock
+
+      - name: Collect deterministic shard
+        run: |
+          python scripts/backend_test_partitions.py list-shard \
+            --index "${{ matrix.shard }}" \
+            --count 6 \
+            --out "shard-pg-${{ matrix.shard }}.txt"
 
       - name: Prepare ephemeral CI secrets
         run: |
@@ -230,20 +250,20 @@ jobs:
             echo "pull failed (attempt ${attempt}) — retrying after backoff…"
             sleep $((attempt * 5))
           done
-          docker run -d --name ukip-postgres \
+          docker run -d --name "ukip-postgres-${{ matrix.shard }}" \
             -e POSTGRES_USER=ukip_test \
             -e POSTGRES_PASSWORD="${PG_PASSWORD}" \
             -e POSTGRES_DB=ukip_test \
             -p 5432:5432 \
             postgres:16-alpine
           for attempt in $(seq 1 30); do
-            if docker exec ukip-postgres pg_isready -U ukip_test >/dev/null 2>&1; then
+            if docker exec "ukip-postgres-${{ matrix.shard }}" pg_isready -U ukip_test >/dev/null 2>&1; then
               echo "PostgreSQL ready"
               break
             fi
             if [ "${attempt}" -eq 30 ]; then
               echo "PostgreSQL did not become ready in time" >&2
-              docker logs ukip-postgres || true
+              docker logs "ukip-postgres-${{ matrix.shard }}" || true
               exit 1
             fi
             sleep 2
@@ -258,10 +278,60 @@ jobs:
           PYTHONPATH: .
         run: python scripts/ci_lifespan_smoke.py
 
-      - name: Run the backend suite against PostgreSQL
+      - name: Run this shard of the backend suite against PostgreSQL
         env:
           UKIP_SKIP_STARTUP_SIDE_EFFECTS: "1"
-        run: pytest backend/tests/ --tb=short -q
+        shell: bash
+        run: |
+          mapfile -t ids < "shard-pg-${{ matrix.shard }}.txt"
+          if [ "${#ids[@]}" -eq 0 ]; then
+            echo "PostgreSQL shard ${{ matrix.shard }} unexpectedly collected zero tests" >&2
+            exit 1
+          fi
+          pytest "${ids[@]}" --tb=short -q
+
+      - name: Upload shard evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-postgres-shard-${{ matrix.shard }}
+          path: shard-pg-${{ matrix.shard }}.txt
+          retention-days: 14
+
+  postgres-partition-guard:
+    name: postgres-partition-guard (union == exhaustive)
+    runs-on: ubuntu-latest
+    needs: [postgres-shard]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -c requirements.lock
+
+      - name: Download all PostgreSQL shard artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: backend-postgres-shard-*
+          merge-multiple: true
+          path: pg-shard-artifacts
+
+      - name: Verify PostgreSQL partition union equals exhaustive suite
+        run: |
+          python scripts/backend_test_partitions.py verify \
+            --count 6 \
+            --shard-file pg-shard-artifacts/shard-pg-0.txt \
+            --shard-file pg-shard-artifacts/shard-pg-1.txt \
+            --shard-file pg-shard-artifacts/shard-pg-2.txt \
+            --shard-file pg-shard-artifacts/shard-pg-3.txt \
+            --shard-file pg-shard-artifacts/shard-pg-4.txt \
+            --shard-file pg-shard-artifacts/shard-pg-5.txt
 
   sdk-smoke:
     runs-on: ubuntu-latest
