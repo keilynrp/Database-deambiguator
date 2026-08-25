@@ -5,12 +5,19 @@ Report builder endpoints.
   POST /exports/pdf
   POST /exports/excel
 """
+# ruff: noqa: B008 — every endpoint below uses FastAPI's own recommended
+# `Depends(...)`/`Depends(require_role(...))` dependency-injection idiom in an
+# argument default, which is exactly what B008 (flake8-bugbear's "no function
+# call as a default") exists to catch in ordinary code. FastAPI resolves these
+# once per request rather than once at import time, so the call is not the
+# footgun the rule is written for; suppressing it file-wide avoids thirteen
+# identical inline per-line suppression comments on a pattern this file cannot
+# avoid.
 import logging
 import os
-from pathlib import Path
-from importlib import import_module
 from datetime import datetime, timezone
-from typing import List, Optional
+from importlib import import_module
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
@@ -32,7 +39,7 @@ from backend.tenant_access import resolve_request_org_id
 _OMITTED_SECTIONS_HEADER = "X-UKIP-Report-Omitted-Sections"
 
 
-def _omission_headers(export_format: str, sections: List[str]) -> dict[str, str]:
+def _omission_headers(export_format: str, sections: list[str]) -> dict[str, str]:
     """Header naming the requested sections `export_format` cannot render, or an
     empty dict when it renders them all."""
     omitted = format_support.unsupported_sections(export_format, sections)
@@ -109,11 +116,11 @@ class _ManualReportSection(BaseModel):
 
 class _ReportRequest(BaseModel):
     domain_id: str = Field(default="default", min_length=1, max_length=64)
-    sections: List[str] = Field(default=_PUBLIC_REPORT_SECTIONS, max_length=_MAX_REQUEST_SECTIONS)
-    title: Optional[str] = Field(default=None, max_length=200)
-    benchmark_profile_id: Optional[str] = Field(default=None, max_length=80)
-    stakeholder_profile: Optional[str] = Field(default="leadership", max_length=80)
-    manual_sections: List[_ManualReportSection] = Field(default_factory=list, max_length=6)
+    sections: list[str] = Field(default=_PUBLIC_REPORT_SECTIONS, max_length=_MAX_REQUEST_SECTIONS)
+    title: str | None = Field(default=None, max_length=200)
+    benchmark_profile_id: str | None = Field(default=None, max_length=80)
+    stakeholder_profile: str | None = Field(default="leadership", max_length=80)
+    manual_sections: list[_ManualReportSection] = Field(default_factory=list, max_length=6)
 
     @model_validator(mode="after")
     def _has_report_content(self):

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import logging
 from io import BytesIO
-from typing import List
 
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -53,8 +52,8 @@ def _autofit(ws, min_width: int = 10, max_width: int = 50) -> None:
             try:
                 cell_len = len(str(cell.value)) if cell.value is not None else 0
                 max_len = max(max_len, cell_len)
-            except Exception:
-                pass
+            except Exception:  # noqa: BLE001, S110 — a cell width is cosmetic;
+                pass  # any read failure just leaves the column at its floor width.
         ws.column_dimensions[col_letter].width = max(min_width, min(max_len + 2, max_width))
 
 
@@ -76,7 +75,7 @@ class EnterpriseExcelExporter:
         self,
         db: Session,
         domain_id: str,
-        sections: List[str],
+        sections: list[str],
         org_id: int | None = None,
         manual_sections: list[dict[str, str]] | None = None,
         language: str | None = None,
@@ -120,8 +119,8 @@ class EnterpriseExcelExporter:
         from backend import report_builder
         from backend.i18n.locale import resolve_report_language
         from backend.reporting.document import ReportDocument
-        from backend.reporting.localize import localize_document
         from backend.reporting.excel_renderer import render_excel
+        from backend.reporting.localize import localize_document
 
         language = resolve_report_language(language)
         requested = set(report_builder.canonical_sections(sections))

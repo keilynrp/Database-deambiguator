@@ -14,6 +14,8 @@ it silently.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 
 from backend.i18n import catalog as catalog_module
@@ -223,7 +225,7 @@ class TestTheHeaderCannotReachReportGeneration:
 
 
 class TestExcelSheetNamesStayValid:
-    """Excel caps a sheet name at 31 characters and forbids / \ ? * [ ] :
+    r"""Excel caps a sheet name at 31 characters and forbids / \ ? * [ ] :
 
     `_safe_sheet_title` truncates rather than failing, so a violation never
     breaks a workbook — it silently cuts a tab mid-word instead. That is why
@@ -232,7 +234,7 @@ class TestExcelSheetNamesStayValid:
     degrade the tabs without anything going red.
     """
 
-    _INVALID = set('/\?*[]:')
+    _INVALID: ClassVar[set[str]] = set(r'/\?*[]:')
 
     def test_spanish_sheet_names_fit_and_are_legal(self):
         """Names authored by this change must need no truncation at all."""
