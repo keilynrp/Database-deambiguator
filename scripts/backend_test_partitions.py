@@ -68,8 +68,11 @@ Local usage
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import subprocess
 import sys
+import tempfile
 import zlib
 from pathlib import Path
 
@@ -92,7 +95,7 @@ ALL_MARKERS = CATEGORY_MARKERS + ["slow"]
 
 
 def _run_pytest_collect(
-    pytest_args: list[str], runner=subprocess.run
+    pytest_args: list[str], runner=subprocess.run, env: dict[str, str] | None = None
 ) -> list[str]:
     """Run `pytest --collect-only -q <args>` and return collected node IDs.
 
@@ -113,7 +116,7 @@ def _run_pytest_collect(
     backend/tests/test_partition_guard.py.
     """
     cmd = [sys.executable, "-m", "pytest", "--collect-only", "-q", *pytest_args]
-    proc = runner(cmd, cwd=REPO_ROOT, capture_output=True, text=True, check=False)
+    proc = runner(cmd, cwd=REPO_ROOT, capture_output=True, text=True, check=False, env=env)
     if proc.returncode not in (0, 5):
         sys.stderr.write(proc.stdout)
         sys.stderr.write(proc.stderr)
@@ -133,8 +136,54 @@ def collect_exhaustive(test_root: str = DEFAULT_TEST_ROOT) -> list[str]:
     return _run_pytest_collect([test_root])
 
 
-def collect_marker(marker: str, test_root: str = DEFAULT_TEST_ROOT) -> list[str]:
-    return _run_pytest_collect(["-m", marker, test_root])
+def collect_exhaustive_with_markers(
+    test_root: str = DEFAULT_TEST_ROOT,
+) -> tuple[list[str], dict[str, set[str]]]:
+    """One collect-only pass yielding both the exhaustive node ID list and
+    each test's marker names.
+
+    `audit-markers` previously called `collect_exhaustive()` plus one
+    `collect_marker()` subprocess per taxonomy marker — 8 full collections of
+    backend/tests per guard-job run (1 exhaustive + 6 category markers +
+    "slow"). Marker membership instead rides along in the SAME subprocess as
+    the exhaustive collection, captured by
+    `scripts/_partition_marker_collect_plugin.py` (loaded via `-p` with
+    `scripts/` added to PYTHONPATH) writing node_id -> [marker names] to a
+    temp JSON sidecar this function reads back — cutting audit-markers to 1
+    collection instead of 8.
+
+    Fails closed like `_run_pytest_collect()`: a non-{0,5} pytest exit is
+    still a RuntimeError (raised inside `_run_pytest_collect` itself), and a
+    missing/unreadable sidecar after a 0/5 exit — meaning the plugin didn't
+    actually run — is also a RuntimeError rather than a silently empty
+    marker map.
+    """
+    scripts_dir = str(Path(__file__).resolve().parent)
+    with tempfile.TemporaryDirectory() as tmp:
+        sidecar = str(Path(tmp) / "markers.json")
+        env = dict(os.environ)
+        env["UKIP_MARKER_AUDIT_OUT"] = sidecar
+        env["PYTHONPATH"] = scripts_dir + os.pathsep + env.get("PYTHONPATH", "")
+
+        node_ids = _run_pytest_collect(
+            ["-p", "_partition_marker_collect_plugin", test_root], env=env
+        )
+
+        try:
+            with open(sidecar, encoding="utf-8") as fh:
+                raw_markers: dict[str, list[str]] = json.load(fh)
+        except (FileNotFoundError, json.JSONDecodeError) as exc:
+            raise RuntimeError(
+                "marker-audit plugin did not produce its sidecar JSON — "
+                "collection succeeded but marker capture failed closed"
+            ) from exc
+
+    marker_map: dict[str, set[str]] = {marker: set() for marker in ALL_MARKERS}
+    for node_id, names in raw_markers.items():
+        for name in names:
+            if name in marker_map:
+                marker_map[name].add(node_id)
+    return node_ids, marker_map
 
 
 def shard_of(node_id: str, num_shards: int) -> int:
@@ -287,13 +336,14 @@ def _find_duplicates(shards: list[list[str]]) -> set[str]:
 
 
 def cmd_audit_markers(args: argparse.Namespace) -> int:
-    exhaustive = set(collect_exhaustive(args.root))
+    node_ids, marker_map = collect_exhaustive_with_markers(args.root)
+    exhaustive = set(node_ids)
     category_union: set[str] = set()
 
     print(f"{'marker':<12} {'count':>7}")
     print("-" * 20)
     for marker in ALL_MARKERS:
-        ids = set(collect_marker(marker, args.root))
+        ids = marker_map[marker]
         print(f"{marker:<12} {len(ids):>7}")
         if marker in CATEGORY_MARKERS:
             category_union |= ids

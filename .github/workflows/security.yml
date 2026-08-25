@@ -48,20 +48,29 @@ jobs:
         # --no-deps: requirements.lock is a flat freeze (no hashes); pip
         # resolver is disabled via --disable-pip so no network lookup needed.
         #
-        # Two entries, down from 33. The old list deferred most of its entries
-        # to "the upgrade sprint"; #202 was that sprint, and the resulting
-        # versions reached or passed every fix version the baseline recorded,
-        # so 31 flags were suppressing advisories that no longer applied.
+        # Five entries, down from 33 at gate introduction. The old list
+        # deferred most of its entries to "the upgrade sprint"; #202 was
+        # that sprint, and the resulting versions reached or passed every
+        # fix version the baseline recorded, so 31 flags were suppressing
+        # advisories that no longer applied.
         #
-        # These use the canonical IDs pip-audit emits, not CVE aliases. The old
-        # list matched via aliases, which is how 34 flags could do two flags'
-        # worth of work without anyone noticing: an alias that stops matching
-        # fails silently, and a flag that matches nothing looks identical to a
-        # flag that is still holding something back.
+        # These use the canonical IDs pip-audit emits, not hand-picked CVE
+        # aliases. The old list matched via aliases, which is how 34 flags
+        # could do two flags' worth of work without anyone noticing: an
+        # alias that stops matching fails silently, and a flag that matches
+        # nothing looks identical to a flag that is still holding something
+        # back. For chromadb's three 2026-08-24 GHSA advisories (aliased to
+        # CVE-2026-45830/45831/45833), pip-audit's own canonical ID *is* the
+        # CVE — the PyPA advisory DB has no PYSEC entry for them yet — so
+        # these three are pip-audit's real output, not an alias regression.
+        # See docs/operating/SECURITY_GATES.md §7e for full disposition.
         run: >-
           pip-audit -r requirements.lock --disable-pip --no-deps
           --ignore-vuln PYSEC-2026-311
           --ignore-vuln PYSEC-2026-1325
+          --ignore-vuln CVE-2026-45830
+          --ignore-vuln CVE-2026-45831
+          --ignore-vuln CVE-2026-45833
 
   # ── Frontend dependency audit (blocking; allowlist via wrapper) ─────────
   npm-audit:

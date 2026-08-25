@@ -12,7 +12,6 @@ No fixtures, no DB, no FastAPI import: this exercises `verify_union()`,
 code handling in isolation, which is exactly what the `unit` marker means in
 this repo's taxonomy.
 """
-import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -20,8 +19,8 @@ from unittest.mock import patch
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "scripts"))
-import backend_test_partitions as btp  # noqa: E402
-from backend_test_partitions import (  # noqa: E402
+import backend_test_partitions as btp
+from backend_test_partitions import (
     partition,
     shard_of,
     validate_shard_file_count,
@@ -127,7 +126,7 @@ def test_collection_error_exit_code_is_fatal_not_a_valid_empty_collection():
     broken import during --collect-only) and prove `_run_pytest_collect`
     raises rather than returning `[]` as if zero tests were legitimately
     collected."""
-    fake_run = lambda *a, **k: _FakeCompletedProcess(  # noqa: E731
+    fake_run = lambda *a, **k: _FakeCompletedProcess(
         returncode=2, stdout="", stderr="ERROR backend/tests/test_broken.py - ImportError"
     )
     with pytest.raises(RuntimeError, match="failed closed"):
@@ -138,21 +137,72 @@ def test_exit_code_1_is_also_fatal_not_silently_accepted():
     """EXIT_TESTSFAILED (1) is unreachable for a pure --collect-only run, so
     its presence signals something unexpected happened during collection —
     it must not be treated as a legitimate outcome either."""
-    fake_run = lambda *a, **k: _FakeCompletedProcess(returncode=1)  # noqa: E731
+    fake_run = lambda *a, **k: _FakeCompletedProcess(returncode=1)
     with pytest.raises(RuntimeError, match="failed closed"):
         btp._run_pytest_collect(["backend/tests"], runner=fake_run)
 
 
 def test_exit_code_0_and_5_are_accepted_as_legitimate():
-    fake_ok = lambda *a, **k: _FakeCompletedProcess(  # noqa: E731
+    fake_ok = lambda *a, **k: _FakeCompletedProcess(
         returncode=0, stdout="backend/tests/test_x.py::test_y\n"
     )
     assert btp._run_pytest_collect(["backend/tests"], runner=fake_ok) == [
         "backend/tests/test_x.py::test_y"
     ]
 
-    fake_empty = lambda *a, **k: _FakeCompletedProcess(returncode=5, stdout="")  # noqa: E731
+    fake_empty = lambda *a, **k: _FakeCompletedProcess(returncode=5, stdout="")
     assert btp._run_pytest_collect(["backend/tests"], runner=fake_empty) == []
+
+
+def test_collect_exhaustive_with_markers_captures_node_ids_and_marker_names():
+    """Real end-to-end run of the single-pass collector (#293 latency
+    follow-up) against a throwaway fixture directory, proving it returns the
+    same node IDs `collect_exhaustive()` would plus correct per-marker
+    membership — from ONE collection instead of one subprocess per marker."""
+    import tempfile
+
+    fixture = (
+        "import pytest\n"
+        "\n"
+        "@pytest.mark.unit\n"
+        "def test_a():\n"
+        "    pass\n"
+        "\n"
+        "@pytest.mark.security\n"
+        "def test_b():\n"
+        "    pass\n"
+        "\n"
+        "def test_c():\n"
+        "    pass\n"
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        (tmp_path / "test_fixture_markers.py").write_text(fixture)
+        with patch.object(btp, "REPO_ROOT", tmp_path):
+            node_ids, marker_map = btp.collect_exhaustive_with_markers(test_root=".")
+
+    assert set(node_ids) == {
+        "test_fixture_markers.py::test_a",
+        "test_fixture_markers.py::test_b",
+        "test_fixture_markers.py::test_c",
+    }
+    assert marker_map["unit"] == {"test_fixture_markers.py::test_a"}
+    assert marker_map["security"] == {"test_fixture_markers.py::test_b"}
+    assert marker_map["contract"] == set()
+
+
+def test_collect_exhaustive_with_markers_fails_closed_when_sidecar_is_missing():
+    """If pytest exits 0/5 but the marker-audit plugin never wrote its
+    sidecar JSON (e.g. -p failed to load, or the collection-finish hook
+    never fired), that must raise — not silently return an empty marker map
+    that would make every marker's count look like zero."""
+    fake_collect = lambda *a, **k: []  # sidecar deliberately never created
+    with (
+        patch.object(btp, "_run_pytest_collect", fake_collect),
+        pytest.raises(RuntimeError, match="failed closed"),
+    ):
+        btp.collect_exhaustive_with_markers()
 
 
 def test_a_real_broken_import_makes_collect_exhaustive_raise():
@@ -168,6 +218,8 @@ def test_a_real_broken_import_makes_collect_exhaustive_raise():
         (tmp_path / "test_intentionally_broken.py").write_text(
             "import this_module_does_not_exist_anywhere\n"
         )
-        with patch.object(btp, "REPO_ROOT", tmp_path):
-            with pytest.raises(RuntimeError, match="failed closed"):
-                btp.collect_exhaustive(test_root=".")
+        with (
+            patch.object(btp, "REPO_ROOT", tmp_path),
+            pytest.raises(RuntimeError, match="failed closed"),
+        ):
+            btp.collect_exhaustive(test_root=".")

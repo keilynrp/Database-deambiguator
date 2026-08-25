@@ -228,8 +228,8 @@ per-advisory disposition.
 
 ### 7e. pip-audit baseline (`--ignore-vuln` flags in `.github/workflows/security.yml`)
 
-**2 vulnerability IDs ignored** (down from 33). Owner: platform owner. SLA: next
-dependency-upgrade window (review by 2026-09-30).
+**5 vulnerability IDs ignored** (down from 33 at gate introduction). Owner:
+platform owner. SLA: next dependency-upgrade window (review by 2026-09-30).
 
 The previous baseline deferred most entries to "the upgrade sprint", noting in
 particular that the starlette CVEs needed a major 0.52 -> 1.x bump. That bump
@@ -241,22 +241,66 @@ suppressing advisories that no longer apply and have been removed rather than
 carried forward.
 
 Verified empirically, not by reading the table: `pip-audit -r requirements.lock
---disable-pip --no-deps` with **no** ignore flags reports exactly the two rows
-below, and with only these two it reports `No known vulnerabilities found, 2
+--disable-pip --no-deps` with **no** ignore flags reports exactly the five rows
+below, and with all five ignored it reports `No known vulnerabilities found, 5
 ignored`.
 
-Both remaining entries are recorded under the canonical IDs pip-audit emits.
-The old list used CVE aliases, which is why a 34-flag list could still be doing
-only two flags' worth of work — an alias that stops matching fails silently.
+All five entries are recorded under the canonical IDs pip-audit emits. The old
+list used hand-picked CVE aliases, which is why a 34-flag list could still be
+doing only two flags' worth of work — an alias that stops matching fails
+silently. For the three chromadb entries added 2026-08-24, pip-audit's own
+canonical ID *is* the CVE number: the PyPA advisory database (the source
+pip-audit prefers) has no PYSEC identifier for these three yet, only GitHub
+Security Advisories (aliased to the CVEs below), so pip-audit falls back to
+emitting the CVE directly. This is not a reversion to the old alias-matching
+practice — it is pip-audit's real, current output for these findings,
+re-verified by running the tool rather than assumed.
 
 | ID | Package (pinned) | Fix version if known | Review date |
 | --- | --- | --- | --- |
 | PYSEC-2026-311 | chromadb==1.5.2 | none published | 2026-09-30 |
 | PYSEC-2026-1325 | ecdsa==0.19.2 | none published | 2026-09-30 |
+| CVE-2026-45830 | chromadb==1.5.2 | none published | 2026-09-30 |
+| CVE-2026-45831 | chromadb==1.5.2 | none published | 2026-09-30 |
+| CVE-2026-45833 | chromadb==1.5.2 | none published | 2026-09-30 |
 
 Note that `chromadb` is a lock-only entry: it constrains dev installs but is not
-among the 97 packages the backend image installs, so its advisory does not apply
-to the shipped artifact.
+among the packages the backend image installs (`pip install -r requirements.txt
+-c requirements.lock`, re-verified 2026-08-24 via `pip install --dry-run`
+against the exact `requirements.txt`/`requirements.lock` pair on this branch —
+`chromadb` does not appear in the resulting install set), so none of its four
+advisories apply to the shipped artifact.
+
+**2026-08-24 review — three new chromadb advisories.** pip-audit newly reports
+three additional `chromadb==1.5.2` findings, all GitHub-reviewed the same day
+(2026-08-24) and none previously covered by `PYSEC-2026-311`:
+
+| CVE | GHSA | Summary | Introduced | Distinct from PYSEC-2026-311? |
+| --- | --- | --- | --- | --- |
+| CVE-2026-45830 | GHSA-2wm9-hf6c-p5cr | Missing authorization lets any authenticated user read/write/update/delete any tenant's collection data | 0.4.17 | Yes — separate GHSA/CVE, own root cause (authZ gap, not code injection) |
+| CVE-2026-45831 | GHSA-xph7-9rjv-w5fr | `SimpleRBACAuthorizationProvider` does not scope a permission to the tenant/database/collection it was granted for | 0.5.0 | Yes — separate GHSA/CVE, RBAC scoping defect distinct from both the authZ gap above and the code-injection issue below |
+| CVE-2026-45833 | GHSA-36p7-vc44-83pf | Code injection via a malicious model repository + `trust_remote_code=true` on the collection-update endpoint, for a caller with `UPDATE_COLLECTION` | 0.4.17 | Yes — a *post*-auth code-injection path (requires `UPDATE_COLLECTION`); `PYSEC-2026-311`/CVE-2026-45829 is the *pre*-auth code-injection path on the collection-create endpoint. Same vulnerability class, different endpoint and auth precondition — not an alias. |
+
+Confirmed via OSV.dev (`GET/POST api.osv.dev` for package `chromadb`,
+ecosystem `PyPI`, version `1.5.2`): all three are independent advisory records
+with their own GHSA ID, none aliasing `GHSA-f4j7-r4q5-qw2c`
+(`PYSEC-2026-311`/CVE-2026-45829). All four chromadb advisories (the pre-existing
+one plus these three) share the same affected range ceiling — `last_affected:
+1.5.9`, which is the current latest release on PyPI — so no in-range upgrade
+(the disposition-order step B in the correction gate) resolves any of them;
+this was checked directly (`pip index versions chromadb` → latest `1.5.9`, and
+each advisory's OSV record lists `1.5.9` as still affected). Per the same gate's
+disposition order, since removal (step A) is not viable — `chromadb` is a real,
+if currently non-shipped, runtime dependency of `backend/analytics/vector_store.py`
+(imported lazily, `backend/services/data_lifecycle.py`,
+`backend/services/derived_status_service.py`, `backend/routers/ai_rag.py` via
+`rag_engine.py`) and removing the pin would break the dev/test contract those
+paths and their tests rely on — and no fixed release exists (step B), a governed
+exception (step C) is the correct disposition, matching the existing
+`PYSEC-2026-311` entry's own history (also "none published"). All three are
+added to `security.yml`'s `--ignore-vuln` list and registered above with the
+same 2026-09-30 review date as the other two entries so the whole `chromadb`
+group is re-evaluated together.
 
 ---
 
