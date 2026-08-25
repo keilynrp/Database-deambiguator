@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader, Badge, Button, Input, Textarea } from "../components/ui";
 import PilotFlowCard from "../components/PilotFlowCard";
@@ -353,15 +353,23 @@ export default function ReportsPage() {
   }, [activeStakeholder.desc, activeStakeholder.label, format, formatOptions, sections.length, selected.size, t]);
 
   // Fetch available sections from backend. Forwards the UI's active language
-  // (#268) the same way report generation does, so the picker's labels agree
-  // with what a generated report actually titles each section.
+  // (issue 268) the same way report generation does, so the picker's labels
+  // agree with what a generated report actually titles each section. Reruns
+  // whenever `language` changes (e.g. a cross-tab language switch), which
+  // must refresh only the labels — an existing manual/template/preset
+  // selection is not the initial load's to overwrite, so select-all is
+  // gated to the first successful load only.
+  const hasLoadedSectionsRef = useRef(false);
   const loadSections = useCallback(async () => {
     try {
       const res = await apiFetch(`/reports/sections?language=${encodeURIComponent(language)}`);
       if (res.ok) {
         const data: Section[] = await res.json();
         setSections(data);
-        setSelected(new Set(data.map((s) => s.id)));
+        if (!hasLoadedSectionsRef.current) {
+          hasLoadedSectionsRef.current = true;
+          setSelected(new Set(data.map((s) => s.id)));
+        }
       }
     } finally {
       setLoadingSections(false);
