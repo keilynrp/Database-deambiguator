@@ -651,7 +651,7 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         for r in rows_q
     )
     table = Table(
-        columns=("Label", "report.col.top_secondary_labels.entities", "report.col.top_secondary_labels.share", "report.col.top_secondary_labels.weight"),
+        columns=("report.col.top_secondary_labels.label", "report.col.top_secondary_labels.entities", "report.col.top_secondary_labels.share", "report.col.top_secondary_labels.weight"),
         rows=rows,
         bar_column=3,
     )
@@ -789,8 +789,10 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
             ),
         ),
         takeaway=(
-            f'"{rows[0][0]}" is the most frequent concept, accounting for '
-            f'{rows[0][2]} of the top {len(topics)}'
+            _counted(
+                "report.takeaway.topics", len(topics),
+                concept=rows[0][0], pct=lead_share,
+            )
         ),
         method=method,
         # Concentration is the finding worth reading; an even spread is not.
@@ -818,13 +820,13 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
         (
             l.step_name or l.step_id,
             f"{l.records_updated or 0:,}",
-            "Reverted" if l.reverted else "Applied",
+            "report.status.harmonization.reverted" if l.reverted else "report.status.harmonization.applied",
             l.executed_at.strftime("%Y-%m-%d %H:%M") if l.executed_at else "—",
         )
         for l in logs
     )
     table = Table(
-        columns=("Step", "report.col.harmonization_log.updated", "Status", "report.col.harmonization_log.executed"),
+        columns=("report.col.harmonization_log.step", "report.col.harmonization_log.updated", "report.col.harmonization_log.status", "report.col.harmonization_log.executed"),
         rows=rows,
     )
     from backend.reporting.section_data import Materiality, StatGrid, StatItem
@@ -1166,7 +1168,7 @@ def collect_institutional_benchmark(
         StatItem(
             label="report.stat.benchmark.readiness",
             value=f"{readiness_pct}%",
-            sub=f"{passed_rules} of {total_rules} rules satisfied",
+            sub=_counted("report.stat.benchmark.sub.rules_satisfied", total_rules, passed=passed_rules),
         ),
         StatItem(
             label="report.col.benchmark.status",
@@ -1245,12 +1247,7 @@ def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "S
     """
     from backend.reporting.section_data import Materiality, Narrative, SectionData
 
-    method = (
-        "AI-generated answers saved from the research assistant, not verified "
-        "findings about the corpus. Each entry records the tools invoked and "
-        "the sources cited so the answer can be audited; the answer itself has "
-        "not been reviewed. Shows the 5 most recent saved traces."
-    )
+    method = "report.method.trace"
 
     traces = (
         db.query(models.AnalysisContext)
@@ -1328,10 +1325,12 @@ def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "S
         key="agentic_trace",
         title="Agentic Research Trace",
         blocks=(summary, *blocks),
-        takeaway=(
-            f"{len(traces)} saved agentic answer{'s' if len(traces) != 1 else ''} "
-            f"in this brief, drawing on {len(tools_seen) or 'no'} distinct tool"
-            f"{'s' if len(tools_seen) != 1 else ''}"
+        # Two independent counts (saved answers, distinct tools) govern the same
+        # sentence, which is one count too many for `_counted`'s single-count
+        # agreement (see its docstring). Rephrased as two labelled figures, like
+        # report.takeaway.collab, so neither word inflects on either number.
+        takeaway=with_params(
+            "report.takeaway.trace", saved=f"{len(traces):,}", tools=f"{len(tools_seen):,}",
         ),
         method=method,
         # Never leads: these are generated answers, not findings about the data.
@@ -1442,7 +1441,7 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
                  sub=with_params("report.stat.authority.sub.of_total",
                                  pct=round(confirmed / total * 100))),
         StatItem(label="report.stat.authority.pending", value=f"{pending:,}",
-                 sub=f"{backlog_pct}% awaiting a human decision"),
+                 sub=with_params("report.stat.authority.sub.awaiting_decision", pct=backlog_pct)),
         StatItem(label="report.stat.authority.mean_confidence", value=f"{round(float(mean_confidence) * 100)}%",
                  sub="report.stat.authority.sub.all_attempts"),
     ))
@@ -1452,9 +1451,9 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
         func.count(models.AuthorityRecord.id),
     ).group_by(models.AuthorityRecord.resolution_status).all()
     distribution = Table(
-        columns=("report.col.authority.resolution_status", "report.col.authority.records", "Share"),
+        columns=("report.col.authority.resolution_status", "report.col.authority.records", "report.col.authority.share"),
         rows=tuple(
-            (status or "unknown", f"{count:,}", f"{round(count / total * 100)}%")
+            (status or "report.authority.resolution.unknown", f"{count:,}", f"{round(count / total * 100)}%")
             for status, count in sorted(by_resolution, key=lambda r: -r[1])
         ),
         bar_column=2,
@@ -1481,7 +1480,7 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
             (
                 r[0] or "—",
                 r[1] or "—",
-                r[2] or "unresolved",
+                r[2] or "report.authority.resolution.unresolved",
                 f"{round(float(r[3] or 0) * 100)}%",
                 r[4] or "—",
             )
@@ -1798,7 +1797,7 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
     grid = StatGrid(items=(
         StatItem(label="report.stat.journal.journals", value=f"{total:,}", sub="report.stat.journal.sub.distinct_venues"),
         StatItem(label="report.stat.journal.in_doaj", value=f"{doaj_pct}%",
-                 sub=f"{in_doaj:,} of {total:,} open-access listed"),
+                 sub=_counted("report.stat.journal.sub.open_access_listed", total, in_doaj=f"{in_doaj:,}")),
         StatItem(label="report.stat.journal.charging_apc", value=f"{with_apc:,}",
                  sub="report.stat.journal.sub.publication_fee"),
     ))
@@ -1831,7 +1830,7 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
                 _bayes_with_interval(r[2], r[3], r[4]),
                 f"{r[5] or 0:,}",
                 f"${int(r[6]):,}" if r[6] else "—",
-                "Yes" if r[7] else "No",
+                "report.bool.yes" if r[7] else "report.bool.no",
             )
             for r in top
         ),

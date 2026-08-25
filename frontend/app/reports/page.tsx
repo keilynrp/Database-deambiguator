@@ -352,10 +352,12 @@ export default function ReportsPage() {
     ];
   }, [activeStakeholder.desc, activeStakeholder.label, format, formatOptions, sections.length, selected.size, t]);
 
-  // Fetch available sections from backend
+  // Fetch available sections from backend. Forwards the UI's active language
+  // (#268) the same way report generation does, so the picker's labels agree
+  // with what a generated report actually titles each section.
   const loadSections = useCallback(async () => {
     try {
-      const res = await apiFetch("/reports/sections");
+      const res = await apiFetch(`/reports/sections?language=${encodeURIComponent(language)}`);
       if (res.ok) {
         const data: Section[] = await res.json();
         setSections(data);
@@ -364,7 +366,7 @@ export default function ReportsPage() {
     } finally {
       setLoadingSections(false);
     }
-  }, []);
+  }, [language]);
 
   useEffect(() => { loadSections(); }, [loadSections]);
 

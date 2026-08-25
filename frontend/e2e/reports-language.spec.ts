@@ -61,7 +61,11 @@ async function mockReportsPage(page: import("@playwright/test").Page) {
   await injectAuth(page);
   await page.route(`${API_BASE}/**`, (route) => route.fulfill({ json: [] }));
   await mockUserMe(page);
-  await page.route(`${API_BASE}/reports/sections`, (route) =>
+  // `**` — #268 made the frontend forward the UI language to this endpoint
+  // too (`?language=es`/`?language=en`), so the request URL now always
+  // carries a query string; a bare-path pattern would stop matching and
+  // silently fall through to the catch-all mock above ({json: []}).
+  await page.route(`${API_BASE}/reports/sections**`, (route) =>
     route.fulfill({ json: SECTIONS })
   );
   await page.route(`${API_BASE}/analytics/benchmarks/profiles`, (route) =>

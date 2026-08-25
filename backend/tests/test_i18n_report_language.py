@@ -314,6 +314,80 @@ class TestAllThreeFormatsFollowTheLanguage:
         assert resp.status_code == 200
 
 
+class TestReportSectionsFollowsTheLanguage:
+    """#268 cross-stack sub-scope — `GET /reports/sections` used to return
+    `SECTION_LABELS[k]` directly: no language parameter, English forever,
+    regardless of what a caller's generated report said. The picker in
+    `frontend/app/reports/page.tsx` renders `label` verbatim (`{s.label}`), so
+    this was user-visible: a Spanish report whose section picker still read
+    "Entity Statistics".
+
+    The fix resolves each label from the same `report.section.<id>` key
+    `assemble_report_document()` already substitutes for every section title,
+    so the picker and a generated report can never disagree on what a section
+    is called.
+    """
+
+    def test_omitting_the_parameter_is_unchanged(self, client, auth_headers):
+        """Task-8.4-style guarantee: existing callers see no difference."""
+        resp = client.get("/reports/sections", headers=auth_headers)
+        assert resp.status_code == 200
+        by_id = {row["id"]: row for row in resp.json()}
+
+        assert by_id["entity_stats"]["label"] == "Entity Statistics"
+        assert by_id["topic_clusters"]["label"] == "Top Concepts"
+        # The formats shape is untouched: still one bool per export format.
+        from backend.reporting import format_support
+
+        assert set(by_id["entity_stats"]["formats"]) == set(format_support.EXPORT_FORMATS)
+
+    def test_english_is_explicit_and_identical_to_omitted(self, client, auth_headers):
+        omitted = {r["id"]: r["label"] for r in client.get("/reports/sections", headers=auth_headers).json()}
+        explicit = {
+            r["id"]: r["label"]
+            for r in client.get("/reports/sections?language=en", headers=auth_headers).json()
+        }
+        assert explicit == omitted
+
+    def test_spanish_translates_every_label(self, client, auth_headers):
+        resp = client.get("/reports/sections?language=es", headers=auth_headers)
+        assert resp.status_code == 200
+        by_id = {row["id"]: row["label"] for row in resp.json()}
+
+        assert by_id["entity_stats"] == "Estadísticas de Entidades"
+        assert by_id["topic_clusters"] == "Principales Conceptos"
+        # Every id resolves to catalog copy, not a raw unresolved key.
+        assert not any(label.startswith("report.section.") for label in by_id.values())
+
+    def test_an_unsupported_language_still_returns_sections(self, client, auth_headers):
+        """A cosmetic picker request must not fail; same contract as report
+        generation for an unrecognised language (falls back to English)."""
+        resp = client.get("/reports/sections?language=fr", headers=auth_headers)
+        assert resp.status_code == 200
+        by_id = {row["id"]: row["label"] for row in resp.json()}
+        assert by_id["entity_stats"] == "Entity Statistics"
+
+    def test_section_ids_are_unchanged_by_the_language_parameter(self, client, auth_headers):
+        """The contract requires stable ids — `language` only ever touches
+        `label`."""
+        en_ids = [r["id"] for r in client.get("/reports/sections", headers=auth_headers).json()]
+        es_ids = [
+            r["id"] for r in client.get("/reports/sections?language=es", headers=auth_headers).json()
+        ]
+        assert en_ids == es_ids
+
+    def test_the_endpoint_does_not_consult_accept_language(self, client, auth_headers):
+        """Same discipline as report generation: a browser's locale must not
+        decide the language of what is, functionally, shared UI vocabulary."""
+        resp = client.get(
+            "/reports/sections",
+            headers={**auth_headers, "Accept-Language": "es-MX,es;q=0.9"},
+        )
+        assert resp.status_code == 200
+        by_id = {row["id"]: row["label"] for row in resp.json()}
+        assert by_id["entity_stats"] == "Entity Statistics"
+
+
 class TestTheDisclosureIsSpecific:
     """Phase 9 found the disclosure was true but not useful.
 

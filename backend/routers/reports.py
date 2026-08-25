@@ -170,14 +170,37 @@ def generate_report(
 
 
 @router.get("/reports/sections", tags=["reports"])
-def list_report_sections(_: models.User = Depends(get_current_user)):
+def list_report_sections(
+    _: models.User = Depends(get_current_user),
+    language: str | None = Query(
+        default=None,
+        description=(
+            "Language for the returned section labels (en, es). Omitted means "
+            "English — existing callers are unaffected. Uses the same "
+            "resolve_report_language() semantics as report generation, so this "
+            "endpoint never consults Accept-Language either."
+        ),
+        max_length=35,
+    ),
+):
     """Return available report sections with per-format availability, so a caller
     can see before exporting which formats render each section (the omission
-    header reports it after the fact)."""
+    header reports it after the fact).
+
+    The label is resolved from the same `report.section.<id>` catalog key
+    `assemble_report_document()` substitutes for every section title, so this
+    endpoint and a generated report can never name a section differently
+    (#268). Section `id` values and the `formats` shape are unchanged —
+    `language` is additive and optional.
+    """
+    from backend.i18n.catalog import translate
+    from backend.i18n.locale import resolve_report_language
+
+    resolved_language = resolve_report_language(language)
     return [
         {
             "id": k,
-            "label": _report_builder.SECTION_LABELS[k],
+            "label": translate(f"report.section.{k}", resolved_language),
             "formats": {
                 fmt: format_support.supports(fmt, k)
                 for fmt in format_support.EXPORT_FORMATS
