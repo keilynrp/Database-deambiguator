@@ -13,6 +13,7 @@ Este directorio contiene el sistema operativo de producto y delivery de UKIP.
 - `ENTERPRISE_CONTROL_REGISTER.md`: autoridad sobre estado, prioridad, ownership y evidencia de controles enterprise.
 - `ENTERPRISE_READINESS_PROGRAM.md`: autoridad sobre madurez, gates y politica de claims enterprise.
 - `epics/EPIC-018-enterprise-assurance-and-operational-readiness.md`: ejecucion consolidada del programa enterprise.
+- `evidence/`: indices de evidencia de release, versionados por RC, que operan el registro de controles sobre un release candidate real (`ER-CTRL-001`). Ver `evidence/README.md` para el procedimiento reproducible.
 - `STORY_MAP.md`: vista funcional resumida del backlog refinado.
 - `epics/`: epicas activas del programa.
 - `stories/`: historias de usuario activas o refinadas.
@@ -57,6 +58,7 @@ La fuente de verdad sigue este orden:
 3. Ejecucion: `docs/product/epics/EPIC-018-enterprise-assurance-and-operational-readiness.md`
 4. Portfolio: `docs/product/PROGRAM_BACKLOG.md`
 5. Evidencia: `docs/product/TRACEABILITY_MATRIX.md`
+6. Evidencia de release versionada por RC: `docs/product/evidence/`
 
 La Runtime projection en `backend/enterprise_readiness.py` es una vista validada
 del registro, no una fuente paralela. Los roadmaps historicos no gobiernan
