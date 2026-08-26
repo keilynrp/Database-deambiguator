@@ -1,9 +1,8 @@
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 from backend.enterprise_controls import ENTERPRISE_CONTROLS
-
 
 ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE_DIR = ROOT / "docs/product/evidence"
