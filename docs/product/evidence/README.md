@@ -47,12 +47,23 @@ snapshot.
 3. **Read `docs/product/ENTERPRISE_CONTROL_REGISTER.md` as it stands at that
    SHA.** If it has changed since the last cycle, reconcile against the new
    text and call out the drift explicitly in the new evidence file.
-4. **Fill every P0/P1 control row.** One row per control, exactly once.
-   Use only one of the five evidence dispositions:
+4. **Persist the contemporaneous P0/P1 control-set snapshot**, then fill
+   every row it lists. Copy the exact list of P0/P1 control IDs from
+   `ENTERPRISE_CONTROLS` (`backend/enterprise_controls.py`) as of this
+   cycle into a ```` ```control-set-snapshot ```` fenced block under §1 (see
+   any existing RC file for the format). One row per control in that
+   snapshot, exactly once. Use only one of the five evidence dispositions:
    `EVIDENCED`, `PARTIALLY EVIDENCED`, `NOT EVIDENCED`,
    `OPERATOR ACTION REQUIRED`, `EXTERNAL ASSURANCE REQUIRED`.
    Cite exact run/job/artifact IDs. A branch name, a chat message, or an
    unlinked claim is not evidence.
+
+   `scripts/lint_release_evidence.py` validates every RC file against its
+   *own* persisted snapshot, not the current manifest — that is what keeps
+   older, settled RC files valid after later control additions/removals
+   (see "File naming" above). It additionally requires the *newest* RC's
+   snapshot to equal the current manifest's P0/P1 set, so a newly authored
+   RC cannot silently omit or invent a control.
 5. **Do not promote maturity from the evidence file alone.** A control's
    `current_maturity` only changes in
    `docs/product/ENTERPRISE_CONTROL_REGISTER.md` and

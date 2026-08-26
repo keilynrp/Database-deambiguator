@@ -32,6 +32,7 @@ REQUIRED_SECTIONS = (
     "## 11. Reproducible next-RC procedure",
 )
 SHA_RE = re.compile(r"`[0-9a-f]{40}`")
+CONTROL_SET_SNAPSHOT_RE = re.compile(r"```control-set-snapshot\n(.*?)```", re.DOTALL)
 
 
 def read(path: Path) -> str:
@@ -44,7 +45,24 @@ def rc_files() -> list[Path]:
     return sorted(p for p in EVIDENCE_DIR.glob("*.md") if p.name != "README.md")
 
 
-def validate_file(path: Path) -> list[str]:
+def current_p0_p1_ids() -> set[str]:
+    return {control.control_id for control in ENTERPRISE_CONTROLS if control.priority in ("P0", "P1")}
+
+
+def parse_control_set_snapshot(content: str) -> list[str] | None:
+    """Extract the RC's persisted, contemporaneous P0/P1 control-set snapshot.
+
+    This is the authority historical RC validation reconciles against — not
+    whatever `ENTERPRISE_CONTROLS` contains today — so that future control
+    additions/removals never require rewriting a settled RC file.
+    """
+    match = CONTROL_SET_SNAPSHOT_RE.search(content)
+    if not match:
+        return None
+    return [line.strip() for line in match.group(1).splitlines() if line.strip()]
+
+
+def validate_file(path: Path, *, is_newest: bool, current_ids: set[str]) -> list[str]:
     errors: list[str] = []
     if not RC_FILENAME_RE.match(path.name):
         errors.append(f"{path.name}: filename does not match RC-YYYY-MM-DD-NN.md")
@@ -58,7 +76,36 @@ def validate_file(path: Path) -> list[str]:
     if not SHA_RE.search(content):
         errors.append(f"{path.name}: no 40-character commit SHA found (backtick-quoted)")
 
-    expected_ids = {control.control_id for control in ENTERPRISE_CONTROLS}
+    persisted = parse_control_set_snapshot(content)
+    if persisted is None:
+        errors.append(
+            f"{path.name}: missing persisted control-set snapshot "
+            "(```control-set-snapshot fenced block)"
+        )
+        persisted = []
+
+    persisted_dupes = {cid for cid in persisted if persisted.count(cid) > 1}
+    for control_id in sorted(persisted_dupes):
+        errors.append(
+            f"{path.name}: control {control_id} listed more than once in the "
+            "persisted control-set snapshot"
+        )
+    expected_ids = set(persisted)
+
+    if is_newest and expected_ids and expected_ids != current_ids:
+        missing = current_ids - expected_ids
+        unknown = expected_ids - current_ids
+        for control_id in sorted(missing):
+            errors.append(
+                f"{path.name}: newest RC's persisted control-set snapshot is missing "
+                f"current P0/P1 control {control_id}"
+            )
+        for control_id in sorted(unknown):
+            errors.append(
+                f"{path.name}: newest RC's persisted control-set snapshot has "
+                f"{control_id}, which is not a current P0/P1 control"
+            )
+
     seen_ids: dict[str, int] = {}
     disposition_by_id: dict[str, str] = {}
     for line in content.splitlines():
@@ -106,8 +153,10 @@ def validate() -> list[str]:
     if not files:
         errors.append("docs/product/evidence/ has no RC-*.md evidence file")
         return errors
+    current_ids = current_p0_p1_ids()
+    newest = files[-1]
     for path in files:
-        errors.extend(validate_file(path))
+        errors.extend(validate_file(path, is_newest=(path == newest), current_ids=current_ids))
     return errors
 
 
