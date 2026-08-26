@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import logging
 from io import BytesIO
-from typing import List
 
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -53,8 +52,8 @@ def _autofit(ws, min_width: int = 10, max_width: int = 50) -> None:
             try:
                 cell_len = len(str(cell.value)) if cell.value is not None else 0
                 max_len = max(max_len, cell_len)
-            except Exception:
-                pass
+            except Exception:  # noqa: BLE001, S110 — a cell width is cosmetic;
+                pass  # any read failure just leaves the column at its floor width.
         ws.column_dimensions[col_letter].width = max(min_width, min(max_len + 2, max_width))
 
 
@@ -76,7 +75,7 @@ class EnterpriseExcelExporter:
         self,
         db: Session,
         domain_id: str,
-        sections: List[str],
+        sections: list[str],
         org_id: int | None = None,
         manual_sections: list[dict[str, str]] | None = None,
         language: str | None = None,
@@ -120,8 +119,8 @@ class EnterpriseExcelExporter:
         from backend import report_builder
         from backend.i18n.locale import resolve_report_language
         from backend.reporting.document import ReportDocument
-        from backend.reporting.localize import localize_document
         from backend.reporting.excel_renderer import render_excel
+        from backend.reporting.localize import localize_document
 
         language = resolve_report_language(language)
         requested = set(report_builder.canonical_sections(sections))
@@ -186,7 +185,7 @@ class EnterpriseExcelExporter:
         harmonization_section = sections_by_key.get("harmonization_log")
         if harmonization_section is not None:
             ws_harm = wb.create_sheet("Harmonization")
-            self._write_harmonization(ws_harm, db, org_id, payload=harmonization_section)
+            self._write_harmonization(ws_harm, db, org_id, payload=harmonization_section, language=language)
             collected.append((ws_harm.title, harmonization_section))
 
         # Built after the section sheets and moved to the front — the same shape
@@ -267,7 +266,7 @@ class EnterpriseExcelExporter:
         _autofit(ws)
 
     def _write_harmonization(
-        self, ws, db: Session, org_id: int | None, payload=None
+        self, ws, db: Session, org_id: int | None, payload=None, language: str | None = None
     ) -> None:
         """The one section sheet still written by hand rather than from the payload.
 
@@ -277,7 +276,15 @@ class EnterpriseExcelExporter:
         its caveat directly above the header, exactly as `render_excel` does for
         every migrated section. 6.2 caught this sheet stating its caveat and no
         finding — 5.2 wired the disclosure here and forgot the takeaway.
+
+        The Reverted column is a plain boolean, the same owned Yes/No vocabulary
+        `collect_journal_portfolio` uses for `is_in_doaj` — translated directly
+        with `translate()` since this cell is written by hand rather than
+        through a `SectionData` table that `localize_section` would otherwise
+        resolve.
         """
+        from backend.i18n.catalog import translate
+
         headers = ["ID", "Step ID", "Step Name", "Records Updated", "Fields Modified", "Executed At", "Reverted"]
         header_row = 1
         if payload is not None:
@@ -304,7 +311,10 @@ class EnterpriseExcelExporter:
             ws.cell(row=row_idx, column=4, value=h.records_updated)
             ws.cell(row=row_idx, column=5, value=h.fields_modified)
             ws.cell(row=row_idx, column=6, value=str(h.executed_at) if h.executed_at else "")
-            ws.cell(row=row_idx, column=7, value="Yes" if h.reverted else "No")
+            ws.cell(
+                row=row_idx, column=7,
+                value=translate("report.bool.yes" if h.reverted else "report.bool.no", language),
+            )
 
         _autofit(ws)
 

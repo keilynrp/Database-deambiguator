@@ -26462,8 +26462,29 @@
     },
     "/reports/sections": {
       "get": {
-        "description": "Return available report sections with per-format availability, so a caller\ncan see before exporting which formats render each section (the omission\nheader reports it after the fact).",
+        "description": "Return available report sections with per-format availability, so a caller\ncan see before exporting which formats render each section (the omission\nheader reports it after the fact).\n\nThe label is resolved from the same `report.section.<id>` catalog key\n`assemble_report_document()` substitutes for every section title, so this\nendpoint and a generated report can never name a section differently\n(#268). Section `id` values and the `formats` shape are unchanged \u2014\n`language` is additive and optional.",
         "operationId": "get_reports_sections",
+        "parameters": [
+          {
+            "description": "Language for the returned section labels (en, es). Omitted means English \u2014 existing callers are unaffected. Uses the same resolve_report_language() semantics as report generation, so this endpoint never consults Accept-Language either.",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 35,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Language for the returned section labels (en, es). Omitted means English \u2014 existing callers are unaffected. Uses the same resolve_report_language() semantics as report generation, so this endpoint never consults Accept-Language either.",
+              "title": "Language"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -26472,6 +26493,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [

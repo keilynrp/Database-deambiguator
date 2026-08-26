@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime, timezone
-from typing import List, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -19,6 +19,18 @@ from backend.schema_registry import registry
 from backend.services.analytics_service import AnalyticsService
 from backend.services.pattern_discovery import PatternDiscoveryService
 from backend.tenant_access import scope_query_to_org
+
+if TYPE_CHECKING:
+    # Every collector otherwise imports `SectionData` (and `assemble_report_
+    # document` imports `ReportDocument`) lazily, inside its own function body
+    # — deliberately, so a module that only wants one collector does not pay
+    # for the whole reporting package at import time. That leaves the return-
+    # type annotations with nothing to resolve against at module scope; under
+    # `from __future__ import annotations` neither name is ever evaluated at
+    # runtime, so a type-checking-only import here satisfies the annotation
+    # without adding a real import-time dependency.
+    from backend.reporting.document import ReportDocument
+    from backend.reporting.section_data import SectionData
 
 # Every field here is a catalog key, resolved at the render boundary like any
 # other section copy. `focus` and `brief_hint` were two literals joined by an
@@ -115,7 +127,7 @@ def collect_stakeholder_reading(
     benchmark_profile_id: str | None = None,
     benchmark_org: models.Organization | None = None,
     stakeholder_profile: str | None = None,
-) -> "SectionData":
+) -> SectionData:
     """Format-neutral stakeholder lens: a single Narrative framing the brief for
     the chosen audience. Migrated onto the shared payload (phase 3.11). The
     attention-point bullets flatten to paragraphs and the bold labels become
@@ -254,7 +266,6 @@ def _section_stakeholder_reading(
     # only so a direct caller gets the same rendering `build()` produces,
     # matching the other twelve `_section_*` wrappers below.
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(localize_section(collect_stakeholder_reading(
         db, domain_id, org_id, benchmark_profile_id, benchmark_org, stakeholder_profile
     )))
@@ -425,14 +436,17 @@ def _harmonization_query(db: Session, org_id: int | None):
     return scope_query_to_org(db.query(models.HarmonizationLog), models.HarmonizationLog, org_id)
 
 
-def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> SectionData:
     """Format-neutral entity statistics: KPI cards + validation distribution.
 
     First section migrated onto the shared section payload; every format renders
     from this one collector rather than re-querying and re-formatting.
     """
     from backend.reporting.section_data import (
-        SectionData, StatGrid, StatItem, Table,
+        SectionData,
+        StatGrid,
+        StatItem,
+        Table,
     )
 
     query = _entities_query(db, domain_id, org_id)
@@ -526,16 +540,18 @@ def collect_entity_stats(db: Session, domain_id: str, org_id: int | None) -> "Se
 
 def _section_entity_stats(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(localize_section(collect_entity_stats(db, domain_id, org_id)))
 
 
-def collect_enrichment_coverage(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+def collect_enrichment_coverage(db: Session, domain_id: str, org_id: int | None) -> SectionData:
     """Format-neutral enrichment coverage: coverage/avg-citation KPIs plus the
     top enriched entities. Migrated onto the shared section payload (phase 3.2).
     """
     from backend.reporting.section_data import (
-        SectionData, StatGrid, StatItem, Table,
+        SectionData,
+        StatGrid,
+        StatItem,
+        Table,
     )
 
     query = _entities_query(db, domain_id, org_id)
@@ -615,11 +631,10 @@ def collect_enrichment_coverage(db: Session, domain_id: str, org_id: int | None)
 
 def _section_enrichment_coverage(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(localize_section(collect_enrichment_coverage(db, domain_id, org_id)))
 
 
-def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None) -> SectionData:
     """Format-neutral top secondary labels: a share table where each row's bar is
     drawn relative to the most common label. Migrated onto the shared payload
     (phase 3.3).
@@ -651,7 +666,7 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
         for r in rows_q
     )
     table = Table(
-        columns=("Label", "report.col.top_secondary_labels.entities", "report.col.top_secondary_labels.share", "report.col.top_secondary_labels.weight"),
+        columns=("report.col.top_secondary_labels.label", "report.col.top_secondary_labels.entities", "report.col.top_secondary_labels.share", "report.col.top_secondary_labels.weight"),
         rows=rows,
         bar_column=3,
     )
@@ -702,7 +717,6 @@ def collect_top_secondary_labels(db: Session, domain_id: str, org_id: int | None
 
 def _section_top_brands(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(localize_section(collect_top_secondary_labels(db, domain_id, org_id)))
 
 
@@ -719,7 +733,7 @@ def _section_top_brands(db: Session, domain_id: str, org_id: int | None) -> str:
 _TOPIC_CAP = 20
 
 
-def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> SectionData:
     """Format-neutral top concepts (report-presentation, task 3.4).
 
     Note the section key says "clusters" and this returns most-frequent
@@ -739,7 +753,7 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
     try:
         result = TopicAnalyzer().top_topics(domain_id=domain_id, top_n=_TOPIC_CAP, org_id=org_id)
         topics = result.get("topics", []) or []
-    except Exception:
+    except Exception:  # noqa: BLE001 — deliberately broad: any analyzer failure
         # An analyzer failure is reported as an empty section rather than a
         # broken report; the empty-state takeaway says so explicitly.
         topics = []
@@ -789,8 +803,10 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
             ),
         ),
         takeaway=(
-            f'"{rows[0][0]}" is the most frequent concept, accounting for '
-            f'{rows[0][2]} of the top {len(topics)}'
+            _counted(
+                "report.takeaway.topics", len(topics),
+                concept=rows[0][0], pct=lead_share,
+            )
         ),
         method=method,
         # Concentration is the finding worth reading; an even spread is not.
@@ -800,11 +816,10 @@ def collect_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> "
 
 def _section_topic_clusters(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(localize_section(collect_topic_clusters(db, domain_id, org_id)))
 
 
-def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -> SectionData:
     """Format-neutral harmonization log: the recent harmonization steps as a
     table. Migrated onto the shared payload (phase 3.5, HTML + PPTX). The
     Applied/Reverted status badge becomes a plain Status column. Excel keeps its
@@ -818,13 +833,13 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
         (
             l.step_name or l.step_id,
             f"{l.records_updated or 0:,}",
-            "Reverted" if l.reverted else "Applied",
+            "report.status.harmonization.reverted" if l.reverted else "report.status.harmonization.applied",
             l.executed_at.strftime("%Y-%m-%d %H:%M") if l.executed_at else "—",
         )
         for l in logs
     )
     table = Table(
-        columns=("Step", "report.col.harmonization_log.updated", "Status", "report.col.harmonization_log.executed"),
+        columns=("report.col.harmonization_log.step", "report.col.harmonization_log.updated", "report.col.harmonization_log.status", "report.col.harmonization_log.executed"),
         rows=rows,
     )
     from backend.reporting.section_data import Materiality, StatGrid, StatItem
@@ -849,7 +864,6 @@ def collect_harmonization_log(db: Session, domain_id: str, org_id: int | None) -
 
 def _section_harmonization_log(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(localize_section(collect_harmonization_log(db, domain_id, org_id)))
 
 
@@ -858,7 +872,7 @@ def collect_decision_recommendations(
     domain_id: str,
     org_id: int | None,
     benchmark_org: models.Organization | None = None,
-) -> "SectionData":
+) -> SectionData:
     """Format-neutral suggested next actions: a prioritized recommendation table.
     Migrated onto the shared payload (phase 3.9). The per-card priority badge
     becomes a plain Priority column so every format renders the same rows.
@@ -927,7 +941,6 @@ def _section_decision_recommendations(
     benchmark_org: models.Organization | None = None,
 ) -> str:
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(localize_section(collect_decision_recommendations(db, domain_id, org_id, benchmark_org)))
 
 
@@ -936,14 +949,18 @@ def collect_impact_projection(
     domain_id: str,
     org_id: int | None,
     benchmark_org: models.Organization | None = None,
-) -> "SectionData":
+) -> SectionData:
     """Format-neutral impact projection: KPI cards, an executive-interpretation
     narrative, and one Meter per projection driver. Migrated onto the shared
     payload (phase 3.7); first section to exercise the Narrative and Meter
     primitives in a real migration.
     """
     from backend.reporting.section_data import (
-        Meter, Narrative, SectionData, StatGrid, StatItem,
+        Meter,
+        Narrative,
+        SectionData,
+        StatGrid,
+        StatItem,
     )
 
     snapshot = AnalyticsService.get_domain_snapshot(
@@ -1020,7 +1037,6 @@ def _section_impact_projection(
     benchmark_org: models.Organization | None = None,
 ) -> str:
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(localize_section(collect_impact_projection(db, domain_id, org_id, benchmark_org)))
 
 
@@ -1029,7 +1045,7 @@ def collect_hidden_patterns(
     domain_id: str,
     org_id: int | None,
     benchmark_org: models.Organization | None = None,
-) -> "SectionData":
+) -> SectionData:
     """Format-neutral hidden patterns: an executive-reading narrative plus a
     table of discovered signals, the impact score drawn as a bar. Migrated onto
     the shared payload (phase 3.8). The per-card confidence badge becomes a plain
@@ -1067,9 +1083,7 @@ def collect_hidden_patterns(
         rows=rows,
         bar_column=5,
     )
-    from backend.reporting.section_data import Materiality
-
-    from backend.reporting.section_data import StatGrid, StatItem
+    from backend.reporting.section_data import Materiality, StatGrid, StatItem
 
     # The count leads the takeaway, so it has to be visible: checking the
     # sentence should not mean counting table rows.
@@ -1100,7 +1114,6 @@ def _section_hidden_patterns(
     benchmark_org: models.Organization | None = None,
 ) -> str:
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(localize_section(collect_hidden_patterns(db, domain_id, org_id, benchmark_org)))
 
 
@@ -1110,14 +1123,18 @@ def collect_institutional_benchmark(
     org_id: int | None,
     benchmark_profile_id: str | None = None,
     benchmark_org: models.Organization | None = None,
-) -> "SectionData":
+) -> SectionData:
     """Format-neutral institutional benchmark: readiness KPIs, an executive
     reading, and gap/rule tables. Migrated onto the shared payload (phase 3.6).
     The status/priority/pass badges become plain text so every format renders
     the same content.
     """
     from backend.reporting.section_data import (
-        Narrative, SectionData, StatGrid, StatItem, Table,
+        Narrative,
+        SectionData,
+        StatGrid,
+        StatItem,
+        Table,
     )
 
     snapshot = AnalyticsService.get_domain_snapshot(
@@ -1166,7 +1183,7 @@ def collect_institutional_benchmark(
         StatItem(
             label="report.stat.benchmark.readiness",
             value=f"{readiness_pct}%",
-            sub=f"{passed_rules} of {total_rules} rules satisfied",
+            sub=_counted("report.stat.benchmark.sub.rules_satisfied", total_rules, passed=passed_rules),
         ),
         StatItem(
             label="report.col.benchmark.status",
@@ -1222,7 +1239,6 @@ def _section_institutional_benchmark(
     benchmark_org: models.Organization | None = None,
 ) -> str:
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(
         localize_section(
             collect_institutional_benchmark(
@@ -1232,7 +1248,7 @@ def _section_institutional_benchmark(
     )
 
 
-def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> SectionData:
     """Format-neutral saved agentic-chat traces (report-presentation, task 3.5).
 
     Migrating this fixed two defects the bespoke HTML builder carried. It styled
@@ -1245,12 +1261,7 @@ def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "S
     """
     from backend.reporting.section_data import Materiality, Narrative, SectionData
 
-    method = (
-        "AI-generated answers saved from the research assistant, not verified "
-        "findings about the corpus. Each entry records the tools invoked and "
-        "the sources cited so the answer can be audited; the answer itself has "
-        "not been reviewed. Shows the 5 most recent saved traces."
-    )
+    method = "report.method.trace"
 
     traces = (
         db.query(models.AnalysisContext)
@@ -1285,7 +1296,8 @@ def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "S
     for trace in traces:
         try:
             payload = json.loads(trace.context_snapshot or "{}")
-        except Exception:
+        except Exception:  # noqa: BLE001 — a malformed snapshot degrades to an
+            # empty payload rather than breaking the whole report.
             payload = {}
         question = payload.get("question") or trace.label.replace("agentic-chat:", "").strip()
         answer = (payload.get("answer") or "")[:900]
@@ -1328,10 +1340,12 @@ def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "S
         key="agentic_trace",
         title="Agentic Research Trace",
         blocks=(summary, *blocks),
-        takeaway=(
-            f"{len(traces)} saved agentic answer{'s' if len(traces) != 1 else ''} "
-            f"in this brief, drawing on {len(tools_seen) or 'no'} distinct tool"
-            f"{'s' if len(tools_seen) != 1 else ''}"
+        # Two independent counts (saved answers, distinct tools) govern the same
+        # sentence, which is one count too many for `_counted`'s single-count
+        # agreement (see its docstring). Rephrased as two labelled figures, like
+        # report.takeaway.collab, so neither word inflects on either number.
+        takeaway=with_params(
+            "report.takeaway.trace", saved=f"{len(traces):,}", tools=f"{len(tools_seen):,}",
         ),
         method=method,
         # Never leads: these are generated answers, not findings about the data.
@@ -1341,7 +1355,6 @@ def collect_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> "S
 
 def _section_agentic_trace(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(localize_section(collect_agentic_trace(db, domain_id, org_id)))
 
 
@@ -1386,7 +1399,7 @@ def _authority_backlog_ratio(db: Session, org_id: int | None) -> tuple[int, int]
     return pending, total
 
 
-def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -> SectionData:
     """Format-neutral authority-control reading: resolution status, review
     backlog, and what that backlog means for the report's own reliability.
 
@@ -1395,7 +1408,11 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
     domain.
     """
     from backend.reporting.section_data import (
-        Narrative, SectionData, StatGrid, StatItem, Table,
+        Narrative,
+        SectionData,
+        StatGrid,
+        StatItem,
+        Table,
     )
 
     query = scope_query_to_org(
@@ -1442,7 +1459,7 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
                  sub=with_params("report.stat.authority.sub.of_total",
                                  pct=round(confirmed / total * 100))),
         StatItem(label="report.stat.authority.pending", value=f"{pending:,}",
-                 sub=f"{backlog_pct}% awaiting a human decision"),
+                 sub=with_params("report.stat.authority.sub.awaiting_decision", pct=backlog_pct)),
         StatItem(label="report.stat.authority.mean_confidence", value=f"{round(float(mean_confidence) * 100)}%",
                  sub="report.stat.authority.sub.all_attempts"),
     ))
@@ -1452,9 +1469,9 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
         func.count(models.AuthorityRecord.id),
     ).group_by(models.AuthorityRecord.resolution_status).all()
     distribution = Table(
-        columns=("report.col.authority.resolution_status", "report.col.authority.records", "Share"),
+        columns=("report.col.authority.resolution_status", "report.col.authority.records", "report.col.authority.share"),
         rows=tuple(
-            (status or "unknown", f"{count:,}", f"{round(count / total * 100)}%")
+            (status or "report.authority.resolution.unknown", f"{count:,}", f"{round(count / total * 100)}%")
             for status, count in sorted(by_resolution, key=lambda r: -r[1])
         ),
         bar_column=2,
@@ -1481,7 +1498,7 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
             (
                 r[0] or "—",
                 r[1] or "—",
-                r[2] or "unresolved",
+                r[2] or "report.authority.resolution.unresolved",
                 f"{round(float(r[3] or 0) * 100)}%",
                 r[4] or "—",
             )
@@ -1545,7 +1562,6 @@ def collect_authority_control(db: Session, domain_id: str, org_id: int | None) -
 
 def _section_authority_control(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(localize_section(collect_authority_control(db, domain_id, org_id)))
 
 
@@ -1556,7 +1572,7 @@ _COLLAB_TOP_LIMIT = 10
 _COLLAB_STALENESS_DAYS = 30
 
 
-def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None) -> SectionData:
     """Format-neutral collaboration-graph reading from PRECOMPUTED `AuthorStats`
     and `CoauthorEdge`: author/edge/community counts, the most central authors,
     and bridge authors spanning communities.
@@ -1568,7 +1584,11 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
     from datetime import datetime, timezone
 
     from backend.reporting.section_data import (
-        Narrative, SectionData, StatGrid, StatItem, Table,
+        Narrative,
+        SectionData,
+        StatGrid,
+        StatItem,
+        Table,
     )
 
     stats_q = scope_query_to_org(
@@ -1731,7 +1751,6 @@ def collect_collaboration_graph(db: Session, domain_id: str, org_id: int | None)
 
 def _section_collaboration_graph(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(localize_section(collect_collaboration_graph(db, domain_id, org_id)))
 
 
@@ -1752,7 +1771,7 @@ def _bayes_with_interval(bayes, ci_low, ci_high) -> str:
     return f"{float(bayes):.2f} [{float(ci_low):.2f}, {float(ci_high):.2f}]"
 
 
-def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -> "SectionData":
+def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -> SectionData:
     """Format-neutral journal-portfolio reading from `JournalMetric`: where the
     work was published, at what open-access cost, and with what field-normalized
     standing — the Bayesian estimate always carried with its credible interval.
@@ -1760,7 +1779,11 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
     `domain_id` is not a filter (org-scoped like the other new sections).
     """
     from backend.reporting.section_data import (
-        Narrative, SectionData, StatGrid, StatItem, Table,
+        Narrative,
+        SectionData,
+        StatGrid,
+        StatItem,
+        Table,
     )
 
     query = scope_query_to_org(
@@ -1798,7 +1821,7 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
     grid = StatGrid(items=(
         StatItem(label="report.stat.journal.journals", value=f"{total:,}", sub="report.stat.journal.sub.distinct_venues"),
         StatItem(label="report.stat.journal.in_doaj", value=f"{doaj_pct}%",
-                 sub=f"{in_doaj:,} of {total:,} open-access listed"),
+                 sub=_counted("report.stat.journal.sub.open_access_listed", total, in_doaj=f"{in_doaj:,}")),
         StatItem(label="report.stat.journal.charging_apc", value=f"{with_apc:,}",
                  sub="report.stat.journal.sub.publication_fee"),
     ))
@@ -1831,7 +1854,7 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
                 _bayes_with_interval(r[2], r[3], r[4]),
                 f"{r[5] or 0:,}",
                 f"${int(r[6]):,}" if r[6] else "—",
-                "Yes" if r[7] else "No",
+                "report.bool.yes" if r[7] else "report.bool.no",
             )
             for r in top
         ),
@@ -1865,7 +1888,6 @@ def collect_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -
 
 def _section_journal_portfolio(db: Session, domain_id: str, org_id: int | None) -> str:
     from backend.reporting.html_renderer import render_html
-    from backend.reporting.localize import localize_section
     return render_html(localize_section(collect_journal_portfolio(db, domain_id, org_id)))
 
 
@@ -1986,14 +2008,14 @@ def canonical_sections(sections: list[str]) -> list[str]:
 def assemble_report_document(
     db: Session,
     domain_id: str,
-    sections: List[str],
+    sections: list[str],
     title: str | None = None,
     org_id: int | None = None,
     benchmark_profile_id: str | None = None,
     benchmark_org: models.Organization | None = None,
     stakeholder_profile: str | None = None,
-    manual_sections: List[ManualReportSection] | None = None,
-) -> "ReportDocument":
+    manual_sections: list[ManualReportSection] | None = None,
+) -> ReportDocument:
     """Collect every section HTML/PDF renders into one semantic document.
 
     Renderer-neutral and pre-localization — see
@@ -2012,7 +2034,8 @@ def assemble_report_document(
     try:
         d = registry.get_domain(domain_id)
         domain_name = d.name if d else domain_id
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 — an unresolvable domain name falls
+        # back to the id itself rather than failing the whole report.
         pass
 
     stakeholder = _stakeholder_profile(stakeholder_profile)
@@ -2048,9 +2071,9 @@ def assemble_report_document(
             # through, so a new section cannot forget to.
             payload = _replace(payload, exhibit=exhibit_no, title=f"report.section.{sec}")
             doc_sections.append(payload)
-        except Exception as exc:
-            # Per-section error boundary: one failing collector degrades its
-            # own section, it does not take the report down.
+        except Exception as exc:  # noqa: BLE001 — deliberate: per-section error
+            # boundary. One failing collector degrades its own section, it
+            # does not take the report down.
             doc_sections.append(SectionError(
                 section_key=sec, title=f"report.section.{sec}", detail=str(exc)
             ))
@@ -2074,13 +2097,13 @@ def assemble_report_document(
 def build(
     db: Session,
     domain_id: str,
-    sections: List[str],
+    sections: list[str],
     title: str | None = None,
     org_id: int | None = None,
     benchmark_profile_id: str | None = None,
     benchmark_org: models.Organization | None = None,
     stakeholder_profile: str | None = None,
-    manual_sections: List[ManualReportSection] | None = None,
+    manual_sections: list[ManualReportSection] | None = None,
     language: str | None = None,
 ) -> str:
     """Return a complete, self-contained HTML report string.

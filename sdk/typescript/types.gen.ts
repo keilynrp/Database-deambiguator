@@ -13992,9 +13992,25 @@ export type PostReportsGenerateResponses = {
 export type GetReportsSectionsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Language
+         *
+         * Language for the returned section labels (en, es). Omitted means English — existing callers are unaffected. Uses the same resolve_report_language() semantics as report generation, so this endpoint never consults Accept-Language either.
+         */
+        language?: string | null;
+    };
     url: '/reports/sections';
 };
+
+export type GetReportsSectionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetReportsSectionsError = GetReportsSectionsErrors[keyof GetReportsSectionsErrors];
 
 export type GetReportsSectionsResponses = {
     /**
