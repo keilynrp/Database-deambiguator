@@ -69,9 +69,14 @@ The PR/evidence branch used to capture the gitleaks failure was deleted after ca
 
 ---
 
-## 6. Operator steps (one-time, repo settings — pending)
+## 6. Operator steps (one-time, repo settings — configuration complete, observation window running)
 
-The following steps must be completed by the security/platform owner in GitHub repository settings. Until they are done, ER-SDLC-001 remains at `implemented` rather than `operated`.
+The repository-settings steps below are now complete (§6.2 steps 1–2,
+activated 2026-08-27). `ER-SDLC-001` remains at `implemented` rather than
+`operated` until the resulting 30-day observation window (§6.2 step 4)
+completes with reviewed, retained evidence and an accountable-owner
+attestation — see
+`docs/operating/ER-SDLC-001-RULESET-ACTIVATION-EVIDENCE-2026-08-27.md` §9.
 
 ### 6.1 Platform discovery (issue #317, 2026-08-27): rulesets reject a per-job `workflows` rule
 
@@ -120,31 +125,46 @@ Product Owner authorization and has not occurred.
 
 ### 6.2 Remaining operator steps
 
-1. **Enable secret scanning + push protection**: Settings → Code security and analysis → enable Secret scanning and Push protection.
-2. **Branch protection on `main`**: configure `required_status_checks` (repository-level primitive) to require exactly:
+1. **Enable secret scanning + push protection**: Settings → Code security and
+   analysis → enable Secret scanning and Push protection. **Done.**
+   Independently confirmed live (2026-08-27):
+   `secret_scanning: enabled`, `secret_scanning_push_protection: enabled`,
+   0 open secret-scanning alerts. See
+   `docs/operating/ER-SDLC-001-RULESET-ACTIVATION-EVIDENCE-2026-08-27.md` §5.
+2. **Branch protection on `main`**: configure `required_status_checks`
+   (repository-level primitive) to require exactly:
    - `backend-required-gate`
    - `lint-required-gate`
    - `security-required-gate`
    - `codeql-required-gate`
    - `docker-required-gate`
+
+   **Done.** Activated on the `UKIP_System` ruleset (id `18524885`) at
+   `2026-08-27T02:58:08.760-06:00`, with `main` at PR #318's merge commit
+   `4979555cd42960622c60092c2812c973eb21fe7e`. All five contexts are pinned
+   to `integration_id: 15368` (the GitHub Actions App); `bypass_actors: []`
+   and `current_user_can_bypass: never` are unchanged from before
+   activation. Full before/after state, independent re-verification, and
+   the run/job IDs proving all five contexts are real and green:
+   `docs/operating/ER-SDLC-001-RULESET-ACTIVATION-EVIDENCE-2026-08-27.md`.
 3. PR #318 (exact head `772bb381680ca9d2c89cdeddb8e655a670f790c9`) observed all
    five aggregate contexts above passing on a real PR, alongside all five
    authoritative workflows green on that same head. That observation
-   validates the compatibility layer only. It does **not** start the 30-day
-   observation window in step 5 below, because the live repository
-   `required_status_checks` ruleset has not yet been activated — §6.1's
-   `UKIP_System` ruleset still contains only `deletion` and
-   `non_fast_forward`.
-4. The 30-day observation window starts only once step 2's live ruleset
-   activation is actually completed and evidenced — exact activation
-   timestamp, before/after ruleset configuration, and the exact five
-   required-check names configured. As of this revision, that window has
-   **not** started.
+   validated the compatibility layer only, and did not by itself start the
+   30-day observation window in step 5 — the live ruleset activation in
+   step 2 was a separate, subsequent event, now completed.
+4. The 30-day observation window started at step 2's activation timestamp:
+   **2026-08-27T02:58:08.760-06:00**, targeting **2026-09-26T02:58:08.760-06:00**.
+   See `docs/operating/ER-SDLC-001-RULESET-ACTIVATION-EVIDENCE-2026-08-27.md`
+   §6 for the retained-evidence plan and invalidation conditions for this
+   window.
 5. Per `docs/product/ENTERPRISE_CONTROL_REGISTER.md`, `ER-SDLC-001` may move
    from `implemented` to `operated` only after **30 days of blocking-gate
    operation and retained SBOM/security artifacts**, with that evidence
    reviewed and attested by the accountable owner — not merely after "at
-   least one real PR" observing the checks exist and pass.
+   least one real PR" observing the checks exist and pass, and not merely
+   after activation. `ER-SDLC-001` remains `implemented` as of this
+   revision; the window in step 4 has started but not completed.
 
 ---
 
