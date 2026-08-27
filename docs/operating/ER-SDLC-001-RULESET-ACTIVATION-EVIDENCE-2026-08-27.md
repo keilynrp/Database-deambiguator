@@ -105,10 +105,12 @@ pull_request`, and `conclusion: success` — this is PR #318's final commit
 | CodeQL | `33055363290` | `codeql-required-gate` | `98461267159` | success |
 | Docker Images | `33055363330` | `docker-required-gate` | `98461499070` | success |
 
-Both the pre-merge PR run and the independent post-merge push-to-main run of
-the identical activation SHA are clean — unlike the flake recorded in
-`docs/product/evidence/RC-2026-08-26-01.md` §5.2–§5.3 for a prior SHA, there
-is no discrepancy between the two runs here.
+Both the final pre-merge PR validation on
+`83bfc467f49e65c7fd558b25c724dfaaccc2f64a` and the independent post-merge
+push-to-main validation on activation SHA
+`4979555cd42960622c60092c2812c973eb21fe7e` are clean — unlike the flake
+recorded in `docs/product/evidence/RC-2026-08-26-01.md` §5.2–§5.3 for a prior
+SHA, there is no discrepancy between the two runs here.
 
 ### 4.3 Supply-chain / SBOM evidence (Docker Images run `33055363330`)
 
