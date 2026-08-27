@@ -1,0 +1,160 @@
+name: Backup Freshness
+
+# ER-BCP-001 provider observation, reconciled from the historical
+# ops/epic018-backup-restore workflow. See
+# docs/operating/ER-BCP-001-HISTORICAL-RECONCILIATION.md for the audit that
+# produced this design.
+#
+# This job does not decide whether backups are fresh. It only:
+#   1. lists the newest object in the backup bucket with read-only
+#      credentials, and
+#   2. reports what it observed to the existing backup-assurance API
+#      (POST /ops/backups/events) — the single source of truth already
+#      evaluated by backend/backup_assurance.py and surfaced at
+#      GET /ops/backups/status and GET /ops/checks.
+# It then reads that same status endpoint and fails the run on a
+# backup-related problem. It deliberately does not gate on
+# `provider_reachable`: that signal requires a refresh inside a 15-minute
+# window (backend.backup_assurance.PROVIDER_REACHABILITY_MAX_AGE_MINUTES),
+# which a daily workflow cannot honestly provide. See the reconciliation
+# doc's "gap this audit surfaced" section and the PR's residual risks.
+#
+# OPERATOR ACTION REQUIRED before this workflow can do anything but fail
+# fast: the six secrets referenced below do not exist yet. Until they are
+# configured, every run stops at the first step with a clear, non-secret
+# error instead of silently no-op'ing or fabricating evidence.
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # daily 07:00 UTC — matches the historical cadence
+  workflow_dispatch:
+    inputs:
+      prefix:
+        description: "Override bucket prefix"
+        required: false
+        default: "pg/"
+
+permissions:
+  contents: read
+
+env:
+  BACKUP_ENVIRONMENT: production
+  BACKUP_PROVIDER_LABEL: s3-compatible
+
+jobs:
+  observe-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require provider and evidence-API secrets
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -z "${{ secrets.S3_BACKUP_ENDPOINT }}" ] && missing+=("S3_BACKUP_ENDPOINT")
+          [ -z "${{ secrets.S3_BACKUP_BUCKET }}" ] && missing+=("S3_BACKUP_BUCKET")
+          [ -z "${{ secrets.S3_BACKUP_RO_ACCESS_KEY_ID }}" ] && missing+=("S3_BACKUP_RO_ACCESS_KEY_ID")
+          [ -z "${{ secrets.S3_BACKUP_RO_SECRET_ACCESS_KEY }}" ] && missing+=("S3_BACKUP_RO_SECRET_ACCESS_KEY")
+          [ -z "${{ secrets.UKIP_BACKUP_EVIDENCE_API_BASE_URL }}" ] && missing+=("UKIP_BACKUP_EVIDENCE_API_BASE_URL")
+          [ -z "${{ secrets.UKIP_BACKUP_EVIDENCE_API_KEY }}" ] && missing+=("UKIP_BACKUP_EVIDENCE_API_KEY")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Backup freshness workflow is not yet configured. Missing repository secrets: ${missing[*]}. See the OPERATOR ACTION REQUIRED items in docs/operating/BACKUP_RESTORE_RUNBOOK.md."
+            exit 1
+          fi
+
+      - name: List newest backup object (read-only)
+        id: observe
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_BACKUP_RO_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_BACKUP_RO_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          S3_ENDPOINT: ${{ secrets.S3_BACKUP_ENDPOINT }}
+          S3_BUCKET: ${{ secrets.S3_BACKUP_BUCKET }}
+          PREFIX: ${{ inputs.prefix || 'pg/' }}
+        run: |
+          set -euo pipefail
+          newest="$(aws s3api list-objects-v2 \
+            --endpoint-url "${S3_ENDPOINT}" \
+            --bucket "${S3_BUCKET}" \
+            --prefix "${PREFIX}" \
+            --query 'sort_by(Contents, &LastModified)[-1].{key: Key, ts: LastModified, size: Size, etag: ETag}' \
+            --output json)"
+          if [ "${newest}" = "null" ] || [ -z "${newest}" ]; then
+            echo "::error::No backup objects found under prefix '${PREFIX}' in the configured bucket — backups are NOT running."
+            exit 1
+          fi
+          key="$(echo "${newest}" | jq -r .key)"
+          ts="$(echo "${newest}" | jq -r .ts)"
+          size="$(echo "${newest}" | jq -r .size)"
+          etag="$(echo "${newest}" | jq -r '.etag | gsub("\"";"")')"
+          {
+            echo "key=${key}"
+            echo "ts=${ts}"
+            echo "size=${size}"
+            echo "etag=${etag}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Newest backup object: ${key} (${ts}, ${size} bytes)"
+
+      - name: Record observed backup as evidence
+        env:
+          API_BASE_URL: ${{ secrets.UKIP_BACKUP_EVIDENCE_API_BASE_URL }}
+          API_KEY: ${{ secrets.UKIP_BACKUP_EVIDENCE_API_KEY }}
+          BACKUP_KEY: ${{ steps.observe.outputs.key }}
+          BACKUP_TS: ${{ steps.observe.outputs.ts }}
+          BACKUP_SIZE: ${{ steps.observe.outputs.size }}
+          BACKUP_ETAG: ${{ steps.observe.outputs.etag }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          payload=$(jq -n \
+            --arg event_type "backup" \
+            --arg status "completed" \
+            --arg environment "${BACKUP_ENVIRONMENT}" \
+            --arg provider "${BACKUP_PROVIDER_LABEL}" \
+            --arg backup_id "${BACKUP_KEY}" \
+            --arg started_at "${BACKUP_TS}" \
+            --arg completed_at "${BACKUP_TS}" \
+            --argjson size_bytes "${BACKUP_SIZE}" \
+            --arg integrity_ref "${BACKUP_ETAG}" \
+            --arg run_id "${RUN_ID}" \
+            '{event_type: $event_type, status: $status, environment: $environment, provider: $provider, backup_id: $backup_id, started_at: $started_at, completed_at: $completed_at, size_bytes: $size_bytes, integrity_ref: $integrity_ref, evidence: {source: "backup-freshness-workflow", github_run_id: $run_id}}')
+          http_status=$(curl -sS -o /tmp/record_response.json -w '%{http_code}' \
+            -X POST "${API_BASE_URL%/}/ops/backups/events" \
+            -H "Authorization: Bearer ${API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "${payload}")
+          if [ "${http_status}" -ge 300 ]; then
+            echo "::error::Failed to record the observed backup event (HTTP ${http_status})."
+            cat /tmp/record_response.json
+            exit 1
+          fi
+          echo "Recorded backup event (HTTP ${http_status})."
+
+      - name: Verify freshness via the existing backup-assurance status endpoint
+        env:
+          API_BASE_URL: ${{ secrets.UKIP_BACKUP_EVIDENCE_API_BASE_URL }}
+          API_KEY: ${{ secrets.UKIP_BACKUP_EVIDENCE_API_KEY }}
+        run: |
+          set -euo pipefail
+          http_status=$(curl -sS -o /tmp/status_response.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${API_KEY}" \
+            "${API_BASE_URL%/}/ops/backups/status?environment=${BACKUP_ENVIRONMENT}")
+          if [ "${http_status}" -ge 300 ]; then
+            echo "::error::Failed to read backup status (HTTP ${http_status})."
+            cat /tmp/status_response.json
+            exit 1
+          fi
+          status="$(jq -r '.status' /tmp/status_response.json)"
+          age="$(jq -r '.age_hours' /tmp/status_response.json)"
+          reachable="$(jq -r '.provider_reachable' /tmp/status_response.json)"
+          reasons="$(jq -r '.reason_codes | join(",")' /tmp/status_response.json)"
+          echo "Backup assurance status: ${status} (age_hours=${age}, provider_reachable=${reachable}, reason_codes=${reasons})"
+          if [ "${reachable}" = "false" ]; then
+            echo "::warning::provider_reachable is false. This workflow does not assert reachability (see workflow header comment) — this is a known, separate gap, not a failure of this check."
+          fi
+          blocking="$(jq -r '
+            [.reason_codes[] | select(. != "provider_unreachable")] | length
+          ' /tmp/status_response.json)"
+          if [ "${blocking}" -gt 0 ]; then
+            echo "::error::Backup freshness has a backup-related problem (reason_codes=${reasons})."
+            exit 1
+          fi
+          echo "Backup freshness OK (excluding the separately-tracked provider_reachable signal)."
