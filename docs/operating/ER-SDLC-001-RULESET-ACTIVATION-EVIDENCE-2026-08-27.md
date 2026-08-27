@@ -78,15 +78,22 @@ no second, conflicting, or shadow ruleset.
 All run/job IDs below were fetched from the GitHub Actions API on 2026-08-27
 and are exact, not reconstructed from memory or chat.
 
-### 4.1 Pre-merge PR validation (`pull_request` event, PR #318 head `772bb381680ca9d2c89cdeddb8e655a670f790c9`)
+### 4.1 Pre-merge PR validation (`pull_request` event, PR #318 final head `83bfc467f49e65c7fd558b25c724dfaaccc2f64a`)
 
 | Workflow | Run ID | Conclusion |
 | --- | --- | --- |
-| Backend Tests | `33051748154` | success |
-| Lint | `33051748163` | success |
-| Security Gates | `33051748153` | success |
-| CodeQL | `33051748152` | success |
-| Docker Images | `33051748176` | success |
+| Backend Tests | `33053480569` | success |
+| Lint | `33053480530` | success |
+| Security Gates | `33053480603` | success |
+| CodeQL | `33053480548` | success |
+| Docker Images | `33053480574` | success |
+
+Each run above was independently re-verified (2026-08-27, via
+`gh api repos/keilynrp/universal-knowledge-intelligence-platform/actions/runs/<id>`)
+to have `head_sha: 83bfc467f49e65c7fd558b25c724dfaaccc2f64a`, `event:
+pull_request`, and `conclusion: success` — this is PR #318's final commit
+(the commit immediately preceding its merge into `4979555c...`, per
+`gh pr view 318`), not an intermediate PR head.
 
 ### 4.2 Post-merge push-to-main validation (`push` event, exact activation SHA `4979555cd42960622c60092c2812c973eb21fe7e`)
 

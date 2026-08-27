@@ -147,12 +147,15 @@ Product Owner authorization and has not occurred.
    activation. Full before/after state, independent re-verification, and
    the run/job IDs proving all five contexts are real and green:
    `docs/operating/ER-SDLC-001-RULESET-ACTIVATION-EVIDENCE-2026-08-27.md`.
-3. PR #318 (exact head `772bb381680ca9d2c89cdeddb8e655a670f790c9`) observed all
-   five aggregate contexts above passing on a real PR, alongside all five
-   authoritative workflows green on that same head. That observation
-   validated the compatibility layer only, and did not by itself start the
-   30-day observation window in step 5 — the live ruleset activation in
-   step 2 was a separate, subsequent event, now completed.
+3. PR #318, at an earlier intermediate head (`772bb381680ca9d2c89cdeddb8e655a670f790c9`,
+   not PR #318's final head), observed all five aggregate contexts above
+   passing on a real PR, alongside all five authoritative workflows green on
+   that same head. That observation validated the compatibility layer only,
+   and did not by itself start the 30-day observation window in step 5 — the
+   live ruleset activation in step 2 was a separate, subsequent event, now
+   completed. The authoritative pre-merge validation evidence is PR #318's
+   final head, recorded in
+   `docs/operating/ER-SDLC-001-RULESET-ACTIVATION-EVIDENCE-2026-08-27.md` §4.1.
 4. The 30-day observation window started at step 2's activation timestamp:
    **2026-08-27T02:58:08.760-06:00**, targeting **2026-09-26T02:58:08.760-06:00**.
    See `docs/operating/ER-SDLC-001-RULESET-ACTIVATION-EVIDENCE-2026-08-27.md`
