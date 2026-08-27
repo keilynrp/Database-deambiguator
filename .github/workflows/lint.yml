@@ -7,6 +7,23 @@ on:
     branches: [main]
 
 jobs:
+  # ── Required-gate coverage (blocking) ────────────────────────────────────
+  # Issue #317 / ER-SDLC-001: keeps each workflow's *-required-gate job (see
+  # test.yml's backend-required-gate comment) honest — its `needs` list must
+  # exactly match the workflow's actual blocking jobs, so it can never go
+  # stale the way a hand-maintained branch-protection check list would.
+  required-gate-coverage-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Enforce required-gate aggregation coverage
+        run: python scripts/lint_required_gates.py
+
   enterprise-readiness-lint:
     runs-on: ubuntu-latest
     steps:
@@ -444,3 +461,31 @@ jobs:
           path: frontend/test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  # ── Stable required-check aggregate (issue #317 / ER-SDLC-001) ──────────
+  # See test.yml's backend-required-gate comment for why this exists: GitHub
+  # rulesets reject a "workflows" rule pinning individual job contexts
+  # (HTTP 422), so this is the one stable context required_status_checks
+  # should target for this workflow.
+  lint-required-gate:
+    name: lint-required-gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [required-gate-coverage-lint, enterprise-readiness-lint, release-evidence-lint, openapi-drift, sdk-clients-drift, i18n-catalog-gates, repo-metrics-drift, domain-scope-lint, entity-query-lint, backend-lint-changed, lint-debt-ratchet, frontend-lint, frontend-test, frontend-typecheck, frontend-e2e-critical]
+    steps:
+      - name: Require every lint gate job to have succeeded
+        env:
+          NEEDS_CONTEXT: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          results = json.loads(os.environ["NEEDS_CONTEXT"])
+          failed = {name: info["result"] for name, info in results.items() if info["result"] != "success"}
+          if failed:
+              print(f"::error::Required lint gate job(s) did not succeed: {failed}")
+              sys.exit(1)
+          print(f"All required lint gate jobs succeeded: {sorted(results)}")
+          PY

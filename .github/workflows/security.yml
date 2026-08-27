@@ -93,3 +93,31 @@ jobs:
       - name: Run npm-audit gate
         working-directory: frontend
         run: npm run audit:gate
+
+  # ── Stable required-check aggregate (issue #317 / ER-SDLC-001) ──────────
+  # See test.yml's backend-required-gate comment for why this exists: GitHub
+  # rulesets reject a "workflows" rule pinning individual job contexts
+  # (HTTP 422), so this is the one stable context required_status_checks
+  # should target for this workflow.
+  security-required-gate:
+    name: security-required-gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [gitleaks, pip-audit, npm-audit]
+    steps:
+      - name: Require every security gate job to have succeeded
+        env:
+          NEEDS_CONTEXT: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          results = json.loads(os.environ["NEEDS_CONTEXT"])
+          failed = {name: info["result"] for name, info in results.items() if info["result"] != "success"}
+          if failed:
+              print(f"::error::Required security gate job(s) did not succeed: {failed}")
+              sys.exit(1)
+          print(f"All required security gate jobs succeeded: {sorted(results)}")
+          PY
