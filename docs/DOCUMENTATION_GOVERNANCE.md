@@ -122,6 +122,9 @@ Para enterprise readiness, la autoridad es:
 5. Secuencia de portafolio: `docs/product/PROGRAM_BACKLOG.md`
 6. Control-to-evidence mapping: `docs/product/TRACEABILITY_MATRIX.md`
 7. Runtime projection: `backend/enterprise_readiness.py`
+8. Versioned release evidence: `docs/product/evidence/` (one file per
+   release candidate; procedure in `docs/product/evidence/README.md`).
+   Evidence only — it never sets or overrides control status.
 
 La proyeccion runtime nunca reemplaza ni eleva el estado del registro de controles.
 

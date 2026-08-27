@@ -19,6 +19,18 @@ jobs:
       - name: Enforce enterprise readiness source of truth
         run: python scripts/lint_enterprise_readiness.py
 
+  release-evidence-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Enforce release evidence index structure
+        run: python scripts/lint_release_evidence.py
+
   # ── OpenAPI spec drift (blocking) ─────────────────────────────────────────
   # The committed sdk/openapi.json is the baseline generated SDK clients are
   # built from. A stale baseline is worse than none: it looks authoritative

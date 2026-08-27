@@ -40,7 +40,25 @@ class EnterpriseControl:
 
 
 ENTERPRISE_CONTROLS = (
-    EnterpriseControl("ER-CTRL-001", "Governed control lifecycle", "Keep control status, ownership, evidence, and claims governed.", "P0", "specified", "auditable", "Product/security owner", (), "Operate the register on a release candidate and publish a versioned evidence index."),
+    EnterpriseControl(
+        "ER-CTRL-001",
+        "Governed control lifecycle",
+        "Keep control status, ownership, evidence, and claims governed.",
+        "P0",
+        "specified",
+        "auditable",
+        "Product/security owner",
+        (),
+        "Operate the register on a release candidate and publish a versioned evidence index.",
+        (
+            (
+                "Cycle 1 release evidence index published for RC-2026-08-26-01 "
+                "(main@8139ee1179ea0505ca2f5b5720c6886478d79d9f); see "
+                "docs/product/evidence/RC-2026-08-26-01.md. Owner attestation pending; "
+                "reproducibility across a second RC not yet demonstrated."
+            ),
+        ),
+    ),
     EnterpriseControl("ER-OPS-001", "Durable background jobs", "Run critical jobs outside the web lifecycle with durable tenant-scoped state.", "P1", "specified", "operated", "Platform owner", ("US-042",), "Implement the queue-backed runtime and complete its recovery test and observation window."),
     EnterpriseControl(
         "ER-BCP-001",
