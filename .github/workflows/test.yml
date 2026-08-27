@@ -438,3 +438,33 @@ jobs:
         if: always()
         run: |
           [ -f uvicorn.pid ] && kill "$(cat uvicorn.pid)" 2>/dev/null || true
+
+  # ── Stable required-check aggregate (issue #317 / ER-SDLC-001) ──────────
+  # GitHub repository rulesets reject a "workflows" rule that pins individual
+  # job contexts (HTTP 422 — see docs/operating/SECURITY_GATES.md §6). This
+  # job is the one stable context this workflow exposes to
+  # `required_status_checks`, so branch-protection config doesn't have to
+  # enumerate every matrix leg here and doesn't go stale when shard counts
+  # change.
+  backend-required-gate:
+    name: backend-required-gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [test-shard, test-py312-compat, test-partition-guard, eval-quality, postgres-shard, postgres-partition-guard, sdk-smoke]
+    steps:
+      - name: Require every backend gate job to have succeeded
+        env:
+          NEEDS_CONTEXT: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          results = json.loads(os.environ["NEEDS_CONTEXT"])
+          failed = {name: info["result"] for name, info in results.items() if info["result"] != "success"}
+          if failed:
+              print(f"::error::Required backend gate job(s) did not succeed: {failed}")
+              sys.exit(1)
+          print(f"All required backend gate jobs succeeded: {sorted(results)}")
+          PY

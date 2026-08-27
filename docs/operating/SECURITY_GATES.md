@@ -73,17 +73,78 @@ The PR/evidence branch used to capture the gitleaks failure was deleted after ca
 
 The following steps must be completed by the security/platform owner in GitHub repository settings. Until they are done, ER-SDLC-001 remains at `implemented` rather than `operated`.
 
+### 6.1 Platform discovery (issue #317, 2026-08-27): rulesets reject a per-job `workflows` rule
+
+An earlier attempt to configure this via a repository ruleset `workflows` rule,
+listing individual job contexts directly, was rejected live by the GitHub API
+with `HTTP 422: Invalid rule 'workflows'`. The follow-up `GET` on the ruleset
+confirmed the rejection made zero live-state change (`UKIP_System` still had
+only `deletion` and `non_fast_forward`, no bypass actors). This is recorded
+here as a platform-capability finding, not as an `OPERATOR ACTION REQUIRED`
+item: GitHub documents "Require workflows to pass before merging" as an
+organization/enterprise-level ruleset rule. This repository's ruleset is a
+user-owned, repository-level ruleset, and that context does not expose the
+`workflows` rule type at all — the rejection is a rule-type/context mismatch,
+not a GitHub-plan or permissions gap. The repository-level primitive this
+context does expose is `required_status_checks`, which is what the
+compatibility layer below targets instead.
+
+The five authoritative workflows (`test.yml`, `lint.yml`, `security.yml`,
+`codeql.yml`, `docker.yml`) also emit many individual job/matrix contexts
+that would have to be hand-enumerated and re-enumerated every time a shard
+count or matrix leg changes — exactly the kind of list that goes stale
+unnoticed. Instead, each workflow now carries exactly one stable aggregation
+job (`if: always()`, fails unless every blocking job in that workflow
+succeeded — see each workflow's `*-required-gate` job and
+`scripts/lint_required_gates.py`, which fails closed if a workflow's gate job
+and its actual blocking jobs ever drift apart):
+
+- `backend-required-gate` (`test.yml`)
+- `lint-required-gate` (`lint.yml`)
+- `security-required-gate` (`security.yml`)
+- `codeql-required-gate` (`codeql.yml`)
+- `docker-required-gate` (`docker.yml`) — covers `build-backend`,
+  `build-frontend`, `build-engine` only; deliberately excludes the
+  main-only `deploy` job, which must not gate PR merges.
+
+These five contexts are what a future `required_status_checks` payload
+(repository-level primitive, not a ruleset `workflows` rule) should target.
+Adding this compatibility layer does **not** itself enable branch
+protection, does **not** mutate the live `UKIP_System` ruleset, and does
+**not** promote `ER-SDLC-001`'s maturity — it only makes the eventual
+required-check configuration possible with five fixed names instead of an
+enumerated, drift-prone job list. The live ruleset mutation is a separate,
+subsequent step: §6.2 records that these five contexts have since been
+observed passing on a real PR, but the mutation itself still requires
+Product Owner authorization and has not occurred.
+
+### 6.2 Remaining operator steps
+
 1. **Enable secret scanning + push protection**: Settings → Code security and analysis → enable Secret scanning and Push protection.
-2. **Branch protection on `main`**: mark the following as required status checks:
-   - `gitleaks`
-   - `pip-audit`
-   - `npm-audit`
-   - `analyze (python)`
-   - `analyze (javascript-typescript)`
-   - `build-backend`
-   - `build-frontend`
-   - `build-engine`
-3. After these settings are applied and the gates have operated on at least one real PR, ER-SDLC-001 moves from `implemented` to `operated`.
+2. **Branch protection on `main`**: configure `required_status_checks` (repository-level primitive) to require exactly:
+   - `backend-required-gate`
+   - `lint-required-gate`
+   - `security-required-gate`
+   - `codeql-required-gate`
+   - `docker-required-gate`
+3. PR #318 (exact head `772bb381680ca9d2c89cdeddb8e655a670f790c9`) observed all
+   five aggregate contexts above passing on a real PR, alongside all five
+   authoritative workflows green on that same head. That observation
+   validates the compatibility layer only. It does **not** start the 30-day
+   observation window in step 5 below, because the live repository
+   `required_status_checks` ruleset has not yet been activated — §6.1's
+   `UKIP_System` ruleset still contains only `deletion` and
+   `non_fast_forward`.
+4. The 30-day observation window starts only once step 2's live ruleset
+   activation is actually completed and evidenced — exact activation
+   timestamp, before/after ruleset configuration, and the exact five
+   required-check names configured. As of this revision, that window has
+   **not** started.
+5. Per `docs/product/ENTERPRISE_CONTROL_REGISTER.md`, `ER-SDLC-001` may move
+   from `implemented` to `operated` only after **30 days of blocking-gate
+   operation and retained SBOM/security artifacts**, with that evidence
+   reviewed and attested by the accountable owner — not merely after "at
+   least one real PR" observing the checks exist and pass.
 
 ---
 

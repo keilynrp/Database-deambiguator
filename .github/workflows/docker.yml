@@ -312,6 +312,37 @@ jobs:
             docker push "$tag"
           done
 
+  # ── Stable required-check aggregate (issue #317 / ER-SDLC-001) ──────────
+  # See test.yml's backend-required-gate comment for why this exists: GitHub
+  # rulesets reject a "workflows" rule pinning individual job contexts
+  # (HTTP 422), so this is the one stable context required_status_checks
+  # should target for this workflow. Deliberately excludes `deploy`: that job
+  # is main-only (see its `if:` below) and must not gate PR merges.
+  docker-required-gate:
+    name: docker-required-gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [build-backend, build-frontend, build-engine]
+    permissions:
+      contents: read
+    steps:
+      - name: Require every PR-gating Docker build to have succeeded
+        env:
+          NEEDS_CONTEXT: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          results = json.loads(os.environ["NEEDS_CONTEXT"])
+          failed = {name: info["result"] for name, info in results.items() if info["result"] != "success"}
+          if failed:
+              print(f"::error::Required Docker build job(s) did not succeed: {failed}")
+              sys.exit(1)
+          print(f"All required Docker build jobs succeeded: {sorted(results)}")
+          PY
+
   deploy:
     needs: [build-backend, build-frontend, build-engine]
     runs-on: ubuntu-latest

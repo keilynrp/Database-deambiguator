@@ -34,3 +34,32 @@ jobs:
         uses: github/codeql-action/analyze@v4.37.6
         with:
           category: "/language:${{ matrix.language }}"
+
+  # ── Stable required-check aggregate (issue #317 / ER-SDLC-001) ──────────
+  # See test.yml's backend-required-gate comment for why this exists: GitHub
+  # rulesets reject a "workflows" rule pinning individual job contexts
+  # (HTTP 422), so this is the one stable context required_status_checks
+  # should target for this workflow. `needs: [analyze]` already waits for
+  # every matrix leg (python, javascript-typescript) to conclude.
+  codeql-required-gate:
+    name: codeql-required-gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [analyze]
+    steps:
+      - name: Require every CodeQL analysis leg to have succeeded
+        env:
+          NEEDS_CONTEXT: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          results = json.loads(os.environ["NEEDS_CONTEXT"])
+          failed = {name: info["result"] for name, info in results.items() if info["result"] != "success"}
+          if failed:
+              print(f"::error::Required CodeQL job(s) did not succeed: {failed}")
+              sys.exit(1)
+          print(f"All required CodeQL jobs succeeded: {sorted(results)}")
+          PY
