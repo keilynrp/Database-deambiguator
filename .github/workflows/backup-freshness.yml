@@ -8,31 +8,48 @@ name: Backup Freshness
 #
 # SEMANTIC MODEL — read this before changing pass/fail logic:
 #
-#   This job is a PROVIDER OBJECT OBSERVATION + OBJECT-FRESHNESS PROJECTION.
-#   It is NOT the overall backup-assurance authority for ER-BCP-001. The
-#   authoritative overall backup-assurance status remains, exclusively,
-#   GET /ops/backups/status (see backend/backup_assurance.py,
-#   backend/routers/backup_ops.py).
+#   This job is PROVIDER OBSERVATION ONLY. It holds no local RPO/freshness
+#   policy of any kind and is NOT the overall backup-assurance authority for
+#   ER-BCP-001. The authoritative RPO/freshness policy remains, exclusively,
+#   the backend/evidence process (backend.backup_assurance, exposed via
+#   GET /ops/backups/status — see backend/backup_assurance.py,
+#   backend/routers/backup_ops.py). This workflow never calls that endpoint
+#   (see "no application credential" below) and never reimplements its
+#   threshold logic.
 #
 #   This workflow:
 #     1. lists the newest object in the backup bucket with read-only
 #        provider credentials, and
-#     2. projects only the backup-object conditions it can directly observe
-#        from that listing (backup_missing, backup_stale, backup_empty), and
+#     2. fails only on conditions directly observable from that listing:
+#        no object exists (backup_missing), the newest object's size is
+#        <= 0 (backup_empty), or its timestamp is absent, unparseable, or
+#        clearly in the future beyond a small clock-skew tolerance
+#        (backup_timestamp_invalid), and
 #     3. notes integrity_missing as an expected, structural limitation of
-#        this projection (see "ETag is not integrity evidence" below) —
+#        this observation (see "ETag is not integrity evidence" below) —
 #        informational, not a per-run failure.
+#
+#   It also computes the newest object's age purely as informational
+#   evidence/logging, explicitly labeled "observed object age" — this is
+#   NOT an RPO/freshness pass-fail decision, and this job never fails a run
+#   because the observed age exceeds any hours threshold. There is
+#   deliberately no local hardcoded-hours policy constant of any kind here:
+#   an earlier draft reintroduced exactly that duplicated-authority risk and
+#   was rejected on strategic review (PR #321, issue #320) — see the
+#   reconciliation doc's "Narrowed on strategic review" section.
 #
 #   It deliberately does NOT call any UKIP application API (see "no
 #   application credential" below), so it cannot observe and does not
 #   attempt to project provider_reachable or the backend's own
 #   integrity_ref state. A pass here means only "the newest object this job
-#   could see looks present, non-empty, and recent enough" — it does NOT
-#   mean overall ER-BCP-001 status is `ok`. The backend may independently
-#   report `critical` (for example: provider_unreachable, integrity_missing
-#   on the recorded event, or a stale recorded event) even when this job
-#   passes. Never read a green run of this workflow as "backup assurance is
-#   healthy" — only GET /ops/backups/status can say that.
+#   could see exists, is non-empty, and has a valid timestamp" — it does NOT
+#   mean overall ER-BCP-001 status is `ok` and it does NOT mean the backup
+#   is fresh enough to meet RPO. The backend may independently report
+#   `critical` (for example: provider_unreachable, integrity_missing on the
+#   recorded event, or a stale recorded event) even when this job passes.
+#   A green run here must never be read as a statement about overall backup
+#   freshness, RPO compliance, or backup-assurance health — only the
+#   backend/evidence process (GET /ops/backups/status) can make that claim.
 #
 # ETAG IS NOT INTEGRITY EVIDENCE:
 #
@@ -134,45 +151,39 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Newest backup object: ${key} (${ts}, ${size} bytes, provider_etag=${provider_etag})"
 
-      - name: Project object freshness (observation only — not the overall backup-assurance authority)
+      - name: Observe object conditions (provider observation only — no RPO/freshness policy)
         env:
           BACKUP_TS: ${{ steps.observe.outputs.ts }}
           BACKUP_SIZE: ${{ steps.observe.outputs.size }}
           BACKUP_PROVIDER_ETAG: ${{ steps.observe.outputs.provider_etag }}
-          # Mirrors, but is not imported from, backend.backup_assurance's
-          # BACKUP_RPO_HOURS / BACKUP_CRITICAL_AFTER_HOURS. This is a local
-          # projection constant for this narrower job only; it can diverge
-          # from the backend if the backend thresholds change without this
-          # workflow being updated to match. The authoritative RPO/RTO
-          # evaluation is always GET /ops/backups/status.
-          WARNING_AFTER_HOURS: "24"
-          CRITICAL_AFTER_HOURS: "26"
+          # Small allowance for clock skew between this runner and the
+          # provider when checking whether a timestamp is implausibly in the
+          # future. Not an RPO/freshness threshold of any kind.
+          CLOCK_SKEW_TOLERANCE_MINUTES: "5"
         run: |
           set -euo pipefail
-          now_epoch="$(date -u +%s)"
-          ts_epoch="$(date -u -d "${BACKUP_TS}" +%s)"
-          age_hours="$(awk -v n="${now_epoch}" -v t="${ts_epoch}" 'BEGIN { printf "%.2f", (n - t) / 3600 }')"
-          echo "Observed object age: ${age_hours}h (projection thresholds: warning>${WARNING_AFTER_HOURS}h, critical>${CRITICAL_AFTER_HOURS}h)"
-          echo "Provider ETag (non-secret metadata, NOT integrity evidence): ${BACKUP_PROVIDER_ETAG:-<none>}"
-          echo "::notice::integrity_missing — this generic s3-compatible object observation has no trustworthy provider-supported checksum configured (ETag is not treated as one). This is an expected, structural limitation of this narrower object-freshness projection, deferred to Phase B provider-specific configuration. It does not by itself determine overall backup-assurance status — see GET /ops/backups/status, which independently enforces integrity_ref on recorded events."
-
-          fail=0
 
           if [ "${BACKUP_SIZE}" -le 0 ]; then
             echo "::error::backup_empty — newest object has size ${BACKUP_SIZE} bytes."
-            fail=1
-          fi
-
-          if awk -v a="${age_hours}" -v c="${CRITICAL_AFTER_HOURS}" 'BEGIN { exit !(a > c) }'; then
-            echo "::error::backup_stale — newest object is ${age_hours}h old (projection critical threshold: ${CRITICAL_AFTER_HOURS}h)."
-            fail=1
-          elif awk -v a="${age_hours}" -v w="${WARNING_AFTER_HOURS}" 'BEGIN { exit !(a > w) }'; then
-            echo "::warning::newest object is ${age_hours}h old (projection warning threshold: ${WARNING_AFTER_HOURS}h)."
-          fi
-
-          if [ "${fail}" -eq 1 ]; then
-            echo "::error::Backup object observation FAILED on a directly observable condition above. This is this job's own object-freshness projection; overall backup-assurance status is separately authoritative at GET /ops/backups/status and may differ."
             exit 1
           fi
 
-          echo "Backup object observation passed; overall backup assurance status remains authoritative at GET /ops/backups/status (not queried by this read-only workflow — see the workflow header comment for why)."
+          ts_epoch="$(date -u -d "${BACKUP_TS}" +%s 2>/dev/null || true)"
+          if [ -z "${ts_epoch}" ]; then
+            echo "::error::backup_timestamp_invalid — newest object's LastModified timestamp '${BACKUP_TS}' is absent or unparseable."
+            exit 1
+          fi
+
+          now_epoch="$(date -u +%s)"
+          skew_seconds="$(( CLOCK_SKEW_TOLERANCE_MINUTES * 60 ))"
+          if [ "${ts_epoch}" -gt "$(( now_epoch + skew_seconds ))" ]; then
+            echo "::error::backup_timestamp_invalid — newest object's timestamp '${BACKUP_TS}' is in the future beyond the ${CLOCK_SKEW_TOLERANCE_MINUTES}m clock-skew tolerance."
+            exit 1
+          fi
+
+          age_hours="$(awk -v n="${now_epoch}" -v t="${ts_epoch}" 'BEGIN { printf "%.2f", (n - t) / 3600 }')"
+          echo "Observed object age: ${age_hours}h. This is informational evidence only — it is NOT an RPO/freshness pass-fail decision. RPO/freshness policy remains authoritative in the backend/evidence process."
+          echo "Provider ETag (non-secret metadata, NOT integrity evidence): ${BACKUP_PROVIDER_ETAG:-<none>}"
+          echo "::notice::integrity_missing — this generic s3-compatible object observation has no trustworthy provider-supported checksum configured (ETag is not treated as one). This is an expected, structural limitation of this provider observation, deferred to Phase B provider-specific configuration. It does not by itself determine overall backup-assurance status — see the backend/evidence process, which independently enforces integrity_ref on recorded events."
+
+          echo "Backup provider object observation passed. Observed object exists, is non-empty, and has a valid timestamp. RPO/freshness policy remains authoritative in the backend/evidence process."

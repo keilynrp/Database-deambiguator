@@ -119,20 +119,30 @@ absence of a probe is not proof of reachability.
 
 `.github/workflows/backup-freshness.yml` runs daily and, once configured (see
 Operator Actions below), lists the newest object in the backup bucket with
-read-only provider credentials and projects only the conditions it can
-directly observe from that listing: `backup_missing`, `backup_stale`,
-`backup_empty`. It holds no UKIP application credential of any kind, calls no
-UKIP API endpoint, and does not mutate application state — it cannot POST to
-`POST /ops/backups/events` or read `GET /ops/backups/status`.
+read-only provider credentials and fails only on conditions it can directly
+observe from that listing: `backup_missing` (no object exists),
+`backup_empty` (newest object's size is `<= 0`), or `backup_timestamp_invalid`
+(the timestamp is absent, unparseable, or clearly in the future beyond a
+small clock-skew tolerance). It holds no UKIP application credential of any
+kind, calls no UKIP API endpoint, and does not mutate application state — it
+cannot POST to `POST /ops/backups/events` or read `GET /ops/backups/status`.
 
-**This workflow is an object-freshness projection, not the overall
-backup-assurance authority.** The overall ER-BCP-001 status remains
-exclusively `GET /ops/backups/status` (backed by
-`backend.backup_assurance.evaluate_backup_freshness`, section 4/5 above). A
-green run of this workflow means only "the newest object this job could see
-looks present, non-empty, and recent enough by this job's own projection
-thresholds" — it does not mean overall backup assurance is `ok`, and it must
-never be read that way. The backend may independently report `critical` (for
+**This workflow is provider observation only — it holds no local
+RPO/freshness policy and is not the overall backup-assurance authority.**
+The authoritative RPO/freshness policy remains exclusively the
+backend/evidence process (`GET /ops/backups/status`, backed by
+`backend.backup_assurance.evaluate_backup_freshness`, section 4/5 above). The
+workflow does compute the newest object's age, but purely as informational
+evidence/logging — labeled "observed object age" and explicitly stated to
+not be an RPO/freshness pass-fail decision. An earlier draft reintroduced a
+local `WARNING_AFTER_HOURS`/`CRITICAL_AFTER_HOURS` threshold and failed runs
+on it; that was rejected on strategic review for duplicating the backend's
+authority and was removed (see
+[ER-BCP-001-HISTORICAL-RECONCILIATION.md](ER-BCP-001-HISTORICAL-RECONCILIATION.md)).
+A green run of this workflow means only "the newest object this job could
+see exists, is non-empty, and has a valid timestamp" — it does not mean
+overall backup assurance is `ok`, and it does not mean the backup is fresh
+enough to meet RPO. The backend may independently report `critical` (for
 example: `provider_unreachable`, or `integrity_missing` on the actual
 recorded event) even when this workflow's run is green.
 

@@ -112,20 +112,36 @@ def test_workflow_distinguishes_object_observation_from_overall_authority():
     assert "not the overall backup-assurance authority" in lowered
     assert "get /ops/backups/status" in lowered
     assert "backup freshness ok" not in lowered
+    assert "rpo passed" not in lowered
+    assert "backup assurance healthy" not in lowered
 
 
-def test_workflow_does_not_reimplement_staleness_math():
+def test_workflow_holds_no_local_freshness_policy():
+    # Second strategic review round (PR #321, issue #320): a corrected draft
+    # removed the application-call defects but reintroduced a local
+    # WARNING_AFTER_HOURS=24 / CRITICAL_AFTER_HOURS=26 projection that failed
+    # runs based on locally computed object age — recreating the exact
+    # duplicated-authority risk already rejected against the historical
+    # workflow's MAX_AGE_HOURS. The workflow must hold no local RPO/freshness
+    # policy threshold of any kind; it may only fail on directly observable
+    # provider conditions (missing object, non-positive size, invalid or
+    # future timestamp).
     text = _read(WORKFLOW)
 
-    # The historical workflow decided pass/fail with its own bash-computed
-    # age threshold and claimed to defer to the existing
-    # backend.backup_assurance evaluator while doing so. The reconciled
-    # workflow instead holds no application credential at all (see
-    # test_workflow_does_not_post_backup_events), so it cannot call that
-    # evaluator; its own local age projection is documented and tested as an
-    # explicitly narrower, non-authoritative projection instead.
+    assert "WARNING_AFTER_HOURS" not in text
+    assert "CRITICAL_AFTER_HOURS" not in text
     assert "MAX_AGE_HOURS" not in text
-    assert "mirrors, but is not imported from" in text.lower()
+    assert re.search(r'["\']24["\']', text) is None
+    assert re.search(r'["\']26["\']', text) is None
+
+
+def test_workflow_labels_observed_age_as_informational_only():
+    text = _read(WORKFLOW)
+    lowered = text.lower()
+
+    assert "observed object age" in lowered
+    assert "not an rpo/freshness pass-fail decision" in lowered
+    assert "rpo/freshness policy remains authoritative in the backend/evidence process" in lowered
 
 
 def test_workflow_never_asserts_reachability_directly():
