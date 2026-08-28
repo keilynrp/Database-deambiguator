@@ -1,0 +1,189 @@
+name: Backup Freshness
+
+# ER-BCP-001 provider object observation, reconciled from the historical
+# ops/epic018-backup-restore workflow and narrowed per strategic review
+# (PR #321, issue #320). See
+# docs/operating/ER-BCP-001-HISTORICAL-RECONCILIATION.md for the audit that
+# produced this design.
+#
+# SEMANTIC MODEL — read this before changing pass/fail logic:
+#
+#   This job is PROVIDER OBSERVATION ONLY. It holds no local RPO/freshness
+#   policy of any kind and is NOT the overall backup-assurance authority for
+#   ER-BCP-001. The authoritative RPO/freshness policy remains, exclusively,
+#   the backend/evidence process (backend.backup_assurance, exposed via
+#   GET /ops/backups/status — see backend/backup_assurance.py,
+#   backend/routers/backup_ops.py). This workflow never calls that endpoint
+#   (see "no application credential" below) and never reimplements its
+#   threshold logic.
+#
+#   This workflow:
+#     1. lists the newest object in the backup bucket with read-only
+#        provider credentials, and
+#     2. fails only on conditions directly observable from that listing:
+#        no object exists (backup_missing), the newest object's size is
+#        <= 0 (backup_empty), or its timestamp is absent, unparseable, or
+#        clearly in the future beyond a small clock-skew tolerance
+#        (backup_timestamp_invalid), and
+#     3. notes integrity_missing as an expected, structural limitation of
+#        this observation (see "ETag is not integrity evidence" below) —
+#        informational, not a per-run failure.
+#
+#   It also computes the newest object's age purely as informational
+#   evidence/logging, explicitly labeled "observed object age" — this is
+#   NOT an RPO/freshness pass-fail decision, and this job never fails a run
+#   because the observed age exceeds any hours threshold. There is
+#   deliberately no local hardcoded-hours policy constant of any kind here:
+#   an earlier draft reintroduced exactly that duplicated-authority risk and
+#   was rejected on strategic review (PR #321, issue #320) — see the
+#   reconciliation doc's "Narrowed on strategic review" section.
+#
+#   It deliberately does NOT call any UKIP application API (see "no
+#   application credential" below), so it cannot observe and does not
+#   attempt to project provider_reachable or the backend's own
+#   integrity_ref state. A pass here means only "the newest object this job
+#   could see exists, is non-empty, and has a valid timestamp" — it does NOT
+#   mean overall ER-BCP-001 status is `ok` and it does NOT mean the backup
+#   is fresh enough to meet RPO. The backend may independently report
+#   `critical` (for example: provider_unreachable, integrity_missing on the
+#   recorded event, or a stale recorded event) even when this job passes.
+#   A green run here must never be read as a statement about overall backup
+#   freshness, RPO compliance, or backup-assurance health — only the
+#   backend/evidence process (GET /ops/backups/status) can make that claim.
+#
+# ETAG IS NOT INTEGRITY EVIDENCE:
+#
+#   The S3-compatible provider's ETag is retained below only as non-secret,
+#   informational provider metadata (an object/version identifier). It is
+#   NEVER mapped to integrity_ref or otherwise treated as a checksum. Per
+#   AWS's own documentation, an ETag is not guaranteed to be a full-object
+#   MD5/checksum (multipart uploads and several server-side encryption
+#   modes break that assumption), so a non-empty ETag must not be treated
+#   as proof of integrity for a generic s3-compatible provider. Ingesting a
+#   real, provider-verified checksum (e.g. a full-object SHA-256/CRC when
+#   the specific provider contract proves it) is deferred to Phase B
+#   provider-specific configuration; it is out of scope here.
+#
+# NO APPLICATION CREDENTIAL:
+#
+#   This workflow holds only read-only S3-compatible provider credentials.
+#   It does not call any UKIP application endpoint, does not hold a UKIP
+#   API key of any scope, and does not mutate application state. Earlier
+#   drafts of this workflow POSTed observed objects to
+#   POST /ops/backups/events using an admin-scoped UKIP API key; that was
+#   rejected on strategic review because every route under /ops —
+#   including GET /ops/backups/status — currently requires `admin` scope
+#   (backend/api_key_scopes.py), which is far broader authority than
+#   "record backup evidence" and is not appropriate to store in a
+#   GitHub-hosted scheduled workflow. Automated application-side evidence
+#   ingestion is deferred until a least-privilege credential/path exists;
+#   until then, evidence ingestion is a manual/trusted-service operator
+#   step (see docs/operating/BACKUP_RESTORE_RUNBOOK.md §4 and §13).
+#
+# OPERATOR ACTION REQUIRED before this workflow can do anything but fail
+# fast: the four S3 read-only secrets referenced below do not exist yet.
+# Until they are configured, every run stops at the first step with a
+# clear, non-secret error instead of silently no-op'ing or fabricating
+# evidence.
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # daily 07:00 UTC — matches the historical cadence
+  workflow_dispatch:
+    inputs:
+      prefix:
+        description: "Override bucket prefix"
+        required: false
+        default: "pg/"
+
+permissions:
+  contents: read
+
+jobs:
+  observe-backup-object:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require provider secrets (read-only only — no application credential)
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -z "${{ secrets.S3_BACKUP_ENDPOINT }}" ] && missing+=("S3_BACKUP_ENDPOINT")
+          [ -z "${{ secrets.S3_BACKUP_BUCKET }}" ] && missing+=("S3_BACKUP_BUCKET")
+          [ -z "${{ secrets.S3_BACKUP_RO_ACCESS_KEY_ID }}" ] && missing+=("S3_BACKUP_RO_ACCESS_KEY_ID")
+          [ -z "${{ secrets.S3_BACKUP_RO_SECRET_ACCESS_KEY }}" ] && missing+=("S3_BACKUP_RO_SECRET_ACCESS_KEY")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Backup freshness workflow is not yet configured. Missing repository secrets: ${missing[*]}. See the OPERATOR ACTION REQUIRED items in docs/operating/BACKUP_RESTORE_RUNBOOK.md."
+            exit 1
+          fi
+
+      - name: List newest backup object (read-only)
+        id: observe
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_BACKUP_RO_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_BACKUP_RO_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          S3_ENDPOINT: ${{ secrets.S3_BACKUP_ENDPOINT }}
+          S3_BUCKET: ${{ secrets.S3_BACKUP_BUCKET }}
+          PREFIX: ${{ inputs.prefix || 'pg/' }}
+        run: |
+          set -euo pipefail
+          newest="$(aws s3api list-objects-v2 \
+            --endpoint-url "${S3_ENDPOINT}" \
+            --bucket "${S3_BUCKET}" \
+            --prefix "${PREFIX}" \
+            --query 'sort_by(Contents, &LastModified)[-1].{key: Key, ts: LastModified, size: Size, etag: ETag}' \
+            --output json)"
+          if [ "${newest}" = "null" ] || [ -z "${newest}" ]; then
+            echo "::error::backup_missing — no backup objects found under prefix '${PREFIX}' in the configured bucket."
+            exit 1
+          fi
+          key="$(echo "${newest}" | jq -r .key)"
+          ts="$(echo "${newest}" | jq -r .ts)"
+          size="$(echo "${newest}" | jq -r .size)"
+          # Non-secret provider metadata only — an object/version identifier,
+          # NOT integrity evidence. See the workflow header comment.
+          provider_etag="$(echo "${newest}" | jq -r '.etag | gsub("\"";"")')"
+          {
+            echo "key=${key}"
+            echo "ts=${ts}"
+            echo "size=${size}"
+            echo "provider_etag=${provider_etag}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Newest backup object: ${key} (${ts}, ${size} bytes, provider_etag=${provider_etag})"
+
+      - name: Observe object conditions (provider observation only — no RPO/freshness policy)
+        env:
+          BACKUP_TS: ${{ steps.observe.outputs.ts }}
+          BACKUP_SIZE: ${{ steps.observe.outputs.size }}
+          BACKUP_PROVIDER_ETAG: ${{ steps.observe.outputs.provider_etag }}
+          # Small allowance for clock skew between this runner and the
+          # provider when checking whether a timestamp is implausibly in the
+          # future. Not an RPO/freshness threshold of any kind.
+          CLOCK_SKEW_TOLERANCE_MINUTES: "5"
+        run: |
+          set -euo pipefail
+
+          if [ "${BACKUP_SIZE}" -le 0 ]; then
+            echo "::error::backup_empty — newest object has size ${BACKUP_SIZE} bytes."
+            exit 1
+          fi
+
+          ts_epoch="$(date -u -d "${BACKUP_TS}" +%s 2>/dev/null || true)"
+          if [ -z "${ts_epoch}" ]; then
+            echo "::error::backup_timestamp_invalid — newest object's LastModified timestamp '${BACKUP_TS}' is absent or unparseable."
+            exit 1
+          fi
+
+          now_epoch="$(date -u +%s)"
+          skew_seconds="$(( CLOCK_SKEW_TOLERANCE_MINUTES * 60 ))"
+          if [ "${ts_epoch}" -gt "$(( now_epoch + skew_seconds ))" ]; then
+            echo "::error::backup_timestamp_invalid — newest object's timestamp '${BACKUP_TS}' is in the future beyond the ${CLOCK_SKEW_TOLERANCE_MINUTES}m clock-skew tolerance."
+            exit 1
+          fi
+
+          age_hours="$(awk -v n="${now_epoch}" -v t="${ts_epoch}" 'BEGIN { printf "%.2f", (n - t) / 3600 }')"
+          echo "Observed object age: ${age_hours}h. This is informational evidence only — it is NOT an RPO/freshness pass-fail decision. RPO/freshness policy remains authoritative in the backend/evidence process."
+          echo "Provider ETag (non-secret metadata, NOT integrity evidence): ${BACKUP_PROVIDER_ETAG:-<none>}"
+          echo "::notice::integrity_missing — this generic s3-compatible object observation has no trustworthy provider-supported checksum configured (ETag is not treated as one). This is an expected, structural limitation of this provider observation, deferred to Phase B provider-specific configuration. It does not by itself determine overall backup-assurance status — see the backend/evidence process, which independently enforces integrity_ref on recorded events."
+
+          echo "Backup provider object observation passed. Observed object exists, is non-empty, and has a valid timestamp. RPO/freshness policy remains authoritative in the backend/evidence process."

@@ -115,6 +115,62 @@ Any provider-reported actor belongs only in clearly labeled non-secret evidence.
 Provider reachability must come from an explicit operator or monitoring probe;
 absence of a probe is not proof of reachability.
 
+### 5a. Automated Backup-Object Observation (not the overall authority)
+
+`.github/workflows/backup-freshness.yml` runs daily and, once configured (see
+Operator Actions below), lists the newest object in the backup bucket with
+read-only provider credentials and fails only on conditions it can directly
+observe from that listing: `backup_missing` (no object exists),
+`backup_empty` (newest object's size is `<= 0`), or `backup_timestamp_invalid`
+(the timestamp is absent, unparseable, or clearly in the future beyond a
+small clock-skew tolerance). It holds no UKIP application credential of any
+kind, calls no UKIP API endpoint, and does not mutate application state — it
+cannot POST to `POST /ops/backups/events` or read `GET /ops/backups/status`.
+
+**This workflow is provider observation only — it holds no local
+RPO/freshness policy and is not the overall backup-assurance authority.**
+The authoritative RPO/freshness policy remains exclusively the
+backend/evidence process (`GET /ops/backups/status`, backed by
+`backend.backup_assurance.evaluate_backup_freshness`, section 4/5 above). The
+workflow does compute the newest object's age, but purely as informational
+evidence/logging — labeled "observed object age" and explicitly stated to
+not be an RPO/freshness pass-fail decision. An earlier draft reintroduced a
+local `WARNING_AFTER_HOURS`/`CRITICAL_AFTER_HOURS` threshold and failed runs
+on it; that was rejected on strategic review for duplicating the backend's
+authority and was removed (see
+[ER-BCP-001-HISTORICAL-RECONCILIATION.md](ER-BCP-001-HISTORICAL-RECONCILIATION.md)).
+A green run of this workflow means only "the newest object this job could
+see exists, is non-empty, and has a valid timestamp" — it does not mean
+overall backup assurance is `ok`, and it does not mean the backup is fresh
+enough to meet RPO. The backend may independently report `critical` (for
+example: `provider_unreachable`, or `integrity_missing` on the actual
+recorded event) even when this workflow's run is green.
+
+The S3-compatible provider's ETag is retained only as non-secret, informational
+provider metadata (an object/version identifier) and is never treated as
+integrity evidence — an ETag is not guaranteed to be a full-object checksum,
+so this workflow always projects `integrity_missing` as an expected,
+structural, non-blocking limitation until a provider-verified checksum path
+exists (Phase B). It also deliberately does not assert `provider_reachable` —
+that signal must stay fresh within 15 minutes
+(`backend.backup_assurance.PROVIDER_REACHABILITY_MAX_AGE_MINUTES`), which a
+daily workflow cannot honestly provide. See
+[ER-BCP-001-HISTORICAL-RECONCILIATION.md](ER-BCP-001-HISTORICAL-RECONCILIATION.md)
+for the audit that produced this design and for the residual risks this gap
+represents.
+
+Automated application-side evidence ingestion (recording the observed object
+as a `backup` event via `POST /ops/backups/events`) is deferred until a
+least-privilege credential/path exists — every route under `/ops`, including
+the read-only status endpoint, currently requires `admin` scope
+(`backend/api_key_scopes.py`), which is too broad to store in a GitHub-hosted
+scheduled workflow. Until that narrower mechanism exists, evidence ingestion
+into `backup_assurance_events` is a manual or trusted-service operator step
+(section 4 above); see §13 below.
+
+Until the required secrets exist, every run of this workflow fails fast with
+a clear, non-secret error rather than silently no-op'ing.
+
 ## 6. Prepare an Isolated Restore Drill
 
 Every drill requires an isolated restore environment with a separate network,
@@ -189,8 +245,11 @@ credential material created for the drill.
 ## 10. Complete and Approve Evidence
 
 Use the
-[backup and restore evidence template](templates/BACKUP_RESTORE_EVIDENCE_TEMPLATE.md).
-Attach or reference:
+[backup and restore evidence template](templates/BACKUP_RESTORE_EVIDENCE_TEMPLATE.md)
+for each cycle and for the drill. Roll both cycles and the drill up into the
+[ER-BCP-001 readiness evidence dossier](templates/ER-BCP-001_READINESS_EVIDENCE_TEMPLATE.md)
+that covers the full gate: provider configuration, two backup cycles, and the
+first isolated restore drill. Attach or reference:
 
 - provider backup and restore job IDs;
 - release and Alembic revision;
@@ -234,3 +293,60 @@ During an incident:
 6. Only after that approval may operators update production routing or replace
    production data.
 7. Preserve the incident timeline, evidence, approvals, and corrective actions.
+
+## 13. Operator Actions Pending
+
+Repository readiness work (this document, the backup-assurance API, and
+`.github/workflows/backup-freshness.yml`) cannot itself provision live
+infrastructure. Each item below is a live-provider or secret action an
+operator must perform outside this repository before evidence can be
+collected. None of these have been executed by this change.
+
+1. **Configure the S3-compatible backup destination in Dokploy** — create the
+   bucket, write credentials, schedule, and retention per sections 1–3 above.
+   Verify read-only via `aws s3api list-objects-v2 --endpoint-url <endpoint>
+   --bucket <bucket> --prefix pg/` using the read-only credentials only.
+   Rollback: remove the Dokploy backup destination; the bucket and its objects
+   are unaffected by application code either way.
+2. **Create two S3 credential sets scoped to the backup bucket only** — write
+   (for Dokploy) and read-only (for CI). Never place either in application
+   environment variables. Verify least privilege by attempting a write with
+   the read-only key and confirming it is denied. Rollback: revoke and
+   recreate the keys at the provider.
+3. **Add repository secrets** `S3_BACKUP_ENDPOINT`, `S3_BACKUP_BUCKET`,
+   `S3_BACKUP_RO_ACCESS_KEY_ID`, `S3_BACKUP_RO_SECRET_ACCESS_KEY` — used only
+   by `backup-freshness.yml`, read-only. No UKIP application secret is
+   required by this workflow. Verify by re-running the workflow via
+   `workflow_dispatch` and confirming it passes the first guard step.
+   Rollback: delete the secrets; the workflow fails closed at the same guard
+   step it fails at today.
+4. **Evidence ingestion into `backup_assurance_events` remains manual or
+   trusted-service, by design, until a least-privilege credential exists** —
+   `backend/api_key_scopes.py` classifies every route under `/ops` (including
+   the read-only `GET /ops/backups/status`) as requiring `admin` scope; there
+   is no narrower role today. Storing an admin-scoped UKIP API key in a
+   GitHub-hosted scheduled workflow was assessed on strategic review as too
+   broad a trust boundary for "record backup evidence", so
+   `backup-freshness.yml` deliberately holds no UKIP application credential
+   and does not POST to `POST /ops/backups/events`. Until a narrower
+   evidence-ingestion scope/credential is designed (a bounded follow-up, not
+   part of this change), record each completed or failed provider job via
+   section 4 above using a trusted operator identity or a trusted colocated
+   service — never a GitHub Actions secret. Rollback: none required; this is
+   the current, intended fail-closed state, not a temporary gap to revert.
+5. **Keep `UKIP_BACKUP_PROVIDER_REACHABLE` / `UKIP_BACKUP_PROVIDER_REACHABLE_AT`
+   fresh in production** — nothing in the repository does this yet, on either
+   branch (see the reconciliation doc's "gap this audit surfaced" section).
+   This needs a mechanism colocated with production that can refresh a
+   timestamp inside `PROVIDER_REACHABILITY_MAX_AGE_MINUTES` (15 minutes); a
+   daily GitHub Actions job cannot do this honestly. Decide and implement the
+   mechanism (for example, a Dokploy-side health probe or a short-interval
+   systemd timer) as a follow-up; until then, `provider_reachable` will
+   correctly report `false` and this is expected, not a defect. Verify via
+   `GET /ops/backups/status` once implemented. Rollback: unset the two
+   environment variables to return to the fail-closed default.
+6. **Observe the first two backup cycles and run the first isolated restore
+   drill** against a demonstrably non-production target per sections 5–12,
+   using the
+   [readiness evidence dossier](templates/ER-BCP-001_READINESS_EVIDENCE_TEMPLATE.md).
+   This is Phase B/C/D work and is explicitly out of scope for this change.
