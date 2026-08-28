@@ -30,8 +30,16 @@ REQUIRED_SECRETS = {
     "S3_BACKUP_BUCKET",
     "S3_BACKUP_RO_ACCESS_KEY_ID",
     "S3_BACKUP_RO_SECRET_ACCESS_KEY",
-    "UKIP_BACKUP_EVIDENCE_API_BASE_URL",
+}
+
+# Application-side secrets that must never appear in this workflow again —
+# corrected on strategic review (PR #321, issue #320): every route under
+# /ops, including the read-only status endpoint, currently requires `admin`
+# scope (backend/api_key_scopes.py), which is too broad to store in a
+# GitHub-hosted scheduled workflow.
+FORBIDDEN_SECRETS = {
     "UKIP_BACKUP_EVIDENCE_API_KEY",
+    "UKIP_BACKUP_EVIDENCE_API_BASE_URL",
 }
 
 
@@ -59,15 +67,65 @@ def test_workflow_only_references_the_expected_secrets():
     assert referenced == REQUIRED_SECRETS
 
 
+def test_workflow_holds_no_application_credential():
+    # Corrected on strategic review (PR #321, issue #320): the workflow must
+    # not require a broad admin-scoped UKIP API key, and must not reference
+    # either the evidence-API key or base-URL secret it used to require.
+    text = _read(WORKFLOW)
+
+    for secret in FORBIDDEN_SECRETS:
+        assert secret not in text, f"forbidden application secret referenced: {secret!r}"
+
+
+def test_workflow_does_not_post_backup_events_or_call_application_api():
+    # The workflow must not mutate application state and must not call any
+    # UKIP application endpoint at all — it observes the provider read-only.
+    text = _read(WORKFLOW)
+
+    assert "curl" not in text
+    assert "-X POST" not in text
+    assert "Authorization:" not in text
+
+
+def test_workflow_does_not_map_etag_to_integrity_ref():
+    # Corrected on strategic review: an S3 ETag is not guaranteed to be a
+    # full-object checksum and must never be mapped into integrity_ref. The
+    # string "integrity_ref" may still appear in prose explaining why it is
+    # deliberately absent as a mapped field.
+    text = _read(WORKFLOW)
+
+    assert "arg integrity_ref" not in text
+    assert '"integrity_ref"' not in text
+    assert "integrity_ref: $" not in text
+    assert "provider_etag" in text
+    assert "NOT integrity evidence" in text
+    assert "integrity_missing" in text
+
+
+def test_workflow_distinguishes_object_observation_from_overall_authority():
+    # Corrected on strategic review: the workflow must not claim overall
+    # backup-assurance health while the authoritative endpoint could
+    # independently report critical.
+    text = _read(WORKFLOW)
+    lowered = text.lower()
+
+    assert "not the overall backup-assurance authority" in lowered
+    assert "get /ops/backups/status" in lowered
+    assert "backup freshness ok" not in lowered
+
+
 def test_workflow_does_not_reimplement_staleness_math():
     text = _read(WORKFLOW)
 
     # The historical workflow decided pass/fail with its own bash-computed
-    # age threshold. The reconciled workflow must defer to the existing
-    # backend.backup_assurance evaluator instead of recomputing it.
+    # age threshold and claimed to defer to the existing
+    # backend.backup_assurance evaluator while doing so. The reconciled
+    # workflow instead holds no application credential at all (see
+    # test_workflow_does_not_post_backup_events), so it cannot call that
+    # evaluator; its own local age projection is documented and tested as an
+    # explicitly narrower, non-authoritative projection instead.
     assert "MAX_AGE_HOURS" not in text
-    assert "/ops/backups/events" in text
-    assert "/ops/backups/status" in text
+    assert "mirrors, but is not imported from" in text.lower()
 
 
 def test_workflow_never_asserts_reachability_directly():
@@ -147,6 +205,20 @@ def test_runbook_documents_the_automated_observation_workflow():
     assert "ER-BCP-001-HISTORICAL-RECONCILIATION.md" in text
     assert "ER-BCP-001_READINESS_EVIDENCE_TEMPLATE.md" in text
     assert "Operator Actions Pending" in text
+
+
+def test_runbook_does_not_require_admin_ci_identity():
+    # Corrected on strategic review: §13 must no longer instruct operators
+    # to create a dedicated admin-role UKIP identity/API key for CI, and
+    # must instead document that evidence ingestion stays manual/trusted
+    # service until a least-privilege mechanism exists.
+    text = _read(RUNBOOK)
+    lowered = text.lower()
+
+    for secret in FORBIDDEN_SECRETS:
+        assert secret not in text
+    assert "dedicated admin-role ukip identity" not in lowered
+    assert "least-privilege" in lowered
 
 
 def test_control_register_and_enterprise_controls_are_untouched_by_phase_a():

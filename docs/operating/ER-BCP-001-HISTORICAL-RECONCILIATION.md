@@ -24,7 +24,7 @@ historical artifacts against that current architecture concept by concept.
 
 | Concept | Disposition |
 | --- | --- |
-| A scheduled, read-only job that actually queries the S3-compatible provider | Adopted. Current `main` had the receiving/evaluating side (`POST /ops/backups/events`, `GET /ops/backups/status`, the `backup_freshness` entry in `GET /ops/checks`) but nothing that observes the live provider. `.github/workflows/backup-freshness.yml` fills that gap. |
+| A scheduled, read-only job that actually queries the S3-compatible provider | Adopted, narrowed. Current `main` had the receiving/evaluating side (`POST /ops/backups/events`, `GET /ops/backups/status`, the `backup_freshness` entry in `GET /ops/checks`) but nothing that observes the live provider. `.github/workflows/backup-freshness.yml` fills that gap as a **provider object observation + object-freshness projection only** — it does not call either application endpoint and is explicitly not the overall backup-assurance authority (see the "narrowed on strategic review" row below). |
 | Daily cadence (~07:00 UTC, four hours after an assumed 03:00 backup window) and a default `pg/` bucket prefix | Adopted as sensible, configurable defaults. |
 | Two separate S3 credential sets — write for the provider, read-only for CI | Adopted. The reconciled workflow only ever receives the read-only set. |
 | The open `ukip_static_data` checklist item (inspect the volume during the first drill; record whether it holds non-regenerable state) | Already present almost verbatim in current `docs/operating/BACKUP_RESTORE_RUNBOOK.md` §Recovery Scope; carried into the new readiness evidence dossier's durable-state review section so it is filled in per gate, not just described once. |
@@ -61,6 +61,20 @@ untouched by this PR:
 - restore-target safety guard (`_PRODUCTION_MARKERS`, `--allow-production-target`)
 - schema/Alembic validation and tenant-isolation validation in `validate_restore.py`
 - existing backup/restore contract tests
+
+## Narrowed on strategic review (PR #321, issue #320)
+
+The initial Phase A draft of `.github/workflows/backup-freshness.yml` went
+further than the reconciliation above intended and was corrected before merge:
+
+| Draft defect | Correction |
+| --- | --- |
+| Mapped the S3-compatible provider's ETag directly into `integrity_ref` | Removed. An ETag is not guaranteed to be a full-object checksum (multipart uploads, several server-side encryption modes), so it is retained only as non-secret `provider_etag` metadata, never as integrity evidence. The workflow now always projects `integrity_missing` as an expected, structural limitation rather than manufacturing integrity evidence to look green. |
+| Called `GET /ops/backups/status`, filtered out `provider_unreachable`, and could exit 0 while the authoritative endpoint reported `status: critical` — while workflow/runbook prose claimed the endpoint was the pass/fail authority | The workflow no longer calls the status endpoint at all (see next row). It is now explicitly documented and contract-tested as an **object-freshness projection**, not the overall backup-health authority; it never claims "Backup freshness OK" in a way that could be read as overall ER-BCP-001 health. |
+| Required an admin-scoped `UKIP_BACKUP_EVIDENCE_API_KEY` repository secret to POST to `POST /ops/backups/events`, because every route under `/ops` — including the read-only status endpoint — currently requires `admin` scope (`backend/api_key_scopes.py`) | Removed entirely. The workflow holds no UKIP application credential and calls no UKIP API endpoint; it is provider-side read-only only. Automated application-side evidence ingestion is deferred until a least-privilege credential/path exists (a bounded follow-up); until then, ingestion into `backup_assurance_events` is a manual/trusted-service operator step (runbook §4, §13). |
+
+None of these corrections change RPO/RTO, ER-BCP-001 maturity, or any
+existing backup-assurance implementation file.
 
 ## A gap this audit surfaced that neither branch solved
 

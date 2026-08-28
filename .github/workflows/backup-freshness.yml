@@ -1,28 +1,73 @@
 name: Backup Freshness
 
-# ER-BCP-001 provider observation, reconciled from the historical
-# ops/epic018-backup-restore workflow. See
+# ER-BCP-001 provider object observation, reconciled from the historical
+# ops/epic018-backup-restore workflow and narrowed per strategic review
+# (PR #321, issue #320). See
 # docs/operating/ER-BCP-001-HISTORICAL-RECONCILIATION.md for the audit that
 # produced this design.
 #
-# This job does not decide whether backups are fresh. It only:
-#   1. lists the newest object in the backup bucket with read-only
-#      credentials, and
-#   2. reports what it observed to the existing backup-assurance API
-#      (POST /ops/backups/events) — the single source of truth already
-#      evaluated by backend/backup_assurance.py and surfaced at
-#      GET /ops/backups/status and GET /ops/checks.
-# It then reads that same status endpoint and fails the run on a
-# backup-related problem. It deliberately does not gate on
-# `provider_reachable`: that signal requires a refresh inside a 15-minute
-# window (backend.backup_assurance.PROVIDER_REACHABILITY_MAX_AGE_MINUTES),
-# which a daily workflow cannot honestly provide. See the reconciliation
-# doc's "gap this audit surfaced" section and the PR's residual risks.
+# SEMANTIC MODEL — read this before changing pass/fail logic:
+#
+#   This job is a PROVIDER OBJECT OBSERVATION + OBJECT-FRESHNESS PROJECTION.
+#   It is NOT the overall backup-assurance authority for ER-BCP-001. The
+#   authoritative overall backup-assurance status remains, exclusively,
+#   GET /ops/backups/status (see backend/backup_assurance.py,
+#   backend/routers/backup_ops.py).
+#
+#   This workflow:
+#     1. lists the newest object in the backup bucket with read-only
+#        provider credentials, and
+#     2. projects only the backup-object conditions it can directly observe
+#        from that listing (backup_missing, backup_stale, backup_empty), and
+#     3. notes integrity_missing as an expected, structural limitation of
+#        this projection (see "ETag is not integrity evidence" below) —
+#        informational, not a per-run failure.
+#
+#   It deliberately does NOT call any UKIP application API (see "no
+#   application credential" below), so it cannot observe and does not
+#   attempt to project provider_reachable or the backend's own
+#   integrity_ref state. A pass here means only "the newest object this job
+#   could see looks present, non-empty, and recent enough" — it does NOT
+#   mean overall ER-BCP-001 status is `ok`. The backend may independently
+#   report `critical` (for example: provider_unreachable, integrity_missing
+#   on the recorded event, or a stale recorded event) even when this job
+#   passes. Never read a green run of this workflow as "backup assurance is
+#   healthy" — only GET /ops/backups/status can say that.
+#
+# ETAG IS NOT INTEGRITY EVIDENCE:
+#
+#   The S3-compatible provider's ETag is retained below only as non-secret,
+#   informational provider metadata (an object/version identifier). It is
+#   NEVER mapped to integrity_ref or otherwise treated as a checksum. Per
+#   AWS's own documentation, an ETag is not guaranteed to be a full-object
+#   MD5/checksum (multipart uploads and several server-side encryption
+#   modes break that assumption), so a non-empty ETag must not be treated
+#   as proof of integrity for a generic s3-compatible provider. Ingesting a
+#   real, provider-verified checksum (e.g. a full-object SHA-256/CRC when
+#   the specific provider contract proves it) is deferred to Phase B
+#   provider-specific configuration; it is out of scope here.
+#
+# NO APPLICATION CREDENTIAL:
+#
+#   This workflow holds only read-only S3-compatible provider credentials.
+#   It does not call any UKIP application endpoint, does not hold a UKIP
+#   API key of any scope, and does not mutate application state. Earlier
+#   drafts of this workflow POSTed observed objects to
+#   POST /ops/backups/events using an admin-scoped UKIP API key; that was
+#   rejected on strategic review because every route under /ops —
+#   including GET /ops/backups/status — currently requires `admin` scope
+#   (backend/api_key_scopes.py), which is far broader authority than
+#   "record backup evidence" and is not appropriate to store in a
+#   GitHub-hosted scheduled workflow. Automated application-side evidence
+#   ingestion is deferred until a least-privilege credential/path exists;
+#   until then, evidence ingestion is a manual/trusted-service operator
+#   step (see docs/operating/BACKUP_RESTORE_RUNBOOK.md §4 and §13).
 #
 # OPERATOR ACTION REQUIRED before this workflow can do anything but fail
-# fast: the six secrets referenced below do not exist yet. Until they are
-# configured, every run stops at the first step with a clear, non-secret
-# error instead of silently no-op'ing or fabricating evidence.
+# fast: the four S3 read-only secrets referenced below do not exist yet.
+# Until they are configured, every run stops at the first step with a
+# clear, non-secret error instead of silently no-op'ing or fabricating
+# evidence.
 
 on:
   schedule:
@@ -37,15 +82,11 @@ on:
 permissions:
   contents: read
 
-env:
-  BACKUP_ENVIRONMENT: production
-  BACKUP_PROVIDER_LABEL: s3-compatible
-
 jobs:
-  observe-and-verify:
+  observe-backup-object:
     runs-on: ubuntu-latest
     steps:
-      - name: Require provider and evidence-API secrets
+      - name: Require provider secrets (read-only only — no application credential)
         run: |
           set -euo pipefail
           missing=()
@@ -53,8 +94,6 @@ jobs:
           [ -z "${{ secrets.S3_BACKUP_BUCKET }}" ] && missing+=("S3_BACKUP_BUCKET")
           [ -z "${{ secrets.S3_BACKUP_RO_ACCESS_KEY_ID }}" ] && missing+=("S3_BACKUP_RO_ACCESS_KEY_ID")
           [ -z "${{ secrets.S3_BACKUP_RO_SECRET_ACCESS_KEY }}" ] && missing+=("S3_BACKUP_RO_SECRET_ACCESS_KEY")
-          [ -z "${{ secrets.UKIP_BACKUP_EVIDENCE_API_BASE_URL }}" ] && missing+=("UKIP_BACKUP_EVIDENCE_API_BASE_URL")
-          [ -z "${{ secrets.UKIP_BACKUP_EVIDENCE_API_KEY }}" ] && missing+=("UKIP_BACKUP_EVIDENCE_API_KEY")
           if [ "${#missing[@]}" -gt 0 ]; then
             echo "::error::Backup freshness workflow is not yet configured. Missing repository secrets: ${missing[*]}. See the OPERATOR ACTION REQUIRED items in docs/operating/BACKUP_RESTORE_RUNBOOK.md."
             exit 1
@@ -78,83 +117,62 @@ jobs:
             --query 'sort_by(Contents, &LastModified)[-1].{key: Key, ts: LastModified, size: Size, etag: ETag}' \
             --output json)"
           if [ "${newest}" = "null" ] || [ -z "${newest}" ]; then
-            echo "::error::No backup objects found under prefix '${PREFIX}' in the configured bucket — backups are NOT running."
+            echo "::error::backup_missing — no backup objects found under prefix '${PREFIX}' in the configured bucket."
             exit 1
           fi
           key="$(echo "${newest}" | jq -r .key)"
           ts="$(echo "${newest}" | jq -r .ts)"
           size="$(echo "${newest}" | jq -r .size)"
-          etag="$(echo "${newest}" | jq -r '.etag | gsub("\"";"")')"
+          # Non-secret provider metadata only — an object/version identifier,
+          # NOT integrity evidence. See the workflow header comment.
+          provider_etag="$(echo "${newest}" | jq -r '.etag | gsub("\"";"")')"
           {
             echo "key=${key}"
             echo "ts=${ts}"
             echo "size=${size}"
-            echo "etag=${etag}"
+            echo "provider_etag=${provider_etag}"
           } >> "$GITHUB_OUTPUT"
-          echo "Newest backup object: ${key} (${ts}, ${size} bytes)"
+          echo "Newest backup object: ${key} (${ts}, ${size} bytes, provider_etag=${provider_etag})"
 
-      - name: Record observed backup as evidence
+      - name: Project object freshness (observation only — not the overall backup-assurance authority)
         env:
-          API_BASE_URL: ${{ secrets.UKIP_BACKUP_EVIDENCE_API_BASE_URL }}
-          API_KEY: ${{ secrets.UKIP_BACKUP_EVIDENCE_API_KEY }}
-          BACKUP_KEY: ${{ steps.observe.outputs.key }}
           BACKUP_TS: ${{ steps.observe.outputs.ts }}
           BACKUP_SIZE: ${{ steps.observe.outputs.size }}
-          BACKUP_ETAG: ${{ steps.observe.outputs.etag }}
-          RUN_ID: ${{ github.run_id }}
+          BACKUP_PROVIDER_ETAG: ${{ steps.observe.outputs.provider_etag }}
+          # Mirrors, but is not imported from, backend.backup_assurance's
+          # BACKUP_RPO_HOURS / BACKUP_CRITICAL_AFTER_HOURS. This is a local
+          # projection constant for this narrower job only; it can diverge
+          # from the backend if the backend thresholds change without this
+          # workflow being updated to match. The authoritative RPO/RTO
+          # evaluation is always GET /ops/backups/status.
+          WARNING_AFTER_HOURS: "24"
+          CRITICAL_AFTER_HOURS: "26"
         run: |
           set -euo pipefail
-          payload=$(jq -n \
-            --arg event_type "backup" \
-            --arg status "completed" \
-            --arg environment "${BACKUP_ENVIRONMENT}" \
-            --arg provider "${BACKUP_PROVIDER_LABEL}" \
-            --arg backup_id "${BACKUP_KEY}" \
-            --arg started_at "${BACKUP_TS}" \
-            --arg completed_at "${BACKUP_TS}" \
-            --argjson size_bytes "${BACKUP_SIZE}" \
-            --arg integrity_ref "${BACKUP_ETAG}" \
-            --arg run_id "${RUN_ID}" \
-            '{event_type: $event_type, status: $status, environment: $environment, provider: $provider, backup_id: $backup_id, started_at: $started_at, completed_at: $completed_at, size_bytes: $size_bytes, integrity_ref: $integrity_ref, evidence: {source: "backup-freshness-workflow", github_run_id: $run_id}}')
-          http_status=$(curl -sS -o /tmp/record_response.json -w '%{http_code}' \
-            -X POST "${API_BASE_URL%/}/ops/backups/events" \
-            -H "Authorization: Bearer ${API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "${payload}")
-          if [ "${http_status}" -ge 300 ]; then
-            echo "::error::Failed to record the observed backup event (HTTP ${http_status})."
-            cat /tmp/record_response.json
-            exit 1
-          fi
-          echo "Recorded backup event (HTTP ${http_status})."
+          now_epoch="$(date -u +%s)"
+          ts_epoch="$(date -u -d "${BACKUP_TS}" +%s)"
+          age_hours="$(awk -v n="${now_epoch}" -v t="${ts_epoch}" 'BEGIN { printf "%.2f", (n - t) / 3600 }')"
+          echo "Observed object age: ${age_hours}h (projection thresholds: warning>${WARNING_AFTER_HOURS}h, critical>${CRITICAL_AFTER_HOURS}h)"
+          echo "Provider ETag (non-secret metadata, NOT integrity evidence): ${BACKUP_PROVIDER_ETAG:-<none>}"
+          echo "::notice::integrity_missing — this generic s3-compatible object observation has no trustworthy provider-supported checksum configured (ETag is not treated as one). This is an expected, structural limitation of this narrower object-freshness projection, deferred to Phase B provider-specific configuration. It does not by itself determine overall backup-assurance status — see GET /ops/backups/status, which independently enforces integrity_ref on recorded events."
 
-      - name: Verify freshness via the existing backup-assurance status endpoint
-        env:
-          API_BASE_URL: ${{ secrets.UKIP_BACKUP_EVIDENCE_API_BASE_URL }}
-          API_KEY: ${{ secrets.UKIP_BACKUP_EVIDENCE_API_KEY }}
-        run: |
-          set -euo pipefail
-          http_status=$(curl -sS -o /tmp/status_response.json -w '%{http_code}' \
-            -H "Authorization: Bearer ${API_KEY}" \
-            "${API_BASE_URL%/}/ops/backups/status?environment=${BACKUP_ENVIRONMENT}")
-          if [ "${http_status}" -ge 300 ]; then
-            echo "::error::Failed to read backup status (HTTP ${http_status})."
-            cat /tmp/status_response.json
+          fail=0
+
+          if [ "${BACKUP_SIZE}" -le 0 ]; then
+            echo "::error::backup_empty — newest object has size ${BACKUP_SIZE} bytes."
+            fail=1
+          fi
+
+          if awk -v a="${age_hours}" -v c="${CRITICAL_AFTER_HOURS}" 'BEGIN { exit !(a > c) }'; then
+            echo "::error::backup_stale — newest object is ${age_hours}h old (projection critical threshold: ${CRITICAL_AFTER_HOURS}h)."
+            fail=1
+          elif awk -v a="${age_hours}" -v w="${WARNING_AFTER_HOURS}" 'BEGIN { exit !(a > w) }'; then
+            echo "::warning::newest object is ${age_hours}h old (projection warning threshold: ${WARNING_AFTER_HOURS}h)."
+          fi
+
+          if [ "${fail}" -eq 1 ]; then
+            echo "::error::Backup object observation FAILED on a directly observable condition above. This is this job's own object-freshness projection; overall backup-assurance status is separately authoritative at GET /ops/backups/status and may differ."
             exit 1
           fi
-          status="$(jq -r '.status' /tmp/status_response.json)"
-          age="$(jq -r '.age_hours' /tmp/status_response.json)"
-          reachable="$(jq -r '.provider_reachable' /tmp/status_response.json)"
-          reasons="$(jq -r '.reason_codes | join(",")' /tmp/status_response.json)"
-          echo "Backup assurance status: ${status} (age_hours=${age}, provider_reachable=${reachable}, reason_codes=${reasons})"
-          if [ "${reachable}" = "false" ]; then
-            echo "::warning::provider_reachable is false. This workflow does not assert reachability (see workflow header comment) — this is a known, separate gap, not a failure of this check."
-          fi
-          blocking="$(jq -r '
-            [.reason_codes[] | select(. != "provider_unreachable")] | length
-          ' /tmp/status_response.json)"
-          if [ "${blocking}" -gt 0 ]; then
-            echo "::error::Backup freshness has a backup-related problem (reason_codes=${reasons})."
-            exit 1
-          fi
-          echo "Backup freshness OK (excluding the separately-tracked provider_reachable signal)."
+
+          echo "Backup object observation passed; overall backup assurance status remains authoritative at GET /ops/backups/status (not queried by this read-only workflow — see the workflow header comment for why)."

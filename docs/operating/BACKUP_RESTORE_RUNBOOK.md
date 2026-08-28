@@ -115,22 +115,48 @@ Any provider-reported actor belongs only in clearly labeled non-secret evidence.
 Provider reachability must come from an explicit operator or monitoring probe;
 absence of a probe is not proof of reachability.
 
-### 5a. Automated Backup-Cycle Observation
+### 5a. Automated Backup-Object Observation (not the overall authority)
 
 `.github/workflows/backup-freshness.yml` runs daily and, once configured (see
 Operator Actions below), lists the newest object in the backup bucket with
-read-only credentials and records it as a `backup` event through
-`POST /ops/backups/events` — the same endpoint described in section 4. It then
-reads `GET /ops/backups/status` and fails the run if a backup-related reason
-code is present. This workflow is an observer, not a second authority: it
-reuses the same evaluation this runbook already relies on instead of
-recomputing staleness thresholds independently. It deliberately does not
-assert `provider_reachable` — that signal must stay fresh within 15 minutes
+read-only provider credentials and projects only the conditions it can
+directly observe from that listing: `backup_missing`, `backup_stale`,
+`backup_empty`. It holds no UKIP application credential of any kind, calls no
+UKIP API endpoint, and does not mutate application state — it cannot POST to
+`POST /ops/backups/events` or read `GET /ops/backups/status`.
+
+**This workflow is an object-freshness projection, not the overall
+backup-assurance authority.** The overall ER-BCP-001 status remains
+exclusively `GET /ops/backups/status` (backed by
+`backend.backup_assurance.evaluate_backup_freshness`, section 4/5 above). A
+green run of this workflow means only "the newest object this job could see
+looks present, non-empty, and recent enough by this job's own projection
+thresholds" — it does not mean overall backup assurance is `ok`, and it must
+never be read that way. The backend may independently report `critical` (for
+example: `provider_unreachable`, or `integrity_missing` on the actual
+recorded event) even when this workflow's run is green.
+
+The S3-compatible provider's ETag is retained only as non-secret, informational
+provider metadata (an object/version identifier) and is never treated as
+integrity evidence — an ETag is not guaranteed to be a full-object checksum,
+so this workflow always projects `integrity_missing` as an expected,
+structural, non-blocking limitation until a provider-verified checksum path
+exists (Phase B). It also deliberately does not assert `provider_reachable` —
+that signal must stay fresh within 15 minutes
 (`backend.backup_assurance.PROVIDER_REACHABILITY_MAX_AGE_MINUTES`), which a
 daily workflow cannot honestly provide. See
 [ER-BCP-001-HISTORICAL-RECONCILIATION.md](ER-BCP-001-HISTORICAL-RECONCILIATION.md)
-for the audit that produced this design and for the residual risk this gap
+for the audit that produced this design and for the residual risks this gap
 represents.
+
+Automated application-side evidence ingestion (recording the observed object
+as a `backup` event via `POST /ops/backups/events`) is deferred until a
+least-privilege credential/path exists — every route under `/ops`, including
+the read-only status endpoint, currently requires `admin` scope
+(`backend/api_key_scopes.py`), which is too broad to store in a GitHub-hosted
+scheduled workflow. Until that narrower mechanism exists, evidence ingestion
+into `backup_assurance_events` is a manual or trusted-service operator step
+(section 4 above); see §13 below.
 
 Until the required secrets exist, every run of this workflow fails fast with
 a clear, non-secret error rather than silently no-op'ing.
@@ -279,23 +305,25 @@ collected. None of these have been executed by this change.
    recreate the keys at the provider.
 3. **Add repository secrets** `S3_BACKUP_ENDPOINT`, `S3_BACKUP_BUCKET`,
    `S3_BACKUP_RO_ACCESS_KEY_ID`, `S3_BACKUP_RO_SECRET_ACCESS_KEY` — used only
-   by `backup-freshness.yml`, read-only. Verify by re-running the workflow via
+   by `backup-freshness.yml`, read-only. No UKIP application secret is
+   required by this workflow. Verify by re-running the workflow via
    `workflow_dispatch` and confirming it passes the first guard step.
    Rollback: delete the secrets; the workflow fails closed at the same guard
    step it fails at today.
-4. **Create a dedicated admin-role UKIP identity for CI evidence recording**
-   — not a real operator's personal account. `backend/api_key_scopes.py`
-   classifies every route under `/ops` (including `/ops/backups`) as
-   requiring `admin` scope; there is no narrower role today. Generate a UKIP
-   API key (`ukip_...`) for that identity and add it as the
-   `UKIP_BACKUP_EVIDENCE_API_KEY` repository secret, alongside
-   `UKIP_BACKUP_EVIDENCE_API_BASE_URL` (the production API origin). **Secret
-   handling caution:** this key can create and read backup assurance events
-   for an admin-scoped identity — treat it with the same care as any other
-   admin credential, rotate it periodically, and scope it to this single
-   purpose. Verify by re-running the workflow and confirming the recorded
-   event's `operator` field is the dedicated identity, not a human account.
-   Rollback: revoke the API key and disable or delete the dedicated identity.
+4. **Evidence ingestion into `backup_assurance_events` remains manual or
+   trusted-service, by design, until a least-privilege credential exists** —
+   `backend/api_key_scopes.py` classifies every route under `/ops` (including
+   the read-only `GET /ops/backups/status`) as requiring `admin` scope; there
+   is no narrower role today. Storing an admin-scoped UKIP API key in a
+   GitHub-hosted scheduled workflow was assessed on strategic review as too
+   broad a trust boundary for "record backup evidence", so
+   `backup-freshness.yml` deliberately holds no UKIP application credential
+   and does not POST to `POST /ops/backups/events`. Until a narrower
+   evidence-ingestion scope/credential is designed (a bounded follow-up, not
+   part of this change), record each completed or failed provider job via
+   section 4 above using a trusted operator identity or a trusted colocated
+   service — never a GitHub Actions secret. Rollback: none required; this is
+   the current, intended fail-closed state, not a temporary gap to revert.
 5. **Keep `UKIP_BACKUP_PROVIDER_REACHABLE` / `UKIP_BACKUP_PROVIDER_REACHABLE_AT`
    fresh in production** — nothing in the repository does this yet, on either
    branch (see the reconciliation doc's "gap this audit surfaced" section).
